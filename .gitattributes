@@ -1,0 +1,21 @@
+# Normaliza saltos de línea: LF en el repo, nativo en el working tree.
+* text=auto
+
+# Binarios: nunca aplicar conversión de texto ni intentar diff.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.mp4  binary
+*.mov  binary
+*.mkv  binary
+*.webm binary
+*.mp3  binary
+*.wav  binary
+*.aiff binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
