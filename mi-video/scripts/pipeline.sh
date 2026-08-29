@@ -59,171 +59,23 @@ corre() {           # corre un paso y sigue: un paso caído no tumba el camino
 }
 
 paso "0 · guardas y modelo de datos"
-# El modelo se valida antes que nada: si le falta una tabla del ciclo de vida,
-# lo que venga despues no tiene donde registrarse y la corrida se pierde al
-# cerrarse la sesion. Jaime: *«valida el modelo de datos y agrega lo que haga
-# falta»*.
+# Lo unico que corre siempre y antes que nada: si una correccion perdio su
+# mecanismo o al modelo le falta una tabla del ciclo, lo que venga despues no
+# tiene donde registrarse.
+node scripts/guardas.mjs || exit 1
 PYTHONIOENCODING=utf-8 python scripts/modelo.py || exit 1
 
-node scripts/guardas.mjs || exit 1
-
-paso "1a · el barato: identificar TODO el material"
-# **Todas las cintas, no los seis reels.** El corte cruza cintas y la busqueda
-# por el corpus decide si una frase que falta se recupera o va a tablero; una
-# cinta sin transcribir hace que esa busqueda conteste «no esta» sin mirar.
-# Una cinta sin guion es material, no sobra (C-74).
+paso "el motor: cada etiqueta llama a su servicio"
+# **La linea dejo de ser una secuencia.** Jaime: *«las fases y los estados son
+# etiquetas que llaman servicios; si una etiqueta esta en un paso, entonces
+# avanza automaticamente en ese paso, y si no avanza pues para eso es el log»*.
 #
-# Pero se identifica con el BARATO. Correccion de Jaime: *«por que estas
-# haciendo cuatro pasadas, ya identificaste el libreto?»* — y no, no lo habia
-# identificado. Cuatro pasadas sobre una cinta que no se sabe que contiene es
-# aplicarle lo mas caro a algo que todavia no ha pasado ningun filtro, que es
-# exactamente lo que el embudo prohibe: *«no tiene sentido logico tener un
-# funnel para aplicarle a todo lo mas caro»*.
-#
-# El barato dice QUE hay. Con eso se decide si esa cinta alimenta una pieza — y
-# solo entonces se paga el caro. `exigir()` no deja montar con un transcript de
-# una pasada, asi que el barato no puede colarse al montaje por accidente.
-PYTHONIOENCODING=utf-8 corre python scripts/transcribir.py --barato
-
-
-
-paso "2 · catalogar la cinta entera"
-PYTHONIOENCODING=utf-8 corre python scripts/catalogar.py
-
-paso "3 · elegir el segmento de cada etapa"
-for n in "${REELS[@]}"; do
-  PYTHONIOENCODING=utf-8 corre python scripts/seleccionar.py "$n" --edl
-done
-
-paso "3a · el caro: afinar SOLO los tramos elegidos"
-# Aqui, y no en el paso 1. Jaime: *«las cuatro pasadas son antes de renderizar,
-# como mecanismo para identificar redundancia, nunca para identificacion de la
-# cinta; identificamos la redundancia en los lugares especificos, la eliminamos
-# y renderizamos con eso»*.
-#
-# El barato dice que hay y la seleccion elige; el caro entra solo donde se va a
-# usar, que es donde `depurar` necesita precision de palabra para ver la
-# repeticion. Antes se pagaban cuatro pasadas sobre la cinta entera para acabar
-# usando dos minutos de ella.
-for n in "${REELS[@]}"; do
-  PYTHONIOENCODING=utf-8 corre python scripts/transcribir.py --elegidos "$n"
-done
-
-paso "3b · borrar lo que no aporta de la toma elegida"
-# **Solo sobre la elegida.** Jaime: *«el filtro de la redundancia se aplica
-# despues de escoger la escena; lo que no aporte, o los segundos que no aporten,
-# se deben borrar»*, y *«no tiene sentido logico tener un funnel para aplicarle a
-# todo lo mas caro»*. Se va el aire sin una sola palabra y el tartamudeo; lo que
-# se dice no se toca.
-for n in "${REELS[@]}"; do
-  PYTHONIOENCODING=utf-8 corre python scripts/depurar.py "$n"
-done
-
-paso "3c · la redundancia, que la decide el modelo y no Python"
-# Jaime: *«la redundancia no es algo que se pueda inferir con codigo facilmente;
-# necesitariamos un modelo probabilistico de prediccion de lenguaje, que es
-# exactamente lo que tenemos contigo. No esta en la capacidad de Python ni de
-# ninguna de sus dependencias»*.
-#
-# `depurar` se queda con lo mecanico —aire y tartamudeo— y esto saca el dossier
-# para que el modelo elija que version de cada frase se queda. Los cortes vuelven
-# como notas de `revision`, ancladas al texto.
-for n in "${REELS[@]}"; do
-  PYTHONIOENCODING=utf-8 corre python scripts/redundancia.py "$n"
-done
-
-paso "3d · la cola del servicio de IA"
-# **Nadie decide fuera de la linea.** Jaime: *«aunque seas el que ejecuta te vas
-# a mover dentro del pipeline reemplazando a la IA que se conecta por tokens o
-# por bash; nunca puedes tomar decisiones por fuera de la linea»*.
-#
-# Los pasos de IA escriben un pedido y leen una respuesta. La conteste el CLI o
-# la conteste la sesion, el contrato es el mismo y **queda registrada**. Esto
-# ensena lo que falta por contestar: mientras haya pedidos abiertos, lo que
-# venga despues corre con datos incompletos y hay que saberlo.
-PYTHONIOENCODING=utf-8 python scripts/servicio.py
-
-paso "3e · las costuras: mejor corte primero, disimular despues"
-# Jaime: *«busca los mejores cortes posibles, y si no, utiliza la transicion del
-# glitch, con esa se disimula — glitch y cambio de camara, mas cerca o mas
-# lejos»*. Mover el corte es gratis y no se nota; el glitch es la segunda
-# opcion, no la primera. Y mover no puede costar voz: *«el punto es transmitir
-# mas emocion»*.
-for n in "${REELS[@]}"; do
-  PYTHONIOENCODING=utf-8 corre python scripts/costuras.py "$n"
-done
-
-paso "4 · describir cada escena"
-# Si el CLI no tiene credencial, se avisa y se sigue: las escenas ya descritas
-# valen y las que falten se cargan por migracion. No para el camino.
-corre node scripts/describir.mjs "${REELS[@]}"
-
-paso "5 · cortar cada fragmento a su fichero"
-PYTHONIOENCODING=utf-8 corre python scripts/cortar.py "${REELS[@]}"
-
-paso "5a · la voz sin modificar, para limpiarla fuera"
-# **Paso 1 de los dos que pidio Jaime.** Sale del BRUTO, no del montaje: cada
-# tramo tal cual y pegados, sin estirar, sin ecualizar, sin fundidos y sin
-# musica. La limpieza va antes de cualquier transformacion — la primera vez le
-# di el audio ya resintetizado y Adobe trabajo encima de eso.
-PYTHONIOENCODING=utf-8 corre python scripts/voz-limpia.py --exportar "${REELS[@]}"
-
-paso "5b · recoger la voz remasterizada"
-# **Paso 2.** Se busca por la convencion que el describio —*«el mismo nombre mas
-# otra parte al final»*—: `reel-01-voz.wav` -> `reel-01-voz-enhanced-v2.wav`. Y
-# no se sustituye si la duracion no encaja al milisegundo: un audio desplazado
-# medio segundo es peor que uno con eco.
-#
-# Si todavia no esta, se dice y el camino sigue: la pieza saldra con la voz
-# cruda y el se enterara. Lo que no puede es sustituirse en silencio.
-PYTHONIOENCODING=utf-8 corre python scripts/voz-limpia.py "${REELS[@]}"
-
-paso "5c · la puerta: nada se renderiza sin pasar por aqui"
-# Corre el juego entero de comprobaciones, no una. El fallo que la creo fue
-# cambiar un criterio y verificar solo ese criterio: `escena_desc` llevaba seis
-# horas caducada mientras los EDL se regeneraban una docena de veces.
-PYTHONIOENCODING=utf-8 python scripts/verificar.py "${REELS[@]}" || fallo=1
-
-if [ "$SIN_RENDER" -eq 0 ] && [ "$fallo" -eq 0 ]; then
-  paso "6 · montar, renderizar, masterizar y verificar"
-  corre bash scripts/montar.sh "${REELS[@]}"
-fi
-
-paso "6b · la revision final: los cortes que Jaime pidio mirando la pieza"
-# **Va aqui y no antes** porque sus tiempos son de la pieza montada, no de la
-# cinta. Y se re-aplican en cada corrida: `seleccionar` regenera el EDL, asi que
-# un corte dado por hecho desaparece a la siguiente.
-for n in "${REELS[@]}"; do
-  PYTHONIOENCODING=utf-8 corre python scripts/revision.py --aplicar "$n"
-done
-PYTHONIOENCODING=utf-8 python scripts/revision.py --ver "${REELS[@]}"
-
-paso "6c · registrar la version de cada pieza"
-# Cierra el ciclo que Jaime describio: *«sale el video renderizado, se aprueba
-# uno por uno, y de cada version aprobada me das el audio virgen»*. Sin version
-# no hay nada que aprobar ni a que atar el audio — y reintegrar el limpio de un
-# corte en otro desincroniza la pieza entera.
-#
-# Es idempotente por huella del corte: renderizar dos veces lo mismo no crea dos
-# versiones.
-PYTHONIOENCODING=utf-8 corre python scripts/modelo.py --registrar
-
-paso "7 · la tabla de colocacion"
-PYTHONIOENCODING=utf-8 corre python scripts/colocar.py "${REELS[@]}"
-
-paso "8 · fragmentos como se ven, para aprobar"
-PYTHONIOENCODING=utf-8 corre python scripts/revisar.py "${REELS[@]}"
-
-paso "9 · que falta para publicar"
-PYTHONIOENCODING=utf-8 python scripts/publicar.py --ver
+# El orden ya no vive aqui: vive en la tabla `fase`, con el servicio que mueve
+# cada etiqueta. Anadir un paso es insertar una fila, no editar este fichero.
+# Y una pieza atascada ya no arrastra a las demas — la unidad es la pieza.
+PYTHONIOENCODING=utf-8 python scripts/avanzar.py "${REELS[@]}" || fallo=1
 
 paso "incidencias de esta corrida"
 PYTHONIOENCODING=utf-8 python scripts/registro.py
 
-echo
-if [ "$fallo" -eq 0 ]; then
-  echo "CAMINO COMPLETO"
-else
-  echo "CAMINO COMPLETO CON FALLOS — mira los pasos marcados arriba"
-fi
-exit "$fallo"
+

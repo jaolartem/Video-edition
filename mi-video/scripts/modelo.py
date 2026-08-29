@@ -124,7 +124,61 @@ CREATE TABLE IF NOT EXISTS medicion (
 );
 
 CREATE INDEX IF NOT EXISTS version_video ON version (video_id, n);
+
+-- La maquina de estados: la etiqueta llama al servicio
+--
+-- Jaime, corrigiendo la arquitectura: *«eso forma parte del modelo: las fases y
+-- los estados son etiquetas que llaman servicios; si una etiqueta esta en un
+-- paso, entonces avanza automaticamente en ese paso, y si no avanza pues para
+-- eso es el log»*.
+--
+-- El pipeline era una **secuencia**: un bash que corria los pasos en orden, todos,
+-- siempre. Eso obliga a que cada paso sepa saltarse solo, y a que el orden viva
+-- en un fichero de texto en vez de en el modelo. Con la maquina, la pieza lleva
+-- su etiqueta, la etiqueta dice que servicio la mueve, y **el orden es un dato**.
+--
+-- `fase` ya existia con seis estados y solo llegaba hasta `cortado`: no cubria
+-- ni la aprobacion, ni el audio, ni la publicacion, que es justo el ciclo que
+-- hay que poder repetir.
+ALTER_FASE_SERVICIO;
+
+-- En que fase esta cada pieza AHORA, y como llego.
+--
+-- Se guarda el historial y no solo el ultimo estado: cuando una pieza se atasca,
+-- lo que hace falta saber es cuantas veces intento pasar y por que no pudo, y
+-- eso con un solo campo no se ve.
+CREATE TABLE IF NOT EXISTS video_fase (
+  id        INTEGER PRIMARY KEY,
+  video_id  INTEGER NOT NULL REFERENCES video(id),
+  fase_id   INTEGER NOT NULL REFERENCES fase(id),
+  entro     TEXT NOT NULL,
+  -- Vacio si avanzo limpio; el motivo si se quedo. **Un estado que no avanza
+  -- sin motivo escrito es un estado que nadie puede desatascar.**
+  por_que   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS video_fase_ult ON video_fase (video_id, id DESC);
 """
+
+# El ciclo completo, en orden. Cada fase dice **que servicio la mueve a la
+# siguiente**: la etiqueta llama al servicio, no al reves.
+CICLO = [
+    (1, "catalogado", "scripts/transcribir.py --barato"),
+    (2, "elegido", "scripts/seleccionar.py {n} --edl"),
+    (3, "afinado", "scripts/transcribir.py --elegidos {n}"),
+    (4, "depurado", "scripts/depurar.py {n}"),
+    (5, "sin_redundancia", "scripts/redundancia.py {n}"),
+    (6, "cosido", "scripts/costuras.py {n}"),
+    (7, "descrito", "scripts/describir.mjs {n}"),
+    (8, "cortado", "scripts/cortar.py {n}"),
+    (9, "voz_entregada", "scripts/voz-limpia.py --exportar {n}"),
+    (10, "verificado", "scripts/verificar.py {n}"),
+    (11, "montado", "scripts/montar.sh {n}"),
+    (12, "aprobado", None),          # lo mueve Jaime, no un servicio
+    (13, "voz_limpia", "scripts/voz-limpia.py {n}"),
+    (14, "masterizado", "scripts/musica.sh {n}"),
+    (15, "publicado", "scripts/publicar.py --finales {n}"),
+]
 
 # Las que referian al video por texto. Segunda forma normal: el slug repetido en
 # cinco tablas es cinco sitios donde escribirlo mal y ninguno donde saltar.
@@ -200,7 +254,22 @@ def validar():
 
 def migrar():
     con = _con()
-    con.executescript(NUEVAS)
+    cols = {r[1] for r in con.execute("pragma table_info(fase)")}
+    alter = ""
+    if "servicio" not in cols:
+        alter += "ALTER TABLE fase ADD COLUMN servicio TEXT;"
+    con.executescript(NUEVAS.replace("ALTER_FASE_SERVICIO;", alter))
+    # El ciclo, idempotente: se corrige el nombre y el servicio de las que ya
+    # estan y se anaden las que faltan.
+    for orden, nombre, serv in CICLO:
+        ya = con.execute("select id from fase where nombre = ?",
+                         (nombre,)).fetchone()
+        if ya:
+            con.execute("update fase set orden = ?, servicio = ? where id = ?",
+                        (orden, serv, ya["id"]))
+        else:
+            con.execute("insert into fase (nombre, orden, servicio)"
+                        " values (?,?,?)", (nombre, orden, serv))
     hecho = []
     # Clave foranea al video donde habia texto.
     vid = {r["slug"]: r["id"] for r in con.execute("select id, slug from video")}
