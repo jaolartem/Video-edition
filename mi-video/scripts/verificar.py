@@ -1,0 +1,160 @@
+"""La puerta del camino. Nada se renderiza sin pasar por aquí.
+
+Regla de Jaime, y viene de un fallo que costó los seis vídeos: *«el camino es
+obligatorio siempre, ninguno de esos vídeos es siquiera útil»*.
+
+## Qué pasó, para que no vuelva a pasar
+
+Él corrigió **cómo se mide la emoción**. De `voz_st` cuelgan cuatro reglas más
+—el umbral de lectura plana, el envío a tablero, el tratamiento y el reparto de
+etapas— y yo **sólo verifiqué la escala que había cambiado**. Cuando vi los
+tableros dispararse recalibré el umbral y ahí paré: no volví a leer una sola
+pieza contra el libreto.
+
+Resultado medido: `escena_desc` —integridad, tratamiento, prioridad— llevaba seis
+horas sin tocarse mientras los EDL se regeneraban una docena de veces. El
+diagnóstico de integridad que estaba dando **describía un montaje que ya no
+existía**. Y por eso el reel 3 llegó con el gancho en un tablero, la tesis
+borrada y el precio fuera: nada de eso es emocionalidad, es cobertura e
+integridad, que es justo lo que dejé de mirar.
+
+Su diagnóstico fue exacto: *«cada cambio en una parte del proceso lo tomas como
+un cambio de proceso, y al evaluar la emocionalidad dejaste de lado el resto»*.
+
+## Por qué una puerta y no una lista
+
+Las comprobaciones ya existían —integridad, cobertura, caminos, presencia— pero
+**sueltas**, como scripts que hay que invocar. Las guardas sí paraban el lote
+porque están dentro del camino; las demás dependían de que yo me acordara. Una
+comprobación que depende de la memoria de alguien no es una comprobación.
+
+Aquí corren **como conjunto** y el paso sale con código 1: `montar.sh` no
+renderiza y `pipeline.sh` no sigue.
+
+    python scripts/verificar.py          # los seis
+    python scripts/verificar.py 3        # sólo el reel 3
+    python scripts/verificar.py --avisa  # informa y no bloquea
+"""
+import argparse
+import json
+import os
+import sqlite3
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
+import transcribir  # noqa: E402
+
+BASE = "ads/decisiones.db"
+
+
+def _texto(edl, cache):
+    """Lo que de verdad dice cada etapa, en orden de montaje."""
+    por = {}
+    for rango, det in zip(edl["segmentos"], edl["detalle"]):
+        toma = det.get("toma")
+        if toma not in cache:
+            try:
+                cache[toma] = transcribir.exigir(toma)["segmentos"]
+            except SystemExit:
+                cache[toma] = []
+        ws = [w["text"] for w in cache[toma]
+              if rango[0] - 0.02 <= w["start"] and w["end"] <= rango[1] + 0.02]
+        por.setdefault(det.get("beat"), []).extend(ws)
+    return {b: " ".join(v) for b, v in por.items()}
+
+
+def revisar(slug, cache):
+    """Todo lo que tiene que cumplirse. Devuelve la lista de motivos para parar."""
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return [f"{slug}: no hay EDL"]
+    edl = json.load(open(ruta, encoding="utf-8"))
+    mal = []
+    con = sqlite3.connect(BASE)
+    con.row_factory = sqlite3.Row
+
+    # 1 · **La descripción caduca cuando cambia EL TEXTO, no la fecha.**
+    #
+    # La primera versión comparaba marcas de tiempo: si el EDL se reescribía,
+    # las seis piezas quedaban invalidadas aunque las etapas dijeran lo mismo, y
+    # eso obligaba a rehacer las 52 descripciones por cualquier ajuste. Jaime lo
+    # corto: *«tenemos una estructura modular para poder apegarnos a la
+    # estructura sin tener que cambiar todo, pero si a cada ajuste de tuerca
+    # cambias el motor nunca vamos a llegar a ningún lado»*.
+    #
+    # Comparando el texto, **caduca sólo la etapa que se movió**. Las demás
+    # siguen valiendo, que es exactamente para lo que existe la modularidad.
+    dice = _texto(edl, cache)
+    filas = con.execute(
+        "select etapa_orden, sobre_texto, integridad, remedio from escena_desc"
+        " where video_slug = ?", (slug,)).fetchall()
+    if not filas:
+        mal.append(f"{slug}: sin descripción de escena — corre el paso 4")
+    else:
+        viejas = []
+        for f in filas:
+            b = f["etapa_orden"]
+            ahora = " ".join((dice.get(b) or "").split())
+            antes = " ".join((f["sobre_texto"] or "").split())
+            if b in dice and antes and antes != ahora:
+                viejas.append(b)
+        if viejas:
+            mal.append(
+                f"{slug}: la descripción de las etapas {viejas} habla de otro"
+                f" texto — vuelve a describir ESAS, no la pieza entera.")
+
+    # 2 · **Ninguna etapa se queda muda.** Ni sin material ni con dos palabras:
+    # una etapa que no dice nada es una etapa que no está.
+    beats_edl = {d.get("beat") for d in edl["detalle"]}
+    tablero = {d.get("beat") for d in (edl.get("sin_toma") or [])}
+    for b, t in sorted(dice.items()):
+        if len(t.split()) < 4:
+            mal.append(f"{slug} e{b}: dice «{t}» — no llega a una idea")
+
+    # 3 · **El gancho es su cara.** Nunca un tablero: contradice el camino
+    # `portada` entero, y ya paso en reel-03.
+    if 1 in tablero:
+        mal.append(f"{slug}: la etapa 1 va a tablero, y el gancho tiene que ser"
+                   f" su cara. Elige otra apertura.")
+
+    # 4 · **Las etapas obligatorias existen**, con toma o con tablero.
+    for f in filas:
+        b = f["etapa_orden"]
+        if b not in beats_edl and b not in tablero:
+            mal.append(f"{slug} e{b}: sin material y sin tablero")
+
+    # 5 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con
+    # ancla que ya no resuelve es una corrección perdida en silencio (C-79).
+    pend = con.execute(
+        "select count(*) from revision where video_slug = ? and accion='cortar'"
+        " and estado='pendiente'", (slug,)).fetchone()[0]
+    if pend:
+        mal.append(f"{slug}: {pend} corte(s) de revisión sin aplicar")
+    con.close()
+    return mal
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("reels", nargs="*", type=int)
+    ap.add_argument("--avisa", action="store_true",
+                    help="informa y no bloquea")
+    a = ap.parse_args()
+    cache, todo = {}, []
+    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+        slug = f"reel-{n:02d}"
+        mal = revisar(slug, cache)
+        todo += mal
+        print(f"{slug}: {'OK' if not mal else str(len(mal)) + ' motivo(s)'}")
+        for m in mal:
+            print(f"    · {m}")
+    if todo and not a.avisa:
+        print(f"\nEL CAMINO SE PARA — {len(todo)} motivo(s). Nada se renderiza"
+              f" hasta que esten resueltos.")
+        sys.exit(1)
+    print("\nverificacion: todo en pie" if not todo else
+          "\n(--avisa: no bloquea)")
+
+
+if __name__ == "__main__":
+    main()

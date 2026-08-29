@@ -1,0 +1,317 @@
+"""La revisión final: lo que Jaime quita mirando la pieza montada.
+
+Regla que la creó: *«vamos a instaurar una última etapa, la revisión final; en
+esta etapa quitamos partes de cada vídeo, haciendo ajustes finales»*. Y la parte
+que la convierte en sistema y no en una lista de recados: *«importante, las
+correcciones se van integrando para que se puedan automatizar, que sirvan de
+entrenamiento»*.
+
+## Por qué una tabla y no un mensaje
+
+Un recado se atiende una vez. Una nota guardada con su tramo, su acción y **la
+regla general que hay detrás** se atiende una vez y luego se automatiza — y a
+partir de ahí ya no hay nota que atender, porque el defecto no vuelve a
+producirse. Ése es el bucle que él pidió.
+
+Cada nota lleva dos textos y no son el mismo:
+
+- `que` — **sus palabras, literales**. No se reescriben ni se resumen: si dentro
+  de tres semanas la regla que deduje resulta equivocada, lo que hay que releer
+  es lo que dijo, no mi interpretación de lo que dijo.
+- `regla` — la versión general. *«Desde el segundo 20 hasta el tablero sobra,
+  sólo es una persona leyendo»* es una nota; *«un tramo largo de lectura sin
+  tratamiento no aporta y se corta»* es una regla, y esa vale para las 16-50
+  piezas.
+
+Y `estado` cuenta en qué punto del bucle está cada una:
+
+    pendiente     dicha, todavía no hecha
+    aplicada      hecha en esta pieza, a mano
+    automatizada  la regla vive en código: no vuelve a hacer falta
+    sube          necesita una decisión suya antes de tocar nada
+
+## Las dos pasadas
+
+*«Este no pasa directo con las correcciones, pero en segunda revisión pasa.»*
+Una pieza corregida no se aprueba sola — se vuelve a mirar. Por eso `pasada`, y
+por eso `publicar.py` mira que no queden notas pendientes.
+
+    python scripts/revision.py --ver                 # el estado de todas
+    python scripts/revision.py --ver 1               # sólo el reel 1
+    python scripts/revision.py --aplicar 1           # los cortes al EDL
+    python scripts/revision.py --anotar 1 cortar 20 47 "sólo es lectura"
+"""
+import argparse
+import datetime
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
+import registro  # noqa: E402
+
+BASE = "ads/decisiones.db"
+# **1, no 1,15: no hay que acelerar nada.** Jaime, al ver las duraciones reales:
+# *«ninguno hay que acelerar la verdad, todos estan por debajo de los 120 y en
+# el rango de los 90s»*. A velocidad natural el lote va de 47,6 a 118,5 s, con
+# cuatro de seis entre 72 y 89 — que es formato corto sin forzar nada.
+#
+# Y quita de la cadena la resintesis mas grande. `rubberband` no es un filtro:
+# reconstruye la senal. Con la voz limpiada fuera eran **dos resintesis
+# encadenadas**, y ahi es donde empezo a sonar a papilla.
+VELOCIDAD = 1.0
+
+
+def _con():
+    import sqlite3
+    c = sqlite3.connect(BASE)
+    c.row_factory = sqlite3.Row
+    return c
+
+
+def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
+           pasada=1, ancla=None):
+    """Guarda una nota de revisión. `que` va literal, siempre.
+
+    `ancla` es **el texto** que hay que cortar. Los segundos sirven para
+    encontrarlo la primera vez; el texto es lo que sobrevive a que la pieza se
+    vuelva a montar, y en un camino que regenera el EDL en cada corrida eso es
+    la diferencia entre una corrección que persiste y una que se pierde (C-79).
+    """
+    con = _con()
+    con.execute(
+        "insert into revision (video_slug, pasada, desde_s, hasta_s, ancla,"
+        " accion, que, regla, estado, fecha) values (?,?,?,?,?,?,?,?,?,?)",
+        (slug, pasada, desde, hasta, ancla, accion, que, regla, estado,
+         datetime.datetime.now().isoformat(timespec="seconds")))
+    con.commit()
+    con.close()
+
+
+def _montado_a_cinta(edl, t_montado):
+    """De segundo de la pieza montada a segundo de la cinta.
+
+    Jaime mira **la pieza**, así que sus tiempos son de la pieza. El EDL vive en
+    tiempo de cinta y además el montaje corre a 1,15×. Sin esta traducción, un
+    «desde el segundo 20» recortaría el sitio equivocado — que es exactamente el
+    tipo de fallo que no se ve hasta que ya está renderizado.
+
+    Devuelve `(i, t_cinta)`: en qué segmento cae y en qué segundo de la cinta.
+    """
+    t = 0.0
+    for i, (a, b) in enumerate(edl["segmentos"]):
+        dur = (b - a) / VELOCIDAD
+        if t_montado <= t + dur + 1e-6:
+            return i, a + (t_montado - t) * VELOCIDAD
+        t += dur
+    return len(edl["segmentos"]) - 1, edl["segmentos"][-1][1]
+
+
+def _por_ancla(edl, ancla, slug=""):
+    """Dónde está ese texto en la pieza, en segundos de montaje.
+
+    Es lo que hace que una corrección sobreviva a que la pieza se vuelva a
+    montar. Se busca sobre las palabras de la cinta recorridas en orden de
+    montaje, que es exactamente lo que el espectador oye.
+    """
+    import unicodedata
+    sys.path.insert(0, os.path.dirname(__file__))
+    import transcribir as _tr, rutas as _ru
+
+    def limpio(t):
+        t = unicodedata.normalize("NFD", t.lower())
+        return "".join(c for c in t if unicodedata.category(c) != "Mn"
+                       and (c.isalnum() or c == " "))
+
+    # Un ancla puede ser una frase, o «desde ... hasta» separadas por «|»: para
+    # un corte largo, la primera dice donde empieza y la segunda donde acaba.
+    partes = [limpio(x).split() for x in ancla.split("|")]
+    obj = partes[0]
+    fin_obj = partes[1] if len(partes) > 1 else None
+    if not obj:
+        return None
+    cache, linea, t = {}, [], 0.0
+    for rango, det in zip(edl["segmentos"], edl["detalle"]):
+        toma = det.get("toma") or _ru.TOMAS.get(slug or slug_de(edl))
+        if toma not in cache:
+            try:
+                cache[toma] = _tr.exigir(toma)["segmentos"]
+            except SystemExit:
+                cache[toma] = []
+        for w in cache[toma]:
+            if rango[0] - 0.02 <= w["start"] and w["end"] <= rango[1] + 0.02:
+                dentro = (w["start"] - rango[0]) / VELOCIDAD
+                linea.append((limpio(w["text"]).strip(), t + dentro,
+                              t + (w["end"] - rango[0]) / VELOCIDAD))
+        t += (rango[1] - rango[0]) / VELOCIDAD
+    pal = [x[0] for x in linea]
+    for i in range(len(pal) - len(obj) + 1):
+        if pal[i:i + len(obj)] != obj:
+            continue
+        desde = round(linea[i][1], 2)
+        if not fin_obj:
+            return desde, round(linea[i + len(obj) - 1][2], 2)
+        for j in range(i + len(obj), len(pal) - len(fin_obj) + 1):
+            if pal[j:j + len(fin_obj)] == fin_obj:
+                return desde, round(linea[j + len(fin_obj) - 1][2], 2)
+        return None
+    return None
+
+
+def slug_de(edl):
+    return edl.get("slug") or edl.get("video_slug") or ""
+
+
+def aplicar(slug, ver=False):
+    """Convierte las notas `cortar` en recortes del EDL.
+
+    **Sólo `cortar` se aplica sola.** Las de sonido, gráfico o subtítulo no son
+    un tramo que quitar: son un mecanismo que cambiar, y ésas se automatizan en
+    el paso que corresponda y se marcan aquí. Aplicar automáticamente algo que
+    no es un tramo sería fingir que se hizo.
+    """
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    # **Los cortes se re-aplican, no se dan por hechos.** `seleccionar.py`
+    # regenera el EDL desde cero en cada corrida, asi que un corte «ya aplicado»
+    # desaparece en la siguiente y la correccion se pierde sin que nadie se
+    # entere. Por eso se aplican todos los que no esten ya dentro de ESTE
+    # fichero — el EDL lleva la lista de ids que carga.
+    #
+    # Es la misma leccion de C-32: editar un artefacto no sirve si el paso que
+    # lo produce no sabe de la edicion. La nota es la fuente; el EDL, la copia.
+    ya = set(edl.get("revision", {}).get("notas_aplicadas") or [])
+    con = _con()
+    notas = [n for n in con.execute(
+        "select * from revision where video_slug = ? and accion = 'cortar'"
+        " and estado in ('pendiente','aplicada') order by desde_s",
+        (slug,)).fetchall() if n["id"] not in ya]
+    if not notas:
+        con.close()
+        return 0
+
+    # Se recortan de atrás hacia delante: cada corte mueve los tiempos de todo
+    # lo que viene después, y hacerlo en orden natural invalida el segundo corte
+    # con el primero.
+    # **El ancla manda sobre los segundos.** Si la nota trae texto, se busca
+    # dónde está AHORA; los segundos sólo valen para la corrida en que se
+    # apuntó, porque la pieza se vuelve a montar en cada pasada (C-79).
+    puestos = []
+    for n in notas:
+        rango = _por_ancla(edl, n["ancla"], slug) if n["ancla"] else None
+        if rango is None and n["desde_s"] is None:
+            continue
+        d, h = rango if rango else (n["desde_s"], n["hasta_s"])
+        puestos.append((d, h, n["id"], n["que"]))
+    cortes = sorted(puestos, key=lambda x: -x[0])
+    hechos = []
+    for d, h, nid, que in cortes:
+        i0, c0 = _montado_a_cinta(edl, d)
+        i1, c1 = _montado_a_cinta(edl, h if h is not None else d)
+        segs, det = [], []
+        for i, (rango, dd) in enumerate(zip(edl["segmentos"], edl["detalle"])):
+            a, b = rango
+            if i < i0 or i > i1:
+                segs.append([a, b])
+                det.append(dd)
+                continue
+            # Lo que queda del segmento a cada lado del recorte.
+            iz_a, iz_b = a, (c0 if i == i0 else a)
+            de_a, de_b = (c1 if i == i1 else b), b
+            if i == i0 and iz_b - iz_a > 0.25:
+                segs.append([iz_a, iz_b])
+                det.append({**dd, "start": iz_a, "end": iz_b})
+            if i == i1 and de_b - de_a > 0.25:
+                segs.append([de_a, de_b])
+                det.append({**dd, "start": de_a, "end": de_b})
+        edl["segmentos"], edl["detalle"] = segs, det
+        hechos.append((nid, d, h, que))
+
+    if ver:
+        con.close()
+        for _, d, h, que in hechos:
+            print(f"  {slug}: cortaria {d:.1f}-{h:.1f}s — {que[:60]}")
+        return len(hechos)
+
+    # Derivada de `detalle`, nunca re-indexada: ver el mismo comentario en
+    # `depurar.py`. Un corte parte segmentos, y el indice deja de valer.
+    edl["fuentes"] = [d.get("toma") or "" for d in edl["detalle"]]
+    edl["duracion_montada_s"] = round(
+        sum((b - a) / VELOCIDAD for a, b in edl["segmentos"]), 2)
+    rev = dict(edl.get("revision") or {})
+    rev["revision_final"] = " · ".join(
+        f"{d:.0f}-{h:.0f}s: {q[:70]}" for _, d, h, q in hechos)
+    rev["notas_aplicadas"] = sorted(ya | {nid for nid, _, _, _ in hechos})
+    edl["revision"] = rev
+    json.dump(edl, open(ruta, "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    for nid, d, h, que in hechos:
+        con.execute("update revision set estado='aplicada' where id=?", (nid,))
+    con.commit()
+    con.close()
+    registro.nota("revision", "cortes de revision final aplicados",
+                  detalle=f"{slug}: {len(hechos)} corte(s)")
+    return len(hechos)
+
+
+def ver(reels=None):
+    con = _con()
+    filas = con.execute("select * from revision order by video_slug, pasada,"
+                        " desde_s").fetchall()
+    con.close()
+    if reels:
+        slugs = {f"reel-{int(n):02d}" for n in reels}
+        filas = [f for f in filas if f["video_slug"] in slugs]
+    if not filas:
+        print("revision: sin notas")
+        return
+    por_estado = {}
+    slug = None
+    for f in filas:
+        por_estado[f["estado"]] = por_estado.get(f["estado"], 0) + 1
+        if f["video_slug"] != slug:
+            slug = f["video_slug"]
+            print(f"\n{slug}")
+        tramo = ("pieza entera" if f["desde_s"] is None
+                 else f"{f['desde_s']:.0f}-{f['hasta_s']:.0f}s"
+                 if f["hasta_s"] is not None else f"{f['desde_s']:.0f}s")
+        print(f"  p{f['pasada']} [{f['estado']:<12}] {f['accion']:<9}"
+              f" {tramo:<14} {f['que'][:64]}")
+        if f["regla"]:
+            print(f"       regla: {f['regla'][:88]}")
+    print("\n" + " · ".join(f"{k}: {v}" for k, v in sorted(por_estado.items())))
+    # Lo que de verdad importa del bucle: cuanto se ha automatizado.
+    auto = por_estado.get("automatizada", 0)
+    print(f"automatizadas {auto} de {len(filas)}"
+          f" ({100 * auto / max(len(filas), 1):.0f}%) — el resto todavia"
+          f" necesita mano")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--aplicar", action="store_true")
+    ap.add_argument("--seco", action="store_true", help="dice que cortaria")
+    ap.add_argument("--anotar", nargs="+", metavar="ARG",
+                    help="slug accion desde hasta «texto»")
+    ap.add_argument("reels", nargs="*", type=int)
+    a = ap.parse_args()
+
+    if a.anotar:
+        n, accion, desde, hasta, *resto = a.anotar
+        anotar(f"reel-{int(n):02d}", accion,
+               None if desde == "-" else float(desde),
+               None if hasta == "-" else float(hasta), " ".join(resto))
+        print("anotada")
+        return
+    if a.aplicar or a.seco:
+        for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+            aplicar(f"reel-{n:02d}", ver=a.seco)
+        return
+    ver(a.reels)
+
+
+if __name__ == "__main__":
+    main()

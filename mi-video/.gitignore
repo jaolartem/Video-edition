@@ -1,0 +1,14 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Ignore the output video from Git but not videos you import into src/.
+out
+
+# Binarios y modelos de Whisper (pesados, se regeneran con scripts/setup-whisper.mjs)
+whisper.cpp/
+whisper-bin-x64.zip
+
+# Trabajo intermedio (audio extraído, transcripciones de sondeo)
+work/
