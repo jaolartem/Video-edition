@@ -49,6 +49,14 @@ export type ReelSpec = {
    * y `components/Capas.tsx`: aqui solo se dibujan.
    */
   caminos: Capa[];
+  /**
+   * Si la pieza lleva efectos de sonido.
+   *
+   * **La version sin aprobar va muda de extras.** Jaime: *«los videos para
+   * aprobacion van sin musica y sin audio adicional»*. Lo decide el spec
+   * mirando si la version esta aprobada, no una bandera que haya que recordar.
+   */
+  sonido?: boolean;
   duracion: number;
   lineas: string[];
   /** Frame en que ENTRA el rótulo: el de la palabra que subraya. */
@@ -237,7 +245,7 @@ export const Reel: React.FC<{ spec: ReelSpec }> = ({ spec: r }) => {
      * la cara, pero una tarjeta o una cortinilla ocupan el cuadro entero y ahi
      * no hay nada que acompanar.
      */}
-    <Capas capas={r.caminos} kicker={r.lineas[0] ?? ""} />
+    <Capas capas={r.caminos} kicker={r.lineas[0] ?? ""} sonido={r.sonido} />
     {/**
      * La tarjeta entra con la barra POR DELANTE y la toma anterior
      * desvaneciéndose por debajo.

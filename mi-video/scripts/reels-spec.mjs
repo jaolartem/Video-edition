@@ -1226,6 +1226,40 @@ const db = new DatabaseSync("ads/decisiones.db");
  */
 const faltas = [];
 
+/**
+ * **La pieza para aprobar va sin música y sin efectos.**
+ *
+ * Jaime: *«los vídeos para aprobación van sin música y sin audio adicional, no
+ * los necesitamos, y será más fácil con el audio final y definitivo, menos
+ * retrabajo»*.
+ *
+ * Masterizar música sobre un corte que todavía puede cambiar es pagarlo dos
+ * veces, y para juzgar si el mensaje llega el acompañamiento estorba más que
+ * ayuda.
+ *
+ * Lo decide **el estado de la versión**, no una bandera que alguien recuerde
+ * poner: mientras no esté aprobada sale sólo la voz, y en cuanto lo está la
+ * misma línea la monta con música y efectos.
+ */
+const aprobadas = (() => {
+  try {
+    const db = new DatabaseSync("ads/decisiones.db");
+    return new Set(
+      db
+        .prepare(
+          "select v.slug from aprobacion a" +
+            " join version ve on ve.id = a.version_id" +
+            " join video v on v.id = ve.video_id" +
+            " where a.veredicto = 'aprobada'",
+        )
+        .all()
+        .map((r) => r.slug),
+    );
+  } catch {
+    return new Set();
+  }
+})();
+
 const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
   const edl = JSON.parse(fs.readFileSync(`ads/${slug}/edl-sell.json`, "utf8"));
   const words = JSON.parse(
@@ -1645,6 +1679,8 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
   const pieza = {
     id: `Reel-R${slug.slice(-1)}`,
     video: `${slug}.mp4`,
+    // Sin aprobar, sin audio adicional: ver `aprobadas` arriba.
+    sonido: aprobadas.has(slug),
     // Las capas por camino: el gancho, los tableros, los cercanos y las
     // metáforas, cada uno con lo suyo. Ver `scripts/caminos.mjs`.
     caminos,

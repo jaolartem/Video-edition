@@ -94,7 +94,22 @@ for n in "${REELS[@]}"; do
   # **Sin musica tambien hay que masterizar.** Antes se saltaba la pieza entera
   # si faltaba el mp3, asi que se quedaba sin entrega — y el paso de audio no es
   # opcional: la voz se nivela y se lleva a -14 LUFS igual.
+  # **La musica solo va en lo aprobado.** Jaime: *«los videos para aprobacion
+  # van sin musica y sin audio adicional»*. Masterizar musica sobre un corte que
+  # puede cambiar es pagarlo dos veces; y para juzgar si el mensaje llega,
+  # estorba. En cuanto la version se aprueba, la misma linea la anade.
+  APROBADA=$(PYTHONIOENCODING=utf-8 python -c "
+import sqlite3,sys
+c=sqlite3.connect('ads/decisiones.db')
+try:
+    r=c.execute(\"select 1 from aprobacion a join version v on v.id=a.version_id\"
+                \" join video vi on vi.id=v.video_id where vi.slug=? and\"
+                \" a.veredicto='aprobada'\", ('reel-0$n',)).fetchone()
+    print(1 if r else 0)
+except Exception: print(0)
+" 2>/dev/null)
   CONMUSICA=1
+  [ "$APROBADA" = "1" ] || CONMUSICA=0
   SELLO="musica tallada 180-4000 Hz"
   if [ ! -f "$MP3" ]; then CONMUSICA=0; SELLO="sin musica"; fi
 

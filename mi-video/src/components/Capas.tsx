@@ -214,17 +214,27 @@ const CapaBloque: React.FC<{ props: Record<string, unknown>; texto: string }> = 
  * es donde se conoce ese frame: una pista aparte se desincroniza en el primer
  * ajuste de copy.
  */
-export const Capas: React.FC<{ capas: Capa[]; kicker: string }> = ({
-  capas,
-  kicker,
-}) => (
+export const Capas: React.FC<{
+  capas: Capa[];
+  kicker: string;
+  /**
+   * Si la pieza lleva los efectos de sonido de cada movimiento.
+   *
+   * **La versión sin aprobar va muda de extras.** Jaime: *«los vídeos para
+   * aprobación van sin música y sin audio adicional, no los necesitamos, y será
+   * más fácil con el audio final y definitivo, menos retrabajo»*. Para juzgar si
+   * el mensaje llega, el sonido de acompañamiento estorba más que ayuda — y
+   * ponerlo sobre un corte que aún puede cambiar es pagarlo dos veces.
+   */
+  sonido?: boolean;
+}> = ({ capas, kicker, sonido }) => (
   <>
     {capas.map((c, i) => {
       const key = `${c.tipo}-${c.at}-${i}`;
       if (c.tipo === "sonido")
-        return (
+        return sonido ? (
           <MotionSound key={key} motion={c.props.motion as Motion} at={c.at} />
-        );
+        ) : null;
       // El punch lo aplica `PunchIn` alrededor del video, no aquí.
       // El rótulo y el subtítulo los llevan `BigTitle` y `CaptionBand`, que ya
       // existen: el camino les fija el frame de entrada, no los duplica.
