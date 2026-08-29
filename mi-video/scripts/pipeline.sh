@@ -126,6 +126,27 @@ for n in "${REELS[@]}"; do
   PYTHONIOENCODING=utf-8 corre python scripts/redundancia.py "$n"
 done
 
+paso "3d · la cola del servicio de IA"
+# **Nadie decide fuera de la linea.** Jaime: *«aunque seas el que ejecuta te vas
+# a mover dentro del pipeline reemplazando a la IA que se conecta por tokens o
+# por bash; nunca puedes tomar decisiones por fuera de la linea»*.
+#
+# Los pasos de IA escriben un pedido y leen una respuesta. La conteste el CLI o
+# la conteste la sesion, el contrato es el mismo y **queda registrada**. Esto
+# ensena lo que falta por contestar: mientras haya pedidos abiertos, lo que
+# venga despues corre con datos incompletos y hay que saberlo.
+PYTHONIOENCODING=utf-8 python scripts/servicio.py
+
+paso "3e · las costuras: mejor corte primero, disimular despues"
+# Jaime: *«busca los mejores cortes posibles, y si no, utiliza la transicion del
+# glitch, con esa se disimula — glitch y cambio de camara, mas cerca o mas
+# lejos»*. Mover el corte es gratis y no se nota; el glitch es la segunda
+# opcion, no la primera. Y mover no puede costar voz: *«el punto es transmitir
+# mas emocion»*.
+for n in "${REELS[@]}"; do
+  PYTHONIOENCODING=utf-8 corre python scripts/costuras.py "$n"
+done
+
 paso "4 · describir cada escena"
 # Si el CLI no tiene credencial, se avisa y se sigue: las escenas ya descritas
 # valen y las que falten se cargan por migracion. No para el camino.

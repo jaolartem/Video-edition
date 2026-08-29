@@ -123,7 +123,18 @@ def revisar(slug, cache):
         if b not in beats_edl and b not in tablero:
             mal.append(f"{slug} e{b}: sin material y sin tablero")
 
-    # 5 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con
+    # 5 · **Ningún pedido de IA sin contestar.**
+    #
+    # Un paso de IA con el pedido abierto significa que la pieza se monto sin esa
+    # decision — sin la lectura de redundancia, o sin la descripcion de escena. No
+    # es un aviso: es que falta un paso del camino.
+    import servicio as _sv
+    abiertos = [p for p, sl, _ in _sv.pendientes() if sl == slug]
+    if abiertos:
+        mal.append(f"{slug}: pedido(s) de IA sin contestar: {abiertos}."
+                   f" La pieza se montaria sin esa decision.")
+
+    # 6 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con
     # ancla que ya no resuelve es una corrección perdida en silencio (C-79).
     pend = con.execute(
         "select count(*) from revision where video_slug = ? and accion='cortar'"

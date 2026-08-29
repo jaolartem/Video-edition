@@ -1789,10 +1789,28 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
      * frames: lo justo para sustituir el salto sin convertirse en el efecto.
      */
     glitch: (() => {
+      /**
+       * **Sólo donde la costura salta, no en todas.**
+       *
+       * Iba en cada costura, y una máscara que se pone siempre deja de ser
+       * máscara: se convierte en el efecto, y entonces el corte limpio y el
+       * malo se ven igual de raros. Jaime lo había acotado —*«el glitch para
+       * cambios de escena o en cortes de escena que quedan mal»*— y después dio
+       * el orden completo: *«busca los mejores cortes posibles, y si no,
+       * utiliza la transición del glitch, con ésa se disimula»*.
+       *
+       * `costuras.py` mueve lo que se puede mover **sin perder voz** y deja en
+       * `costuras_duras` lo que no tuvo arreglo. Eso, y sólo eso, se disimula.
+       */
+      const duras = new Set(edl.costuras_duras ?? []);
       const out = [];
       const det = edl.detalle ?? [];
       let t = 0;
       for (let i = 0; i < edl.segmentos.length - 1; i++) {
+        if (!duras.has(i)) {
+          t += edl.segmentos[i][1] - edl.segmentos[i][0];
+          continue;
+        }
         t += edl.segmentos[i][1] - edl.segmentos[i][0];
         const at = Math.round((t / VELOCIDAD) * FPS) - Math.round(DUR_GLITCH / 2);
         if (at < 0) continue;

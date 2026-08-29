@@ -42,6 +42,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
 import revision  # noqa: E402
+import servicio  # noqa: E402
 import rutas  # noqa: E402
 import transcribir  # noqa: E402
 
@@ -111,25 +112,43 @@ def cargar(slug, cortes, pasada=1):
 
 
 def main():
+    """Pide al servicio y carga lo que conteste. **No decide nada aqui.**
+
+    Regla de Jaime: *«aunque seas el que ejecuta te vas a mover dentro del
+    pipeline reemplazando a la IA que se conecta por tokens o por bash; nunca
+    puedes tomar decisiones por fuera de la linea»*.
+
+    Asi que este paso ya no imprime un dossier para que alguien lo lea y actue:
+    **escribe un pedido y espera una respuesta**. La conteste el CLI o la
+    conteste yo, el contrato es el mismo y queda registrada. Lo que se acabo es
+    leer el dossier y editar la base a mano — por ese agujero se colo todo lo
+    que salio mal.
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
-    ap.add_argument("--cargar", metavar="JSON",
-                    help="fichero con los cortes que devolvio el modelo")
+    ap.add_argument("--ver", action="store_true",
+                    help="ensena el dossier sin pedir nada")
     a = ap.parse_args()
+    prompt = open(PROMPT, encoding="utf-8").read()
     for n in (a.reels or [1, 2, 3, 4, 5, 6]):
         slug = f"reel-{n:02d}"
-        if a.cargar:
-            cortes = json.load(open(a.cargar, encoding="utf-8"))
-            print(f"{slug}: {cargar(slug, cortes)} corte(s) anotados")
-            continue
         filas = dossier(slug)
         if not filas:
             continue
-        print(f"\n===== {slug} — el prompt esta en {PROMPT} =====")
-        for f in filas:
-            voz = (f"  [voz {f['voz']} · tono {f['tono']}]"
-                   if "voz" in f else "")
-            print(f"{f['en']:>6.1f}  b{f['beat']}{voz}\n        {f['texto']}")
+        if a.ver:
+            print("== " + slug + " ==")
+            for f in filas:
+                voz = (f"  [voz {f['voz']} · tono {f['tono']}]"
+                       if "voz" in f else "")
+                print(f"{f['en']:>6.1f}  b{f['beat']}{voz}")
+                print("        " + f["texto"])
+            continue
+        r = servicio.pedir("redundancia", slug, prompt, filas)
+        if r is None:
+            print(f"{slug}: pedido puesto, sin respuesta todavia"
+                  f" -> {servicio.ruta_pedido('redundancia', slug)}")
+            continue
+        print(f"{slug}: {cargar(slug, r)} corte(s) anotados por el servicio")
 
 
 if __name__ == "__main__":
