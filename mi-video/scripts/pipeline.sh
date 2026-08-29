@@ -58,7 +58,13 @@ corre() {           # corre un paso y sigue: un paso caído no tumba el camino
   fi
 }
 
-paso "0 · guardas"
+paso "0 · guardas y modelo de datos"
+# El modelo se valida antes que nada: si le falta una tabla del ciclo de vida,
+# lo que venga despues no tiene donde registrarse y la corrida se pierde al
+# cerrarse la sesion. Jaime: *«valida el modelo de datos y agrega lo que haga
+# falta»*.
+PYTHONIOENCODING=utf-8 python scripts/modelo.py || exit 1
+
 node scripts/guardas.mjs || exit 1
 
 paso "1a · el barato: identificar TODO el material"
@@ -191,6 +197,16 @@ for n in "${REELS[@]}"; do
   PYTHONIOENCODING=utf-8 corre python scripts/revision.py --aplicar "$n"
 done
 PYTHONIOENCODING=utf-8 python scripts/revision.py --ver "${REELS[@]}"
+
+paso "6c · registrar la version de cada pieza"
+# Cierra el ciclo que Jaime describio: *«sale el video renderizado, se aprueba
+# uno por uno, y de cada version aprobada me das el audio virgen»*. Sin version
+# no hay nada que aprobar ni a que atar el audio — y reintegrar el limpio de un
+# corte en otro desincroniza la pieza entera.
+#
+# Es idempotente por huella del corte: renderizar dos veces lo mismo no crea dos
+# versiones.
+PYTHONIOENCODING=utf-8 corre python scripts/modelo.py --registrar
 
 paso "7 · la tabla de colocacion"
 PYTHONIOENCODING=utf-8 corre python scripts/colocar.py "${REELS[@]}"
