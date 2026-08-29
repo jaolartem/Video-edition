@@ -134,7 +134,24 @@ corre node scripts/describir.mjs "${REELS[@]}"
 paso "5 · cortar cada fragmento a su fichero"
 PYTHONIOENCODING=utf-8 corre python scripts/cortar.py "${REELS[@]}"
 
-paso "5b · la puerta: nada se renderiza sin pasar por aqui"
+paso "5a · la voz sin modificar, para limpiarla fuera"
+# **Paso 1 de los dos que pidio Jaime.** Sale del BRUTO, no del montaje: cada
+# tramo tal cual y pegados, sin estirar, sin ecualizar, sin fundidos y sin
+# musica. La limpieza va antes de cualquier transformacion — la primera vez le
+# di el audio ya resintetizado y Adobe trabajo encima de eso.
+PYTHONIOENCODING=utf-8 corre python scripts/voz-limpia.py --exportar "${REELS[@]}"
+
+paso "5b · recoger la voz remasterizada"
+# **Paso 2.** Se busca por la convencion que el describio —*«el mismo nombre mas
+# otra parte al final»*—: `reel-01-voz.wav` -> `reel-01-voz-enhanced-v2.wav`. Y
+# no se sustituye si la duracion no encaja al milisegundo: un audio desplazado
+# medio segundo es peor que uno con eco.
+#
+# Si todavia no esta, se dice y el camino sigue: la pieza saldra con la voz
+# cruda y el se enterara. Lo que no puede es sustituirse en silencio.
+PYTHONIOENCODING=utf-8 corre python scripts/voz-limpia.py "${REELS[@]}"
+
+paso "5c · la puerta: nada se renderiza sin pasar por aqui"
 # Corre el juego entero de comprobaciones, no una. El fallo que la creo fue
 # cambiar un criterio y verificar solo ese criterio: `escena_desc` llevaba seis
 # horas caducada mientras los EDL se regeneraban una docena de veces.

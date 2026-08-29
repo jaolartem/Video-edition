@@ -28,6 +28,7 @@ y no se sustituye — un audio desplazado medio segundo es peor que uno con eco.
 """
 import argparse
 import glob
+import json
 import os
 import re
 import subprocess
@@ -48,6 +49,62 @@ CARPETAS = [
 # labios.
 TOLERANCIA = 0.04
 
+# **La convencion de nombres, que la puso el.** Jaime: *«ya viste que la
+# estructura de guardado es regular: el mismo nombre mas otra parte al final»*.
+#
+# Yo exporto `reel-01-voz.wav` y el devuelve `reel-01-voz-enhanced-v2.wav`. Asi
+# que el limpiado es **cualquier fichero que empiece por el nombre base y sea
+# mas largo**: no hay que obligarle a renombrar seis ficheros ni adivinar que
+# sufijo pone cada herramienta.
+BASE_VOZ = "{slug}-voz"
+
+
+def exportar(n):
+    """Saca la voz del reel n **sin tocarla**: el paso 1 de los dos que pidio.
+
+    Cada tramo se extrae del bruto tal cual y se pegan. Sin estirar, sin
+    ecualizar, sin fundidos, sin musica y sin normalizar. Es lo que Jaime pidio
+    con esas palabras: *«quiero el audio de la voz separado sin
+    modificaciones»*.
+
+    **Y a velocidad natural.** La primera vez le di el audio ya estirado a
+    1,15x, o sea resintetizado por `rubberband`, y encima paso por Adobe: dos
+    resintesis encadenadas. De ahi lo raro. Ahora el estirado no existe
+    (`beats.VELOCIDAD` es 1), pero aunque volviera, esto sale del bruto y no del
+    montaje: la limpieza va **antes** de cualquier transformacion.
+    """
+    slug = f"reel-{n:02d}"
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return None
+    sys.path.insert(0, os.path.dirname(__file__))
+    import rutas as _ru
+    edl = json.load(open(ruta, encoding="utf-8"))
+    os.makedirs("out/audio-voz", exist_ok=True)
+    os.makedirs("F:/tmp-video/voz", exist_ok=True)
+    trozos = []
+    for i, (r, d) in enumerate(zip(edl["segmentos"], edl["detalle"])):
+        f = f"F:/tmp-video/voz/{slug}-{i:03d}.wav"
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-ss", str(r[0]),
+             "-i", f"{_ru.ORIGEN}/{d['toma']}.mp4",
+             "-t", str(round(r[1] - r[0], 3)), "-vn",
+             "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1", f], check=True)
+        trozos.append(f)
+    lista = f"F:/tmp-video/voz/{slug}.txt"
+    open(lista, "w", encoding="utf-8").write(
+        "\n".join("file '{}'".format(t) for t in trozos) + "\n")
+    out = f"out/audio-voz/{BASE_VOZ.format(slug=slug)}.wav"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0",
+                    "-i", lista, "-c", "copy", out], check=True)
+    # Y a la carpeta donde el la recoge y deja la limpiada.
+    for carpeta in CARPETAS:
+        if os.path.isdir(carpeta):
+            import shutil
+            shutil.copy2(out, carpeta)
+            break
+    return out
+
 
 def duracion(f):
     out = subprocess.run(
@@ -62,22 +119,19 @@ def duracion(f):
 def candidato(n):
     """El WAV limpiado del reel n, si lo hay.
 
-    Se acepta cualquier nombre que lleve `reel-R<n>` **menos el original**: las
-    herramientas de limpieza renombran a su gusto —«(enhanced)», «_clean»— y
-    obligar a un nombre exacto sería obligarle a él a renombrar seis ficheros.
-    Entre varios, el más reciente.
+    Por la convencion de nombres: el limpiado es el que **empieza por el nombre
+    base y es mas largo** — `reel-01-voz.wav` -> `reel-01-voz-enhanced-v2.wav`.
+    Entre varios, el mas reciente.
     """
+    base = BASE_VOZ.format(slug=f"reel-{n:02d}").lower()
     vistos = []
     for carpeta in CARPETAS:
         if not os.path.isdir(carpeta):
             continue
         for f in glob.glob(os.path.join(carpeta, "*.wav")):
-            base = os.path.basename(f).lower()
-            if not re.search(rf"reel-r0?{n}\b", base):
-                continue
-            if base.endswith("-puro.wav"):
-                continue          # el que le di yo, no el que devuelve
-            vistos.append(f)
+            nom = os.path.basename(f).lower()[:-4]
+            if nom.startswith(base) and len(nom) > len(base):
+                vistos.append(f)
     return max(vistos, key=os.path.getmtime) if vistos else None
 
 
@@ -117,7 +171,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--exportar", action="store_true",
+                    help="paso 1: saca la voz sin modificar a la carpeta")
     a = ap.parse_args()
+    if a.exportar:
+        for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+            f = exportar(n)
+            if f:
+                d = duracion(f)
+                print(f"R{n}: {os.path.basename(f)}  {d:.2f}s sin modificar")
+        print(f"\nen {CARPETAS[0]}")
+        return
     hechos = []
     for n in (a.reels or [1, 2, 3, 4, 5, 6]):
         if integrar(n, ver=a.ver):
