@@ -548,7 +548,17 @@ def intensidad(toma, a, b, palabras=None):
     return out
 
 
-def salto(toma_a, fin_a, toma_b, ini_b, palabras=None, ventana=1.5):
+# Lo que hace falta para que una costura **se oiga**. Estaban en la prosa de
+# `salto` —«por debajo de ~2 st y de ~1,5 pal/s pasa desapercibido»— y una cifra
+# que solo vive en un comentario no la puede usar nadie: la segunda valoracion
+# necesita descontar por costura audible, y para eso el umbral tiene que ser un
+# dato del modulo, no una frase.
+SALTO_TONO = 2.0        # semitonos de diferencia de altura media
+SALTO_RITMO = 1.5       # palabras por segundo
+
+
+def salto(toma_a, fin_a, toma_b, ini_b, palabras=None, ventana=1.5,
+          palabras_b=None):
     """Cuánto salta la voz AL CRUZAR una costura. Es lo que se oye del corte.
 
     Jaime: *«si notas que los cortes de tono, o de ritmo, son muy profundos,
@@ -589,11 +599,24 @@ def salto(toma_a, fin_a, toma_b, ini_b, palabras=None, ventana=1.5):
                 mb *= 2.0
             out["tono"] = round(abs(12 * np.log2(mb / ma)), 2)
     if palabras:
-        def tasa(a, b):
-            n = sum(1 for w in palabras if a <= w["start"] < b)
+        def tasa(ws, a, b):
+            """Palabras por segundo en esa ventana, con SUS palabras.
+
+            **Cada lado se mide con la transcripcion de su cinta.** Cuando la
+            costura cruza de una toma a otra —el caso donde el salto mas se
+            oye— medir los dos lados con las palabras de la primera daba 2,0
+            pal/s donde habia 0,67: cruzaba el umbral por el lado equivocado
+            y denunciaba costuras que no existen.
+            """
+            if not ws:
+                return 0.0
+            n = sum(1 for w in ws if a <= w["start"] < b)
             return n / max(b - a, 1e-6)
-        out["ritmo"] = round(abs(tasa(ini_b, ini_b + ventana)
-                                 - tasa(max(0.0, fin_a - ventana), fin_a)), 2)
+
+        pb = palabras_b if palabras_b is not None else palabras
+        out["ritmo"] = round(
+            abs(tasa(pb, ini_b, ini_b + ventana)
+                - tasa(palabras, max(0.0, fin_a - ventana), fin_a)), 2)
     return out
 
 

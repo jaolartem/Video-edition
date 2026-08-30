@@ -112,6 +112,27 @@ for (const [k, v] of Object.entries(PROMESA)) {
  * urgencia real** que pide el playbook. Lo que no entra es un «cupos
  * limitados» generico.
  */
+/**
+ * **El escalon de precio vigente hoy, preguntado a quien lo sabe.**
+ *
+ * La escalera vive en la tabla `precio` y el rotulo lo redacta
+ * `consulta.precio_vigente` — aqui NO se vuelve a implementar. Dos formas de
+ * redactar el mismo rotulo son dos rotulos en cuanto alguien toque una.
+ *
+ * `null` cuando ya cerro la inscripcion, y entonces **no se imprime precio**:
+ * una tarifa cerrada en pantalla es peor que ninguna.
+ */
+const PRECIO_HOY = (() => {
+  try {
+    return JSON.parse(
+      execFileSync("python", ["scripts/consulta.py", "precio_vigente", "[]"],
+                   { encoding: "utf8" }),
+    );
+  } catch {
+    return null;
+  }
+})();
+
 const CUENTA = {
   "reel-01": {
     cuesta: "$576 cada semana",
@@ -124,7 +145,10 @@ const CUENTA = {
     // Es la urgencia real que pide el playbook: una fecha del brief, no un
     // «cupos limitados». Los tramos de $30 y $40 van sin fecha porque no la
     // hay cerrada, y **inventarla seria fabricar un detalle de la oferta**.
-    vale: "$20 hasta el 28 ago",
+    // **El precio se deriva de la escalera, no se escribe.** Ver la tabla
+    // `precio` y `consulta.precio_vigente`: un literal no caduca, y por eso
+    // «$20 hasta el 28 ago» seguia en pantalla en septiembre (C-28, reabierta).
+    vale: PRECIO_HOY?.vale ?? null,
     nota: "luego $30 y $40",
   },
 };
@@ -159,7 +183,7 @@ const CONTRASTE = {
  * la unica toma que la tenia colgaba del precio sin antecedente.
  */
 const PRECIO = {
-  "reel-03": "$20 hasta el 28 ago",
+  "reel-03": PRECIO_HOY?.vale ?? null,
 };
 
 /** Frames que se sostiene el rotulo dentro del cuadro. 54 = 1,8 s. */

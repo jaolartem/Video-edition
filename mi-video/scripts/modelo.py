@@ -189,6 +189,85 @@ CREATE TABLE IF NOT EXISTS regla (
 );
 
 CREATE INDEX IF NOT EXISTS regla_clase ON regla (clase, padre_id);
+
+-- De donde sale cada cifra que la pieza pone delante del espectador
+--
+-- Jaime: *«lo importante es que la fuente aparezca en todos esos datos; pon en
+-- los CC el valor real, y un cuadro con la fuente de la info»*.
+--
+-- El hueco estaba justo al reves de como parecia. Los componentes **ya exigen**
+-- la fuente —`Comparacion` no compila sin ella, y eso es deliberado: *«el
+-- cumplimiento va en la API, no en la revision»*—, pero el valor se escribia a
+-- mano en `reels-spec.mjs`, una cadena por pieza: «Calculo de Jaime Olarte ·
+-- $21 por cada $100 facturado». Un literal por pieza es la misma trampa que un
+-- `if (slug === ...)`: no escala a 16-50 anuncios, no se puede auditar, y el
+-- tablero que dibuja el CAMINO —el que se usa de verdad— ni siquiera recibia
+-- fuente.
+--
+-- Con esto, la fuente **viaja con el dato**: la escribe el paso que la busca, la
+-- lee el que dibuja, y la puerta puede negarse a sacar en pantalla una cifra que
+-- no la tiene.
+CREATE TABLE IF NOT EXISTS fuente (
+  id        INTEGER PRIMARY KEY,
+  -- Como se rotula en pantalla: organismo + documento. Se guarda ya redactado
+  -- porque es lo que el espectador lee, no una referencia interna.
+  rotulo    TEXT NOT NULL UNIQUE,
+  organismo TEXT,
+  url       TEXT,
+  -- El año fiscal o la fecha de lo que dice. **Una tasa sin año caduca en
+  -- silencio**, que es la peor forma de caducar.
+  vigencia  TEXT,
+  cita      TEXT,
+  fecha     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dato (
+  id           INTEGER PRIMARY KEY,
+  video_id     INTEGER NOT NULL REFERENCES video(id),
+  etapa_orden  INTEGER NOT NULL,
+  cifra        TEXT NOT NULL,
+  afirmacion   TEXT NOT NULL,
+  fuente_id    INTEGER REFERENCES fuente(id),
+  -- Lo que hay que declarar para que la cifra no engañe: provincia, tipo de
+  -- ingreso, horizonte temporal, supuestos del caso. El playbook lo exige y
+  -- `TwoPaths` ya lo pide por API con `horizon` y `condition`.
+  condiciones  TEXT,
+  -- `sin_fuente` no es un registro incompleto: es **el estado honesto** de un
+  -- dato que todavia no se puede rotular, y es lo que la puerta mira para no
+  -- dejarlo salir en pantalla.
+  respalda     TEXT NOT NULL DEFAULT 'sin_fuente'
+                 CHECK (respalda IN ('si','parcial','no','sin_fuente')),
+  nota         TEXT,
+  fecha        TEXT,
+  UNIQUE (video_id, etapa_orden, cifra)
+);
+
+CREATE INDEX IF NOT EXISTS dato_etapa ON dato (video_id, etapa_orden);
+
+-- La escalera de precios, con sus ventanas
+--
+-- C-28 cerro que un precio sale con su fecha de cierre —*«un $20 a secas deja de
+-- ser cierto pasado manana»*— y aun asi volvio a pasar: el rotulo vivia como
+-- cadena literal en `reels-spec.mjs` (`"$20 hasta el 28 ago"`), una por pieza. Un
+-- literal no caduca: **el que caduca es el mundo**, y la cadena se queda ahi
+-- diciendo una fecha que ya paso.
+--
+-- Con la escalera como dato, el rotulo se **deriva de la fecha del render**, y
+-- una pieza que se monta fuera de toda ventana no puede imprimir precio.
+--
+-- El escalon pasado no se borra: Jaime lo dejo dicho del Early Bird —*«se queda
+-- como fila pasada, ancla, no se borra»*—. Un precio tachado es lo que hace que
+-- el vigente se lea como oportunidad y no como tarifa.
+CREATE TABLE IF NOT EXISTS precio (
+  id      INTEGER PRIMARY KEY,
+  importe INTEGER NOT NULL,
+  -- NULL en el ancla: no tiene apertura, solo cierre.
+  desde   TEXT,
+  hasta   TEXT NOT NULL,
+  ancla   INTEGER NOT NULL DEFAULT 0,
+  nota    TEXT,
+  UNIQUE (importe, hasta)
+);
 """
 
 # El ciclo completo, en orden. Cada fase dice **que servicio la mueve a la
@@ -196,6 +275,12 @@ CREATE INDEX IF NOT EXISTS regla_clase ON regla (clase, padre_id);
 CICLO = [
     (1, "catalogado", "scripts/transcribir.py --barato"),
     (2, "elegido", "scripts/seleccionar.py {n} --edl"),
+    # **Los tramos declarados se vuelven a poner justo despues de elegir.**
+    # `seleccionar` rehace el EDL desde cero, asi que sin este paso cada pasada
+    # del motor borraba las decisiones fijadas —el arranque bueno de reel-01
+    # volvia a ser la toma dudada— y nadie se enteraba. Una decision que no
+    # sobrevive a rehacer el paso anterior no es una decision: es un apaño.
+    (2.5, "fijado", "scripts/fijar.py --aplicar {n}"),
     (3, "afinado", "scripts/transcribir.py --elegidos {n}"),
     (4, "depurado", "scripts/depurar.py {n}"),
     (5, "sin_redundancia", "scripts/redundancia.py {n}"),
@@ -278,6 +363,18 @@ def validar():
     vivas = [t for t in MUERTAS if t in hay]
     if vivas:
         mal.append(f"tablas vacias y sin uso, confunden el esquema: {vivas}")
+    cf = {r[1] for r in con.execute("pragma table_info(corte_fijo)")}
+    if cf and "toma" not in cf:
+        mal.append("«corte_fijo» solo sabe de apertura y cierre: no hay donde"
+                   " declarar el tramo de una etapa, y sin eso la composicion"
+                   " no se puede aplicar por la linea")
+    if "precio" not in hay:
+        mal.append("falta la tabla «precio» — el precio vuelve a ser una cadena"
+                   " literal, y una cadena no caduca (C-28)")
+    for t in ("fuente", "dato"):
+        if t not in hay:
+            mal.append(f"falta la tabla «{t}» — una cifra en pantalla no tiene"
+                       f" donde declarar de donde sale, y eso es cumplimiento")
     if "medicion" not in hay:
         mal.append("falta «medicion»: lo que se mide de cada render no se guarda"
                    " en ningun sitio, asi que no se puede comparar entre tandas")
@@ -289,6 +386,62 @@ def validar():
     return mal
 
 
+# La escalera que fijo Jaime el 29 de agosto de 2026, corrida para arrancar hoy.
+# El Early Bird se conserva como fila pasada: es el ancla.
+ESCALERA = [
+    (10, None, "2026-08-28", 1, "Early Bird — fila pasada, ancla"),
+    (20, "2026-08-29", "2026-09-04", 0, None),
+    (30, "2026-09-05", "2026-09-11", 0, None),
+    (40, "2026-09-12", "2026-09-21T11:30", 0, "cierra con el evento"),
+]
+
+
+def _corte_fijo_etapa(con):
+    """`corte_fijo` deja de servir solo para la apertura y el cierre.
+
+    La composicion sabe decir «esta etapa no entrega y la toma buena esta en el
+    segundo 516», y no habia donde declararlo: el CHECK solo admitia `apertura`
+    y `cierre`. Aplicar esa decision era editar el EDL a mano — el agujero por
+    el que este proyecto pierde el estado.
+
+    Se anaden tambien `toma` —el tramo bueno puede estar en OTRA cinta, y sin
+    esa columna el fijado apuntaria a la del video—, y `quien`/`fecha`, porque
+    una decision declarada sin autor no se puede discutir despues.
+
+    SQLite no sabe alterar un CHECK, asi que se reconstruye la tabla. Las 13
+    filas que hay se conservan.
+    """
+    cols = {r[1] for r in con.execute("pragma table_info(corte_fijo)")}
+    if "toma" in cols:
+        return False
+    con.executescript("""
+      CREATE TABLE corte_fijo_nuevo (
+        id       INTEGER PRIMARY KEY,
+        video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+        papel    TEXT NOT NULL CHECK (papel IN ('apertura','cierre','etapa')),
+        -- En `etapa` es el numero de beat; en apertura/cierre, el orden.
+        orden    INTEGER NOT NULL DEFAULT 0,
+        desde    REAL NOT NULL,
+        hasta    REAL NOT NULL,
+        toma     TEXT,
+        por_que  TEXT,
+        quien    TEXT,
+        fecha    TEXT,
+        -- Varios tramos por etapa: la idea puede vivir en dos sitios de
+        -- la cinta, y con la clave sin `desde` el segundo pisaba al primero.
+        UNIQUE (video_id, papel, orden, desde),
+        CHECK (hasta > desde)
+      );
+      INSERT INTO corte_fijo_nuevo (id, video_id, papel, orden, desde, hasta,
+                                    por_que)
+        SELECT id, video_id, papel, orden, desde, hasta, por_que
+          FROM corte_fijo;
+      DROP TABLE corte_fijo;
+      ALTER TABLE corte_fijo_nuevo RENAME TO corte_fijo;
+    """)
+    return True
+
+
 def migrar():
     con = _con()
     cols = {r[1] for r in con.execute("pragma table_info(fase)")}
@@ -296,6 +449,13 @@ def migrar():
     if "servicio" not in cols:
         alter += "ALTER TABLE fase ADD COLUMN servicio TEXT;"
     con.executescript(NUEVAS.replace("ALTER_FASE_SERVICIO;", alter))
+    _corte_fijo_etapa(con)
+    for importe, desde, hasta, ancla, nota in ESCALERA:
+        con.execute("insert into precio (importe, desde, hasta, ancla, nota)"
+                    " values (?,?,?,?,?) on conflict(importe, hasta) do update"
+                    " set desde=excluded.desde, ancla=excluded.ancla,"
+                    " nota=excluded.nota",
+                    (importe, desde, hasta, ancla, nota))
     # El ciclo, idempotente: se corrige el nombre y el servicio de las que ya
     # estan y se anaden las que faltan.
     for orden, nombre, serv in CICLO:

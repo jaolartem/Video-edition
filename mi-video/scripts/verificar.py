@@ -42,28 +42,12 @@ import sqlite3
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-import transcribir  # noqa: E402
+from servicios import Pieza  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
 
-def _texto(edl, cache):
-    """Lo que de verdad dice cada etapa, en orden de montaje."""
-    por = {}
-    for rango, det in zip(edl["segmentos"], edl["detalle"]):
-        toma = det.get("toma")
-        if toma not in cache:
-            try:
-                cache[toma] = transcribir.exigir(toma)["segmentos"]
-            except SystemExit:
-                cache[toma] = []
-        ws = [w["text"] for w in cache[toma]
-              if rango[0] - 0.02 <= w["start"] and w["end"] <= rango[1] + 0.02]
-        por.setdefault(det.get("beat"), []).extend(ws)
-    return {b: " ".join(v) for b, v in por.items()}
-
-
-def revisar(slug, cache):
+def revisar(slug):
     """Todo lo que tiene que cumplirse. Devuelve la lista de motivos para parar."""
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
@@ -84,7 +68,7 @@ def revisar(slug, cache):
     #
     # Comparando el texto, **caduca sólo la etapa que se movió**. Las demás
     # siguen valiendo, que es exactamente para lo que existe la modularidad.
-    dice = _texto(edl, cache)
+    dice = Pieza(int(slug[-2:])).texto
     filas = con.execute(
         "select etapa_orden, sobre_texto, integridad, remedio from escena_desc"
         " where video_slug = ?", (slug,)).fetchall()
@@ -134,7 +118,47 @@ def revisar(slug, cache):
         mal.append(f"{slug}: pedido(s) de IA sin contestar: {abiertos}."
                    f" La pieza se montaria sin esa decision.")
 
-    # 6 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con
+    # **Nada se dice dos veces por culpa del corte.**
+    #
+    # Jaime: *«la redundancia o es explicita en el libreto, o es continua en la
+    # grabacion; pero dejar enfasis cada corte no es enfasis sino ruido»*. Lo
+    # que sobrevive aqui es lo tercero: el montaje pego dos tomas de la misma
+    # frase y la pieza la dice dos veces.
+    #
+    # Existia el detector —`repeticiones.py`— y **no lo llamaba nadie**. Por eso
+    # esta aqui: en la puerta, que es lo que no se puede saltar.
+    import consulta as _cs
+
+    # **La puerta para la repeticion PEGADA**, que es la que no admite lectura:
+    # «su negocio esta funcionando, su negocio esta vendiendo» es el hablante
+    # rearrancando, y suena a error. La repeticion separada puede ser retorica
+    # —«30 mil dolares… 30 mil dolares» esta asi en el libreto— y esa no la
+    # decide un umbral: va al dossier del paso que compone.
+    for r in _cs.repetido(slug):
+        if r["separadas_por"] <= 8:
+            mal.append(
+                f"{slug} e{r['etapa']}: dice «{r['dice']}» dos veces seguidas"
+                f" — es rearranque del hablante o repeticion del corte, no"
+                f" enfasis")
+
+    # 7 · **Un tramo fijado que no llegó al corte es una decisión perdida.**
+    #
+    # Fijar una etapa es declarar cuál es su tramo, y esa decisión tiene que
+    # poder sobrevivir a rehacer la selección. Si el EDL no la lleva, alguien
+    # decidió y el montaje no se enteró — que es la forma exacta en la que este
+    # proyecto perdía el estado antes de que fijar existiera.
+    import fijar as _fj
+
+    puestos = {(d.get("beat"), round(a, 2))
+               for (a, _b), d in zip(edl["segmentos"], edl["detalle"])}
+    for f in _fj.fijados(slug):
+        if (f["beat"], round(f["desde"], 2)) not in puestos:
+            mal.append(
+                f"{slug} e{f['beat']}: hay un tramo fijado"
+                f" [{f['desde']}-{f['hasta']}] que no está en el corte."
+                f" Corre: python scripts/fijar.py --aplicar {int(slug[-2:])}")
+
+    # 7 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con
     # ancla que ya no resuelve es una corrección perdida en silencio (C-79).
     pend = con.execute(
         "select count(*) from revision where video_slug = ? and accion='cortar'"
@@ -151,10 +175,10 @@ def main():
     ap.add_argument("--avisa", action="store_true",
                     help="informa y no bloquea")
     a = ap.parse_args()
-    cache, todo = {}, []
+    todo = []
     for n in (a.reels or [1, 2, 3, 4, 5, 6]):
         slug = f"reel-{n:02d}"
-        mal = revisar(slug, cache)
+        mal = revisar(slug)
         todo += mal
         print(f"{slug}: {'OK' if not mal else str(len(mal)) + ' motivo(s)'}")
         for m in mal:

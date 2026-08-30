@@ -8,6 +8,10 @@ mi-video/public/musica/
 mi-video/public/sfx/
 mi-video/work/
 mi-video/node_modules/
+# El bytecode no es codigo fuente: 25 .pyc comprometidos hacian que un cambio
+# de dos ficheros midiera diecinueve en `alcance.py`, que es justamente el
+# instrumento con el que se mira si un cambio se paso de alcance.
+__pycache__/
 mi-video/.parcel-cache/
 
 # Lo que SÍ entra, y por qué:

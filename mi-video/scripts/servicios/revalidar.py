@@ -56,6 +56,24 @@ class ServicioRevalidar(Servicio):
         filas = revalidar.dossier(pieza.slug)
         if not filas:
             return Resultado(False, motivo="el dossier sale vacio")
+        # **El bucle corre ANTES de preguntar, y su historial va en el pedido.**
+        #
+        # Jaime: *«luego el LLM hace lo mismo, pero recibiendo la info de la
+        # primera pasada; con eso puede tomar mejores decisiones y componer por
+        # alguno de los caminos alguna de las opciones»*.
+        #
+        # O sea que el LLM no empieza en blanco: llega cuando la maquina ya
+        # midio el montaje, lo comparo con las candidatas y —si no ganaba— probo
+        # otras pasandolas por el barrido caro. Preguntar antes de eso es pedir
+        # una opinion sobre datos que todavia no existen.
+        #
+        # Y el coste se paga solo donde hace falta: `rondas` no afina nada si el
+        # montaje ya gana por encima del ruido del detector.
+        for f in filas:
+            try:
+                f["historial"] = revalidar.rondas(pieza.slug, f["beat"])
+            except Exception as e:                 # noqa: BLE001
+                f["historial"] = [{"error": str(e)[:160]}]
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
         r = contrato.pedir("revalidar", pieza.slug, prompt, filas)

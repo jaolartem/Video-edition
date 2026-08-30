@@ -23,7 +23,7 @@ class ServicioVerificar(Servicio):
     def correr(self, pieza: Pieza) -> Resultado:
         import verificar
 
-        mal = verificar.revisar(pieza.slug, {})
+        mal = verificar.revisar(pieza.slug)
         if not mal:
             return Resultado(True, salida="pasa la puerta")
         # Se devuelve el primero y se cuentan los demas: el motivo tiene que

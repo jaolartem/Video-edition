@@ -25,10 +25,18 @@ import { bruto } from "./rutas.mjs";
 /**
  * Silencio interno que se quita. Por debajo de esto es respiración y se queda:
  * quitarla toda deja el habla pegada y suena a locutor de radio.
+ *
+ * **Bajado de 0,25 a 0,16 por indicación de Jaime**, viendo el primer render:
+ * *«el vídeo tiene mucho tiempo entre frases y muchos silencios entre frases
+ * pueden ser cortados; como son microsegundos, los cortes no se suelen notar»*.
+ * Con 0,25 se conservaba toda pausa corta, y en una pieza de veinte trozos eso
+ * son varios segundos de nada. Con 0,16 se respeta la respiración y se va el
+ * hueco. Y no queda crudo: la mezcla pasa por Adobe Podcast, que suaviza el
+ * empalme — *«Adobe Podcast va a suavizar los cortes»*.
  */
-const AIRE = 0.25;
+const AIRE = 0.16;
 /** Margen que se deja a cada lado del habla para no comerse la consonante. */
-const MARGEN = 0.06;
+const MARGEN = 0.05;
 
 /**
  * Interseca un tramo del EDL con los tramos de habla medidos.
@@ -107,7 +115,35 @@ let aireQuitado = 0;
  * La etapa sale del `detalle` del EDL **por el corte del que nace la escena**,
  * no por tiempo: el reparto puede ir fuera de orden (aprendizaje 35).
  */
+/**
+ * **Las pausas que se conservan, declaradas en el libreto.**
+ *
+ * Jaime: *«lo de los silencios tambien puede ser aritmetico… excepto cuando
+ * aporta: antes de una revelacion o de una afirmacion importante, siempre y
+ * cuando el silencio sea mirando a camara»*. Quitar aire es aritmetica y corre
+ * sola; **conservarlo es una decision**, y por eso se declara — con `[pausa]`
+ * en el texto del libreto de esa etapa.
+ *
+ * Aqui eso significa una cosa concreta: en la etapa marcada **no se recorta el
+ * silencio de entrada**. El resto del aire de la pieza se sigue yendo.
+ */
+const PAUSAS = (() => {
+  try {
+    return JSON.parse(
+      execFileSync("python", ["scripts/consulta.py", "pausas",
+                              JSON.stringify([slug])], { encoding: "utf8" }),
+    );
+  } catch {
+    return {};
+  }
+})();
+
 const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
+  const d0 = (edl.detalle || [])[iSeg] || {};
+  // Etapa con pausa declarada: entra tal cual, con su silencio.
+  if (PAUSAS[String(d0.beat)]) {
+    return [[a, b, d0.beat ?? iSeg + 1, d0.etapa || "", d0.texto || ""]];
+  }
   const t = conHabla(a, b, runs);
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
   const d = (edl.detalle || [])[iSeg] || {};

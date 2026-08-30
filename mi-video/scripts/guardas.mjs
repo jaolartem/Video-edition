@@ -41,7 +41,10 @@ const texto = fs.readFileSync(LOG, "utf8");
 
 /** Cada entrada, con su número, su título y su cuerpo. */
 const entradas = [];
-for (const bloque of texto.split(/^### /m).slice(1)) {
+// `###` o `##`: el log usa los dos niveles y mirar solo uno dejaba 28
+// entradas sin comprobar —y, peor, pegaba sus guardas al bloque anterior, asi
+// que una rotura de C-81 se denunciaba como rotura de C-53.
+for (const bloque of texto.split(/^###? /m).slice(1)) {
   const salto = bloque.indexOf("\n");
   const titulo = bloque.slice(0, salto).trim();
   const num = titulo.match(/^C-(\d+)/)?.[1];

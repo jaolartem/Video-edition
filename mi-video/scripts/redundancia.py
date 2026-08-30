@@ -73,8 +73,13 @@ def dossier(slug, con_voz=True):
                 cache[toma] = transcribir.exigir(toma)["segmentos"]
             except SystemExit:
                 cache[toma] = []
+        # La vara de que palabra suena dentro del corte vive en
+        # `transcribir.suena` (C-84): este era el tercer sitio que llevaba su
+        # propia copia, y con la copia vieja el dossier de redundancia perdia
+        # una palabra en cada borde — justo donde se ve si dos trozos dicen lo
+        # mismo.
         ws = [w["text"] for w in cache[toma]
-              if rango[0] - 0.02 <= w["start"] and w["end"] <= rango[1] + 0.02]
+              if transcribir.suena(w, rango[0], rango[1])]
         dur = (rango[1] - rango[0]) / beats.VELOCIDAD
         if ws:
             fila = {"en": round(t, 1), "beat": det.get("beat"),

@@ -127,6 +127,395 @@ def mejor(edl, i, cache):
     return elegido
 
 
+# Lo que hace que un borde sea limpio. Jaime: *«muy importante que los cortes
+# sean finos, que no queden inicios con palabras anteriores»*.
+#
+# `AIRE` es el silencio que basta para que el oido oiga una frontera; por debajo
+# de eso el corte entra pegado a la palabra de antes y se oye el empalme o se
+# come el arranque. `BUSCA` es cuanto se mira a cada lado antes de rendirse.
+AIRE = 0.30
+BUSCA = 2.0
+
+
+# Palabras con las que una frase **no puede acabar**: articulos, preposiciones y
+# conectores. Si el ultimo trozo de una etapa muere en una de estas, la idea se
+# quedo sin objeto.
+COLGANTES = {"y", "o", "u", "pero", "porque", "que", "cuando", "si", "de", "del",
+             "la", "el", "los", "las", "un", "una", "unos", "unas", "en", "a",
+             "al", "con", "para", "por", "su", "sus", "se", "le", "les", "lo",
+             "me", "te", "nos", "es", "son", "mi", "tu", "como", "sin", "sobre",
+             "entre", "hasta", "desde", "muy", "mas", "más", "ya", "no"}
+
+
+def _colgante(txt):
+    return txt.strip(".,¿?¡!;:").lower() in COLGANTES
+
+
+def _fronteras(ws):
+    """Los sitios donde una frase puede empezar o acabar de verdad.
+
+    Dos senales, y las dos salen de la transcripcion buena:
+
+    - **La puntuacion.** El barrido de cuatro pasadas devuelve puntos e
+      interrogantes, asi que se sabe donde cierra una idea sin adivinar.
+    - **El aire.** Un hueco de `AIRE` entre dos palabras es una frontera aunque
+      no lleve punto: el hablante respiro ahi.
+    """
+    ini, fin = [], []
+    for k, w in enumerate(ws):
+        antes = ws[k - 1] if k else None
+        if antes is None or w["start"] - antes["end"] >= AIRE or \
+           antes["text"].strip().endswith((".", "?", "!")):
+            ini.append(w["start"])
+        sig = ws[k + 1] if k + 1 < len(ws) else None
+        if sig is None or sig["start"] - w["end"] >= AIRE or \
+           w["text"].strip().endswith((".", "?", "!")):
+            fin.append(w["end"])
+    return sorted(set(ini)), sorted(set(fin))
+
+
+def _fuera_de_palabra(x, ws, hacia):
+    """Saca un corte de dentro de una palabra. `hacia` es 'ini' o 'fin'.
+
+    Regla de Jaime mirando el primer render: *«muy importante que los cortes
+    sean finos»*, y dos ejemplos suyos de lo que pasa cuando no lo son — en el
+    segundo 58 se oye «30, much» y en el 1:15 queda «rente», la cola de
+    «diferente». Las dos son el mismo fallo: **el corte cayo en mitad de una
+    palabra**.
+
+    Un corte dentro de una palabra no se arregla con criterio: se saca. Al
+    entrar, a donde empieza la palabra si se oye mas de media, o a donde acaba
+    si no; al salir, al reves. Es aritmetica, y por eso puede correr siempre.
+    """
+    for w in ws:
+        if not (w["start"] < x < w["end"]):
+            continue
+        dentro = (x - w["start"]) / max(w["end"] - w["start"], 1e-6)
+        # **Al borde exacto, sin margen.** Con ±0,02 el corte salia de una
+        # palabra y entraba en la de al lado —el transcript las da pegadas, sin
+        # hueco entre el final de una y el principio de la siguiente—, asi que
+        # el arreglo oscilaba y nunca convergia: once cortes «arreglados» en
+        # cada pasada, indefinidamente. En el borde justo no esta dentro de
+        # ninguna, y el margen para no comerse la consonante ya lo pone
+        # `plan-reel` al cortar.
+        if hacia == "ini":
+            return w["start"] if dentro < 0.5 else w["end"]
+        return w["end"] if dentro > 0.5 else w["start"]
+    return x
+
+
+def palabras_enteras(slug, ver=False):
+    """Ningun corte de la pieza cae dentro de una palabra."""
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    cache, tocados = {}, 0
+    for i, ((a, b), det) in enumerate(zip(edl["segmentos"], edl["detalle"])):
+        t = det.get("toma")
+        if t not in cache:
+            try:
+                cache[t] = transcribir.exigir(t)["segmentos"]
+            except SystemExit:
+                cache[t] = []
+        ws = cache[t]
+        if not ws:
+            continue
+        na = round(_fuera_de_palabra(a, ws, "ini"), 3)
+        nb = round(_fuera_de_palabra(b, ws, "fin"), 3)
+        if nb - na < 0.3:
+            continue
+        if abs(na - a) > 0.001 or abs(nb - b) > 0.001:
+            if ver:
+                print(f"  {slug} e{det.get('beat')}: [{a:.2f}-{b:.2f}] ->"
+                      f" [{na:.2f}-{nb:.2f}]")
+            edl["segmentos"][i] = [na, nb]
+            tocados += 1
+    if tocados and not ver:
+        edl["duracion_s"] = round(sum(y - x for x, y in edl["segmentos"]), 2)
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    print(f"{slug}: {tocados} corte(s) sacados de dentro de una palabra")
+    return tocados
+
+
+def mudos(slug, ver=False):
+    """Fuera los trozos que no dicen ni una palabra entera.
+
+    Los deja el propio ajuste de bordes: al mover una entrada o cerrar una cola
+    puede quedar un resto de dos o tres decimas con media palabra dentro. Medido
+    en el lote: cinco trozos de 0,26 a 0,57 s **sin una sola palabra completa**.
+
+    Es aritmetica —un segmento sin palabras no dice nada— asi que se quita solo.
+    Y quitarlo aprieta el montaje: son restos que suenan a chasquido.
+    """
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    segs, det = edl["segmentos"], edl["detalle"]
+    cache, fuera = {}, []
+    for i, ((a, b), d) in enumerate(zip(segs, det)):
+        if b - a >= 0.7:
+            continue
+        t = d.get("toma")
+        if t not in cache:
+            try:
+                cache[t] = transcribir.exigir(t)["segmentos"]
+            except SystemExit:
+                cache[t] = []
+        if not [w for w in cache[t] if transcribir.suena(w, a, b)]:
+            fuera.append(i)
+            if ver:
+                print(f"  {slug} e{d.get('beat')}: fuera [{a:.2f}-{b:.2f}]"
+                      f" ({b - a:.2f}s sin una palabra)")
+    if fuera and not ver:
+        edl["segmentos"] = [x for k, x in enumerate(segs) if k not in fuera]
+        edl["detalle"] = [x for k, x in enumerate(det) if k not in fuera]
+        edl["duracion_s"] = round(sum(y - x for x, y in edl["segmentos"]), 2)
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    print(f"{slug}: {len(fuera)} trozo(s) mudos fuera")
+    return len(fuera)
+
+
+def sin_solapes(slug, ver=False):
+    """Dos trozos de la misma cinta no pueden pisarse: eso es audio repetido.
+
+    Salio de una nota de Jaime sobre el primer render —«segundo 8 repite "eso no
+    es"»— y al medirlo eran cinco solapes en el lote, uno de **10,4 segundos** en
+    `reel-01`: la convocatoria entera sonando dos veces.
+
+    Los produce mover bordes: al estirar una entrada hacia atras para devolverle
+    la cabeza a la frase, esa entrada puede meterse dentro del trozo anterior. La
+    guarda de `bordes` miraba el trozo anterior **en el orden de la lista**, y
+    tras reordenar por beat ese ya no era el que estaba antes en la cinta.
+
+    Se arregla por lo que significa: si los dos trozos son de la **misma etapa**,
+    son el mismo tramo partido y se funden; si son de etapas distintas, el
+    segundo empieza donde acaba el primero.
+    """
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    segs, det = edl["segmentos"], edl["detalle"]
+    orden = sorted(range(len(segs)),
+                   key=lambda i: (det[i].get("toma") or "", segs[i][0]))
+    fuera, tocados = set(), 0
+    for k in range(len(orden) - 1):
+        i, j = orden[k], orden[k + 1]
+        if i in fuera or (det[i].get("toma") != det[j].get("toma")):
+            continue
+        if segs[j][0] >= segs[i][1] - 0.05:
+            continue
+        tocados += 1
+        if det[i].get("beat") == det[j].get("beat"):
+            segs[i][1] = max(segs[i][1], segs[j][1])       # se funden
+            fuera.add(j)
+            if ver:
+                print(f"  {slug} e{det[i].get('beat')}: fundidos en"
+                      f" [{segs[i][0]:.2f}-{segs[i][1]:.2f}]")
+        else:
+            if ver:
+                print(f"  {slug} e{det[j].get('beat')}: entrada {segs[j][0]:.2f}"
+                      f" -> {segs[i][1]:.2f} (pisaba a e{det[i].get('beat')})")
+            segs[j][0] = segs[i][1]
+    if tocados and not ver:
+        edl["segmentos"] = [x for k, x in enumerate(segs) if k not in fuera]
+        edl["detalle"] = [x for k, x in enumerate(det) if k not in fuera]
+        edl["duracion_s"] = round(sum(y - x for x, y in edl["segmentos"]), 2)
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    print(f"{slug}: {tocados} solape(s) resueltos")
+    return tocados
+
+
+def bordes(slug, ver=False):
+    """Lleva cada entrada y cada salida a la frontera de frase mas cercana.
+
+    **No cambia lo que la etapa dice**: mueve el corte al silencio que ya existe,
+    dentro de `BUSCA` segundos. Si el borde ya esta limpio, no lo toca; si no hay
+    frontera cerca, lo deja y lo dice — mover mas de dos segundos si cambiaria lo
+    que se oye, y eso es otra decision.
+
+    Medido antes de esto: 27 de 85 entradas del lote entraban con menos de 0,2 s
+    de aire. `reel-06` e6 empezaba en «anos» cuando lo anterior era «En 10», y e5
+    en «mil» dejando fuera el «30»: el corte se comia la cifra.
+    """
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0, 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    cache = {}
+    movidos, sucios = 0, 0
+    for i, ((a, b), det) in enumerate(zip(edl["segmentos"], edl["detalle"])):
+        t = det.get("toma")
+        if t not in cache:
+            try:
+                ws = transcribir.exigir(t)["segmentos"]
+            except SystemExit:
+                ws = []
+            cache[t] = (ws, _fronteras(ws)) if ws else ([], ([], []))
+        ws, (ini, fin) = cache[t]
+        if not ws:
+            continue
+        na = min((x for x in ini if abs(x - a) <= BUSCA),
+                 key=lambda x: abs(x - a), default=None)
+        nb = min((x for x in fin if abs(x - b) <= BUSCA),
+                 key=lambda x: abs(x - b), default=None)
+        # **Dos guardas, y las dos salen de verlo fallar.** Sin la primera, un
+        # borde se iba 1,9 s y el segmento pasaba a decir otra cosa; sin la
+        # segunda, la entrada de una etapa se metia dentro de la salida de la
+        # anterior y los dos trozos se solapaban en el montaje.
+        antes_fin = None
+        for j in range(i - 1, -1, -1):
+            if edl["detalle"][j].get("toma") == t:
+                antes_fin = edl["segmentos"][j][1]
+                break
+        palabras = [w for w in ws if transcribir.suena(w, a, b)]
+
+        def _mantiene(x, y):
+            if not palabras:
+                return True
+            quedan = sum(1 for w in palabras if transcribir.suena(w, x, y))
+            return quedan >= max(1, int(len(palabras) * 0.8))
+
+        # **Y si no hay frontera cerca, se le devuelve la cabeza de la frase.**
+        #
+        # Una entrada pegada a la palabra anterior sin pausa a la vista no se
+        # arregla moviendola: se arregla **incluyendo** lo que le falta. La
+        # senal es la puntuacion: si la palabra de antes cierra con punto, esta
+        # entrada ya es principio de frase y solo suena pegada; si no cierra,
+        # entonces la frase empezo antes y el corte se comio la cabeza.
+        #
+        # Medido: `reel-06` e5 entraba en «mil dolares al año» con el «30» fuera,
+        # y `reel-05` e7 en «activo esa tasa» con el «no» fuera —que invierte la
+        # frase—. Estirar hacia atras hasta la frontera devuelve la cifra y la
+        # negacion.
+        if na is None or abs(na - a) > BUSCA:
+            k = next((j for j, w in enumerate(ws)
+                      if w["start"] >= a - 0.001), None)
+            if k:
+                j = k
+                while j > 0:
+                    ant = ws[j - 1]
+                    # La coma cuenta como frontera **solo aqui**, al estirar
+                    # hacia atras: buscamos la cabeza de ESTA frase, no la
+                    # anterior entera. Con el punto solo, `reel-03` se traia
+                    # «usted tiene un contador» dos veces.
+                    if ws[j]["start"] - ant["end"] >= AIRE or                        ant["text"].strip().endswith((".", "?", "!", ",")):
+                        break
+                    j -= 1
+                cand = round(max(0.0, ws[j]["start"] - 0.08), 3)
+                # **La cabeza que se devuelve no puede ser un arranque en
+                # falso.** Si lo que hay delante repite lo que la etapa ya dice
+                # —«esto es diferente, esto es diferente»— no es la cabeza de la
+                # frase: es el intento anterior, y meterlo es meter tartamudeo.
+                def _norm(x):
+                    return "".join(c for c in x.lower() if c.isalnum())
+
+                cabeza = [_norm(w["text"]) for w in ws[j:k] if _norm(w["text"])]
+                primeras = {_norm(w["text"]) for w in ws[k:k + 5]}
+                repite = sum(1 for x in cabeza if x in primeras)
+                if j < k and (antes_fin is None or cand >= antes_fin - 0.001)                    and a - cand <= 4.0 and len(cabeza) >= 2 and repite <= 1:
+                    edl["segmentos"][i][0] = cand
+                    if ver:
+                        print(f"  {slug} e{det.get('beat')}: cabeza devuelta"
+                              f" [{a:.2f} -> {cand:.2f}] «"
+                              + " ".join(w["text"] for w in ws[j:k]) + "»")
+                    movidos += 1
+                    continue
+
+        # **Y la cola tampoco puede quedar colgando.** Mismo problema por el
+        # otro extremo: `reel-02` acababa una etapa en «se queda con» —sin la
+        # cifra— y otra en «voy a» —sin el verbo—. Una frase que muere en una
+        # preposicion no dice nada, y el espectador se queda esperando.
+        ult = [w for w in ws if transcribir.suena(w, a, b)]
+        # **El conector volando: la primera palabra de la frase siguiente que se
+        # colo al final.** Jaime lo vio en el primer render —«hay un conector
+        # volando (y cuando)»—. Se reconoce porque va en mayuscula o porque lo
+        # anterior cerro con punto: no es que falte el objeto, es que sobra la
+        # palabra. Esa no se extiende: se corta.
+        if len(ult) >= 2 and _colgante(ult[-1]["text"]):
+            prev = ult[-2]["text"].strip()
+            if ult[-1]["text"].strip()[:1].isupper() or                prev.endswith((".", "?", "!")):
+                cand = round(ult[-2]["end"], 3)
+                if cand - edl["segmentos"][i][0] > 0.8:
+                    edl["segmentos"][i][1] = cand
+                    if ver:
+                        print(f"  {slug} e{det.get('beat')}: conector suelto"
+                              f" fuera «{ult[-1]['text']}»")
+                    movidos += 1
+                    continue
+        if ult and _colgante(ult[-1]["text"]):
+            k2 = ws.index(ult[-1])
+            j2 = k2
+            while j2 + 1 < len(ws):
+                sig = ws[j2 + 1]
+                if sig["start"] - ws[j2]["end"] >= AIRE:
+                    break
+                j2 += 1
+                if ws[j2]["text"].strip().endswith((".", "?", "!", ",")) and                    not _colgante(ws[j2]["text"]):
+                    break
+            cand = round(ws[j2]["end"], 3)
+            if j2 > k2 and cand - b <= 3.0:
+                edl["segmentos"][i][1] = cand
+                if ver:
+                    print(f"  {slug} e{det.get('beat')}: cola cerrada"
+                          f" [{b:.2f} -> {cand:.2f}] «"
+                          + " ".join(w["text"] for w in ws[k2 + 1:j2 + 1]) + "»")
+                movidos += 1
+                continue
+            # **Si completar la frase costaria mas de tres segundos, se corta la
+            # palabra que cuelga.** Mejor una etapa que acaba un poco seca que
+            # una que acaba en «voy a» — y mejor eso que alargar la pieza tres
+            # segundos por una preposicion.
+            if len(ult) >= 2:
+                corte = round(ult[-2]["end"], 3)
+                if corte - edl["segmentos"][i][0] > 0.8:
+                    edl["segmentos"][i][1] = corte
+                    if ver:
+                        print(f"  {slug} e{det.get('beat')}: cola cortada"
+                              f" «{ult[-1]['text']}»")
+                    movidos += 1
+                    continue
+
+        cambia = False
+        if na is not None and abs(na - a) > 0.01 and (nb or b) - na > 0.8:
+            cand = round(max(0.0, na - 0.08), 3)
+            if (antes_fin is None or cand >= antes_fin - 0.001) and                _mantiene(cand, b):
+                # Se entra un pelin antes de la primera palabra, para no comerse
+                # el ataque de la consonante.
+                edl["segmentos"][i][0] = cand
+                cambia = True
+        if nb is not None and abs(nb - b) > 0.01 and nb - edl["segmentos"][i][0] > 0.8:
+            cand = round(nb + 0.12, 3)
+            if _mantiene(edl["segmentos"][i][0], cand):
+                edl["segmentos"][i][1] = cand
+                cambia = True
+        if cambia:
+            movidos += 1
+            if ver:
+                print(f"  {slug} e{det.get('beat')}: [{a:.2f}-{b:.2f}] ->"
+                      f" [{edl['segmentos'][i][0]:.2f}-{edl['segmentos'][i][1]:.2f}]")
+        elif na is None:
+            sucios += 1
+    if not ver and movidos:
+        edl["duracion_s"] = round(sum(y - x for x, y in edl["segmentos"]), 2)
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    print(f"{slug}: {movidos} borde(s) llevados a frontera de frase"
+          f"{f' · {sucios} sin frontera cerca' if sucios else ''}")
+    return movidos, sucios
+
+
 def arreglar(slug, ver=False):
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
@@ -170,9 +559,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--bordes", action="store_true",
+                    help="lleva entradas y salidas a la frontera de frase")
+    ap.add_argument("--palabras", action="store_true",
+                    help="saca los cortes de dentro de una palabra")
     a = ap.parse_args()
     for n in (a.reels or [1, 2, 3, 4, 5, 6]):
-        arreglar(f"reel-{n:02d}", ver=a.ver)
+        slug = f"reel-{n:02d}"
+        if a.palabras:
+            sin_solapes(slug, ver=a.ver)
+            palabras_enteras(slug, ver=a.ver)
+            mudos(slug, ver=a.ver)
+        elif a.bordes:
+            bordes(slug, ver=a.ver)
+            sin_solapes(slug, ver=a.ver)
+            palabras_enteras(slug, ver=a.ver)
+        else:
+            arreglar(slug, ver=a.ver)
 
 
 if __name__ == "__main__":

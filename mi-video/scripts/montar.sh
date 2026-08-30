@@ -24,12 +24,13 @@ cd "$(dirname "$0")/.."
 # `candidatos.py` reventaba al imprimir una flecha —`UnicodeEncodeError`— con el
 # fichero ya escrito: el trabajo estaba hecho y el paso salia con error. Es el
 # gotcha 1 del proyecto por otra puerta: el entorno no es el que el codigo supone.
-export PYTHONIOENCODING=utf-8
-
-export TMPDIR="F:/tmp-video"
-export TEMP="$TMPDIR"
-export TMP="$TMPDIR"
-mkdir -p "$TMPDIR"
+#
+# **Y la ruta ya no se escribe aquí.** Se declara en `rutas.json` y la pone
+# `entorno.sh`, que ademas se planta si apunta a C:. Tenerla escrita en este
+# fichero significaba que cualquier paso lanzado por fuera de `montar.sh`
+# —un render suelto, una prueba— volvia a producir en el disco del sistema, y
+# ahi es donde murieron dos renders con el disco al 96%.
+source "$(dirname "$0")/entorno.sh"
 
 # **Las correcciones, antes que nada.** Cada entrada de `docs/correcciones.md`
 # declara el fichero y el trozo de código donde quedó imposible repetirla; si

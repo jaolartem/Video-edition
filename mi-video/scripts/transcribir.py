@@ -501,6 +501,31 @@ def _guardar_en_base(toma, mapa):
     con.close()
 
 
+def suena(w, a, b):
+    """¿Esta palabra se oye dentro del corte `[a, b]`?
+
+    **La vara es la del oido, no la del filtro.** Exigir la palabra entera
+    dentro del rango se come una en cada borde de cada segmento: en reel-06 e5
+    «estructura» acababa 51 milesimas despues del corte y el texto del montaje
+    decia «que facture 180 mil sin puede estar perdiendo» (C-84). El espectador
+    oye lo que suena, asi que la palabra esta si **mas de la mitad** de su
+    duracion cae dentro.
+
+    Vive aqui porque aqui viven las palabras: lo tenian copiado `Pieza.texto` y
+    las dos extracciones de `revalidar.py`, y una regla de medida repetida en
+    tres sitios son tres reglas en cuanto alguien toca una.
+    """
+    dur = w["end"] - w["start"]
+    if dur <= 0:
+        # **La palabra sin duracion existe y se oye.** Whisper devuelve marcas
+        # iguales cuando dos palabras caen en el mismo frame: hay 207 en las
+        # siete cintas. Con `> dur/2` ninguna pasaba —`0 > 0` es falso— y se
+        # perdian palabras portantes: reel-01 e3 se quedaba sin «Pongamoslo» y
+        # reel-06 e2 sin «mes». Para ella la vara es estar dentro.
+        return a <= w["start"] <= b
+    return (min(b, w["end"]) - max(a, w["start"])) > dur / 2
+
+
 def afinar(toma, tramos, pasadas=4):
     """JUBILADO para la via normal. Re-transcribe SOLO esos tramos.
 
@@ -653,10 +678,19 @@ def afinar(toma, tramos, pasadas=4):
     # no mitad de palabra. Si el afinado sustituye tramos ENTEROS, lo viejo y lo
     # nuevo nunca comparten una palabra y el solape deja de existir. Por eso
     # `afinar` redondea lo que le piden al tramo que lo contiene antes de nada.
-    ini = min(a for a, _ in tramos)
-    fin = max(b for _, b in tramos)
-    fuera = [w for w in d["segmentos"]
-             if w["end"] <= ini + 0.001 or w["start"] >= fin - 0.001]
+    # **Tramo a tramo, nunca del primero al ultimo.** Esto tomaba el minimo y el
+    # maximo de TODOS los tramos y borraba lo que hubiera en medio: afinar el
+    # segundo 87 y el 590 de una cinta se llevaba por delante los 503 segundos
+    # intermedios. Medido: la cinta 135637 paso de 935 palabras a 342, y en el
+    # hueco 408-519 vivian las ocho tomas alternativas del bootcamp — o sea el
+    # abanico entero donde hay que elegir, que es la materia prima del paso
+    # siguiente. El sintoma es cruel: la pieza montada se ve perfecta, porque
+    # sus tramos SI estan; lo que desaparece es todo lo que no se uso.
+    def _toca(w):
+        return any(w["end"] > x + 0.001 and w["start"] < y - 0.001
+                   for x, y in tramos)
+
+    fuera = [w for w in d["segmentos"] if not _toca(w)]
     d["segmentos"] = sorted(fuera + nuevas, key=lambda w: w["start"])
     d["afinado"] = sorted(set(tuple(t) for t in
                               [tuple(x) for x in d.get("afinado", [])] +

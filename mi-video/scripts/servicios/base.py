@@ -85,6 +85,44 @@ class Pieza:
     def existe(self) -> bool:
         return self.edl is not None
 
+    # ── lo que la pieza DICE ─────────────────────────────────────────────
+    #
+    # **Vivia en `verificar.py` como funcion privada, y ese fue el hueco.** El
+    # paso que describe la escena leia otra cosa —la eleccion guardada en la
+    # base— y la puerta comprobaba esta. Dos fuentes para «lo que dice esta
+    # etapa» son dos verdades, y la descripcion acababa hablando de un texto
+    # que el montaje ya no tenia sin que nadie lo notara.
+    #
+    # El cache es de clase a proposito: son siete cintas para seis piezas, y
+    # releerlas por pieza multiplica por seis el trabajo para el mismo dato.
+    _CINTAS: dict = {}
+
+    @property
+    def texto(self) -> dict:
+        """Lo que dice cada etapa **en el montaje actual**, por beat."""
+        import transcribir
+
+        edl = self.edl
+        if not edl:
+            return {}
+        por: dict = {}
+        for rango, det in zip(edl["segmentos"], edl["detalle"]):
+            toma = det.get("toma")
+            if toma not in Pieza._CINTAS:
+                try:
+                    Pieza._CINTAS[toma] = transcribir.exigir(toma)["segmentos"]
+                except SystemExit:
+                    # Sin cinta no se inventa texto: se queda vacio y quien
+                    # pregunte lo vera vacio. Un texto por defecto aqui es una
+                    # descripcion que describe la nada y nadie se entera.
+                    Pieza._CINTAS[toma] = []
+            # La vara —que palabra suena dentro del corte— vive en
+            # `transcribir.suena`, que es donde viven las palabras (C-84).
+            ws = [w["text"] for w in Pieza._CINTAS[toma]
+                  if transcribir.suena(w, rango[0], rango[1])]
+            por.setdefault(det.get("beat"), []).extend(ws)
+        return {b: " ".join(v) for b, v in por.items()}
+
     def _con(self):
         c = sqlite3.connect(BASE)
         c.row_factory = sqlite3.Row

@@ -71,6 +71,74 @@ import fs from "fs";
 
 const PROMPT = fs.readFileSync("scripts/describir.prompt.md", "utf8");
 
+/**
+ * **El contrato del servicio, el mismo que usan redundancia y revalidar.**
+ *
+ *     work/servicio/describir/<slug>.pedido.json      lo que el paso pregunta
+ *     work/servicio/describir/<slug>.respuesta.json   lo que contesta el servicio
+ *
+ * Antes este paso llamaba al CLI y, sin credencial, moria. Lo que pasaba
+ * entonces esta escrito arriba: la descripcion se hacia «en sesion» y se
+ * cargaba a mano. Eso no es un paso manual, es **el paso saltado** — 54 escenas
+ * cargadas en 37 segundos, ninguna anclada al montaje, y la puerta comprobando
+ * un texto que ninguna linea de codigo mantenia.
+ *
+ * Con el contrato, la sesion contesta **por el mismo sitio que el CLI** y pasa
+ * por la misma validacion. Quien conteste cambia; lo que se exige, no.
+ */
+const DIR = "work/servicio/describir";
+const rutaPedido = (slug) => `${DIR}/${slug}.pedido.json`;
+const rutaRespuesta = (slug) => `${DIR}/${slug}.respuesta.json`;
+
+function dejaPedido(slug, entrada) {
+  fs.mkdirSync(DIR, { recursive: true });
+  fs.writeFileSync(
+    rutaPedido(slug),
+    JSON.stringify({ paso: "describir", slug, prompt: PROMPT, datos: entrada },
+                   null, 1),
+  );
+}
+
+function leeRespuesta(slug) {
+  if (!fs.existsSync(rutaRespuesta(slug))) return null;
+  const arr = JSON.parse(fs.readFileSync(rutaRespuesta(slug), "utf8"));
+  if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
+  return arr;
+}
+
+/**
+ * El CLI, si tiene credencial aqui. `null` si no la tiene: **eso no es un
+ * fallo, es una espera**, y el motor distingue las dos cosas. Un fallo del
+ * prompt si sube, porque ese hay que arreglarlo.
+ */
+function porCli(entrada) {
+  let salida;
+  try {
+    salida = execFileSync(
+      "claude",
+      ["-p", `${PROMPT}\n\n---\n\n${entrada}\nResponde SOLO el array JSON.`,
+       "--output-format", "json"],
+      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"] },
+    );
+  } catch {
+    return null;                       // ni siquiera arranco: no hay CLI aqui
+  }
+  const d = JSON.parse(salida);
+  const txt = String(d.result ?? "");
+  if (d.is_error) {
+    if (/revoked|authenticat|401|not logged in|please run \/login/i.test(txt)) {
+      return null;
+    }
+    throw new Error(txt.slice(0, 200));
+  }
+  const m = txt.match(/\[[\s\S]*\]/);
+  if (!m) throw new Error("el CLI no devolvio un array JSON");
+  const arr = JSON.parse(m[0]);
+  if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
+  return arr;
+}
+
 /** Las claves que la descripción tiene que traer, y sus valores admitidos. */
 const CAMPOS = {
   etapa_orden: null,
@@ -121,6 +189,29 @@ function valida(d) {
  *
  * Y sale mas barato: seis llamadas en vez de cincuenta y cuatro.
  */
+/**
+ * **El barrido caro es la ENTRADA de este paso, no un acabado posterior.**
+ *
+ * Jaime: *«la idea del barrido caro es que el agente de IA tenga el CC correcto,
+ * y pueda tomar decisiones sobre el, eliminar redundancia y componer las
+ * escenas»*.
+ *
+ * Sin esa comprobacion, este paso compone sobre el texto del barrido barato
+ * —que sirve para localizar donde se dice algo y no para saber que se dijo— y
+ * decide con palabras que nadie pronuncio. Medido: cuatro de las seis piezas
+ * llegaron a montarse con el 0% del montaje afinado.
+ *
+ * No se avisa: se para. Un aviso en un lote de 16-50 se ignora.
+ */
+const AFINADO_MINIMO = 0.95;
+
+function sinAfinar(slug) {
+  const cob = JSON.parse(sql("cc_afinado", [slug]));
+  return Object.entries(cob)
+    .filter(([, v]) => v < AFINADO_MINIMO)
+    .map(([b, v]) => `e${b} ${Math.round(v * 100)}%`);
+}
+
 function describePieza(slug, filas) {
   // Cual es la portada ya esta decidido —es la etapa que abre— y no se
   // renegocia aqui: se le dice, para que la describa como gancho.
@@ -145,27 +236,39 @@ function describePieza(slug, filas) {
         `Funcion: ${f.mensaje ?? "(no declarada)"}`,
         "Libreto:",
         f.libreto,
+        // **Lo que dice el montaje, no lo que se eligio.** Son cosas
+        // distintas en cuanto un recorte posterior toca la etapa, y describir
+        // una mientras la puerta verifica la otra es como se llego a tener
+        // seis piezas descritas contra un texto que ya no existia.
         "Lo que de verdad se dijo:",
-        f.dicho || "(esta etapa no tiene toma: va con tablero o tarjeta)",
+        f.montaje || f.dicho ||
+          "(esta etapa no tiene toma: va con tablero o tarjeta)",
         "",
       ].join("\n"),
     ),
   ].join("\n");
 
-  const salida = execFileSync(
-    "claude",
-    ["-p", `${PROMPT}\n\n---\n\n${entrada}\nResponde SOLO el array JSON.`,
-     "--output-format", "json"],
-    { encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const d = JSON.parse(salida);
-  if (d.is_error) throw new Error(String(d.result).slice(0, 200));
-  const m = String(d.result).match(/\[[\s\S]*\]/);
-  if (!m) throw new Error("el CLI no devolvio un array JSON");
-  const arr = JSON.parse(m[0]);
-  if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
-  return arr.map(valida);
+  // `quien` tiene que decir QUIEN contesto. Puso «gemini» cuando esa via ni
+  // existia, y decir «cli» de lo que contesto la sesion es el mismo error con
+  // otro nombre: el campo esta para poder auditar de donde salio una decision.
+  const falta = sinAfinar(slug);
+  if (falta.length) {
+    throw new Error(
+      `el CC no esta afinado (${falta.join(", ")}). El barrido caro va ANTES` +
+        ` de componer: node/python scripts/transcribir.py --elegidos ${
+          Number(slug.slice(-2))}`,
+    );
+  }
+  const ya = leeRespuesta(slug);
+  if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
+  // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
+  // queda escrito es la pregunta entera —prompt incluido— y cualquiera puede
+  // contestarla despues sin reconstruir nada.
+  dejaPedido(slug, entrada);
+  const arr = porCli(entrada);
+  if (!arr) return null;
+  fs.writeFileSync(rutaRespuesta(slug), JSON.stringify(arr, null, 1));
+  return arr.map(valida).map((d) => ({ ...d, quien: "cli" }));
 }
 
 const rehacer = process.argv.includes("--rehacer");
@@ -178,7 +281,7 @@ if (!filas.length) {
 console.log(`${filas.length} escenas a describir`);
 
 let ok = 0;
-let sinAuth = null;
+const esperan = [];
 // Agrupadas por pieza: la unidad de la llamada es el video, no la etapa.
 const porPieza = new Map();
 for (const f of filas) {
@@ -188,6 +291,10 @@ for (const f of filas) {
 for (const [slug, suyas] of porPieza) {
   try {
     const ds = describePieza(slug, suyas);
+    if (!ds) {
+      esperan.push(slug);
+      continue;
+    }
     const porOrden = new Map(ds.map((d) => [Number(d.etapa_orden), d]));
     for (const f of suyas) {
       const d = porOrden.get(Number(f.orden));
@@ -204,29 +311,25 @@ for (const [slug, suyas] of porPieza) {
       );
     }
   } catch (e) {
-    const msg = String(e.message);
-    // Insistir contra una credencial revocada no la arregla.
-    // «Not logged in» sale con exit 0 y como texto dentro del JSON, asi que
-    // llegaba aqui disfrazado de «Command failed» y no se reconocia. Un fallo
-    // de credencial tiene que decir que es de credencial: si no, se confunde
-    // con un fallo del prompt y se pierde media hora buscando donde no es.
-    if (/revoked|authenticat|401|not logged in|please run \/login/i.test(msg)) {
-      sinAuth = msg.slice(0, 120);
-      break;
-    }
-    console.error(`  ${slug}: ${msg.slice(0, 160)}`);
+    // Un fallo de credencial ya no llega aqui: `porCli` lo devuelve como
+    // espera. Lo que llegue es un fallo de verdad —esquema, JSON roto— y ese
+    // se dice por pieza sin parar el lote.
+    console.error(`  ${slug}: ${String(e.message).slice(0, 160)}`);
   }
 }
 
-if (sinAuth) {
+console.log(`${ok}/${filas.length} descritas y guardadas`);
+if (esperan.length) {
   console.error(
-    `\nEl CLI no está autenticado: ${sinAuth}\n` +
+    "\nEl CLI no contesta aqui (usa la credencial de la terminal que lo lanza).\n" +
       "  claude setup-token   token de larga duración para scripts\n" +
       "  /login               dentro de una sesión interactiva\n" +
       "Y revisa ANTHROPIC_BASE_URL: puesta y vacía rompe la auth.\n" +
-      "Mientras tanto, la descripción se hace en sesión y se carga con\n" +
-      "  python scripts/consulta.py guardar_escena '[\"reel-0N\", M, {...}]'",
+      "Mientras tanto contesta el pedido: mismo esquema, misma validación.",
   );
+  // La ULTIMA linea es la que el motor guarda como motivo en `video_fase`, asi
+  // que tiene que decir que falta y donde se contesta.
+  console.error(
+    `espera respuesta del servicio -> ${esperan.map(rutaPedido).join(" ")}`);
   process.exit(1);
 }
-console.log(`${ok}/${filas.length} descritas y guardadas`);
