@@ -621,15 +621,11 @@ const TARJETAS = {
  * por tiempo de lectura: se toma de lo que dura el beat. Jaime: *«en esos cortes
  * el tablero reemplaza la escena, y el tablero es un instrumento pedagógico»*.
  */
-function duracionBeat(edl, beat) {
-  const det = edl.detalle ?? [];
-  for (let i = 0; i < edl.segmentos.length; i++) {
-    if (det[i]?.beat === beat) {
-      const [a, b] = edl.segmentos[i];
-      return Math.round(((b - a) / VELOCIDAD) * FPS);
-    }
-  }
-  return null;
+function duracionBeat(plan, beat) {
+  const suyas = (plan.escenas ?? []).filter((e) => Number(e.beat) === beat);
+  if (!suyas.length) return null;
+  const t = suyas.reduce((n, e) => n + e.duracion, 0);
+  return Math.round((t / VELOCIDAD) * FPS);
 }
 
 /** La placa asignada a un beat en `ads/fondos.json`, o `undefined`. */
@@ -640,16 +636,34 @@ function placaDe(slug, beat) {
   );
 }
 
-function anclarBeat(edl, beat) {
-  const det = edl.detalle ?? [];
-  let t = 0;
-  for (let i = 0; i < edl.segmentos.length; i++) {
-    const b = det[i]?.beat;
-    // Su propio hueco si el beat tiene toma; el del siguiente si no la tiene.
-    if (typeof b === "number" && b >= beat) return Math.round((t / VELOCIDAD) * FPS);
-    t += edl.segmentos[i][1] - edl.segmentos[i][0];
+/**
+ * Donde cae un beat **en la linea que se renderiza**, que es el plan.
+ *
+ * Esto sumaba los segmentos del EDL, y el EDL no es la pieza: `plan-reel`
+ * quita el aire de cada corte antes de repartirlo en escenas —regla de Jaime,
+ * *«lo de los silencios tambien puede ser aritmetico»*— asi que la imagen corre
+ * sobre una linea mas corta que el EDL. En reel-01 la diferencia son 6,83 s.
+ *
+ * El efecto no es un desfase constante sino uno que **crece**: 0 en el beat 2,
+ * 2,08 s en el 4, 4,93 s en el 6, y 6,77 s en el 8 — o sea el cierre se
+ * colocaba en el segundo 119,77 de un video que dura 119,32 y se caia fuera.
+ * Por el camino, cada tablero entraba cuando el audio ya estaba en otra frase:
+ * Jaime lo describio como *«la entrada del tablero sigue hablando de los 500
+ * antes de entrar a dar el remate»*, y como glitches y perdida de continuidad.
+ *
+ * Dos listas describiendo la misma pieza es el aprendizaje 33 otra vez. La que
+ * manda es la que se renderiza.
+ */
+function anclarBeat(plan, beat) {
+  const es = plan.escenas ?? [];
+  for (const e of es) {
+    // Su propio hueco si el beat tiene escena; el del siguiente si no la tiene.
+    if (Number(e.beat) >= beat) {
+      return Math.round((e.montado_desde / VELOCIDAD) * FPS);
+    }
   }
-  return Math.round((t / VELOCIDAD) * FPS);
+  const u = es[es.length - 1];
+  return u ? Math.round(((u.montado_desde + u.duracion) / VELOCIDAD) * FPS) : 0;
 }
 
 /**
@@ -848,24 +862,57 @@ const FRAMES = JSON.parse(fs.readFileSync("ads/frames.json", "utf8"));
  * Se busca dentro de la ventana del beat, no en toda la pieza: la misma frase
  * puede repetirse y sólo debe realzarse donde ese beat la dice.
  */
-function ideasFuerza(slug, edl, captions) {
+/**
+ * De un corte del EDL a **donde acaba en la pieza montada**, en segundos.
+ *
+ * Hace falta porque son dos lineas distintas: `plan-reel` quita el aire de cada
+ * corte antes de repartirlo en escenas, asi que el reloj del EDL corre por
+ * delante del de la imagen —6,83 s de mas al final de reel-01—. Todo lo que se
+ * coloca por tiempo tiene que traducirse, o entra tarde y creciendo.
+ *
+ * Se traduce por CONTENIDO, no por indice: las escenas del plan llevan de que
+ * trozo de cinta nacen, asi que el final del corte `i` es el final montado de
+ * su ultima escena.
+ */
+function finMontado(plan, edl, i) {
+  const [a, b] = edl.segmentos[i];
+  let fin = null;
+  for (const e of plan.escenas ?? []) {
+    if (e.origen_desde >= a - 0.05 && e.origen_hasta <= b + 0.05) {
+      fin = e.montado_desde + e.duracion;
+    }
+  }
+  return fin;
+}
+
+function ideasFuerza(slug, edl, plan, captions) {
   const marco = FRAMES.reels[slug];
-  let t = 0;
   const ventanas = [];
   const det = edl.detalle ?? [];
-  for (let i = 0; i < edl.segmentos.length; i++) {
-    const dur = (edl.segmentos[i][1] - edl.segmentos[i][0]) / VELOCIDAD;
-    const b = det[i]?.beat;
-    const frase = typeof b === "number" ? marco.beats[b - 1]?.idea_fuerza : null;
-    if (frase) {
-      ventanas.push({
-        desde: Math.round(t * FPS),
-        hasta: Math.round((t + dur) * FPS),
-        frase,
-      });
-    }
-    t += dur;
+  /**
+   * **La ventana es la del plan.** Esto acumulaba las duraciones del EDL y las
+   * cruzaba con `captions`, que salen de transcribir el video ya montado: dos
+   * relojes distintos, asi que el realce caia sobre la frase de al lado. Aqui
+   * se toma el hueco real del beat en la pieza.
+   */
+  const porBeat = new Map();
+  for (const e of plan.escenas ?? []) {
+    const b = Number(e.beat);
+    const v = porBeat.get(b);
+    if (v) v.hasta = Math.max(v.hasta, e.montado_desde + e.duracion);
+    else porBeat.set(b, { desde: e.montado_desde,
+                          hasta: e.montado_desde + e.duracion });
   }
+  for (const [b, v] of porBeat) {
+    const frase = marco.beats[b - 1]?.idea_fuerza;
+    if (!frase) continue;
+    ventanas.push({
+      desde: Math.round((v.desde / VELOCIDAD) * FPS),
+      hasta: Math.round((v.hasta / VELOCIDAD) * FPS),
+      frase,
+    });
+  }
+  void det;
   const hechas = new Set();
   const salida = captions.map((c) => {
     const v = ventanas.find(
@@ -1414,7 +1461,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
   ]
     .filter((t) => !conToma.has(t.beat))
     .map((t) => ({
-      at: anclarBeat(edl, t.beat),
+      at: anclarBeat(plan, t.beat),
       /**
        * **La tarjeta no se come el beat sobre el que cae.**
        *
@@ -1431,8 +1478,8 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
        */
       duration: (() => {
         const quiere = duracionTarjeta(t.props);
-        const a0 = anclarBeat(edl, t.beat);
-        const a1 = anclarBeat(edl, t.beat + 2);
+        const a0 = anclarBeat(plan, t.beat);
+        const a1 = anclarBeat(plan, t.beat + 2);
         const sitio = a1 > a0 ? Math.floor((a1 - a0) / 2) : quiere;
         if (sitio < quiere) {
           console.log(
@@ -1488,7 +1535,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
         // palabra. Y en los que sí la tienen, la palabra puede no aparecer en
         // el montaje final — de seis tableros anclaban dos. El orden del EDL
         // siempre está.
-        const at = empujaTablero(anclarBeat(edl, b.beat));
+        const at = empujaTablero(anclarBeat(plan, b.beat));
         return at === null
           ? null
           : (() => {
@@ -1512,7 +1559,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
             // El tope duro es el arranque del CTA: la tarjeta lleva su propio
             // cuadro y un tablero por debajo no lo ve nadie.
             const dur = Math.min(
-              (duracionBeat(edl, b.beat) ?? duracionTablero(b.kind, b.props)) +
+              (duracionBeat(plan, b.beat) ?? duracionTablero(b.kind, b.props)) +
                 SOLAPE,
               fin - at,
             );
@@ -1596,7 +1643,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
     }
   }
 
-  const marca = marcaDeHumanidad(slug, ideasFuerza(slug, edl, captions), cta);
+  const marca = marcaDeHumanidad(slug, ideasFuerza(slug, edl, plan, captions), cta);
   /**
    * **La correccion de cumplimiento, encima de lo que se dijo mal.**
    *
@@ -1671,17 +1718,39 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
      * unidad correcta en los dos lados: se toma el frame donde empieza su primer
      * trozo y la duracion de todos los suyos juntos.
      */
-    const porBeat = new Map();
-    let t = 0;
+    /**
+     * **Y el reloj es el del plan, no el del EDL.** Esto acumulaba la duracion
+     * de los segmentos del EDL, que incluye el aire que `plan-reel` quita antes
+     * de renderizar: la imagen corre sobre una linea 6,83 s mas corta. El
+     * desfase no es constante, crece —0 en el beat 2, 4,93 s en el 6, 6,77 s en
+     * el 8— asi que cada tablero entra mas tarde que la frase que ilustra y el
+     * cierre se sale del video. Es lo que Jaime describio como *«la entrada del
+     * tablero sigue hablando de los 500 antes de entrar a dar el remate»*.
+     *
+     * El `det` sigue viniendo del EDL, que es donde vive lo que dice y como se
+     * trata la etapa; lo unico que cambia de sitio es **cuando**.
+     */
+    const detPorBeat = new Map();
     for (let i = 0; i < edl.segmentos.length; i++) {
-      const [a, b] = edl.segmentos[i];
       const det = edl.detalle[i] ?? {};
-      const at = Math.round((t / VELOCIDAD) * FPS);
-      t += b - a;
-      const dur = Math.round(((b - a) / VELOCIDAD) * FPS);
-      const previo = porBeat.get(det.beat);
-      if (previo) previo.duration += dur;
-      else porBeat.set(det.beat, { at, duration: dur, det, i });
+      if (!detPorBeat.has(det.beat)) detPorBeat.set(det.beat, { det, i });
+    }
+    const porBeat = new Map();
+    for (const e of plan.escenas ?? []) {
+      const beat = Number(e.beat);
+      const dur = Math.round((e.duracion / VELOCIDAD) * FPS);
+      const previo = porBeat.get(beat);
+      if (previo) {
+        previo.duration += dur;
+        continue;
+      }
+      const d = detPorBeat.get(beat) ?? { det: {}, i: 0 };
+      porBeat.set(beat, {
+        at: Math.round((e.montado_desde / VELOCIDAD) * FPS),
+        duration: dur,
+        det: d.det,
+        i: d.i,
+      });
     }
     const out = [];
     for (const { at, duration, det, i } of porBeat.values()) {      const e = plan.escenas[i] ?? plan.escenas[0];
@@ -1764,7 +1833,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
      */
     paneles: (PANELES[slug] ?? [])
       .map((b) => {
-        const inicio = anclarBeat(edl, b.beat);
+        const inicio = anclarBeat(plan, b.beat);
         const suyo = tableros.find((t) => t.at === inicio);
         if (suyo) {
           const dur = ADELANTO(b.bloques);
@@ -1785,7 +1854,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
          * lleve el subtitulo compuesto, que es lo que Jaime pidio para ese
          * tramo: *«del 45 al 65 no hay cc»*.
          */
-        const dur = duracionBeat(edl, b.beat);
+        const dur = duracionBeat(plan, b.beat);
         const tope = ADELANTO(b.bloques) + 3 * FPS;
         return dur
           ? { at: inicio, duration: Math.min(dur, tope), bloques: b.bloques }
@@ -1865,14 +1934,20 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
       const duras = new Set(edl.costuras_duras ?? []);
       const out = [];
       const det = edl.detalle ?? [];
-      let t = 0;
+      /**
+       * **Y se coloca donde esta la costura en la pieza, no en el EDL.**
+       * Esto acumulaba las duraciones del EDL, que lleva el aire que la imagen
+       * ya no tiene: el glitch entraba hasta 6,8 s tarde, o sea **en mitad de
+       * una frase en vez de encima del salto que venia a tapar**. Un efecto que
+       * disimula un corte se convierte en un defecto en cuanto se despega de
+       * el, y es lo que Jaime vio: *«veo muchos glitches, se pierde bastante
+       * continuidad»*.
+       */
       for (let i = 0; i < edl.segmentos.length - 1; i++) {
-        if (!duras.has(i)) {
-          t += edl.segmentos[i][1] - edl.segmentos[i][0];
-          continue;
-        }
-        t += edl.segmentos[i][1] - edl.segmentos[i][0];
-        const at = Math.round((t / VELOCIDAD) * FPS) - Math.round(DUR_GLITCH / 2);
+        if (!duras.has(i)) continue;
+        const fin = finMontado(plan, edl, i);
+        if (fin === null) continue;
+        const at = Math.round((fin / VELOCIDAD) * FPS) - Math.round(DUR_GLITCH / 2);
         if (at < 0) continue;
         // Donde ya hay tablero o tarjeta el plano cambió: no hay salto que tapar.
         const cubierto = [...tableros, ...cartas].some(
@@ -1903,8 +1978,8 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
    * el argumento y no cada N segundos.
    */
   const ventanas = FRAMES.reels[slug].beats.map((_, i) => [
-    anclarBeat(edl, i + 1),
-    anclarBeat(edl, i + 2),
+    anclarBeat(plan, i + 1),
+    anclarBeat(plan, i + 2),
   ]);
   const comp = componer(pieza.captions, [
     ...pieza.boards,
