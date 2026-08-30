@@ -436,6 +436,8 @@ def main():
 
         segs, det, quitado, aire = [], [], 0.0, 0.0
         fragmentadas = []
+        # Lo que la costura repite, para que lo resuelva quien compone.
+        cruces = []
         brutos = {}
         for i, (rango, d) in enumerate(zip(edl["segmentos"], edl["detalle"])):
             toma = fuentes[i] if i < len(fuentes) else rutas.TOMAS[slug]
@@ -473,11 +475,33 @@ def main():
             # **Y la costura contra la etapa anterior.** Se mira aqui porque es
             # donde estan los dos lados a la vez: lo ultimo que quedo de la
             # etapa de antes y lo primero de esta. Ver `cruza_el_corte`.
+            # **Y ya no corta: apunta.** Regla de Jaime, la misma de C-88:
+            # *«la solucion es que el detector apunte y tu decidas caso a caso,
+            # sin degradar el esfuerzo que haces»*.
+            #
+            # Cortaba hasta la palabra repetida incluida, y la palabra repetida
+            # puede ser la unidad de dos cifras distintas. Medido en reel-01 e7:
+            # la cola decia «550 dolares, semanales» y la cabeza «Esta semana el
+            # bootcamp esta en 20 dolares»; la regla vio «dolares» a los dos
+            # lados y se llevo **el precio de la oferta**, que es lo unico que la
+            # pieza vende. El corte cayo en 584,78, que es el final de «dolares»
+            # mas el margen: exacto y exactamente equivocado.
+            #
+            # Saber si «dolares» repetido es redundancia o son dos cifras exige
+            # entender la frase, y eso no es aritmetica. Se anota y lo resuelve
+            # quien compone, que para entonces tiene el texto de las dos etapas
+            # delante.
             if segs and trozos:
                 nuevo = cruza_el_corte(pal, segs[-1], trozos[0])
                 if nuevo is not None:
-                    quitado += nuevo - trozos[0][0]
-                    trozos[0] = [nuevo, trozos[0][1]]
+                    cruces.append({"etapa": d.get("beat"),
+                                   "corta_hasta": nuevo,
+                                   "cola": " ".join(
+                                       w["text"] for w in pal
+                                       if segs[-1][0] <= w["start"] <= segs[-1][1])[-70:],
+                                   "cabeza": " ".join(
+                                       w["text"] for w in pal
+                                       if trozos[0][0] <= w["start"] <= nuevo)})
             for t in trozos:
                 segs.append(t)
                 det.append({**d, "start": t[0], "end": t[1]})
@@ -498,6 +522,10 @@ def main():
 
         print(f"{slug}: {len(edl['segmentos'])} cortes -> {len(segs)} · "
               f"{aire:.1f}s de aire y {quitado:.1f}s de repeticion fuera")
+        for c in cruces:
+            print(f"  costura e{c['etapa']}: se repite cerca del corte —"
+                  f" «…{c['cola'].strip()}» / «{c['cabeza'].strip()}» —"
+                  f" NO se corta: lo resuelve quien compone")
         # **El descarte se registra, si no el aviso es papel.** Sin esto,
         # `depurar` decia «esta queda picada» y la siguiente corrida volvia a
         # elegirla porque nada recordaba el descarte.

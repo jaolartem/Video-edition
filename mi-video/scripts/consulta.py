@@ -236,6 +236,52 @@ def pausas(slug):
     return out
 
 
+def cruces(slug):
+    """Lo que se repite **a los dos lados de una costura**, sin cortarlo.
+
+    Tercer sitio de la regla que el proyecto tiene escrita —dentro de la
+    ventana, cruzando el corte, y el mismo dato en dos etapas— y el unico donde
+    la aritmetica no llega. `depurar` lo cortaba solo, hasta la palabra repetida
+    incluida, y esa palabra puede ser la unidad de dos cifras distintas: en
+    reel-01 e7 la cola decia «550 dolares, semanales» y la cabeza «Esta semana
+    el bootcamp esta en 20 dolares», y el paso se llevo el precio de la oferta.
+
+    Saber si eso es redundancia o son dos datos exige entender la frase. Asi que
+    aqui **se apunta**: la etapa, lo que se oye a cada lado, y hasta donde
+    cortaria la regla si se aplicara. Lo resuelve quien compone, que tiene el
+    texto de las dos etapas delante.
+
+        python scripts/consulta.py cruces '["reel-01"]'
+    """
+    import depurar
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return []
+    edl = json.load(open(ruta, encoding="utf-8"))
+    out = []
+    pares = list(zip(edl["segmentos"], edl["detalle"]))
+    for ((a0, b0), d0), ((a1, b1), d1) in zip(pares, pares[1:]):
+        toma = d1.get("toma") or d0.get("toma")
+        try:
+            pal = transcribir.exigir(toma)["segmentos"]
+        except SystemExit:
+            continue
+        nuevo = depurar.cruza_el_corte(pal, (a0, b0), (a1, b1))
+        if nuevo is None:
+            continue
+        out.append({
+            "etapa": d1.get("beat"),
+            "cola": " ".join(w["text"] for w in pal
+                             if transcribir.suena(w, a0, b0))[-70:],
+            "repite": " ".join(w["text"] for w in pal
+                               if transcribir.suena(w, a1, nuevo)),
+            "cortaria_hasta": nuevo,
+        })
+    return out
+
+
 def brolls(minimo=2.0, maximo=8.0, cintas=None):
     """Los tramos donde el esta en cuadro y **no habla**. Material de transicion.
 
@@ -586,6 +632,7 @@ if __name__ == "__main__":
           "repetido": repetido,
           "abanico": abanico,
           "brolls": brolls,
+          "cruces": cruces,
           "pausas": pausas,
           "precio_vigente": precio_vigente,
           "guardar_escena": guardar_escena}[sys.argv[1]]

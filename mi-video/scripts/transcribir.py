@@ -792,6 +792,24 @@ def afinar(toma, tramos, pasadas=4):
         if not cands:
             continue
         elegido, acuerdo = medoide(cands)
+        # **Y no se acepta si trae menos de lo que se va a llevar.**
+        #
+        # `afinar` sustituye el tramo entero: borra lo viejo que lo toca y pone
+        # lo nuevo. Si la pasada nueva oye menos —pasa, y pasa justo en los
+        # tramos dificiles, que son los que se mandan a afinar— la cinta pierde
+        # palabras a cambio de nada y nadie se entera, porque el paso informa de
+        # los tramos que hizo, no de las palabras que quedaron.
+        #
+        # Es la misma familia que C-89: medir el resultado y no el esfuerzo. Y
+        # aqui la cuenta es trivial, que es lo que la hace imperdonable.
+        viejas = [w for w in d["segmentos"]
+                  if w["end"] > a + 0.001 and w["start"] < b - 0.001]
+        if len(elegido["ws"]) < len(viejas):
+            registro.aviso("transcribir", "afinado que resta: se queda lo viejo",
+                           toma=toma,
+                           detalle=f"{a:.2f}-{b:.2f}: {len(viejas)} palabras ->"
+                                   f" {len(elegido['ws'])}", eco=False)
+            continue
         for w in elegido["ws"]:
             ini = a_cinta(w["a"], mapa)
             fin = a_cinta(min(w["b"], vb - 0.001), mapa)
