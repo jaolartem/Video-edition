@@ -146,7 +146,20 @@ for r in "${REELS[@]}"; do
     echo "   $MOTIVOS"
     continue
   fi
-  npx remotion render "Reel-R$n" "$DESTINO/reels/reel-R$n.mp4"     --gl=angle --concurrency=16 --offthread-video-threads=8 --log=error
+  # **Si falla por carga, se repite con menos carga.** No es reintentar lo
+  # mismo esperando otra cosa: es cambiar la condicion que lo rompio.
+  #
+  # Con `--concurrency=16` el servidor de frames de Remotion devuelve «Failed to
+  # fetch … /proxy?src=…&time=71.266» a media pieza, y **no es el material**: el
+  # proxy decodifica entero y ese frame se extrae con ffmpeg sin una queja. Es
+  # la maquina: dieciseis pestanas pidiendole frames a un fichero de 481 MB.
+  #
+  # La segunda pasada tarda mas y termina, que es el unico resultado que cuenta.
+  # Si tambien falla, entonces si hay algo que arreglar y el motor se planta.
+  if ! npx remotion render "Reel-R$n" "$DESTINO/reels/reel-R$n.mp4"        --gl=angle --concurrency=16 --offthread-video-threads=8 --log=error; then
+    echo "  (fallo con concurrencia 16 — se repite con 4, que es mas lento y aguanta)"
+    npx remotion render "Reel-R$n" "$DESTINO/reels/reel-R$n.mp4"       --gl=angle --concurrency=4 --offthread-video-threads=2 --log=error
+  fi
   # **La entrega NO recorta.** Jaime: *«respeta el guion; si hay necesidad de
   # recortar lo definimos al final»* y *«el ajuste de tiempo lo hacemos al final
   # con el reel montado»*.

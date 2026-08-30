@@ -1528,8 +1528,48 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
       at,
     );
 
+  /**
+   * El pie del tablero, **de la fuente comprobada y no de una cadena a mano**.
+   *
+   * `TABLEROS` trae `fuente` y `condicion` escritas aqui, una por pieza. Es la
+   * trampa que `fuentes.py` vino a quitar —no escala a 16-50 anuncios y no se
+   * puede auditar— y era el ultimo tramo sin conectar: el paso ya guardaba el
+   * respaldo en `dato`, y el tablero seguia imprimiendo el literal.
+   *
+   * Importa mas de lo que parece por lo que decia cada uno. El literal era
+   * *«$30,000 sobre $180,000 de utilidad»*, que es de donde sale la resta pero
+   * no de donde sale la verdad. Comprobado contra la CRA, la diferencia real es
+   * 33.500 $ y —esto es lo que cambia el mensaje— **buena parte es
+   * diferimiento**: mientras el dinero se queda en la sociedad se paga menos, y
+   * al repartirlo como dividendo la integracion iguala la carga. Sin esa
+   * condicion el espectador entiende «me ahorro 30.000 al ano», y eso la fuente
+   * no lo sostiene.
+   *
+   * Si no hay dato comprobado se deja lo que hubiera: una pieza sin verificar
+   * no se queda muda de golpe.
+   */
+  const pieDe = (beat) => {
+    try {
+      const r = db.prepare(
+        "select f.rotulo, d.condiciones from dato d" +
+        "  left join fuente f on f.id = d.fuente_id" +
+        "  join video v on v.id = d.video_id" +
+        " where v.slug = ? and d.etapa_orden = ? and d.respalda = 'si'" +
+        " order by length(d.cifra) desc limit 1",
+      ).get(slug, beat);
+      if (!r) return {};
+      const out = {};
+      if (r.rotulo) out.fuente = String(r.rotulo);
+      if (r.condiciones) out.condicion = String(r.condiciones);
+      return out;
+    } catch {
+      return {};
+    }
+  };
+
   const tableros = (TABLEROS[slug] ?? [])
       .map((b) => {
+        b = { ...b, props: { ...b.props, ...pieDe(b.beat) } };
         // **Por beat, no por palabra.** Anclar a una palabra del subtítulo no
         // puede funcionar en un beat sin toma: no hay audio, así que no hay
         // palabra. Y en los que sí la tienen, la palabra puede no aparecer en
