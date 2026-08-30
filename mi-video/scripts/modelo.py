@@ -313,6 +313,22 @@ CICLO = [
     (3, "afinado", "scripts/transcribir.py --elegidos {n}"),
     (4, "depurado", "scripts/depurar.py {n}"),
     (5, "sin_redundancia", "scripts/redundancia.py {n}"),
+    # **Y los cortes anotados se aplican.** `redundancia` no corta: anota en
+    # `revision` con su ancla y su porque, que es lo correcto —el ancla
+    # sobrevive a que la pieza se vuelva a montar y los segundos no—. Pero
+    # ninguna fase los llevaba al EDL: se anotaban, `verificar` los contaba como
+    # pendientes, y la pieza se montaba con la redundancia dentro.
+    #
+    # Es exactamente la queja de Jaime sobre el primer video —*«no parece que
+    # hubieras revisado redundancia despues de las cuatro pasadas»*— y la
+    # respuesta es que si se reviso: los cuatro cortes estaban escritos en la
+    # base, en estado «pendiente», desde antes de montar.
+    #
+    # Va **antes** de `revalidado` a proposito. La segunda valoracion juzga
+    # entrega y ritmo, y tiene que juzgarlos sobre la pieza sin lo que sobra;
+    # ademas las notas se estampan con la huella del montaje en que se
+    # apuntaron, asi que si el corte cambia primero, las notas quedan huerfanas.
+    (5.2, "recortado", "scripts/revision.py --aplicar {n}"),
     (5.5, "revalidado", None),       # servicio de IA con decision acotada
     (6, "cosido", "scripts/costuras.py {n}"),
     (7, "descrito", "scripts/describir.mjs {n}"),

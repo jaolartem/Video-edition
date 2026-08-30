@@ -111,7 +111,8 @@ def cargar(slug, cortes, pasada=1):
             continue
         revision.anotar(slug, "cortar", None, None,
                         c.get("por_que") or "redundancia",
-                        regla=REGLA, pasada=pasada, ancla=ancla)
+                        regla=REGLA, pasada=pasada, ancla=ancla,
+                        cual=int(c.get("cual") or 1))
         n += 1
     return n
 

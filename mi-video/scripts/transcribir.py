@@ -211,14 +211,72 @@ def sin_etiquetas(ws):
         t = w["t"].strip()
         if dentro:
             dentro -= 1
-            if t.endswith("]") or t.endswith(")"):
+            if t.endswith("]") or t.endswith(")") or t.endswith("*"):
                 dentro = 0
             continue
-        if t.startswith("[") or t.startswith("("):
-            dentro = 0 if (t.endswith("]") or t.endswith(")")) else 8
+        if t.startswith("[") or t.startswith("(") or t.startswith("*"):
+            # **El modelo tambien anota con asteriscos.** `*sonido de caja*`
+            # entro entero en el reel 1 por la puerta que dejaba el filtro:
+            # miraba corchete y parentesis y nada mas, asi que la anotacion
+            # salia en el subtitulo como si Jaime la hubiera dicho. Aparecio
+            # justo donde el afinado tapo un hueco, que es donde el modelo se
+            # inventa cosas: no tiene habla que transcribir y rellena.
+            dentro = (0 if (t.endswith("]") or t.endswith(")")
+                            or (t.startswith("*") and t.endswith("*") and len(t) > 1))
+                      else 8)
             continue
         out.append(w)
     return out
+
+
+def sin_fantasmas(ws):
+    """Quita la palabra duplicada que **no tiene audio propio que cortar**.
+
+    El transcript sale de fundir varias pasadas y deja dos formas de duplicado
+    que ninguna tijera puede arreglar, porque el problema no esta en el audio:
+
+    - **La de duracion cero.** `Revise,` de 590.664 a 590.664, pegada a
+      `revise`. `sin_tartamudeo` la detecta y corta su tramo — que mide cero
+      segundos, o sea no corta nada — y la palabra sigue en el texto. El
+      subtitulo dice «Revise, revise» para siempre.
+    - **La que se pisa con su gemela.** `cuenta` 591.354-591.962 y `cuenta`
+      591.744-593.276. Ahi el cinturon de C-64 hace bien en no cortar —es UNA
+      palabra oida dos veces, y cortarla la borraria— pero se limita a no
+      tocarla, y el texto sigue diciendo «cuenta cuenta».
+
+    Las dos veces el fallo es el mismo: se trato como problema de montaje algo
+    que es un defecto del transcript. Aqui se arregla donde esta, fundiendo las
+    dos en una que abarca de la primera a la ultima.
+
+    No toca la repeticion de verdad —«luego sube, luego sube» son dos tramos
+    separados y con audio cada uno—: eso lo decide quien monta, no esto.
+    """
+    out = []
+    for w in sorted(ws, key=lambda x: (x["start"], x["end"])):
+        p = beats_palabras(w["text"])
+        q = beats_palabras(out[-1]["text"]) if out else None
+        if p and q and p[0] == q[0]:
+            hueco = w["start"] - out[-1]["end"]
+            cero = (w["end"] - w["start"] <= 0.001
+                    or out[-1]["end"] - out[-1]["start"] <= 0.001)
+            if cero or hueco < -0.01:
+                # Una sola palabra, del arranque mas temprano al final mas
+                # tardio: asi el corte que la use la abarca entera.
+                out[-1] = dict(out[-1],
+                               start=min(out[-1]["start"], w["start"]),
+                               end=max(out[-1]["end"], w["end"]),
+                               text=(w["text"] if len(w["text"]) >= len(out[-1]["text"])
+                                     else out[-1]["text"]))
+                continue
+        out.append(w)
+    return out
+
+
+def beats_palabras(t):
+    """La normalizacion de `beats`, importada tarde para no cerrar un ciclo."""
+    import beats
+
+    return beats.palabras(t)
 
 
 def a_cinta(t, mapa):
@@ -456,7 +514,7 @@ def guardar(toma, palabras, mapa, dudosos, modelo=None, paso=None):
                SELLO: len(con_texto) and round(
                    sum(m["pasadas"] for m in con_texto) / len(con_texto), 2),
                "dudosos": dudosos,
-               "segmentos": palabras,
+               "segmentos": sin_fantasmas(palabras),
                "tramos": con_texto},
               open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
@@ -499,6 +557,32 @@ def _guardar_en_base(toma, mapa):
          for m in mapa if m.get("texto")])
     con.commit()
     con.close()
+
+
+def _saneado(toma, d):
+    """Pasa por el transcript ya escrito los filtros que no existian al hacerlo.
+
+    **Un arreglo que solo vale para las cintas futuras no arregla nada**: las
+    siete de este proyecto costaron horas de CPU y no se van a rehacer porque
+    el filtro de etiquetas creciera. Asi que se aplica al pasar, que es cuando
+    el paso ya tiene el fichero delante, y se reescribe solo si cambio algo.
+
+    Es la misma idea que la cobertura de C-89: el paso comprueba el resultado
+    que tiene, no el trabajo que recuerda haber hecho.
+    """
+    ws = d.get("segmentos") or []
+    # `sin_etiquetas` habla en el idioma de la transcripcion —`t`— y el fichero
+    # guarda `text`; se traduce en los dos sentidos en vez de duplicar la regla.
+    puente = [{"t": w["text"], "_w": w} for w in ws]
+    limpias = [x["_w"] for x in sin_etiquetas(puente)]
+    limpias = sin_fantasmas(limpias)
+    if len(limpias) == len(ws):
+        return d, 0
+    quitadas = len(ws) - len(limpias)
+    d["segmentos"] = limpias
+    json.dump(d, open(f"work/transcripts/{toma}.json", "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    return d, quitadas
 
 
 class Incompleta(Exception):
@@ -760,7 +844,7 @@ def afinar(toma, tramos, pasadas=4):
                    for x, y in hechos)
 
     fuera = [w for w in d["segmentos"] if not _toca(w)]
-    d["segmentos"] = sorted(fuera + nuevas, key=lambda w: w["start"])
+    d["segmentos"] = sin_fantasmas(fuera + nuevas)
     d["afinado"] = sorted(set(tuple(t) for t in
                               [tuple(x) for x in d.get("afinado", [])] +
                               [tuple(t) for t in hechos]))
@@ -899,6 +983,10 @@ def main():
                 # —ocho de los once trozos del reel 1— mientras el paso repite
                 # «ya esta». Se mira tambien la cobertura contra los tramos de
                 # habla medidos, que es lo que dice cuanto deberia haber.
+                transcribir_ya, quitadas = _saneado(toma, transcribir_ya)
+                if quitadas:
+                    print(f"── {toma} ── saneado: {quitadas} palabra(s)"
+                          f" fantasma o de etiqueta fuera")
                 falta = _sin_cubrir(toma, transcribir_ya)
                 if falta > 20.0:
                     # **Se tapa el agujero donde esta.** Los tramos huerfanos

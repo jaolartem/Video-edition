@@ -70,7 +70,7 @@ def _con():
 
 
 def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
-           pasada=1, ancla=None):
+           pasada=1, ancla=None, cual=1):
     """Guarda una nota de revisión. `que` va literal, siempre.
 
     `ancla` es **el texto** que hay que cortar. Los segundos sirven para
@@ -96,9 +96,10 @@ def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
         _huella = None
     con.execute(
         "insert into revision (video_slug, huella, pasada, desde_s, hasta_s, ancla,"
-        " accion, que, regla, estado, fecha) values (?,?,?,?,?,?,?,?,?,?,?)",
-        (slug, _huella, pasada, desde, hasta, ancla, accion, que, regla, estado,
-         datetime.datetime.now().isoformat(timespec="seconds")))
+        " cual, accion, que, regla, estado, fecha)"
+        " values (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (slug, _huella, pasada, desde, hasta, ancla, int(cual or 1), accion, que,
+         regla, estado, datetime.datetime.now().isoformat(timespec="seconds")))
     con.commit()
     con.close()
 
@@ -122,12 +123,24 @@ def _montado_a_cinta(edl, t_montado):
     return len(edl["segmentos"]) - 1, edl["segmentos"][-1][1]
 
 
-def _por_ancla(edl, ancla, slug=""):
+def _por_ancla(edl, ancla, slug="", cual=1):
     """Dónde está ese texto en la pieza, en segundos de montaje.
 
     Es lo que hace que una corrección sobreviva a que la pieza se vuelva a
     montar. Se busca sobre las palabras de la cinta recorridas en orden de
     montaje, que es exactamente lo que el espectador oye.
+
+    `cual` dice **qué aparición**, y sin eso el paso de redundancia no podia
+    hacer su trabajo. La cinta es un abanico: la misma frase esta grabada varias
+    veces para poder escoger. Cuando dos tomas dicen exactamente lo mismo, el
+    ancla —que es texto— casa con las dos, y devolvia siempre la primera. O sea
+    que el paso podia medir cual se entrega mejor y **no tenia como pedir que se
+    fuera la otra**.
+
+    Medido en reel-01 e2: «terminan ganando mucho mas» dicho dos veces, la
+    primera con intensidad 2,26 y la segunda con 0,22 —plana, por debajo del
+    suelo de 0,25—. Sin `cual`, cortar la plana era imposible: el ancla se
+    llevaba la buena.
     """
     import unicodedata
     sys.path.insert(0, os.path.dirname(__file__))
@@ -166,8 +179,12 @@ def _por_ancla(edl, ancla, slug=""):
                               t + (w["end"] - rango[0]) / VELOCIDAD))
         t += (rango[1] - rango[0]) / VELOCIDAD
     pal = [x[0] for x in linea]
+    visto = 0
     for i in range(len(pal) - len(obj) + 1):
         if pal[i:i + len(obj)] != obj:
+            continue
+        visto += 1
+        if visto < max(1, int(cual or 1)):
             continue
         desde = round(linea[i][1], 2)
         if not fin_obj:
@@ -230,9 +247,27 @@ def aplicar(slug, ver=False):
         # **Solo las notas de este montaje.** Las de un corte anterior se
         # quedan en la tabla —son el recorrido del video— pero no se aplican:
         # hablan de un sitio que ya no existe. La huella lo dice sin ambiguedad.
-        if n["huella"] and huella_hoy and n["huella"] != huella_hoy:
+        #
+        # **Y la que no trae huella tampoco vale.** Esto decia `if n["huella"]
+        # and ...`, o sea que una nota sin estampa pasaba siempre — y las que no
+        # la traen son justo las viejas, de antes de que la columna existiera.
+        # El resultado, medido en reel-01: treinta notas de montajes que ya no
+        # existen se aplicaron a este, y la pieza paso de 136,4 a 92,6 segundos.
+        # Se llevaron la revelacion entera de e2 y el cierre completo.
+        #
+        # El fallo estaba en la direccion de la duda. Sin huella no sabemos de
+        # que corte habla la nota, y ante esa duda cortar es la opcion cara: si
+        # se salta de mas, la redundancia se vuelve a anotar en la corrida
+        # siguiente —el paso corre en cada vuelta— pero lo que se corta de mas
+        # no vuelve solo, y encima la pieza parece entera.
+        if huella_hoy and n["huella"] != huella_hoy:
             continue
-        rango = _por_ancla(edl, n["ancla"], slug) if n["ancla"] else None
+        # `cual` puede no estar en notas viejas: entonces es la primera.
+        try:
+            _cual = n["cual"]
+        except (IndexError, KeyError):
+            _cual = 1
+        rango = _por_ancla(edl, n["ancla"], slug, _cual) if n["ancla"] else None
         if rango is None and n["desde_s"] is None:
             # **Un ancla que ya no esta en la pieza es un corte ya hecho.**
             # Antes se saltaba y la nota se quedaba pendiente para siempre: la

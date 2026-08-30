@@ -115,13 +115,21 @@ def aplicar(slug):
     # encima despues —los recortes de redundancia, sobre todo— y la pieza se
     # volvia a alargar sola. Se comprueba por contenido: si lo que hay en el EDL
     # ya cae dentro de lo declarado, esa etapa esta hecha y no se toca.
+    #
+    # **Y «cae dentro» no es «se aplico».** Esto preguntaba si los trozos que hay
+    # caben dentro de lo declarado, y con eso una etapa recortada por otro paso
+    # parecia hecha: reel-01 e2 esta declarada en dos tramos —16,2 s y 11 s— y
+    # tenia un solo trozo de 6,2 s dentro del primero. La comprobacion dijo «ya
+    # esta», el segundo tramo no se puso nunca, y la etapa perdio la mitad que
+    # la convierte en hueco de conocimiento: «los que usan esa estructura
+    # terminan ganando mucho mas vendiendo exactamente lo mismo».
+    #
+    # La marca `fijado` es la señal honesta, porque la pone este paso al aplicar.
+    # La aritmetica solo sabe que un trozo cabe; la marca sabe quien lo puso.
     ya = set()
     for b_, fs in por_beat.items():
-        suyos = [(x, y) for (x, y), d in zip(edl["segmentos"], edl["detalle"])
-                 if d.get("beat") == b_]
-        if suyos and all(
-                any(f["desde"] - 0.05 <= x and y <= f["hasta"] + 0.05
-                    for f in fs) for x, y in suyos):
+        suyos = [d for d in edl["detalle"] if d.get("beat") == b_]
+        if suyos and all(d.get("fijado") for d in suyos):
             ya.add(b_)
     for b_ in ya:
         por_beat.pop(b_, None)
