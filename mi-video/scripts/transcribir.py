@@ -737,11 +737,18 @@ def main():
     if a.elegidos:
         """El caro, y solo donde se va a usar.
 
-        Regla de Jaime, dicha para corregir justo lo contrario: *«las cuatro
-        pasadas son antes de renderizar, como mecanismo para identificar
-        redundancia, nunca para identificacion de la cinta; identificamos la
-        redundancia en los lugares especificos, la eliminamos y renderizamos con
-        eso»*.
+        Regla de Jaime, y la precisó él mismo despues: *«la revision cara no es
+        para identificar redundancia, es para obtener los scripts ajustados a la
+        realidad; la redundancia necesita criterio editorial»*.
+
+        O sea que lo que este paso aporta es **fidelidad**: saber qué se dijo
+        exactamente, palabra por palabra, en los tramos que se van a usar. Nada
+        más. Quitar la repeticion es un juicio —cuál de las tres versiones
+        comunica más— y eso vive en `redundancia.prompt.md`.
+
+        Confundir las dos cosas lleva a esperar que una transcripcion mejor
+        resuelva un problema editorial, y no lo hace: deja el mismo texto
+        repetido tres veces, sólo que bien escrito.
 
         Antes se pagaban cuatro pasadas sobre la cinta entera —media hora larga
         por cinta— para acabar usando dos minutos de ella. Ahora el barato dice

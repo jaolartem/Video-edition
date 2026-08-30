@@ -158,6 +158,37 @@ CREATE TABLE IF NOT EXISTS video_fase (
 );
 
 CREATE INDEX IF NOT EXISTS video_fase_ult ON video_fase (video_id, id DESC);
+
+-- Las reglas como CLASES, no como texto repetido en cada nota
+--
+-- Jaime: *«no hay cambios temporales o pasajeros, hay clases y subclases»*, y
+-- *«puedes crear una subclase o una clase nueva»*.
+--
+-- `revision.regla` era texto libre: 65 notas con 24 redacciones distintas, y las
+-- tres primeras eran **la misma regla escrita de tres maneras** (32 + 9 + 3
+-- notas). Eso no es una regla aplicada 44 veces: son 44 copias que se pueden
+-- contradecir entre si, y ninguna que se pueda marcar como automatizada de una
+-- vez.
+--
+-- Con clases, una correccion suya deja de ser un parche para ESA pieza y pasa a
+-- ser una instancia de algo que vale para las 16-50. Y cuando algo no encaja, la
+-- salida no es una excepcion en el codigo: es **una subclase**.
+CREATE TABLE IF NOT EXISTS regla (
+  id           INTEGER PRIMARY KEY,
+  -- La familia: redundancia, integridad, sonido, grafico, subtitulo, proceso.
+  clase        TEXT NOT NULL,
+  -- Si es una subclase, de quien. NULL es una clase de primer nivel.
+  padre_id     INTEGER REFERENCES regla(id),
+  enunciado    TEXT NOT NULL,
+  -- **Automatizada se marca en la REGLA, no en la nota.** Una regla que ya vive
+  -- en codigo lo esta para todas sus instancias; marcarlo nota a nota era decir
+  -- treinta veces lo mismo y poder equivocarse en la treinta y una.
+  automatizada INTEGER NOT NULL DEFAULT 0,
+  donde        TEXT,
+  fecha        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS regla_clase ON regla (clase, padre_id);
 """
 
 # El ciclo completo, en orden. Cada fase dice **que servicio la mueve a la
