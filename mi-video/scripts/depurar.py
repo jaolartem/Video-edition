@@ -136,6 +136,29 @@ def podar_dentro(palabras, a, b):
             for y in range(x + n, len(cont) - n + 1):
                 if [c[1] for c in cont[y:y + n]] != g:
                     continue
+                # **Y lo de antes es el ensayo solo si lo de antes ES la
+                # cabeza.** Esto entraba en la ultima aparicion y tiraba todo lo
+                # anterior, repitiera o no. En reel-01 e2 el tramo declarado
+                # empieza en «y los que usan esa estructura terminan ganando
+                # mucho mas, terminan ganando mucho mas vendiendo…»: el trigrama
+                # repetido es «terminan ganando mucho», y al entrar en el
+                # segundo se llevo por delante **el puente**. La pieza pasaba de
+                # «espera que usted tenga una cierta estructura y» a «terminan
+                # ganando mucho», que no se sigue de nada.
+                #
+                # Jaime lo nombro por su nombre: *«se recortaron pasos
+                # intermedios entre secciones y no secciones completas»*, y
+                # *«pasar de ahi a "y cuando" rompe con la logica del video»*.
+                #
+                # Si antes de la primera aparicion hay texto que no repite, eso
+                # no es un ensayo: es lo que hace que la frase siga. La
+                # repeticion de en medio no se pierde — la quita
+                # `sin_tartamudeo`, que corta el tramo duplicado y **conserva
+                # los dos lados**, que es lo que habia que hacer desde el
+                # principio.
+                cabeza = ws[cont[x][0]]["start"] - a
+                if cabeza > 0.4:
+                    continue
                 corte = ws[cont[y][0]]["start"] - MARGEN
                 if corte - a < 0.2 or b - corte < 0.8:
                     continue

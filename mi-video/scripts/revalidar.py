@@ -335,8 +335,31 @@ def candidatas(slug, beat, cuantas=3):
                                    if r["puntuacion"] is not None else None),
                     "desde": round(r["desde"], 2), "hasta": round(r["hasta"], 2),
                     "dura": round(r["hasta"] - r["desde"], 1),
+                    # **Y hacia donde va, no solo cuanto.** Sin esto la eleccion
+                    # entre candidatas era ciega a lo unico que Jaime pide aqui:
+                    # *«si hablo de muerte no quiero estar cagado de la risa; si
+                    # hablo de futuro no quiero sonar como un desesperado»*.
+                    # `intensidad` dice cuanta emocion hay —sin signo, a
+                    # proposito—; `altura` y `velocidad` dicen cual es.
+                    **_direccion(r["toma"], r["desde"], r["hasta"], pal),
                     "texto": txt[:400]})
     return out
+
+
+def _direccion(toma, a, b, pal):
+    """Altura y velocidad **con signo**, y la intensidad al lado.
+
+    Grave y lento es una emocion; agudo y rapido es otra; y las dos pueden ser
+    fuertes. Por eso la magnitud no basta para elegir: hay que saber si el tramo
+    va donde el momento del libreto pide que vaya.
+    """
+    try:
+        i = beats.intensidad(toma, a, b, pal) or {}
+    except Exception:                              # noqa: BLE001
+        return {}
+    return {"intensidad": i.get("intensidad"),
+            "altura": i.get("altura"),
+            "velocidad": i.get("velocidad")}
 
 
 def afinada(toma, a, b):
@@ -445,6 +468,21 @@ def dossier(slug):
             "trato": d["det"].get("trato"),
             **m,
             "intensidad": inten.get("intensidad"),
+            # **Con signo, y por eso hacen falta las dos.** `intensidad` mide
+            # cuanta emocion hay y es sin signo a proposito —Jaime: *«no hay
+            # emociones positivas o negativas»*—, pero eso deja fuera la otra
+            # mitad de la pregunta, que el nombro asi: *«si hablo de muerte no
+            # quiero estar cagado de la risa; si hablo de futuro no quiero sonar
+            # como un desesperado»*.
+            #
+            # O sea: cuanta emocion lo dice `intensidad`, y **cual** lo dicen la
+            # altura y la velocidad. Se medían las dos y se tiraban antes de
+            # llegar al contrato, asi que quien elige no podia ver si un tramo
+            # iba grave o iba arriba — y con esa ceguera el reel-01 salio con
+            # siete de ocho etapas en tono grave, el mecanismo incluido, que es
+            # justo la etapa que promete la salida.
+            "altura": inten.get("altura"),
+            "velocidad": inten.get("velocidad"),
             "flojo": flojo(m),
             # **Como suena cada costura**, que es lo que decide si el segmento
             # queda armonico o pegado. Ver `saltos`.

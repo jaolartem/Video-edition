@@ -236,6 +236,69 @@ def pausas(slug):
     return out
 
 
+def onda(slug):
+    """La curva emocional de la pieza, etapa por etapa. **No decide: dibuja.**
+
+    Regla de Jaime, y es la que ordena la seleccion entera:
+
+    > *«El efecto que buscamos es mas parecido a una onda: arriba, luego abajo,
+    > luego arriba otra vez. En la seleccion hay una narrativa emocional, y es la
+    > que nos dice cual fragmento es el mejor.»* Y la vara de si va o no va:
+    > *«si hablo de muerte no quiero estar cagado de la risa; si hablo de futuro
+    > no quiero sonar como un desesperado»*.
+
+    Devuelve por etapa la `intensidad` —cuanta emocion, sin signo—, la `altura`
+    —hacia donde, en semitonos: negativo grave, positivo arriba—, la
+    `velocidad`, y el texto. Con eso se ve de un vistazo si la pieza hace una
+    onda o si baja y se queda abajo.
+
+    **Lo que no hace es decir cual deberia ser la altura de cada etapa.** Eso
+    depende de que se este diciendo ahi, y saberlo es leer la frase — no es
+    aritmetica. El detector apunta; quien monta decide.
+
+        python scripts/consulta.py onda '["reel-01"]'
+    """
+    import beats
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return []
+    edl = json.load(open(ruta, encoding="utf-8"))
+    porb, cache = {}, {}
+    for (a, b), d in zip(edl["segmentos"], edl["detalle"]):
+        porb.setdefault(d.get("beat"), {"tramos": [], "etapa": d.get("etapa"),
+                                        "toma": d.get("toma")})
+        porb[d.get("beat")]["tramos"].append((a, b))
+    out = []
+    for beat in sorted(x for x in porb if x is not None):
+        v = porb[beat]
+        toma = v["toma"]
+        if toma not in cache:
+            try:
+                cache[toma] = transcribir.exigir(toma)["segmentos"]
+            except SystemExit:
+                cache[toma] = []
+        pal = cache[toma]
+        tot = sum(y - x for x, y in v["tramos"]) or 1.0
+        acc = {"intensidad": 0.0, "altura": 0.0, "velocidad": 0.0}
+        for x, y in v["tramos"]:
+            m = beats.intensidad(toma, x, y, pal) or {}
+            peso = (y - x) / tot
+            for k in acc:
+                acc[k] += peso * float(m.get(k) or 0.0)
+        out.append({
+            "etapa": beat, "titulo": v["etapa"],
+            "intensidad": round(acc["intensidad"], 2),
+            "altura": round(acc["altura"], 2),
+            "velocidad": round(acc["velocidad"], 2),
+            "tibio": acc["intensidad"] < 1.2,
+            "texto": " ".join(w["text"] for x, y in v["tramos"] for w in pal
+                              if transcribir.suena(w, x, y))[:120],
+        })
+    return out
+
+
 def cruces(slug):
     """Lo que se repite **a los dos lados de una costura**, sin cortarlo.
 
@@ -633,6 +696,7 @@ if __name__ == "__main__":
           "abanico": abanico,
           "brolls": brolls,
           "cruces": cruces,
+          "onda": onda,
           "pausas": pausas,
           "precio_vigente": precio_vigente,
           "guardar_escena": guardar_escena}[sys.argv[1]]

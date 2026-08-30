@@ -375,9 +375,24 @@ const TABLEROS = {
       derecha: {
         titulo: "Con estructura",
         cifra: "+$30,000",
-        // El ancla por cada $100, donde se compara. Sale de las cifras del
-        // propio libreto: 30.000 sobre 180.000 son 16,70 de cada 100.
-        pie: "$16,70 de cada $100 facturado.",
+        // **Aqui decia «$16,70 de cada $100 facturado» y el numero no era el
+        // problema: era lo que la columna dejaba entender.** Enfrentada a un
+        // «se van en impuesto, cada ano», un «+$30,000» se lee como ahorro
+        // definitivo, y la fuente no sostiene eso.
+        //
+        // Comprobado contra la CRA: sobre 180.000 $ el impuesto personal en
+        // Ontario 2026 es ~55.500 $ y el corporativo al 12,2% es 21.960 $. La
+        // diferencia de ESE ano es real —33.500 $, o sea decir 30.000 se queda
+        // corto— pero **es diferimiento**: el dinero se queda en la sociedad y
+        // paga al salir, porque la integracion iguala la carga al repartir
+        // dividendos.
+        //
+        // La columna izquierda si puede decir «cada ano»: sin estructura eso se
+        // paga todos los anos. La derecha no, y por eso solo cambia esta.
+        //
+        // Y no debilita la pieza: «queda en la empresa» es una promesa mas
+        // concreta que «se ahorra», y ademas es la que se puede defender.
+        pie: "Quedan en la empresa. Impuesto al sacarlos.",
       },
       // **El dato ancla, por cada $100.** Es como lo pide el canon —«por cada
       // $100 que saca»— y sale de las cifras del propio libreto: 30.000 sobre
