@@ -61,7 +61,7 @@ def fijados(slug):
     """Los tramos declarados de una pieza, por beat."""
     con = _con()
     filas = con.execute(
-        "select cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que"
+        "select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que"
         "  from corte_fijo cf join video v on v.id = cf.video_id"
         " where v.slug = ? and cf.papel = 'etapa' order by cf.orden, cf.desde",
         (slug,)).fetchall()
@@ -126,10 +126,23 @@ def aplicar(slug):
     #
     # La marca `fijado` es la señal honesta, porque la pone este paso al aplicar.
     # La aritmetica solo sabe que un trozo cabe; la marca sabe quien lo puso.
+    #
+    # **Y la marca dice de QUE declaracion viene, no solo que hubo una.**
+    # Con un `True` a secas la etapa quedaba cerrada para siempre: la segunda
+    # valoracion declaraba un tramo nuevo para el reel-01 e4 —343,16 a 366,65,
+    # para dejar de cortar dentro de «Usted» y de «eso»— y `aplicar` lo saltaba
+    # porque la etapa «ya estaba fijada». La decision se guardaba en
+    # `corte_fijo` y no llegaba al montaje, que es el mismo fallo de C-93 por la
+    # puerta de al lado.
+    #
+    # Con el id se distinguen los dos casos que hay que distinguir: si en el EDL
+    # estan todas las declaraciones de hoy, la etapa esta hecha —y lo que otro
+    # paso haya recortado por dentro se respeta—; si falta una, es nueva y entra.
     ya = set()
     for b_, fs in por_beat.items():
         suyos = [d for d in edl["detalle"] if d.get("beat") == b_]
-        if suyos and all(d.get("fijado") for d in suyos):
+        puestas = {d.get("fijado") for d in suyos}
+        if suyos and {f["id"] for f in fs} <= puestas:
             ya.add(b_)
     for b_ in ya:
         por_beat.pop(b_, None)
@@ -156,7 +169,7 @@ def aplicar(slug):
                              if transcribir.suena(w, f["desde"], f["hasta"]))
             segs.append([round(f["desde"], 3), round(f["hasta"], 3)])
             det.append({**d, "toma": toma, "texto": texto,
-                        "fijado": True, "por_que": f["por_que"]})
+                        "fijado": f["id"], "por_que": f["por_que"]})
         puestos.add(b)
         hechos.append(b)
     # Las etapas fijadas que no estaban en el EDL —las que se habían quedado sin
@@ -173,7 +186,7 @@ def aplicar(slug):
             texto = " ".join(w["text"] for w in pal
                              if transcribir.suena(w, f["desde"], f["hasta"]))
             segs.append([round(f["desde"], 3), round(f["hasta"], 3)])
-            det.append({"beat": b, "toma": toma, "texto": texto, "fijado": True,
+            det.append({"beat": b, "toma": toma, "texto": texto, "fijado": f["id"],
                         "por_que": f["por_que"]})
         hechos.append(b)
     orden = sorted(range(len(det)), key=lambda i: (det[i].get("beat") or 0,
