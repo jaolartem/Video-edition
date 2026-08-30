@@ -79,10 +79,25 @@ def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
     la diferencia entre una corrección que persiste y una que se pierde (C-79).
     """
     con = _con()
+    # **La nota pertenece al montaje en que se apunto**, y se estampa con su
+    # huella. Regla de Jaime: *«las anclas tienen la funcion de establecer los
+    # lugares; si el video se edita o se corta, el ancla cambia, pero es
+    # idempotente: no borra registro, crea otro»*.
+    #
+    # Antes intente lo contrario —caducar la nota vieja— y es peor por dos
+    # razones: se pierde el recorrido del video, y una nota sin montaje sigue
+    # pudiendo encajar a medias y cortar donde no es. Con la huella, cada nota
+    # sabe de que corte habla y las viejas se quedan como lo que son: historia.
+    try:
+        import modelo as _mo
+
+        _huella = _mo.huella_edl(slug)
+    except Exception:                              # noqa: BLE001
+        _huella = None
     con.execute(
-        "insert into revision (video_slug, pasada, desde_s, hasta_s, ancla,"
-        " accion, que, regla, estado, fecha) values (?,?,?,?,?,?,?,?,?,?)",
-        (slug, pasada, desde, hasta, ancla, accion, que, regla, estado,
+        "insert into revision (video_slug, huella, pasada, desde_s, hasta_s, ancla,"
+        " accion, que, regla, estado, fecha) values (?,?,?,?,?,?,?,?,?,?,?)",
+        (slug, _huella, pasada, desde, hasta, ancla, accion, que, regla, estado,
          datetime.datetime.now().isoformat(timespec="seconds")))
     con.commit()
     con.close()
@@ -139,7 +154,13 @@ def _por_ancla(edl, ancla, slug=""):
             except SystemExit:
                 cache[toma] = []
         for w in cache[toma]:
-            if rango[0] - 0.02 <= w["start"] and w["end"] <= rango[1] + 0.02:
+            # La vara de que palabra suena dentro del corte vive en
+            # `transcribir.suena` (C-84). Este era el CUARTO sitio con su propia
+            # copia, y aqui el precio es alto: si la linea del montaje no es la
+            # que se oye, los segundos que se calculan no son los de la pieza y
+            # **el corte cae donde no es**. Reel-01 perdio media etapa 2 y el
+            # cierre entero por esto.
+            if _tr.suena(w, rango[0], rango[1]):
                 dentro = (w["start"] - rango[0]) / VELOCIDAD
                 linea.append((limpio(w["text"]).strip(), t + dentro,
                               t + (w["end"] - rango[0]) / VELOCIDAD))
@@ -198,10 +219,40 @@ def aplicar(slug, ver=False):
     # **El ancla manda sobre los segundos.** Si la nota trae texto, se busca
     # dónde está AHORA; los segundos sólo valen para la corrida en que se
     # apuntó, porque la pieza se vuelve a montar en cada pasada (C-79).
+    try:
+        import modelo as _mo
+
+        huella_hoy = _mo.huella_edl(slug)
+    except Exception:                              # noqa: BLE001
+        huella_hoy = None
     puestos = []
     for n in notas:
+        # **Solo las notas de este montaje.** Las de un corte anterior se
+        # quedan en la tabla —son el recorrido del video— pero no se aplican:
+        # hablan de un sitio que ya no existe. La huella lo dice sin ambiguedad.
+        if n["huella"] and huella_hoy and n["huella"] != huella_hoy:
+            continue
         rango = _por_ancla(edl, n["ancla"], slug) if n["ancla"] else None
         if rango is None and n["desde_s"] is None:
+            # **Un ancla que ya no esta en la pieza es un corte ya hecho.**
+            # Antes se saltaba y la nota se quedaba pendiente para siempre: la
+            # puerta contaba «5 cortes sin aplicar» que en realidad estaban
+            # todos aplicados, y esa cuenta falsa tapa a la nota que si falta.
+            # Si el texto que habia que quitar no suena, la nota cumplio.
+            if n["ancla"] and not ver:
+                con.execute(
+                    "update revision set estado='aplicada',"
+                    " que = que || ' [el texto ya no esta en la pieza]'"
+                    " where id = ?", (n["id"],))
+                con.commit()
+            continue
+        # **Si la nota trae ancla y el ancla no resuelve, no se corta.** Los
+        # segundos son de la corrida en que se apunto y la pieza se ha vuelto a
+        # montar desde entonces: usarlos corta en otro sitio. Paso justo eso —
+        # una nota de e7 se llevo por delante de e2 a e8 y la pieza cayo de
+        # 119 s a 75 s. Los segundos solo valen para una nota **sin** ancla,
+        # que es la que se apunto mirando el video.
+        if n["ancla"] and rango is None:
             continue
         d, h = rango if rango else (n["desde_s"], n["hasta_s"])
         puestos.append((d, h, n["id"], n["que"]))

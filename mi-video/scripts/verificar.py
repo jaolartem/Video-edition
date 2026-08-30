@@ -149,13 +149,18 @@ def revisar(slug):
     # proyecto perdía el estado antes de que fijar existiera.
     import fijar as _fj
 
-    puestos = {(d.get("beat"), round(a, 2))
-               for (a, _b), d in zip(edl["segmentos"], edl["detalle"])}
+    # **Se comprueba que el tramo esta REPRESENTADO, no que sea identico.** Un
+    # recorte de redundancia posterior acorta legitimamente lo fijado: exigir el
+    # rango exacto convertia cada recorte en un fallo de la puerta. Lo que no
+    # puede pasar es que del tramo declarado no quede nada.
     for f in _fj.fijados(slug):
-        if (f["beat"], round(f["desde"], 2)) not in puestos:
+        dentro = any(d.get("beat") == f["beat"]
+                     and min(b_, f["hasta"]) - max(a_, f["desde"]) > 0.1
+                     for (a_, b_), d in zip(edl["segmentos"], edl["detalle"]))
+        if not dentro:
             mal.append(
-                f"{slug} e{f['beat']}: hay un tramo fijado"
-                f" [{f['desde']}-{f['hasta']}] que no está en el corte."
+                f"{slug} e{f['beat']}: el tramo fijado"
+                f" [{f['desde']}-{f['hasta']}] no dejo rastro en el corte."
                 f" Corre: python scripts/fijar.py --aplicar {int(slug[-2:])}")
 
     # 7 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con

@@ -59,6 +59,16 @@ def fase_de(pieza):
     return pieza.fase
 
 
+def _fallo_antes(video_id, fase_id, motivo):
+    """¿Esta fase ya habia fallado por lo mismo? Entonces no es una espera."""
+    con = _con()
+    n = con.execute(
+        "select count(*) from video_fase where video_id = ? and fase_id = ?"
+        " and por_que is not null and por_que <> ''", (video_id, fase_id)).fetchone()[0]
+    con.close()
+    return n > 1
+
+
 def anotar(video_id, fase_id, por_que=None):
     con = _con()
     con.execute("insert into video_fase (video_id, fase_id, entro, por_que)"
@@ -119,6 +129,24 @@ def avanzar(n, ver=False, tope=None):
             anotar(pieza.video_id, actual["id"], motivo)
             registro.aviso("avanzar", "la pieza no avanza",
                            detalle=f"{pieza.slug}: {motivo}", eco=False)
+            # **A la segunda, error.** Regla de Jaime: *«si algo no funciona a
+            # la primera, paras y que genere error; corregimos y volvemos a
+            # correr — para eso esta el log»*.
+            #
+            # Un paso que ya fallo antes y vuelve a fallar no es una espera: es
+            # el mismo problema sin resolver, y seguir dandole vueltas lo
+            # esconde. El motor se planta y sale con codigo 1; lo que hay que
+            # arreglar queda en `registro` con su motivo.
+            #
+            # Una espera —un servicio de IA sin contestar— **no cuenta como
+            # fallo**: ahi el paso no se rompio, esta pidiendo su turno.
+            espera = "espera" in (r.motivo or "").lower()
+            if not espera and _fallo_antes(pieza.video_id, actual["id"], motivo):
+                raise SystemExit(
+                    f"avanzar: {pieza.slug} lleva dos intentos fallando en"
+                    f" «{siguiente['nombre']}» por lo mismo — {r.motivo}."
+                    " Se para aqui a proposito: corrige y vuelve a correr,"
+                    " que el detalle esta en el log.")
             break
 
         anotar(pieza.video_id, siguiente["id"])

@@ -542,9 +542,71 @@ def arreglar(slug, ver=False):
                   f" · ritmo {s['ritmo']}→{s2['ritmo']}")
         else:
             duras.append(i)
-    # **Lo que no tuvo arreglo se marca para disimular**, y el spec pone ahi el
-    # glitch y el cambio de encuadre. Los dos juntos: el ojo perdona un salto de
-    # voz cuando el plano tambien cambio, porque le da un motivo.
+    # **Antes del glitch, el B-roll.** Jaime: *«otra forma de hacer transiciones
+    # es hacer B-rolls con pedazos del video donde yo salgo en silencio… es una
+    # alternativa al glitch»*. Y es mejor alternativa: el glitch tapa la costura
+    # con un efecto, el B-roll la resuelve con material real y ademas da el
+    # espacio para pensar cuando lo anterior pesaba.
+    #
+    # El orden queda en tres escalones, de menos a mas intervencion:
+    #   1. mover el corte —gratis, no se anade nada—
+    #   2. B-roll mudo de la misma cinta —se anade material que ya existe—
+    #   3. glitch y cambio de encuadre —se anade un efecto—
+    if duras:
+        try:
+            import consulta as _cs
+
+            # «Un par de segundos», que es lo que Jaime pidio: mas que eso deja de
+            # ser una transicion y se convierte en una pausa.
+            libres = _cs.brolls(1.8, 3.0, cintas=sorted(
+                {d.get("toma") for d in edl["detalle"] if d.get("toma")}))
+        except Exception:                          # noqa: BLE001
+            libres = []
+        # **El B-roll no se asigna aqui: se propone.** Jaime, cuando le puse
+        # cuatro y luego dos: *«no tantas, es una herramienta de enfasis o de
+        # separacion»*, *«idealmente una por video, y cuando sea necesario»*, y
+        # lo que lo zanja: *«por eso se piensa bien en la composicion»*.
+        #
+        # O sea que esto es un detector, no un decisor —la misma regla que ya
+        # costo una correccion (C-88)—. Se apuntan las costuras que **podrian**
+        # llevarlo, con su razon, y quien compone elige si alguna lo necesita.
+        # Cero es una respuesta buena.
+        TOPE = 3
+        det = edl["detalle"]
+        compone = set()
+        try:
+            import sqlite3
+
+            cx = sqlite3.connect("ads/decisiones.db")
+            compone = {r[0] for r in cx.execute(
+                "select etapa_orden from escena_desc where video_slug = ?"
+                " and componente is not null", (slug,))}
+            cx.close()
+        except Exception:                          # noqa: BLE001
+            pass
+        posibles = []
+        for i in duras:
+            if i + 1 >= len(det):
+                continue
+            b_ant, b_sig = det[i].get("beat"), det[i + 1].get("beat")
+            if b_ant == b_sig:
+                continue                 # dentro de una etapa: no separa nada
+            posibles.append((i, b_ant, b_sig,
+                             "enfasis" if b_ant in compone else "separacion"))
+        posibles.sort(key=lambda x: 0 if x[3] == "enfasis" else 1)
+        edl["brolls_posibles"] = [
+            {"costura": i, "entre": [b_ant, b_sig], "razon": razon,
+             "toma": b0["toma"], "desde": b0["desde"], "hasta": b0["hasta"],
+             "dura": b0["dura"]}
+            for (i, b_ant, b_sig, razon), b0 in zip(posibles[:TOPE], libres)]
+        edl.pop("brolls", None)
+        if not ver and edl["brolls_posibles"]:
+            print(f"  {slug}: {len(edl['brolls_posibles'])} costura(s) admiten"
+                  f" B-roll — lo decide la composicion")
+
+    # **Lo que no tuvo arreglo ni B-roll se marca para disimular**, y el spec
+    # pone ahi el glitch y el cambio de encuadre. Los dos juntos: el ojo perdona
+    # un salto de voz cuando el plano tambien cambio, porque le da un motivo.
     if not ver:
         edl["costuras_duras"] = duras
         json.dump(edl, open(ruta, "w", encoding="utf-8"),
@@ -575,6 +637,29 @@ def main():
             sin_solapes(slug, ver=a.ver)
             palabras_enteras(slug, ver=a.ver)
         else:
+            # **El paso completo, que es lo que corre la fase `cosido`.**
+            #
+            # Estaba a medias: la fase solo movia costuras, y las garantias
+            # —que ningun corte caiga dentro de una palabra, que dos trozos no
+            # se pisen, que no quede un resto sin palabras— solo corrian si
+            # alguien las lanzaba a mano. O sea que **no corrian**: el remate
+            # del gancho de reel-01 volvio a quedar cortado dentro de «suerte»
+            # despues de cada arreglo, y habia que descubrirlo mirando.
+            #
+            # Van antes del optimizador y en este orden: primero se deja el
+            # corte sano, luego se busca que la union suene bien. Al reves, el
+            # optimizador afina una costura que despues se mueve.
+            # **`bordes` NO va aqui, y es a proposito.** Decide —si la palabra
+            # de delante es la cabeza que falta o la cola de otra idea— y eso
+            # es criterio: Jaime lo saco del automatismo *«el detector apunta y
+            # tu decidas caso a caso»*. Metido en la fase, deshacia las
+            # decisiones del paso anterior: devolvia «Yo conte» al gancho y
+            # «500,» al beat del precio, y la pieza volvia a repetirse.
+            #
+            # Aqui solo lo que es aritmetica y no puede equivocarse.
+            sin_solapes(slug, ver=a.ver)
+            palabras_enteras(slug, ver=a.ver)
+            mudos(slug, ver=a.ver)
             arreglar(slug, ver=a.ver)
 
 

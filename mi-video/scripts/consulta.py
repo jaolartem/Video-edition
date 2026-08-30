@@ -41,9 +41,11 @@ def escenas_por_describir(reels=None, rehacer=False):
     if reels:
         donde = " and v.slug in (%s)" % ",".join("?" * len(reels))
         args = [f"reel-{int(r):02d}" for r in reels]
-    if not rehacer:
-        donde += (" and not exists (select 1 from escena_desc d"
-                  " where d.video_slug = v.slug and d.etapa_orden = e.orden)")
+    # **Sin filtro en SQL.** Antes se excluia aqui toda etapa ya descrita, y por
+    # eso una descripcion caducada no se volvia a pedir: el paso decia «nada que
+    # describir» y la puerta paraba la pieza sin que nadie supiera que faltaba.
+    # Ahora se traen todas y se descartan abajo las que siguen hablando de su
+    # texto — que es una comparacion de textos y no cabe en el WHERE.
     filas = con.execute(f"""
         select v.slug, e.orden, ec.nombre as etapa, es.nombre as estructura,
                e.mensaje_esperado as mensaje, l.texto as libreto,
@@ -65,6 +67,17 @@ def escenas_por_describir(reels=None, rehacer=False):
     # **Lo que se dijo es lo que dice el montaje, no lo que se eligio.** El
     # `dicho` de la base queda como respaldo para la etapa que no tiene toma
     # —la que va a tablero—, porque ahi no hay montaje del que leer.
+    # La caducidad se decide comparando textos, que es lo que sabe hacer
+    # `sobre_texto`; en SQL no se puede porque el montaje se calcula leyendo la
+    # cinta. Se filtra aqui, despues de traer las filas.
+    con2 = sqlite3.connect(BASE)
+    con2.row_factory = sqlite3.Row
+    guardado = {(r["video_slug"], r["etapa_orden"]): (r["sobre_texto"] or "")
+                for r in con2.execute(
+                    "select video_slug, etapa_orden, sobre_texto"
+                    " from escena_desc")}
+    con2.close()
+
     salida, textos, avisos = [], {}, {}
     for f in filas:
         d = dict(f)
@@ -78,6 +91,11 @@ def escenas_por_describir(reels=None, rehacer=False):
         d["bordes"] = avisos[d["slug"]].get(int(d["orden"])) or []
         d["repetido"] = [r for r in repetido(d["slug"])
                          if r["etapa"] == int(d["orden"])]
+        if not rehacer:
+            g = guardado.get((d["slug"], int(d["orden"])))
+            if g is not None and " ".join(g.split()) == " ".join(
+                    (d["montaje"] or "").split()):
+                continue                 # descrita y sigue hablando de este texto
         salida.append(d)
     return salida
 
@@ -216,6 +234,53 @@ def pausas(slug):
                 out[f["orden"]] = t[i:i + 90].strip()
                 break
     return out
+
+
+def brolls(minimo=2.0, maximo=8.0, cintas=None):
+    """Los tramos donde el esta en cuadro y **no habla**. Material de transicion.
+
+    Regla de Jaime, y anade un recurso que ya estaba grabado y no se usaba:
+
+    > *«Otra forma de hacer transiciones es hacer B-rolls con pedazos del video
+    > donde yo salgo en silencio, leyendo o haciendo algo; mostrar un poco el
+    > proceso, durante un par de segundos, luego continuar. Dar espacio
+    > intencional a dos secciones diferentes, o dar el espacio para pensar
+    > cuando algo importante se dijo.»*
+
+    Son los huecos del transcript: si entre dos palabras hay dos segundos, ahi
+    la camara siguio grabando y el seguia delante. No hace falta grabar nada
+    nuevo — hay 149 huecos de dos segundos o mas en las siete cintas.
+
+    Dos usos, y los dos son de ritmo, no de relleno:
+
+    - **Entre dos secciones**, para que no se pisen.
+    - **Despues de algo importante**, para dejarlo caer.
+
+    Un B-roll que no hace ninguna de las dos cosas es tiempo muerto, y esta
+    pieza vive de que no sobre nada.
+    """
+    import glob
+
+    rutas = ([f"work/transcripts/{c}.json" for c in cintas] if cintas
+             else sorted(glob.glob("work/transcripts/*.json")))
+    out = []
+    for r in rutas:
+        if not os.path.exists(r):
+            continue
+        d = json.load(open(r, encoding="utf-8"))
+        ws = d.get("segmentos") or []
+        for a, b in zip(ws, ws[1:]):
+            hueco = b["start"] - a["end"]
+            if hueco < minimo:
+                continue
+            # Se corta a `maximo`: un plano mudo largo deja de ser transicion.
+            out.append({"toma": d["toma"],
+                        "desde": round(a["end"] + 0.15, 2),
+                        "hasta": round(min(b["start"] - 0.15,
+                                           a["end"] + maximo), 2),
+                        "dura": round(min(hueco, maximo) - 0.3, 2),
+                        "antes": a["text"], "despues": b["text"]})
+    return sorted(out, key=lambda x: -x["dura"])
 
 
 def abanico(frase, cintas=None, tope=12):
@@ -520,6 +585,7 @@ if __name__ == "__main__":
           "bordes_sucios": bordes_sucios,
           "repetido": repetido,
           "abanico": abanico,
+          "brolls": brolls,
           "pausas": pausas,
           "precio_vigente": precio_vigente,
           "guardar_escena": guardar_escena}[sys.argv[1]]

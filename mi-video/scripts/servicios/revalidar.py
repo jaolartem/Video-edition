@@ -96,13 +96,22 @@ def aplicar(pieza: Pieza, veredictos) -> str:
       a descartar por número de cortes, que ya costo una correccion.
     - `compone` — la escena lleva composición. Es lo que decide si esa etapa se
       monta con figura y tablero o va a plano seco.
+    - `tramos` / `elegida` — **el corte cambia**. Es la decisión principal del
+      paso y no se aplicaba: el servicio medía, preguntaba, recibía «entra la
+      candidata 1» … y dejaba el montaje como estaba. Jaime lo pidió así —*«ahí
+      decide si cambia de candidato del segmento o si lo mantiene»*— y sin esto
+      la mitad de la respuesta se perdía en silencio.
+
+      Se aplica **declarándolo**, no editando el EDL: entra por `fijar`, que lo
+      mide contra las demás, lo registra con su porqué y sobrevive a que la
+      selección se rehaga.
     """
     import datetime
     import sqlite3
 
     con = sqlite3.connect("ads/decisiones.db")
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
-    falsos, cortados, componen = 0, 0, 0
+    falsos, cortados, componen, cambiados = 0, 0, 0, 0
     for v in veredictos:
         beat = v.get("beat")
         if beat is None:
@@ -117,6 +126,35 @@ def aplicar(pieza: Pieza, veredictos) -> str:
             falsos += 1
         if v.get("entrecortado"):
             cortados += 1
+        # El corte nuevo: o los tramos que propone, o el rango de la
+        # candidata que elige. Lo segundo solo si no dijo tramos.
+        nuevos = [t for t in (v.get("tramos") or []) if len(t) == 2]
+        if not nuevos and int(v.get("elegida") or 1) != 1:
+            r = con.execute(
+                "select f.desde, f.hasta, t.nombre from candidato c"
+                "  join etapa e on e.id = c.etapa_id"
+                "  join video vi on vi.id = e.video_id"
+                "  join fragmento f on f.id = c.fragmento_id"
+                "  join toma t on t.id = f.toma_id"
+                " where vi.slug = ? and e.orden = ? and c.puesto = ?",
+                (pieza.slug, beat, int(v["elegida"]))).fetchone()
+            if r:
+                nuevos = [[r[0], r[1]]]
+                v["toma"] = r[2]
+        if nuevos:
+            import fijar
+
+            con.execute(
+                "delete from corte_fijo where papel='etapa' and orden = ?"
+                " and video_id = (select id from video where slug = ?)",
+                (beat, pieza.slug))
+            con.commit()
+            toma = v.get("toma") or (pieza.edl or {}).get("detalle", [{}])[0].get("toma")
+            for a0, b0 in nuevos:
+                fijar.fijar(pieza.slug, beat, toma, a0, b0,
+                            (v.get("edicion") or v.get("por_que") or "")[:200],
+                            quien="revalidado")
+            cambiados += 1
         if v.get("compone"):
             con.execute(
                 "update escena_desc set remedio = coalesce(remedio,'tablero')"
@@ -124,5 +162,10 @@ def aplicar(pieza: Pieza, veredictos) -> str:
             componen += 1
     con.commit()
     con.close()
-    return (f"{falsos} falso(s) positivo(s) a la siguiente candidata, "
+    if cambiados:
+        import fijar
+
+        fijar.aplicar(pieza.slug)
+    return (f"{cambiados} corte(s) cambiados, "
+            f"{falsos} falso(s) positivo(s) a la siguiente candidata, "
             f"{cortados} entrecortada(s), {componen} con composicion")

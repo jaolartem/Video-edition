@@ -612,7 +612,13 @@ def afinar(toma, tramos, pasadas=4):
             redondeados.append(r)
     tramos = redondeados
 
-    nuevas, tocados = [], 0
+    # **Solo se quita lo viejo de los tramos que SI dieron texto.** Si una
+    # pasada no devuelve nada —whisper calla, la ventana sale alucinada, el
+    # tramo no tiene voz— y aun asi se borran las palabras de antes, queda un
+    # hueco: la cinta pierde ese trozo y todo lo que dependa de el se queda sin
+    # texto. Medido: `20260825_135637` con seis huecos, y ocho de los once
+    # trozos del reel-01 sin una sola palabra.
+    hechos, nuevas, tocados = [], [], 0
     for a, b in tramos:
         va, vb = a_voz(a), a_voz(max(a, b - 0.01))
         if va is None or vb is None:
@@ -645,6 +651,7 @@ def afinar(toma, tramos, pasadas=4):
             fin = a_cinta(min(w["b"], vb - 0.001), mapa)
             nuevas.append({"start": round(ini, 3), "end": round(max(ini, fin), 3),
                            "text": w["t"], "larga": int(fin - ini > LARGA)})
+        hechos.append((a, b))
         tocados += 1
         # `acuerdo` es None cuando solo sobrevivio una pasada: con una no hay
         # acuerdo, hay ausencia de discrepancia. Formatearlo como numero
@@ -688,13 +695,13 @@ def afinar(toma, tramos, pasadas=4):
     # sus tramos SI estan; lo que desaparece es todo lo que no se uso.
     def _toca(w):
         return any(w["end"] > x + 0.001 and w["start"] < y - 0.001
-                   for x, y in tramos)
+                   for x, y in hechos)
 
     fuera = [w for w in d["segmentos"] if not _toca(w)]
     d["segmentos"] = sorted(fuera + nuevas, key=lambda w: w["start"])
     d["afinado"] = sorted(set(tuple(t) for t in
                               [tuple(x) for x in d.get("afinado", [])] +
-                              [tuple(t) for t in tramos]))
+                              [tuple(t) for t in hechos]))
     json.dump(d, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return d, tocados
 
