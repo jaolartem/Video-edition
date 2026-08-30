@@ -199,16 +199,22 @@ CICLO = [
     (3, "afinado", "scripts/transcribir.py --elegidos {n}"),
     (4, "depurado", "scripts/depurar.py {n}"),
     (5, "sin_redundancia", "scripts/redundancia.py {n}"),
+    (5.5, "revalidado", None),       # servicio de IA con decision acotada
     (6, "cosido", "scripts/costuras.py {n}"),
     (7, "descrito", "scripts/describir.mjs {n}"),
     (8, "cortado", "scripts/cortar.py {n}"),
     (9, "voz_entregada", "scripts/voz-limpia.py --exportar {n}"),
     (10, "verificado", "scripts/verificar.py {n}"),
     (11, "montado", "scripts/montar.sh {n}"),
-    (12, "aprobado", None),          # lo mueve Jaime, no un servicio
-    (13, "voz_limpia", "scripts/voz-limpia.py {n}"),
-    (14, "masterizado", "scripts/musica.sh {n}"),
-    (15, "publicado", "scripts/publicar.py --finales {n}"),
+    # **El criterio humano es el escalon mas caro, y por eso va aqui.** Jaime:
+    # *«lo mas caro es criterio humano, por eso es el paso anterior a la
+    # aprobacion»*. Mirar una pieza montada cuesta su tiempo y su atencion, asi
+    # que se hace **una vez** y sobre algo que ya paso todos los filtros baratos.
+    (12, "revisado", None),          # el mira y anota; lo mueve el
+    (13, "aprobado", None),          # lo mueve Jaime, no un servicio
+    (14, "voz_limpia", "scripts/voz-limpia.py {n}"),
+    (15, "masterizado", "scripts/musica.sh {n}"),
+    (16, "publicado", "scripts/publicar.py --finales {n}"),
 ]
 
 # Las que referian al video por texto. Segunda forma normal: el slug repetido en

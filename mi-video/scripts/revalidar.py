@@ -43,6 +43,7 @@ reel 1 peor de lo que estaba — ya pasó una vez (C-65).
 import argparse
 import json
 import os
+import sqlite3
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -83,8 +84,53 @@ def flojo(m):
     return [k for k, v in SUELO.items() if m.get(k, 0) < v]
 
 
+def candidatas(slug, beat, cuantas=3):
+    """Las otras opciones de esa etapa, con su texto y su puntuacion.
+
+    Jaime, definiendo el contrato: *«por contrato recibes la informacion de cada
+    escena y el contexto de las otras candidatas, para saber cual escoges»*.
+    Elegir sin ver las alternativas no es elegir — y hasta ahora el dossier
+    mandaba la elegida sola, asi que lo unico que se podia contestar era «esta
+    vale o no vale», nunca «esta otra vale mas».
+
+    Tres, que es el tope del embudo: *«si ninguna de las tres candidatas es, pues
+    la que mejor puntaje tenga»*.
+    """
+    con = sqlite3.connect("ads/decisiones.db")
+    con.row_factory = sqlite3.Row
+    filas = con.execute(
+        "select c.puesto, c.puntuacion, c.voz_st, f.desde, f.hasta, t.nombre toma"
+        " from candidato c join etapa e on e.id = c.etapa_id"
+        " join video v on v.id = e.video_id"
+        " join fragmento f on f.id = c.fragmento_id"
+        " join toma t on t.id = f.toma_id"
+        " where v.slug = ? and e.orden = ? order by c.puesto limit ?",
+        (slug, beat, cuantas)).fetchall()
+    con.close()
+    out = []
+    for r in filas:
+        try:
+            pal = transcribir.exigir(r["toma"])["segmentos"]
+        except SystemExit:
+            pal = []
+        txt = " ".join(w["text"] for w in pal
+                       if r["desde"] - 0.02 <= w["start"]
+                       and w["end"] <= r["hasta"] + 0.02)
+        out.append({"puesto": r["puesto"],
+                    # **La puntuación puede no estar, y eso no es cero.** Es la
+                    # cuarta vez que este patrón rompe algo: hacer representable
+                    # el «no medido» obliga a mirar todos los sitios que asumían
+                    # un número (C-63 y las dos de hoy).
+                    "puntuacion": (round(r["puntuacion"], 3)
+                                   if r["puntuacion"] is not None else None),
+                    "desde": round(r["desde"], 2), "hasta": round(r["hasta"], 2),
+                    "dura": round(r["hasta"] - r["desde"], 1),
+                    "texto": txt[:400]})
+    return out
+
+
 def dossier(slug):
-    """Lo que el LLM necesita para decidir: el texto y sus números al lado."""
+    """Lo que el LLM necesita para decidir: el texto, sus números y las otras."""
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
         return []
@@ -107,13 +153,21 @@ def dossier(slug):
         texto = " ".join(
             w["text"] for x, y in sorted(d["tramos"])
             for w in pal if x - 0.02 <= w["start"] and w["end"] <= y + 0.02)
+        try:
+            inten = beats.intensidad(toma, m["desde"], m["hasta"], pal)
+        except Exception:                          # noqa: BLE001
+            inten = {}
         out.append({
             "beat": beat,
             "etapa": d["det"].get("etapa"),
             "trato": d["det"].get("trato"),
             **m,
+            "intensidad": inten.get("intensidad"),
             "flojo": flojo(m),
             "texto": texto,
+            # **Y las otras candidatas.** Sin esto solo se puede contestar «vale
+            # o no vale»; con esto se puede elegir.
+            "candidatas": candidatas(slug, beat),
         })
     return out
 
