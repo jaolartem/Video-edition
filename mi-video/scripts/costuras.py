@@ -241,6 +241,79 @@ def palabras_enteras(slug, ver=False):
     return tocados
 
 
+# Lo que hace falta para que se oiga la consonante con la que arranca una
+# palabra. Por debajo de 60 ms la primera silaba entra descabezada y por encima
+# de 120 se cuela el final de lo anterior; 80 es el centro de esa ventana.
+ATAQUE = 0.08
+
+
+def ataques(slug, ver=False):
+    """Ningun corte entra pisando la primera palabra.
+
+    Jaime, oyendo el reel-01: *«el "no es mala suerte" se entrega sin alma,
+    falta el "eso"»*. Y el «eso» estaba: el corte empezaba en 93,44, que es
+    exactamente lo que el transcript da como arranque de esa palabra.
+
+    **El transcript no sirve para medir un ataque.** Whisper reparte las marcas
+    sin dejar hueco entre palabras, asi que estira la anterior por encima del
+    silencio: aqui «suerte,» figura de 92,01 a 93,44 cuando el detector de voz
+    dice que la voz se corta en 92,29 y vuelve en 92,89. El arranque real de la
+    frase esta medio segundo antes de donde el texto lo pone, y entrar por el
+    texto entra con la palabra ya empezada.
+
+    La vara buena es el audio, que ya esta medido en `work/cuts`: se retrocede
+    hasta `ATAQUE` **sin cruzar el final del tramo de voz anterior** —para no
+    traerse la cola de lo de antes— ni el final del trozo anterior del montaje.
+
+    Es aritmetica y por eso corre sola: no decide que entra, solo hace que lo
+    que ya entra se oiga entero. Medido en el lote: 42 cortes empezaban justo
+    en el ataque.
+    """
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    segs, det = edl["segmentos"], edl["detalle"]
+    cache, vad, tocados = {}, {}, 0
+    for i, ((a0, b0), d) in enumerate(zip(segs, det)):
+        toma = d.get("toma")
+        if toma not in cache:
+            try:
+                cache[toma] = transcribir.exigir(toma)["segmentos"]
+            except SystemExit:
+                cache[toma] = []
+            try:
+                vad[toma] = json.load(
+                    open(f"work/cuts/{toma}.json", encoding="utf-8"))["segmentos"]
+            except Exception:                      # noqa: BLE001
+                vad[toma] = []
+        prim = next((w for w in cache[toma] if w["end"] > a0 + 0.001), None)
+        if not prim or abs(prim["start"] - a0) > 0.02:
+            continue                    # no entra pisando nada: se deja
+        suelo = a0 - ATAQUE
+        previos = [y for x, y in vad[toma] if y <= a0 + 0.001]
+        if previos:
+            suelo = max(suelo, max(previos) + 0.01)
+        if i and det[i - 1].get("toma") == toma:
+            suelo = max(suelo, segs[i - 1][1] + 0.01)
+        if a0 - suelo < 0.01:
+            continue
+        if ver:
+            print(f"  {slug} e{d.get('beat')}: {a0:.3f} -> {suelo:.3f}"
+                  f" para que se oiga {prim['text']!r}")
+        else:
+            segs[i] = [round(suelo, 3), b0]
+        tocados += 1
+    if tocados and not ver:
+        edl["duracion_s"] = round(sum(y - x for x, y in segs), 2)
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    print(f"{slug}: {tocados} corte(s) respiran el ataque")
+    return tocados
+
+
 def mudos(slug, ver=False):
     """Fuera los trozos que no dicen ni una palabra entera.
 
@@ -659,6 +732,9 @@ def main():
             # Aqui solo lo que es aritmetica y no puede equivocarse.
             sin_solapes(slug, ver=a.ver)
             palabras_enteras(slug, ver=a.ver)
+            # Despues de cuadrar los bordes a palabra entera, porque es ese
+            # ajuste el que deja el corte pegado al ataque.
+            ataques(slug, ver=a.ver)
             mudos(slug, ver=a.ver)
             arreglar(slug, ver=a.ver)
 
