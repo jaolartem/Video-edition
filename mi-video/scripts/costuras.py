@@ -174,6 +174,9 @@ def _fronteras(ws):
     return sorted(set(ini)), sorted(set(fin))
 
 
+ATAQUE = 0.08
+
+
 def _fuera_de_palabra(x, ws, hacia):
     """Saca un corte de dentro de una palabra. `hacia` es 'ini' o 'fin'.
 
@@ -199,6 +202,19 @@ def _fuera_de_palabra(x, ws, hacia):
         # ninguna, y el margen para no comerse la consonante ya lo pone
         # `plan-reel` al cortar.
         if hacia == "ini":
+            # **Un respiro no es un corte a medias.** `ataques` retrocede 80 ms
+            # para que se oiga la consonante con la que arranca la primera
+            # palabra, y ese retroceso cae dentro de la palabra ANTERIOR porque
+            # el transcript las da pegadas. Sin esta salvedad, la pasada
+            # siguiente lo empujaba de vuelta al borde justo y los dos pasos se
+            # deshacian el trabajo uno al otro — la misma oscilacion que ya
+            # costo once cortes «arreglados» en cada pasada.
+            #
+            # Se distingue por lo que es: si lo que queda por delante de la
+            # palabra siguiente cabe en un ataque, esto es un respiro puesto a
+            # proposito y se deja.
+            if w["end"] - x <= ATAQUE + 0.005:
+                return x
             return w["start"] if dentro < 0.5 else w["end"]
         return w["end"] if dentro > 0.5 else w["start"]
     return x
@@ -244,7 +260,6 @@ def palabras_enteras(slug, ver=False):
 # Lo que hace falta para que se oiga la consonante con la que arranca una
 # palabra. Por debajo de 60 ms la primera silaba entra descabezada y por encima
 # de 120 se cuela el final de lo anterior; 80 es el centro de esa ventana.
-ATAQUE = 0.08
 
 
 def ataques(slug, ver=False):
@@ -602,6 +617,25 @@ def arreglar(slug, ver=False):
             continue
         total += 1
         if not dura(s):
+            continue
+        # **Una costura declarada no se mueve.** Mover el empalme es el trabajo
+        # de este paso y esta bien hecho —busca el par de bordes que suena
+        # menos a pegote—, pero lo hace recortando una palabra a cada lado, y
+        # cuando el tramo viene declarado eso **deshace una decision en
+        # silencio**.
+        #
+        # Medido en reel-01 e2: la segunda valoracion declaro 118,20-134,35 y
+        # 220,35-224,85 justo para que entraran «estructura» al cerrar y «y
+        # los» al abrir, que son lo que hace que la frase siga. `arreglar` los
+        # volvio a quitar buscando una costura mas limpia, y la pieza quedo
+        # diciendo «una cierta | que usan esa estructura». Jaime ya lo habia
+        # nombrado: *«se recortaron pasos intermedios entre secciones»*.
+        #
+        # La costura sigue siendo dura, y para eso esta el glitch: se disimula
+        # en vez de recortarse. Disimular no cuesta palabras.
+        if (edl["detalle"][i].get("fijado")
+                or edl["detalle"][i + 1].get("fijado")):
+            duras.append(i)
             continue
         f, n, s2 = mejor(edl, i, cache)
         if s2 and not dura(s2):

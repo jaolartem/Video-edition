@@ -367,14 +367,23 @@ const TABLEROS = {
       // **Cifra en las DOS columnas.** La derecha decía «SE QUEDAN» y Jaime lo
       // señaló: «la comparación no es suficientemente clara». No se puede
       // comparar un número con una frase — el ojo no tiene contra qué medirlo.
+      // **La cifra la manda la voz, no el tablero.** La etapa cambio a la toma
+      // que entrega —Jaime: *«prima la emocion en la entrega de un mensaje»*—
+      // y esa dice «entre 25 mil y 30 mil». Dejar el tablero en 30.000 dejaria
+      // la pantalla diciendo una cosa y la voz otra, que es lo unico que la
+      // regla de la entrega NO mueve.
+      //
+      // Y la horquilla no debilita: comprobado contra la CRA, la diferencia
+      // sobre 180.000 $ es 33.500 $, asi que 25-30 es conservador por los dos
+      // lados. Una cifra redonda suena mas segura y se defiende peor.
       izquierda: {
         titulo: "Sin estructura",
-        cifra: "−$30,000",
-        pie: "Se van en impuesto, cada año.",
+        cifra: "−$25-30K",
+        pie: "En impuesto, cada año.",
       },
       derecha: {
         titulo: "Con estructura",
-        cifra: "+$30,000",
+        cifra: "+$25-30K",
         // **Aqui decia «$16,70 de cada $100 facturado» y el numero no era el
         // problema: era lo que la columna dejaba entender.** Enfrentada a un
         // «se van en impuesto, cada ano», un «+$30,000» se lee como ahorro
