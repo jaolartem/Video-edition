@@ -501,6 +501,68 @@ def _guardar_en_base(toma, mapa):
     con.close()
 
 
+class Incompleta(Exception):
+    """La cinta tiene habla sin texto y afinarla no la tapo.
+
+    **Tiene que ser una excepcion propia.** El bucle usa `SystemExit` para otra
+    cosa —`exigir()` la lanza cuando la cinta aun no esta sellada, y ahi
+    significa «hazla»— y la caza con un `except SystemExit: pass`. Si el aviso
+    viajara por esa via, el paso lo entenderia como «rehazla entera»: media hora
+    de CPU para repetir el barrido que ya dejo esos tramos vacios.
+    """
+
+
+def _sin_cubrir(toma, d):
+    """Cuantos segundos de habla medida se quedaron sin una sola palabra.
+
+    Los tramos de `work/cuts/<toma>.json` los midio el detector de silencio
+    sobre el audio: dicen donde hay voz. Si en uno de esos tramos el transcript
+    no tiene ninguna palabra, ahi falta texto — y el paso no puede decir «ya
+    esta».
+    """
+    import json as _js
+
+    try:
+        runs = _js.load(open(f"work/cuts/{toma}.json", encoding="utf-8"))["segmentos"]
+    except Exception:                              # noqa: BLE001
+        return 0.0
+    return sum(b0 - a0 for a0, b0 in _huecos(toma, d))
+
+
+def _huecos(toma, d, minimo=1.0):
+    """**Donde** falta el texto, no solo cuanto. Tramos de voz sin palabra.
+
+    `_sin_cubrir` daba un numero y con un numero solo se puede hacer una cosa:
+    rehacer la cinta entera. Eso costo media hora de CPU en el reel 1 y dejo
+    43 de los 102 segundos igual, porque el barrido vuelve a usar las mismas
+    ventanas que ya fallaron. Los tramos, en cambio, se pueden afinar uno a
+    uno con contexto mas ancho, que es para lo que existe `afinar`.
+    """
+    import json as _js
+
+    try:
+        runs = _js.load(open(f"work/cuts/{toma}.json", encoding="utf-8"))["segmentos"]
+    except Exception:                              # noqa: BLE001
+        return []
+    ws = d.get("segmentos") or []
+    hue = [(a0, b0) for a0, b0 in runs
+           if b0 - a0 >= minimo and not any(a0 <= w["start"] < b0 for w in ws)]
+    # **Lo que ya se oyo y se descarto no vuelve a parar el paso.** Sin esto la
+    # linea se planta igual en cada corrida y la lectura hay que rehacerla de
+    # memoria; con esto la decision esta escrita y se puede discutir. Solo callan
+    # los tramos declarados uno a uno: un agujero nuevo sigue parando.
+    try:
+        c = sqlite3.connect(BASE)
+        ya = c.execute("select desde, hasta from hueco_oido"
+                       " where toma = ? and veredicto = 'descartado'",
+                       (toma,)).fetchall()
+        c.close()
+    except Exception:                              # noqa: BLE001
+        return hue
+    return [(a0, b0) for a0, b0 in hue
+            if not any(abs(a0 - d0) < 0.3 and abs(b0 - h0) < 0.3 for d0, h0 in ya)]
+
+
 def suena(w, a, b):
     """¿Esta palabra se oye dentro del corte `[a, b]`?
 
@@ -831,6 +893,43 @@ def main():
         if not a.rehacer:
             try:
                 transcribir_ya = exigir(toma)
+                # **Sellada no es lo mismo que entera.** El sello dice cuantas
+                # pasadas se hicieron, no si la cinta tiene agujeros; y una
+                # cinta con agujeros deja sin texto a las etapas que caen ahi
+                # —ocho de los once trozos del reel 1— mientras el paso repite
+                # «ya esta». Se mira tambien la cobertura contra los tramos de
+                # habla medidos, que es lo que dice cuanto deberia haber.
+                falta = _sin_cubrir(toma, transcribir_ya)
+                if falta > 20.0:
+                    # **Se tapa el agujero donde esta.** Los tramos huerfanos
+                    # se vuelven a oir con el modelo bueno y una ventana mas
+                    # ancha; rehacer la cinta entera es caro y repite el mismo
+                    # barrido que ya los dejo vacios.
+                    hue = _huecos(toma, transcribir_ya)
+                    print(f"── {toma} ── sellada pero con {falta:.0f}s de habla"
+                          f" sin texto en {len(hue)} tramos: se afinan")
+                    j = []
+                    for d0, h0 in sorted(hue):
+                        if j and d0 - j[-1][1] < 2.0:
+                            j[-1] = (j[-1][0], h0)
+                        else:
+                            j.append((d0, h0))
+                    transcribir_ya, n = afinar(toma, j)
+                    falta = _sin_cubrir(toma, transcribir_ya)
+                    print(f"   {n}/{len(j)} afinados → quedan {falta:.0f}s"
+                          f" sin texto")
+                    # **Y si sigue faltando, para y avisa.** Regla de Jaime:
+                    # *«si algo no funciona a la primera, paras y que genere
+                    # error»*. Un tramo que no suelta texto tras afinarlo o no
+                    # es habla o no se entiende, y las dos cosas las decide
+                    # quien monta — no un umbral.
+                    if falta > 20.0:
+                        for d0, h0 in _huecos(toma, transcribir_ya)[:10]:
+                            print(f"   sin texto: {d0:.1f}-{h0:.1f}s")
+                        raise Incompleta(
+                            f"{toma}: {falta:.0f}s de habla sin texto tras"
+                            f" afinar. Oye esos tramos y decide: o se rehace"
+                            f" la cinta (--rehacer) o no son habla.")
                 print(f"── {toma} ── ya esta ({transcribir_ya['pasadas']} pasadas"
                       f" por tramo, {len(transcribir_ya['segmentos'])} palabras)")
                 continue

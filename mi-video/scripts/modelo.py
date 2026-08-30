@@ -268,6 +268,35 @@ CREATE TABLE IF NOT EXISTS precio (
   nota    TEXT,
   UNIQUE (importe, hasta)
 );
+
+-- Un tramo de habla que se oyo y **no aporta texto a la pieza**.
+--
+-- El paso 1 se planta cuando la cinta tiene habla sin transcribir, y hace bien:
+-- asi salieron los 102 segundos mudos del reel 1. Pero no todo hueco es una
+-- perdida. La cinta es un abanico —*«se grabo asi para poder escoger una buena
+-- entre estas»*— y sus 29 segundos restantes son falsos arranques y tomas
+-- repetidas de una linea que ya esta transcrita tres veces mas alla.
+--
+-- Sin esta tabla esa lectura se queda en la cabeza de quien la hizo y el paso
+-- vuelve a plantarse en la corrida siguiente, identico. Con ella la decision
+-- **existe fuera de la conversacion**: dice quien la tomo, cuando y por que, y
+-- se puede discutir. Es la misma regla que gobierna el resto del proyecto —
+-- una decision que no queda registrada no ocurrio.
+--
+-- No abre la puerta a saltarse huecos nuevos: solo silencia los tramos
+-- declarados uno a uno. Un agujero que aparezca en otro sitio sigue parando.
+CREATE TABLE IF NOT EXISTS hueco_oido (
+  id        INTEGER PRIMARY KEY,
+  toma      TEXT NOT NULL,
+  desde     REAL NOT NULL,
+  hasta     REAL NOT NULL,
+  -- `descartado` = se oyo y no aporta. `pendiente` = aun no se ha oido.
+  veredicto TEXT NOT NULL DEFAULT 'descartado',
+  por_que   TEXT NOT NULL,
+  quien     TEXT,
+  fecha     TEXT,
+  UNIQUE (toma, desde, hasta)
+);
 """
 
 # El ciclo completo, en orden. Cada fase dice **que servicio la mueve a la
