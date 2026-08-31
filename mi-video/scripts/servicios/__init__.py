@@ -12,6 +12,7 @@ migración es gradual, que es la única manera de no rehacer la máquina.
 """
 from .base import Espera, Pieza, Resultado, Servicio, ServicioScript  # noqa: F401
 from .redundancia import ServicioRedundancia
+from .repaso import ServicioRepaso
 from .revalidar import ServicioRevalidar
 from .verificar import ServicioVerificar
 
@@ -19,6 +20,7 @@ from .verificar import ServicioVerificar
 # que diga la tabla `fase`.
 REGISTRO: dict[str, Servicio] = {
     "sin_redundancia": ServicioRedundancia(),
+    "repasado": ServicioRepaso(),
     "revalidado": ServicioRevalidar(),
     "verificado": ServicioVerificar(),
     # El criterio humano no tiene servicio: lo mueve el mirando la pieza.

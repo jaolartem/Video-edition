@@ -1622,9 +1622,27 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
             //
             // El tope duro es el arranque del CTA: la tarjeta lleva su propio
             // cuadro y un tablero por debajo no lo ve nadie.
+            // **El tablero dura lo que cuesta leerlo, no lo que dura el beat.**
+            //
+            // Esto tomaba la duracion del beat y solo caia en el tiempo de
+            // lectura cuando el beat no existia. Mientras la voz decia la
+            // comparacion entera daba igual; en cuanto la etapa 3 del reel-01
+            // paso a la toma corta —9,4 s de voz, 6,5 s de escena— el tablero
+            // se quedo en 6,5 s **para ocho bloques**: premisa, dos columnas
+            // con su cifra y su pie, remate y fuente. A 0,75 s por bloque mas
+            // medio segundo de respiro son doce, asi que la mitad de la tabla
+            // pasaba sin poder leerse.
+            //
+            // Jaime: *«el primer tablero esta sin sonido, prefiero borrarlo,
+            // pero realmente prefiero que explique lo que tiene que
+            // explicar»*. Y el canon ya lo decia: la duracion la decide la
+            // lectura, y **un dato que no da tiempo a leer no esta en la pieza
+            // aunque este en el frame**.
+            //
+            // Se toma el mayor de los dos. El tope duro sigue siendo el CTA.
             const dur = Math.min(
-              (duracionBeat(plan, b.beat) ?? duracionTablero(b.kind, b.props)) +
-                SOLAPE,
+              Math.max(duracionBeat(plan, b.beat) ?? 0,
+                       duracionTablero(b.kind, b.props)) + SOLAPE,
               fin - at,
             );
             return {
