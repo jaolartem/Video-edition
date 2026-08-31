@@ -1572,13 +1572,26 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
    * Si no hay dato comprobado se deja lo que hubiera: una pieza sin verificar
    * no se queda muda de golpe.
    */
+  /**
+   * **El pie lleva la fuente Y la condicion, y por eso admite `parcial`.**
+   *
+   * Solo pintaba las cifras marcadas `si`, o sea las que se sostienen sin
+   * matices — y las que mas necesitan pie son justo las otras: las que son
+   * ciertas **bajo una condicion**. Una cifra asi sin su condicion es peor que
+   * no ponerla, porque parece general.
+   *
+   * Regla de Jaime, y es la misma que ya aplico a los redondeos: *«si esa parte
+   * no se sostiene, la aclaramos en pie de foto»*. No se cambia la toma ni se
+   * quita el numero: se dice al pie que hace falta para que sea verdad.
+   */
   const pieDe = (beat) => {
     try {
       const r = db.prepare(
         "select f.rotulo, d.condiciones from dato d" +
         "  left join fuente f on f.id = d.fuente_id" +
         "  join video v on v.id = d.video_id" +
-        " where v.slug = ? and d.etapa_orden = ? and d.respalda = 'si'" +
+        " where v.slug = ? and d.etapa_orden = ?" +
+        "   and d.respalda in ('si','parcial')" +
         " order by length(d.cifra) desc limit 1",
       ).get(slug, beat);
       if (!r) return {};
@@ -1743,11 +1756,27 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
              " where video_slug = ? and corrige_dice is not null")
     .all(slug)) {
     let puesta = false;
+    // **La correccion es sobre una palabra; la frase solo la situa.**
+    //
+    // Esto exigia que `corrige_dice` cupiera entero dentro de UN caption, y el
+    // subtitulo parte por tiempo, no por sentido: «un rector» sale con «un» al
+    // final de un trozo y «rector» al principio del siguiente, asi que la
+    // correccion no se colocaba y el render paraba. Pasaba con las tres del
+    // lote —«un rector», «El Serrea»— teniendo el texto delante.
+    //
+    // Se intenta la frase entera primero, que es lo mas preciso; si no cabe en
+    // ningun trozo, se busca la palabra que de verdad cambia —la mas larga, que
+    // es la que el ojo lee mal— y se corrige ahi.
+    const clave = row.corrige_dice
+      .split(/\s+/)
+      .reduce((a, b) => (b.length > a.length ? b : a), "");
+    const cabe = (t, q) => t?.toLowerCase().includes(q.toLowerCase());
+    const entera = marca.captions.some((c) => cabe(c.text, row.corrige_dice));
     marca.captions = marca.captions.map((c) => {
       if (puesta) return c;
-      const encaja = c.text
-        ?.toLowerCase()
-        .includes(row.corrige_dice.toLowerCase());
+      const encaja = entera
+        ? cabe(c.text, row.corrige_dice)
+        : clave.length > 3 && cabe(c.text, clave);
       if (!encaja) return c;
       puesta = true;
       // **Si ya la puso `marcaDeHumanidad`, solo se le enciende el palpiteo.**

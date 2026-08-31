@@ -174,6 +174,23 @@ def main():
         print(f"REVISION -> {raiz}")
         for pieza, mp4, ver, pega in listas(con):
             mb = os.path.getsize(mp4) / 1e6
+            # **Y lo que subio a Jaime y sigue abierto.** Un `sube` no para el
+            # render —se mira mejor con la pieza delante— pero si para esto:
+            # soltar al mundo una pieza con una cifra sin fuente o un dato que
+            # contradice al mensaje es exactamente lo que el piso prohibe.
+            try:
+                import sqlite3 as _s
+
+                _c = _s.connect(BASE)
+                abiertos = _c.execute(
+                    "select count(*) from revision where video_slug = ?"
+                    " and estado = 'sube'", (pieza,)).fetchone()[0]
+                _c.close()
+            except Exception:                      # noqa: BLE001
+                abiertos = 0
+            if abiertos:
+                pega.append(f"{abiertos} aviso(s) sin resolver que subieron a"
+                            f" Jaime — mira `revision.py --ver`")
             estado = "listo" if not pega else "NO pasa: " + "; ".join(pega)
             print(f"  {pieza}  {mb:>4.0f} MB  {estado}")
             shutil.copy2(mp4, os.path.join(raiz, f"{pieza}.mp4"))

@@ -57,6 +57,19 @@ class ServicioRepaso(Servicio):
         import servicio as contrato
 
         filas = redundancia.dossier(pieza.slug)
+        # Las etapas que el frame declara, para saber cual falta. Sale de la
+        # base y no del montaje: el montaje es justo lo que puede haberla
+        # perdido.
+        try:
+            import sqlite3 as _s3
+
+            _c3 = _s3.connect("ads/decisiones.db")
+            estructura_beats = [r[0] for r in _c3.execute(
+                "select e.orden from etapa e join video v on v.id = e.video_id"
+                " where v.slug = ? order by e.orden", (pieza.slug,))]
+            _c3.close()
+        except Exception:                          # noqa: BLE001
+            estructura_beats = []
         if not filas:
             return Resultado(True, salida="sin material que repasar")
         # **Y va la curva con el texto.** El contrato pregunta si el tono va con
@@ -168,7 +181,25 @@ class ServicioRepaso(Servicio):
                     "repaso" + os.sep, "repaso" + os.sep + "usadas" + os.sep)))
         except Exception:                          # noqa: BLE001
             vuelta = 1
+        # **Y el corpus, para la etapa que se quedo sin voz.**
+        #
+        # Tres pasos distintos dieron por no grabado material que estaba en
+        # cuatro cintas —el mecanismo de reel-01 e5— o incluso ya montado en
+        # otro corte de la misma pieza —el umbral de reel-05—. No fue criterio:
+        # nadie les enseño mas alla de su propia cinta, y el contrato lo tenia
+        # declarado como deuda con nombre, `abanico`.
+        #
+        # Cuando se busco a mano aparecio en minutos, y ahi estaba la trampa:
+        # buscarlo a mano lo arregla una vez y deja el agujero. Jaime lo corto
+        # en tres palabras —*«siempre dentro del pipeline»*—, asi que el corpus
+        # entra como dato y elige el paso.
+        faltan = sorted(set(estructura_beats) - {f.get("beat") for f in filas})
+        try:
+            material = redundancia.material_para(pieza.slug, faltan) if faltan else {}
+        except Exception:                          # noqa: BLE001
+            material = {}
         datos = {"montaje": filas, "onda": curva, "se_ve": ve,
+                 "etapas_sin_voz": faltan, "material_en_corpus": material,
                  "libreto": libreto, "evento": evento, "vuelta": vuelta,
                  "precio_vigente": precio,
                  "cierres_en_corpus": cierres,
@@ -243,13 +274,21 @@ class ServicioRepaso(Servicio):
         # despues de renderizar: una cifra sin fuente, un dato que contradice
         # al mensaje, una etapa del frame que no existe.
         paran = [x for x in subes if x.get("cuando") != "postproduccion"]
+        # **Y un `sube` no para el render: para la PUBLICACION.**
+        #
+        # Estuvo parando aqui, y era el mismo error que meter cumplimiento antes
+        # de renderizar: lo que sube es para Jaime, y Jaime lo lee mirando la
+        # pieza —*«para hacer correcciones necesito ver todo el video»*—. Pararla
+        # antes del render le quita la unica forma que tiene de decidir sobre lo
+        # que le estoy preguntando.
+        #
+        # Las notas quedan puestas con estado `sube`, y quien se planta es la
+        # puerta de publicar. Ver una pieza con un aviso encima es exactamente
+        # lo que hay que poder hacer; soltarla al mundo con el, no.
         if paran:
             uno = str(paran[0].get("sube"))[:130]
             resto = f" (+{len(paran) - 1} mas)" if len(paran) > 1 else ""
-            return Resultado(False, motivo=f"sube a Jaime: {uno}{resto}",
-                             salida=f"{len(paran)} que paran y"
-                                    f" {len(subes) - len(paran)} para"
-                                    f" postproduccion, anotadas en revision")
+            print(f"  {pieza.slug}: {len(paran)} sube(n) a Jaime — {uno}{resto}")
         if not puestos and not movidos:
             return Resultado(True, salida="pieza limpia, sin repeticiones")
         if movidos and not puestos:

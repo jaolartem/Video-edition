@@ -12,6 +12,18 @@ Lo encontró una auditoría en frío, y la consecuencia estaba medida: diez cifr
 marcadas `no` en la base —los $14.300 y el «$20 esta semana» entre ellas— sin
 que ninguna parara nada.
 
+## Dónde va, y por qué no antes del render
+
+Estuvo un rato entre `descrito` y `cortado`, o sea **antes de renderizar**, y
+eso estaba mal por una razón simple: **ver una pieza no es publicarla.** Jaime
+revisa mirando —*«para hacer correcciones necesito ver todo el video, no sólo el
+audio»*—, así que bloquear el render por una fuente que falta le quita la única
+forma que tiene de revisar, y encima no protege de nada: un mp4 en
+`out/revision/` no lo ve nadie más.
+
+Va justo antes de `publicado`. Lo que una cifra sin respaldo tiene que impedir
+es que la pieza **salga**, no que se pueda mirar.
+
 ## Y por qué para la pieza
 
 El piso lo dice sin matices, con las palabras de Jaime: *«queremos ser honestos,
@@ -62,7 +74,11 @@ class ServicioRespaldo(Servicio):
             _c = _s.connect("ads/decisiones.db")
             _c.row_factory = _s.Row
             catalogo = [dict(x) for x in _c.execute(
-                "select rotulo, organismo, url, vigencia, cita from fuente"
+                # `condiciones` es la mitad util: una cifra cierta bajo un
+                # supuesto y otra cierta en general no se rotulan igual, y lo
+                # que las separa es esa frase. Va al pie del tablero.
+                "select rotulo, organismo, url, vigencia, cita, condiciones"
+                " from fuente"
                 " where url is not null and url <> '' order by rotulo")]
             _c.close()
         except Exception:                          # noqa: BLE001

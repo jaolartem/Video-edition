@@ -38,6 +38,7 @@ import argparse
 import json
 import os
 import re
+import sqlite3 as _sq3
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -110,6 +111,105 @@ def _sin_tildes(t):
 
 CIERRE = re.compile(
     r"(link|enlace|descripci|inscri|registrar|apunt|cupo|reserv|primer comentario)")
+
+
+def material_para(slug, faltan, ventana=14, cuantas=6):
+    """Ventanas del corpus que podrian cumplir una etapa que se quedo sin voz.
+
+    ## Por que esto tiene que ser un dato y no una busqueda mia
+
+    Tres pasos distintos dieron por no grabado material que si estaba. La etapa
+    5 de reel-01 —el mecanismo, «como sacar plata de su negocio para pasarla a
+    su bolsillo»— esta en **cuatro cintas**; el mecanismo del umbral de reel-05
+    esta en la suya y ademas **ya montado** en el corte EDUCATE de la misma
+    pieza. Ninguno de los tres lo encontro, y no por criterio: porque nadie les
+    enseño mas que su propia cinta.
+
+    Cuando se busco a mano aparecio en minutos. Y ahi esta la trampa: buscarlo a
+    mano y declararlo yo lo arregla una vez y deja el agujero abierto. Jaime lo
+    corto en tres palabras — *«siempre dentro del pipeline»*. Asi que el corpus
+    entra como `material_en_corpus` en el pedido, con sus segundos, y **elige el
+    paso**, igual que ya elige entre los cierres.
+
+    Es la generalizacion de `cierres_en_corpus`: alli se buscaba una funcion
+    concreta —mandar a algun sitio— y aqui la funcion la define el libreto de la
+    etapa que falta.
+
+    `faltan` son los ordenes de etapa sin material. Se puntua por palabras de
+    contenido compartidas con su libreto, que es lo que el paso 2 ya hace para
+    elegir: no se decide nada aqui, se ordena lo que hay.
+    """
+    import rutas as _ru
+
+    con = _sq3.connect("ads/decisiones.db")
+    con.row_factory = _sq3.Row
+    libretos = {r["orden"]: r["texto"] for r in con.execute(
+        "select l.orden, l.texto from libreto l join video v on v.id = l.video_id"
+        " where v.slug = ?", (slug,))}
+    con.close()
+
+    # Palabras que no distinguen nada: si puntuaran, ganaria la ventana mas
+    # larga en vez de la que dice lo mismo.
+    VACIAS = set("de la que el en y a los las un una es no se lo por con su del"
+                 " al para mas o si le me ya son como pero esta este esa ese"
+                 " sus te tu yo he ha han hay muy tan todo toda".split())
+
+    def claves(t):
+        return {w for w in _sin_tildes(t or "").split()
+                if len(w) > 3 and w not in VACIAS}
+
+    # **Las candidatas se construyen sobre tramos de habla, no sobre ventanas
+    # de N palabras.** Cortar cada 14 palabras parte frases por la mitad: la
+    # mejor candidata de reel-01 e5 salia como «hacer es ensenarle como sacar
+    # plata de su empresa para meterla en su bolsillo», sin cabeza ni cierre.
+    #
+    # Un tramo de habla ya es una unidad: empieza y acaba donde el hablante
+    # calla. Se juntan los consecutivos hasta `LARGO` para que quepa una idea
+    # entera, y el resultado son frases que se pueden montar tal cual.
+    LARGO = 13.0
+    fuera = {}
+    for beat in faltan:
+        obj = claves(libretos.get(beat, ""))
+        if not obj:
+            continue
+        marcadas = []
+        for toma in _ru.material():
+            ft = os.path.join(_ru.TRABAJO, "transcripts", f"{toma}.json")
+            fc = os.path.join(_ru.TRABAJO, "cuts", f"{toma}.json")
+            if not (os.path.exists(ft) and os.path.exists(fc)):
+                continue
+            try:
+                ws = json.load(open(ft, encoding="utf-8")).get("segmentos") or []
+                voz = json.load(open(fc, encoding="utf-8"))["segmentos"]
+            except (OSError, KeyError, json.JSONDecodeError):
+                continue
+            grupos, act = [], []
+            for x, y in voz:
+                if act and y - act[0][0] > LARGO:
+                    grupos.append((act[0][0], act[-1][1]))
+                    act = []
+                act.append((x, y))
+            if act:
+                grupos.append((act[0][0], act[-1][1]))
+            for a, b in grupos:
+                tro = [w for w in ws if transcribir.suena(w, a, b)]
+                if len(tro) < 4:
+                    continue
+                txt = " ".join(w["text"] for w in tro).strip()
+                punto = len(obj & claves(txt))
+                if punto < 2:
+                    continue
+                marcadas.append({
+                    "beat": beat, "toma": toma, "punto": punto,
+                    "desde": round(tro[0]["start"], 3),
+                    "hasta": round(tro[-1]["end"], 3),
+                    "texto": txt,
+                    "palabras": [[round(w["start"], 3), round(w["end"], 3),
+                                  w["text"].strip()] for w in tro],
+                })
+        marcadas.sort(key=lambda x: (-x["punto"], x["hasta"] - x["desde"]))
+        fuera[beat] = marcadas[:cuantas]
+    return fuera
 
 
 def cierres_en_corpus(margen=14):
