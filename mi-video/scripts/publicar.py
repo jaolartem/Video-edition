@@ -163,6 +163,36 @@ def main():
     con = sqlite3.connect(BASE)
     con.execute("PRAGMA foreign_keys = ON")
 
+    # **Aquí es donde el motivo pesa, y no antes.**
+    #
+    # Regla de Jaime: *«pon el bloqueo en el paso final, no acá»*, después de
+    # que el montaje se negara a renderizarle reel-01 y él pidiera verla igual:
+    # *«el render se necesita, quiero ver lo que va a salir; no importan
+    # restricciones, quiero aprobarlo»*.
+    #
+    # El reparto queda así, y tiene sentido en las dos direcciones: **ver una
+    # pieza con un defecto cuesta dos minutos suyos; publicarla cuesta la
+    # campaña.** Así que el montaje entrega siempre —con los motivos escritos al
+    # lado— y quien para es esto.
+    if a.finales and not a.ver:
+        import json as _j
+
+        try:
+            spec = _j.load(open("src/reels.json", encoding="utf-8"))
+        except OSError:
+            spec = []
+        con_motivo = [(r["id"], r.get("bloqueado") or []) for r in spec
+                      if r.get("bloqueado")]
+        if con_motivo:
+            print(f"NO SE PUBLICA — {len(con_motivo)} pieza(s) con motivos"
+                  f" abiertos:")
+            for pid, ms in con_motivo:
+                print(f"  · {pid}")
+                for m in ms:
+                    print(f"      {m}")
+            print("\n  Verlas y aprobarlas, sí. Soltarlas al mundo, no.")
+            raise SystemExit(1)
+
     if a.revision:
         # **Ver montado no es publicar.** Jaime: *«quiero verlos todos montados;
         # los segmentos sirven como banco de segmentos pero no como videos

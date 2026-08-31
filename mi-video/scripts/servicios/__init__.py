@@ -17,6 +17,7 @@ from .repaso import ServicioRepaso
 from .respaldo import ServicioRespaldo
 from .revalidar import ServicioRevalidar
 from .verificar import ServicioVerificar
+from .visto import ServicioVisto
 
 # Los que ya son objetos. El resto entra por `ServicioScript` con la plantilla
 # que diga la tabla `fase`.
@@ -27,6 +28,7 @@ REGISTRO: dict[str, Servicio] = {
     "disenado": ServicioDisenar(),
     "revalidado": ServicioRevalidar(),
     "verificado": ServicioVerificar(),
+    "visto": ServicioVisto(),
     # El criterio humano no tiene servicio: lo mueve el mirando la pieza.
     "revisado": Espera("revisado"),
     "aprobado": Espera("aprobado"),

@@ -171,12 +171,23 @@ for r in "${REELS[@]}"; do
   #   h264_amf (abajo)  La entrega, ésa sí por el codificador de AMD.
   # **Lo que no paso la puerta no se renderiza, y el resto sigue.** El peldaño
   # caro solo sobre lo que ya sabemos que esta bien.
+  # **El bloqueo va en el paso final, no aquí.** Regla de Jaime: *«pon el
+  # bloqueo en el paso final, no acá»*, *«el render se necesita, quiero ver lo
+  # que va a salir; no importan restricciones, quiero aprobarlo»*.
+  #
+  # La puerta existía para no gastar el peldaño caro —su atención— en una pieza
+  # que no está. Pero cuando es él quien pide verla, la puerta deja de proteger
+  # y sólo estorba: el criterio humano es el escalón más caro **porque es el que
+  # manda**, no para que el código decida qué le deja mirar.
+  #
+  # Los motivos no se borran ni se callan: se imprimen aquí y viajan en
+  # `bloqueado` hasta `publicar.py`, que es donde sí paran. Ver algo malo cuesta
+  # dos minutos suyos; publicarlo cuesta la campaña.
   MOTIVOS=$(node -e "const s=JSON.parse(require('fs').readFileSync('src/reels.json','utf8'));const r=s.find(x=>x.id==='Reel-R$n');console.log((r&&r.bloqueado||[]).join(' | '))")
   if [ -n "$MOTIVOS" ]; then
-    echo "── Reel-R$n NO se renderiza ──"
+    echo "── Reel-R$n se renderiza CON motivos abiertos ──"
     echo "   $MOTIVOS"
     BLOQUEADAS+=("R$n: $MOTIVOS")
-    continue
   fi
   # **Si falla por carga, se repite con menos carga.** No es reintentar lo
   # mismo esperando otra cosa: es cambiar la condicion que lo rompio.
@@ -283,9 +294,9 @@ done
 # aprendizaje 24: arreglar el generador no arregla lo generado.
 node scripts/verificacion.mjs
 if [ ${#BLOQUEADAS[@]} -gt 0 ]; then
-  echo "MONTAJE INCOMPLETO — ${#BLOQUEADAS[@]} pieza(s) sin renderizar:"
+  echo "CON MOTIVOS ABIERTOS — ${#BLOQUEADAS[@]} pieza(s), renderizadas igual:"
   for b in "${BLOQUEADAS[@]}"; do echo "  · $b"; done
-  exit 1
+  echo "  Se pueden ver y aprobar. Lo que no se puede es publicarlas."
 fi
 if [ ${#IDENTICAS[@]} -gt 0 ]; then
   echo "SIN CAMBIOS EN PANTALLA — ${IDENTICAS[*]} salieron identicas al render anterior."

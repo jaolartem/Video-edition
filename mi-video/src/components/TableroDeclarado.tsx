@@ -147,14 +147,34 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
 
   const tranquila = String(props.familia ?? "tranquila") !== "cargada";
 
+  /**
+   * **`cubre` decide si el elemento ES el plano o lo acompaña, y lo dice el
+   * diseñador.**
+   *
+   * Esto vivía en una vía aparte —`PANELES`, un literal escrito a mano— y por
+   * eso llevaba cinco ciclos idéntico. No hacía falta pedirle nada nuevo al
+   * diseñador: ya lo declaraba. `pleno` toma el cuadro; `panel` y `banda`
+   * acompañan al plano sin taparle la cara, que es exactamente lo que el
+   * literal codificaba a mano.
+   *
+   * Un camino en vez de dos: la misma declaración dibuja las dos cosas.
+   */
+  const cubre = String(props.cubre ?? "pleno");
+  const acompana = cubre === "panel" || cubre === "banda";
+
   return (
     <AbsoluteFill
       style={{
-        justifyContent: "center",
-        padding: `${layout.safe.top}px ${layout.safe.right}px ${layout.safe.bottom}px ${layout.safe.left}px`,
+        // Acompañando se va al tercio inferior y deja la cara libre; a pleno
+        // toma el cuadro entero.
+        justifyContent: acompana ? "flex-end" : "center",
+        padding: `${layout.safe.top}px ${layout.safe.right}px ${
+          acompana ? layout.safe.bottom + 120 : layout.safe.bottom
+        }px ${layout.safe.left}px`,
         // La familia decide el fondo, y viene declarada: `cargada` deja ver el
         // plano, `tranquila` va sobre placa lisa para que las cifras se lean.
-        background: tranquila ? color.richBlack : "transparent",
+        // Acompañando **nunca** hay placa: taparía el plano que acompaña.
+        background: acompana || !tranquila ? "transparent" : color.richBlack,
       }}
     >
       {cuerpo.map((l, i) => {

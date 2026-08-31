@@ -156,17 +156,30 @@ def arco(slug):
     """
     con = _con()
     filas = [dict(r) for r in con.execute(
-        "select e.orden, e.titulo, e.mensaje_esperado, d.emocion, d.que_pasa"
+        "select e.orden, ec.nombre funcion, e.mensaje_esperado, e.obligatorio,"
+        "       d.emocion, d.que_pasa, d.trato"
         "  from etapa e join video v on v.id = e.video_id"
+        "  left join etapa_canonica ec"
+        "         on ec.estructura_id = e.estructura_id"
+        "        and ec.orden = e.etapa_orden"
         "  left join escena_desc d on d.video_slug = v.slug"
         "   and d.etapa_orden = e.orden"
         " where v.slug = ? order by e.orden", (slug,))]
     con.close()
     return {
-        "narrativo": [{"etapa": f["orden"], "funcion": f["titulo"],
-                       "tiene_que_decir": f["mensaje_esperado"]}
+        # **La intención narrativa de CADA segmento, no la de la pieza.** Jaime:
+        # *«el segundo recibe la intención narrativa y el arco emocional de cada
+        # segmento; con eso puede potenciarlo con diseño»*. Saber que la etapa 4
+        # es la revelación y tiene que decir tal cosa es lo que deja diseñar
+        # para eso, en vez de ilustrar la frase que se oye.
+        "narrativo": [{"etapa": f["orden"], "funcion": f["funcion"],
+                       "tiene_que_decir": f["mensaje_esperado"],
+                       "obligatoria": bool(f["obligatorio"])}
                       for f in filas],
+        # Y la onda: arriba, abajo, arriba. Con el tratamiento que ya lleva, que
+        # es lo que dice si ese punto pide sostener o golpear.
         "emocional": [{"etapa": f["orden"], "emocion": f["emocion"],
+                       "trato": f["trato"],
                        "que_pasa": (f["que_pasa"] or "")[:120]}
                       for f in filas],
     }

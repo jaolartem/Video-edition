@@ -1846,7 +1846,27 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
       `desde su descripción — re-describir la etapa no lo va a cambiar.`,
     );
   }
-  const tableros = (deLaBase.length ? deLaBase : TABLEROS[slug] ?? [])
+  /**
+   * **`cubre` reparte en tres vías, y lo decide el diseñador.**
+   *
+   * Regla de Jaime: *«tableros son para contenido complejo o para tapar cortes
+   * muy fuertes; panel para contenido complejo que requiere activación
+   * emocional, o que no es tan complejo para un tablero; y cc dinámico en el
+   * resto»*.
+   *
+   * Aquí entraba **todo** como tablero, así que un elemento marcado `panel` se
+   * dibujaba dos veces —como tablero y como panel— y encima a pleno cuadro. Con
+   * seis a pleno, reel-01 quedó con 90 de sus 142,8 s tapados y Jaime sin
+   * aparecer en el tercio de en medio: la puerta paró la pieza.
+   *
+   * `cc` no emite nada: esa etapa la lleva el subtítulo dinámico, que ya tiene
+   * la idea. No es un hueco, es la opción por defecto del resto.
+   */
+  const tableros = deLaBase
+      .filter((b) => {
+        const c = String(b.props?.cubre ?? "pleno");
+        return c !== "cc" && c !== "panel" && c !== "banda";
+      })
       .map((b) => {
         b = { ...b, props: { ...b.props, ...pieDe(b.beat) } };
         // **Por beat, no por palabra.** Anclar a una palabra del subtítulo no
@@ -2184,7 +2204,49 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
      *   ejemplifica lo que dice, y **dura el beat entero** — no hay nada que
      *   anunciar, hay algo que sostener.
      */
-    paneles: (PANELES[slug] ?? [])
+    /**
+     * **Una sola fuente, y es `escena_desc`.**
+     *
+     * Jaime: *«unifica fuentes de verdad, no pueden ser dos»*, *«que llegue lo
+     * que los agentes pidieron y que se renderice»*.
+     *
+     * `PANELES` era la segunda: un literal escrito a mano en este fichero que
+     * llevaba cinco ciclos idéntico. Y no era inofensivo — de sus diez entradas,
+     * **ocho caían en beats que el diseñador ya había descrito**, así que se
+     * dibujaba encima de su trabajo. Ése era el solapamiento entre elementos
+     * gráficos.
+     *
+     * Su contenido no se tiró: se migró a `escena_desc` para los dos beats que
+     * el diseñador no cubría, y ahí ya lo mueve y lo modifica él. Lo que decide
+     * si un elemento acompaña o toma el cuadro es su `cubre`, que ya declaraba.
+     */
+    paneles: deLaBase
+      .filter((b) => ["panel", "banda"].includes(String(b.props?.cubre ?? "")))
+      /**
+       * **Los props del diseñador se convierten a bloques, que es lo que el
+       * panel sabe leer.**
+       *
+       * Pasaba el objeto tal cual y `ADELANTO` hace `bloques.length`: con un
+       * objeto eso es `undefined`, la duración salía `NaN` y **el panel
+       * desaparecía sin decir nada**. Es el mismo fallo de hoy otra vez — el
+       * trabajo del diseñador cayéndose en una junta— y por eso se cuenta
+       * abajo si alguno se pierde.
+       *
+       * Un bloque por texto declarado, en el orden en que él los escribió: ése
+       * es su orden de lectura. Lo que no es texto —familia, cubre, oro— es
+       * cromo y no se rotula.
+       */
+      .map((b) => {
+        const yaSon = Array.isArray(b.props?.bloques) ? b.props.bloques : null;
+        const NO_TEXTO = new Set(["familia", "zona", "cubre", "oro", "sound",
+          "fondo", "filete", "source", "paso", "entrada"]);
+        const bloques = yaSon ?? Object.entries(b.props ?? {})
+          .filter(([k, v]) => !NO_TEXTO.has(k) && typeof v === "string" && v.trim())
+          .slice(0, 3)
+          .map(([, v]) => ({ texto: v }));
+        return { beat: b.beat, bloques };
+      })
+      .filter((b) => b.bloques.length)
       .map((b) => {
         const inicio = anclarBeat(plan, b.beat);
         const suyo = tableros.find((t) => t.at === inicio);
@@ -2515,13 +2577,25 @@ const bloquea = (r) => !PEDIDOS.length || PEDIDOS.includes(r.id);
  * esta, no impedir gastarlo en lo que si. La pieza queda con sus motivos y
  * `montar.sh` no la renderiza.
  */
+/**
+ * **`REELS_VER=1` renderiza igual, con los motivos escritos.**
+ *
+ * Jaime: *«el render se necesita, quiero ver lo que va a salir; no importan
+ * restricciones, quiero aprobarlo»*.
+ *
+ * La puerta existe para no gastar el peldaño caro —su atención— en una pieza
+ * que no está. Pero cuando el que decide dice que quiere verla, la puerta deja
+ * de proteger nada y sólo estorba: el criterio humano es el escalón más caro
+ * del embudo justamente porque es el que manda.
+ *
+ * No se borran los motivos ni se silencian: se imprimen igual y la pieza sale.
+ * Lo que cambia es quién decide si se mira, y eso nunca fue del código.
+ */
 const para = (r, msg) => {
-  if (bloquea(r)) {
-    (r.bloqueado ??= []).push(msg);
-    console.log(`    NO RENDERIZA · ${msg}`);
-    return;
-  }
-  console.log(`    (en revisión, no bloquea) ${msg}`);
+  // **El motivo se apunta, pero aquí no para nada.** Sigue viajando en
+  // `r.bloqueado` para que el paso final lo lea; lo que cambia es cuándo pesa.
+  (r.bloqueado ??= []).push(msg);
+  console.log(`    ${bloquea(r) ? "PARA AL PUBLICAR" : "en revisión"} · ${msg}`);
 };
 
 for (const r of spec) {

@@ -757,13 +757,13 @@ def guardar_escena(slug, orden, d):
         " values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         " on conflict(video_slug, etapa_orden) do update set"
         " que_pasa=excluded.que_pasa, emocion=excluded.emocion,"
-        " componente=excluded.componente, grafico=excluded.grafico,"
-        " color=excluded.color, sonido=excluded.sonido, plano=excluded.plano,"
+        " grafico=excluded.grafico,"
+        ""
         " trato=excluded.trato, trato_porque=excluded.trato_porque,"
         " prioridad=excluded.prioridad,"
         " integridad=excluded.integridad, remedio=excluded.remedio,"
         " corrige_dice=excluded.corrige_dice, corrige_es=excluded.corrige_es,"
-        " sobre_texto=excluded.sobre_texto, tablero=excluded.tablero,"
+        " sobre_texto=excluded.sobre_texto, tablero=coalesce(excluded.tablero, escena_desc.tablero), componente=coalesce(excluded.componente, escena_desc.componente), color=coalesce(excluded.color, escena_desc.color), sonido=coalesce(excluded.sonido, escena_desc.sonido), plano=coalesce(excluded.plano, escena_desc.plano),"
         " quien=excluded.quien, fecha=excluded.fecha",
         (slug, int(orden), d["que_pasa"], d.get("emocion"),
          None if d.get("componente") in (None, "ninguno") else d["componente"],
@@ -779,8 +779,23 @@ def guardar_escena(slug, orden, d):
          # escuchando las indicaciones viejas»*. Ahora lo escribe quien
          # compone y lo lee el render, que es el unico orden en el que
          # una correccion llega a la pantalla.
-         (None if d.get("tablero") in (None, "", {})
-          else json.dumps(d["tablero"], ensure_ascii=False)),
+         # **Describir NO borra el tablero del diseñador.**
+         #
+         # `descrito` (7) escribe el encargo y `disenado` (7.5) lo monta, así
+         # que el tablero es del segundo. Pero este UPDATE hacía
+         # `tablero=excluded.tablero`, y una descripción sin tablero —que es lo
+         # normal, porque el compositor no diseña— lo dejaba en NULL: **re-
+         # describir una etapa borraba en silencio lo que el diseñador había
+         # montado**, y en la siguiente corrida esa etapa salía sin nada.
+         #
+         # Es la misma familia que llevamos todo el día: dos pasos escribiendo
+         # el mismo campo, y el que no lo posee ganando por llegar después.
+         #
+         # Si la descripción trae tablero, manda; si no, se conserva el que
+         # haya. Vaciarlo a propósito se hace desde el paso de diseño, que es
+         # su dueño.
+         (json.dumps(d["tablero"], ensure_ascii=False)
+          if d.get("tablero") not in (None, "", {}) else None),
          # `quien` decia «gemini» y esa via se descarto —*«no quiero a
          # Google»*—, asi que el campo mentia sobre quien decidio.
          d.get("quien", "cli"),

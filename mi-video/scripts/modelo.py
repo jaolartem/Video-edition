@@ -415,6 +415,16 @@ CICLO = [
     # *«lo mas caro es criterio humano, por eso es el paso anterior a la
     # aprobacion»*. Mirar una pieza montada cuesta su tiempo y su atencion, asi
     # que se hace **una vez** y sobre algo que ya paso todos los filtros baratos.
+    # **El diseñador revisa lo que salió, y es su segundo momento.** Jaime:
+    # *«que lo revise el diseñador como paso final»*, *«asegurate de que las
+    # piezas del renderizado sean revisadas por el ultimo agente y que todo
+    # este en el pipline»*.
+    #
+    # Va DESPUES de nivelar y medir, y ANTES de que la mire el: el criterio
+    # humano es el escalon mas caro del embudo, y gastarlo en una pieza con un
+    # silencio de seis segundos es tirarlo. Todos los pasos anteriores juzgan lo
+    # que se va a montar; este es el unico que mira lo que salio.
+    (11.6, "visto", None),
     (12, "revisado", None),          # el mira y anota; lo mueve el
     (13, "aprobado", None),          # lo mueve Jaime, no un servicio
     # **La voz virgen sale DESPUES de aprobar, no antes.** Regla de Jaime:

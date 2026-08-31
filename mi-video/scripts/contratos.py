@@ -1252,6 +1252,25 @@ DISENO = Contrato(
                      " tablero y qué tiene que quedar dicho en cada uno. Antes de"
                      " `cortado`: montar sobre un corte que aún puede moverse es"
                      " pagarlo dos veces."),
+        # **Y el mismo diseñador cierra: revisa lo que salió y lo lanza.**
+        #
+        # Jaime, fijando el reparto entero: *«exacto, el de corte compone; éste
+        # diseña y hace, revisa que todo esté bien y lo lanza a render»*, *«que
+        # lo revise el diseñador como paso final»*.
+        #
+        # Compuso la pieza, así que es el único que puede decir si lo entregado
+        # es lo que diseñó. Un revisor nuevo tendría que deducir la intención
+        # desde el resultado, que es justo lo que no se puede hacer.
+        Momento("visto", 11.6,
+                trae=("dura", "aire", "costuras", "repetido", "se_ve",
+                      "motivos_abiertos"),
+                no_trae=("encargo", "canon", "otras_etapas", "topes"),
+                nota="Aquí no recibe encargos: recibe **el artefacto medido** —lo"
+                     " que dura, dónde calla, qué costuras se oyen, qué dice dos"
+                     " veces y qué hay en pantalla sobre qué texto— y contesta"
+                     " una sola cosa: si esto se le puede enseñar a Jaime. Todos"
+                     " los momentos anteriores juzgan lo que se va a montar;"
+                     " éste es el único que mira lo que salió."),
     ),
     campos=(
         # ── el encargo, que viene del paso anterior ──────────────────────────
@@ -1310,6 +1329,26 @@ DISENO = Contrato(
                    " alcanza. Una forma que todavía no tiene componente sale como"
                    " falta con su nombre —encargo de código, no de diseño— en vez"
                    " de forzar al diseñador a elegir entre ocho cajas."),
+        Clave("tablero.cubre",
+              dispara=(Aguja("scripts/reels-spec.mjs", '["panel", "banda"].includes(String(b.props?.cubre ?? ""))'),
+                       Aguja("src/components/TableroDeclarado.tsx", 'const acompana = cubre === "panel" || cubre === "banda";'),),
+              efecto="si el elemento TOMA el cuadro, lo acompaña, o no existe",
+              obligatoria=True,
+              lista=("pleno", "panel", "banda", "cc"),
+              nota="**El reparto lo fijó Jaime y es de tres:** *«tableros son"
+                   " para contenido complejo o para tapar cortes muy fuertes;"
+                   " panel para contenido complejo que requiere activación"
+                   " emocional, o que no es tan complejo para un tablero; y cc"
+                   " dinámico en el resto»*.\n\n"
+                   "                   Y no es una preferencia de estilo: es lo que"
+                   " decide si él sale en cuadro. Con seis tableros a `pleno`,"
+                   " reel-01 quedó con **90 de sus 142,8 s tapados —el 63%— y"
+                   " Jaime sin aparecer en el tercio de en medio**, así que la"
+                   " puerta paró la pieza. Un tablero que no lleva contenido"
+                   " complejo ni tapa un corte duro le está quitando el sitio a"
+                   " la cara.\n\n"
+                   "                   `cc` es la opción por defecto del resto, no"
+                   " un hueco: el subtítulo dinámico ya lleva la idea."),
         Clave("tablero.props",
               dispara=(Aguja("scripts/reels-spec.mjs", "b = { ...b, props: { ...b.props, ...pieDe(b.beat) } };"),
                        Aguja("scripts/caminos.mjs", "export const copyDeclarado = (desc) => {"),),
@@ -1318,6 +1357,42 @@ DISENO = Contrato(
               obligatoria=True,
               nota="`copyDeclarado` es la mitad del gancho: sin esto la capa no"
                    " entra, que es mejor que entrar repitiendo el rótulo."),
+        # ── la composición gráfica ENTERA, no sólo el tablero ───────────────
+        #
+        # Jaime: *«ojo, que no es sólo el tablero: es la composición gráfica de
+        # la pieza, animaciones, hooks y paneles»*.
+        #
+        # De estos cuatro campos sale todo lo que se mueve en pantalla, y los
+        # escribía el compositor: `figuraDe(grafico)` decide la figura que se
+        # anima, `sonidoDe(sonido)` el movimiento que suena, `desaturaDe(color)`
+        # si la escena se apaga, y `plano` dónde cae respecto a la cara. O sea
+        # que el diseñador tenía el tablero y el compositor tenía las
+        # animaciones, el gancho y los paneles — al revés de como debe ser.
+        #
+        # `grafico` se queda en el otro contrato a propósito: es el ENCARGO
+        # —qué tiene que quedar dicho— y eso sí es de quien compone. El CÓMO es
+        # de aquí.
+        Clave("componente",
+              dispara=(Aguja("scripts/caminos.mjs", "componente: desc?.componente ?? null,"),),
+              efecto="qué forma dibuja la etapa, y si compone o va a plano seco",
+              sin_valor="ninguno"),
+        Clave("color",
+              dispara=(Aguja("scripts/caminos.mjs", "const desaturaDe = (color) =>"),),
+              efecto="si la escena se aviva o se apaga bajo el gráfico",
+              lista=("avivar", "apagar"),
+              sin_valor="dejar"),
+        Clave("sonido",
+              dispara=(Aguja("scripts/caminos.mjs", "export const sonidoDe = ("),),
+              efecto="el movimiento que suena, en el frame en que se mueve",
+              nota="Prohibido el sonido sin movimiento que lo justifique, y al"
+                   " revés: prohibido inventarle sonido a un movimiento que la"
+                   " escena no describió."),
+        Clave("plano",
+              dispara=(Aguja("scripts/caminos.mjs", "const tipo = esTipografico(desc?.grafico);"),),
+              efecto="dónde cae el gráfico respecto a la cara",
+              lista=("en cuadro", "cerrado", "fuera"),
+              nota="Es lo que decide si él sale en pantalla en ese beat, así que"
+                   " manda sobre la regla de las tres apariciones."),
         Clave("tablero.fuente",
               dispara=(Aguja("scripts/reels-spec.mjs", "select f.rotulo, d.condiciones from dato d"),),
               efecto="el pie del tablero cuando rotula una cifra",
@@ -1327,7 +1402,7 @@ DISENO = Contrato(
                    " no dijo de dónde sale»."),
         # ── nivel PIEZA: lo que sólo se ve mirándolos todos ──────────────────
         Clave("pieza.alternancia",
-              dispara=(Aguja("scripts/reels-spec.mjs", "const tableros = (deLaBase.length ? deLaBase : TABLEROS[slug] ?? [])",
+              dispara=(Aguja("scripts/reels-spec.mjs", "return c !== \"cc\" && c !== \"panel\" && c !== \"banda\";",
                              pendiente="leer la familia declarada por tablero en vez"
                                        " de dejar que cada uno salga con la suya"),),
               efecto="qué tableros van cargados y cuáles tranquilos",
@@ -1366,6 +1441,8 @@ POR_FASE: dict[str, Contrato] = {
     # La cadena de composición: `descrito` define lo que va a haber y escribe el
     # encargo; `disenado` lo monta. Dos contratos porque son dos tareas.
     "disenado": DISENO,
+    # El mismo contrato, su segundo momento: revisa lo que salió y lo lanza.
+    "visto": DISENO,
     "respaldado": RESPALDO,
 }
 

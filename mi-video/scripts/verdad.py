@@ -89,7 +89,7 @@ VERDADES = (
         decision="El contenido de un tablero",
         vive_en="`escena_desc.tablero`, escrito por quien compone",
         lee=(Aguja("scripts/reels-spec.mjs", "const deLaBase = (() => {"),
-             Aguja("scripts/consulta.py", 'else json.dumps(d["tablero"], ensure_ascii=False)'),),
+             Aguja("scripts/consulta.py", 'tablero=coalesce(excluded.tablero, escena_desc.tablero)'),),
         prohibido=(Aguja("scripts/reels-spec.mjs",
                          "const tableros = (TABLEROS[slug] ?? [])\n"),),
         copia="`TABLEROS[slug]` queda SOLO como respaldo para una pieza sin"

@@ -29,6 +29,25 @@ _TMP_PROY=$(node -e "console.log(JSON.parse(require('fs').readFileSync('rutas.js
 export TMPDIR="$_TMP_PROY"
 export TEMP="$_TMP_PROY"
 export TMP="$_TMP_PROY"
+
+# **Y el perfil de Chrome, que NO lo mueve `TEMP`.**
+#
+# Regla de Jaime, dicha treinta veces: *«todo debe guardar en F:, C: no se
+# toca»*, *«C no se debe utilizar»*.
+#
+# Las tres variables de arriba llevaban puestas semanas y aun asi el disco del
+# sistema seguia siendo un limite: Chrome escribe su perfil, su cache de GPU y
+# sus volcados en `%LOCALAPPDATA%`, que es una ruta distinta y no la toca
+# `TMPDIR`. Por eso la guarda de «el temporal apunta a C:» pasaba y el montaje
+# se caia igual.
+#
+# Se redirigen para los procesos que lanza la linea y **solo para ellos**: esto
+# es un `export` de este shell, asi que no cambia nada del sistema ni de las
+# otras aplicaciones. Chrome sigue ejecutandose desde donde este instalado; lo
+# unico que se mueve es lo que escribe.
+export LOCALAPPDATA="$_TMP_PROY/appdata/local"
+export APPDATA="$_TMP_PROY/appdata/roaming"
+mkdir -p "$LOCALAPPDATA" "$APPDATA"
 # Python imprime en UTF-8 aunque la consola sea cp1252 (gotcha 1, otra puerta).
 export PYTHONIOENCODING=utf-8
 mkdir -p "$_TMP_PROY"
@@ -42,3 +61,26 @@ case "$_TMP_PROY" in
     return 1 2>/dev/null || exit 1
     ;;
 esac
+
+# **Y se mira el espacio de C:, aunque no produzcamos ahi.**
+#
+# La guarda de arriba comprueba que el temporal APUNTE a F:, y eso ya estaba
+# puesto y pasaba. Aun asi el montaje murio: dos piezas de seis se cayeron con
+# «Chrome rejecting the request because the disk space is low» con 252 GB libres
+# en F: y **21 GB en C:, al 96%**. Chrome escribe su perfil y sus cachés en
+# `%LOCALAPPDATA%`, que no lo mueve `TEMP`, asi que el disco del sistema sigue
+# siendo un limite aunque el proyecto no produzca ahi.
+#
+# Jaime lo ha dicho treinta veces —*«todo debe guardar en F:, C: no se toca»*— y
+# la guarda comprobaba la mitad: la ruta, no el sitio. Un render tarda veinte
+# minutos en fallar por esto, asi que se mide ANTES de empezar.
+_LIBRE_C=$(df -m /c 2>/dev/null | awk 'NR==2 {print $4}')
+if [ -n "$_LIBRE_C" ] && [ "$_LIBRE_C" -lt 30000 ]; then
+  echo "entorno.sh: quedan $((_LIBRE_C / 1024)) GB en C: y Chrome escribe su" \
+       "perfil ahi pase lo que pase con TEMP. Por debajo de 30 GB el render" \
+       "muere a mitad con un error que habla de disco sin decir cual." >&2
+  echo "  AVISA, no para. De seis piezas con 21 GB libres renderizaron cuatro," \
+       "y las dos que cayeron eran las dos mas largas: el mensaje de disco" \
+       "puede estar tapando otra cosa. Parar aqui seria bloquear la linea por" \
+       "un diagnostico sin probar — y ya lo hizo una vez." >&2
+fi
