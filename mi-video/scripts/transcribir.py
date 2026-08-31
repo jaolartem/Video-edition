@@ -1067,8 +1067,28 @@ def main():
                 continue
             except SystemExit:
                 pass
-        runs = json.load(open(f"work/cuts/{toma}.json",
-                              encoding="utf-8"))["segmentos"]
+        # **Una cinta sin preparar no se lleva por delante a las demas.**
+        #
+        # Esto abria los tramos sin comprobar que existieran, y una cinta nueva
+        # —recien copiada, sin `cut-silence` corrido— reventaba el bucle entero
+        # con un `FileNotFoundError` sin capturar. El corpus se recorre por orden
+        # alfabetico, asi que la del 14 de agosto iba PRIMERA: se murio en
+        # segundos y las otras siete ni se miraron.
+        #
+        # Y lo peor no es que fallara: es que fallo **en silencio para quien
+        # miraba desde fuera**. La corrida salio, no dejo nada en `incidencia`, y
+        # durante una hora el estado creido fue «transcribiendo».
+        #
+        # Ahora se dice que falta y se sigue con las demas: una cinta sin
+        # preparar es un trabajo pendiente, no una corrida rota.
+        cuts = f"work/cuts/{toma}.json"
+        if not os.path.exists(cuts):
+            registro.aviso("transcribir", "cinta sin tramos de voz: se salta",
+                           toma=toma,
+                           detalle=f"falta {cuts} — corre antes cut-silence.py"
+                                   f" sobre su audio")
+            continue
+        runs = json.load(open(cuts, encoding="utf-8"))["segmentos"]
         print(f"── {toma} ──")
         modelo = MODELOS["barato" if a.barato else "bueno"]
         # **Un solo camino.** Jaime, tras ver que los dos fallos de la sesion

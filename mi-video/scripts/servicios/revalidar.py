@@ -35,6 +35,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import registro  # noqa: E402
 from .base import Pieza, Resultado, Servicio  # noqa: E402
 
 PROMPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -155,6 +156,26 @@ def aplicar(pieza: Pieza, veredictos) -> str:
                             (v.get("edicion") or v.get("por_que") or "")[:200],
                             quien="revalidado")
             cambiados += 1
+        # **Un falso positivo que no cambia nada no es una decision: es un
+        # aviso perdido.** Marcarlo solo escribe en `descartado` y deja la pieza
+        # igual, asi que la etapa que se declaro mala sigue sonando igual de mal
+        # en la corrida siguiente — y en la siguiente.
+        #
+        # Y lo mismo con `edicion` cuando describe un BORDE. Es prosa: se guarda
+        # como el porque de la declaracion y **no la ejecuta nadie**. Todo lo
+        # que se escribio ahi durante una tarde —«entra despues de X», «cierra
+        # en Y», «suelta el conector»— no llego nunca al montaje, y los mismos
+        # bordes volvian corrida tras corrida. Lo que mueve un borde es `tramos`
+        # y solo `tramos`.
+        if (v.get("falso_positivo") or v.get("entrecortado")) and not nuevos:
+            registro.aviso(
+                "revalidar", "veredicto sin efecto: la etapa se queda como esta",
+                detalle=f"{pieza.slug} e{beat}: se marco"
+                        f"{' falso positivo' if v.get('falso_positivo') else ''}"
+                        f"{' entrecortado' if v.get('entrecortado') else ''}"
+                        f" y no vino ni `tramos` ni otra candidata."
+                        f" Lo que dice `edicion` no lo aplica nadie:"
+                        f" {(v.get('edicion') or '(vacio)')[:90]}")
         if v.get("compone"):
             con.execute(
                 "update escena_desc set remedio = coalesce(remedio,'tablero')"
