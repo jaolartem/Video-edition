@@ -23,7 +23,7 @@ import {
  *   lentos»* — la barra crece por debajo de la línea. Aún no pasa nada.
  * - R5 · *«cuando esa plata quieta cruzó cierto umbral, el gobierno empezó a
  *   cobrarle más sobre cada dólar nuevo»* — la barra cruza, y lo que asoma por
- *   encima se pone en oro. **$14.300.**
+ *   encima se pone en oro. **$14,000.**
  * - R6 · *«en diez años eso es entre $250.000 y $300.000»* — la misma barra sin
  *   umbral: sólo acumulación sobre un horizonte declarado.
  *

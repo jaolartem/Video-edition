@@ -185,7 +185,7 @@ export const MyComposition = () => {
           ],
           umbral: { etiqueta: "Umbral", en: 0.6 },
           resultado: {
-            figure: "$14,300 de más",
+            figure: "$14,000 de más",
             source: "Caso relatado por Jaime Olarte",
           },
           condicion:

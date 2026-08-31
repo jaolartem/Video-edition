@@ -77,7 +77,7 @@ RETROCESO = 1.5
 HUECO = 1.2
 
 
-def _a_la_palabra(toma, ini, fin, cerca=0.45):
+def _a_la_palabra(toma, ini, fin, cerca=0.45, voz=None):
     """Mueve los bordes a la frontera de palabra mas cercana.
 
     Solo si esta a menos de `cerca`: por encima de eso el borde no parte una
@@ -101,9 +101,28 @@ def _a_la_palabra(toma, ini, fin, cerca=0.45):
             break
     for w in pal:
         x, y = w["start"], w["end"]
-        if x < fin < y and y - x < 2.0:
-            fin = y if (y - fin) <= cerca else (x if (fin - x) <= cerca else fin)
-            break
+        if not (x < fin < y):
+            continue
+        # **El final de la palabra puede tragarse la pausa siguiente.** El
+        # alineador estira la ultima palabra de una frase sobre el silencio, asi
+        # que su `end` no es donde deja de sonar. Si se ajustara ahi entrarian
+        # segundos mudos, y por eso el filtro de `cerca` lo descartaba y el
+        # borde se quedaba partido: «al» sin «año», «en» sin «Ontario».
+        #
+        # La salida no es rendirse: es **acotar**. La palabra acaba, de verdad,
+        # donde acaba el tramo de habla que la contiene. Lo dijo el paso que lo
+        # sufrio dos vueltas seguidas: «cuando el acaba de la palabra absorbe
+        # una pausa, acotar en vez de rendirse».
+        real = y
+        for a2, b2 in (voz or []):
+            if a2 <= x < b2:
+                real = min(y, b2)
+                break
+        if (real - fin) <= cerca:
+            fin = real
+        elif (fin - x) <= cerca:
+            fin = x
+        break
     return ini, fin
 
 
@@ -176,7 +195,7 @@ def _a_la_voz(toma, a, b, margen=0.12):
     # palabra que cruza el borde apenas ha empezado, se entra despues de ella;
     # si ya casi ha acabado, se entra antes. Mas lejos que eso no se toca — ahi
     # ya no es una silaba partida, es contenido, y eso lo decide el paso.
-    ini, fin = _a_la_palabra(toma, ini, fin)
+    ini, fin = _a_la_palabra(toma, ini, fin, voz=voz)
     for x, y in voz:
         if x < a < y and a - x <= RETROCESO:
             ini = min(ini, max(0.0, x - margen))

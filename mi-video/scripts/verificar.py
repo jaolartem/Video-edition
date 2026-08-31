@@ -194,13 +194,28 @@ def revisar(slug):
     # esta aqui: en la puerta, que es lo que no se puede saltar.
     import consulta as _cs
 
-    # **La puerta para la repeticion PEGADA**, que es la que no admite lectura:
-    # «su negocio esta funcionando, su negocio esta vendiendo» es el hablante
-    # rearrancando, y suena a error. La repeticion separada puede ser retorica
-    # —«30 mil dolares… 30 mil dolares» esta asi en el libreto— y esa no la
-    # decide un umbral: va al dossier del paso que compone.
+    # **La puerta para lo que hizo EL CORTE, y solo eso.**
+    #
+    # Paraba por cualquier repeticion pegada, y con eso se comio una
+    # enumeracion correcta: «ni a su abogado ni a su contador» dice «ni a su»
+    # dos veces porque el castellano lo pide. La distancia no las separa —el
+    # ejemplo de ruido de este mismo comentario, «su negocio esta funcionando,
+    # su negocio esta vendiendo», tiene la misma forma exacta—, asi que un
+    # umbral no puede decidirlo: hay que entender la frase.
+    #
+    # Regla de Jaime, que es la que reparte: *«la redundancia o es explicita en
+    # el libreto, o es continua en la grabacion; pero dejar enfasis cada corte
+    # no es enfasis sino ruido»*. **La puerta es duena del corte.** Si las dos
+    # veces caen en el mismo trozo, el hablante lo dijo asi de seguido y la
+    # puerta no tiene nada que arbitrar; si caen en trozos distintos, la pego
+    # el montaje y eso si es aritmetica.
+    #
+    # Y lo que no para tiene que ir a alguien: `repaso` lo recibe en su pedido
+    # (`repeticiones`) y decide con la frase delante. Parar por algo que el que
+    # compone no ve es dejar la pieza sin nadie que pueda arreglarla — el mismo
+    # atasco de C-116, que costo dos vueltas contando el mismo fallo.
     for r in _cs.repetido(slug):
-        if r["separadas_por"] <= 8:
+        if r["separadas_por"] <= 8 and not r["una_toma"]:
             mal.append(
                 f"{slug} e{r['etapa']}: dice «{r['dice']}» dos veces seguidas"
                 f" — es rearranque del hablante o repeticion del corte, no"
