@@ -77,6 +77,36 @@ RETROCESO = 1.5
 HUECO = 1.2
 
 
+def _a_la_palabra(toma, ini, fin, cerca=0.45):
+    """Mueve los bordes a la frontera de palabra mas cercana.
+
+    Solo si esta a menos de `cerca`: por encima de eso el borde no parte una
+    silaba, esta donde alguien lo puso a proposito, y moverlo seria decidir por
+    el. Devuelve `(ini, fin)` tal cual si no hay transcript.
+    """
+    import transcribir as _tr
+
+    try:
+        pal = _tr.exigir(toma)["segmentos"]
+    except SystemExit:
+        return ini, fin
+    # Al entrar: si el borde cae dentro de una palabra, o justo despues de que
+    # empiece, se entra donde empieza. Si esa palabra ya va por la mitad, se
+    # entra cuando acaba.
+    for w in pal:
+        x, y = w["start"], w["end"]
+        if x < ini < y and y - x < 2.0:
+            ini = x if (ini - x) < (y - ini) and (ini - x) <= cerca else (
+                y if (y - ini) <= cerca else ini)
+            break
+    for w in pal:
+        x, y = w["start"], w["end"]
+        if x < fin < y and y - x < 2.0:
+            fin = y if (y - fin) <= cerca else (x if (fin - x) <= cerca else fin)
+            break
+    return ini, fin
+
+
 def _a_la_voz(toma, a, b, margen=0.12):
     """Recorta los bordes de un tramo hasta donde de verdad se habla.
 
@@ -133,6 +163,20 @@ def _a_la_voz(toma, a, b, margen=0.12):
     # mucho antes, el borde se puso ahi por una razon y no se toca.
     ini = max(a, min(x for x, _ in dentro) - margen)
     fin = min(b, max(y for _, y in dentro) + margen)
+    # **Y no se entra ni se sale a mitad de palabra.**
+    #
+    # El recorte a la voz deja el borde donde hay sonido, pero el sonido de una
+    # palabra empieza antes de que la palabra se entienda: entrar en mitad de
+    # «estratega» deja «tratega», y salir en mitad de «Ontario» deja «Onta».
+    # Los agentes lo han devuelto vuelta tras vuelta —«estratega», «mas», «año»,
+    # «Ontario», «20»— y siempre es lo mismo: un corte que cae dentro del tramo
+    # de una palabra.
+    #
+    # Se ajusta a la frontera mas cercana **dentro de un margen corto**: si la
+    # palabra que cruza el borde apenas ha empezado, se entra despues de ella;
+    # si ya casi ha acabado, se entra antes. Mas lejos que eso no se toca — ahi
+    # ya no es una silaba partida, es contenido, y eso lo decide el paso.
+    ini, fin = _a_la_palabra(toma, ini, fin)
     for x, y in voz:
         if x < a < y and a - x <= RETROCESO:
             ini = min(ini, max(0.0, x - margen))
