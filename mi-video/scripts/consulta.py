@@ -85,6 +85,17 @@ def escenas_por_describir(reels=None, rehacer=False):
             textos[d["slug"]] = _montaje(d["slug"])
             avisos[d["slug"]] = bordes_sucios(d["slug"])
         d["montaje"] = textos[d["slug"]].get(int(d["orden"]))
+        # **Una etapa que no esta en la pieza no se describe.** El listado sale
+        # de la estructura —las etapas que el frame define— y no del montaje, y
+        # eso es correcto mientras todas esten. Cuando una se corta entera, sin
+        # embargo, seguia pidiendose: la puerta de composicion reclamaba una
+        # descripcion de la etapa 5 del reel-01 despues de que Jaime la mandara
+        # sacar, y la pieza no podia avanzar por describir algo que ya no suena.
+        #
+        # Se mira el montaje, que es lo que el espectador oye: si esa etapa no
+        # aporta texto **y no es de las que van a tablero sin toma**, no esta.
+        if not (d["montaje"] or "").strip() and (d.get("dicho") or "").strip():
+            continue
         # **Los bordes que hay que mirar van con la etapa**, para que quien
         # compone los resuelva con el texto delante en vez de dejarselos a un
         # umbral.

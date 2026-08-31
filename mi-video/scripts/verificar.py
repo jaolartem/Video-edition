@@ -38,6 +38,7 @@ renderiza y `pipeline.sh` no sigue.
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 
@@ -102,9 +103,36 @@ def revisar(slug):
                    f" su cara. Elige otra apertura.")
 
     # 4 · **Las etapas obligatorias existen**, con toma o con tablero.
+    #
+    # **Salvo la que se decidio sacar.** Una etapa cortada a proposito no tiene
+    # material ni tablero, y no deberia: la puerta la contaba como falta y la
+    # pieza no podia avanzar por no tener algo que alguien mando quitar. Paso
+    # con el mecanismo del reel-01, que Jaime mando fuera entero.
+    #
+    # La diferencia entre «falta» y «se quito» no es del montaje: esta en el
+    # log. Una nota de corte aplicada, con su ancla y su porque, es la prueba de
+    # que hubo una decision — y una decision no es un agujero.
+    quitadas = set()
+    try:
+        _c = sqlite3.connect(BASE)
+        for (q,) in _c.execute(
+                "select que from revision where video_slug = ? and accion='cortar'"
+                " and estado='aplicada' and regla='seccion que sobra'", (slug,)):
+            for _b in re.findall(r"e(\d+)", q or ""):
+                quitadas.add(int(_b))
+        _c.close()
+    except Exception as e:                         # noqa: BLE001
+        # **Y si no se puede saber, no se da por hecho que no hay ninguna.**
+        # Este `pass` dejaba `quitadas` vacio ante cualquier tropiezo —la base
+        # tomada por otra corrida, por ejemplo— y entonces la puerta acusaba de
+        # falta una etapa que alguien mando quitar. Un fallo de lectura no es
+        # una respuesta: se dice y se para por lo que es.
+        mal.append(f"{slug}: no se pudo leer que etapas se quitaron ({e})."
+                   f" Vuelve a correr cuando la base este libre.")
     for f in filas:
         b = f["etapa_orden"]
-        if b not in beats_edl and b not in tablero:
+        if (b not in beats_edl and b not in tablero
+                and int(b) not in quitadas):
             mal.append(f"{slug} e{b}: sin material y sin tablero")
 
     # 5 · **Ningún pedido de IA sin contestar.**
