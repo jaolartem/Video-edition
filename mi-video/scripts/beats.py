@@ -429,6 +429,24 @@ def expresividad(toma, a, b):
     return 0.0 if st > 8 or st < 0.2 else float(st)
 
 
+#: Lo que la medida de F0 necesita para existir, en segundos.
+#:
+#: **Es la precondicion de la medida, y por eso es un dato publico.** Estaba
+#: escondida como `x.size < 16000` despues de haber gastado un ffmpeg, asi que
+#: la unica forma de saber que una ventana no se podia medir era pedirla y
+#: recibir `None`. Quien pregunta no distingue eso de «se midio y salio bajo».
+#:
+#: Sale de la autocorrelacion: ventanas de 40 ms con salto de 20 ms y un minimo
+#: de 8 ventanas con voz. Un segundo de audio es el suelo por debajo del cual
+#: no hay F0 que promediar, se haga como se haga.
+VENTANA_MIN = 1.0
+
+
+def cabe(a, b):
+    """Si ese tramo da para medir. La precondicion, preguntable antes de gastar."""
+    return (b - a) >= VENTANA_MIN
+
+
 def contorno(toma, a, b):
     """El contorno de F0 del tramo, en Hz y ya corregido de octava.
 
@@ -436,7 +454,17 @@ def contorno(toma, a, b):
     movimiento son dos cosas distintas**: una lectura monotona puede tener un
     recorrido amplio si deriva despacio de grave a agudo, y sonar plana igual.
     Para saber si hay *cambio de tono* hace falta el contorno, no su rango.
+
+    **Una ventana que no llega al minimo se contesta aqui, no en ffmpeg.** Un
+    tramo de cero segundos hacia abortar a ffmpeg —«-to value smaller than
+    -ss»— y `check=True` lo convertia en excepcion; el mismo hecho —«no se
+    puede medir»— salia unas veces como `None` y otras como una excepcion, y
+    quien llamaba tenia que acertar con cual. Dos representaciones de un mismo
+    hecho es la familia de C-63: hacer representable el «no medido» obliga a
+    mirar todos los sitios que asumian un numero.
     """
+    if not cabe(a, b):
+        return None
     # **Un fichero por llamada, no uno para todas.** Esto escribia siempre
     # `exp.wav`, y con dos procesos midiendo a la vez —la linea avanzando piezas
     # en segundo plano y una consulta a mano— uno lee lo que el otro esta
@@ -463,7 +491,9 @@ def contorno(toma, a, b):
             os.remove(wav)
         except OSError:
             pass
-    if x.size < 16000:
+    # El mismo suelo que `cabe`, ahora sobre lo que ffmpeg devolvio de verdad:
+    # un tramo puede pedirse largo y salir corto si cae al final de la cinta.
+    if x.size < 16000 * VENTANA_MIN:
         return None
     # F0 por autocorrelacion en ventanas de 40 ms.
     sr, n, f0 = 16000, 640, []

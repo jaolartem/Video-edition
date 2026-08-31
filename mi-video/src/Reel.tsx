@@ -245,7 +245,7 @@ export const Reel: React.FC<{ spec: ReelSpec }> = ({ spec: r }) => {
      * la cara, pero una tarjeta o una cortinilla ocupan el cuadro entero y ahi
      * no hay nada que acompanar.
      */}
-    <Capas capas={r.caminos} kicker={r.lineas[0] ?? ""} sonido={r.sonido} />
+    <Capas capas={r.caminos} sonido={r.sonido} />
     {/**
      * La tarjeta entra con la barra POR DELANTE y la toma anterior
      * desvaneciéndose por debajo.

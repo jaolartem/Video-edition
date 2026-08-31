@@ -11,6 +11,7 @@ tabla — así los pasos que aún no se han envuelto siguen funcionando y la
 migración es gradual, que es la única manera de no rehacer la máquina.
 """
 from .base import Espera, Pieza, Resultado, Servicio, ServicioScript  # noqa: F401
+from .disenar import ServicioDisenar
 from .redundancia import ServicioRedundancia
 from .repaso import ServicioRepaso
 from .respaldo import ServicioRespaldo
@@ -23,6 +24,7 @@ REGISTRO: dict[str, Servicio] = {
     "sin_redundancia": ServicioRedundancia(),
     "repasado": ServicioRepaso(),
     "respaldado": ServicioRespaldo(),
+    "disenado": ServicioDisenar(),
     "revalidado": ServicioRevalidar(),
     "verificado": ServicioVerificar(),
     # El criterio humano no tiene servicio: lo mueve el mirando la pieza.

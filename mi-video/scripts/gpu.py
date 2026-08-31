@@ -228,12 +228,25 @@ def sello():
 # **Y hay una condicion, que casi se cuela.** Una prueba dio «mismo tamano,
 # bytes distintos» y la causa no era la tarjeta: era que la prueba no fijaba el
 # formato de salida. Con aceleracion los frames vuelven en NV12, asi que sin un
-# `format=` explicito ffmpeg puede entregar otro empaquetado. Los scripts de la
-# linea si lo fijan —`format=gray`, `-pix_fmt rgb24`— y ahi la salida es
-# **identica pixel a pixel**: 0 de 4.369.920 distintos.
+# `format=` explicito ffmpeg puede entregar otro empaquetado.
 #
-# Asi que esto no se enchufa a cualquier ffmpeg: se enchufa al que declara su
-# formato. El que no lo declare, primero se le declara.
+# **Y la condicion no es la que estaba escrita aqui.** Decia que declarar el
+# formato bastaba —«`format=gray`, `-pix_fmt rgb24`, identica pixel a pixel: 0
+# de 4.369.920 distintos»— y eso es falso para `rgb24`. Medido de nuevo sobre
+# tres frames de `hook-zoom.mp4`: **6.165.139 de 6.220.800 pixeles distintos, el
+# 99,1%**, diferencia media 1,11 por canal y maxima 39.
+#
+# La condicion real es **no cruzar croma**. `format=gray` se queda con el plano
+# Y, que es identico en NV12 y en yuv420p, y `format=yuv420p` para recodificar
+# tampoco lo cruza; por eso las trece llamadas que ya usan esto salen iguales.
+# `rgb24` si lo cruza, y swscale interpola el croma entrelazado de NV12 distinto
+# del planar. Esos pixeles alimentan la segmentacion y acaban en el frame
+# entregado.
+#
+# Asi que esto no se enchufa a cualquier ffmpeg: se enchufa al que **no cruza
+# croma**. Y la unica ruta `rgb24` del repo —`text-behind.py`— ademas no lo
+# necesita: medida, la tarjeta va mas LENTA (0,74 s -> 0,86 s, 0,86x) y el
+# decodificado es el 1,6% de su corrida.
 DECODIFICADOR = ["-hwaccel", "d3d11va"]
 
 

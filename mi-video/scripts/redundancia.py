@@ -43,6 +43,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
+import registro  # noqa: E402
 import revision  # noqa: E402
 import servicio  # noqa: E402
 import rutas  # noqa: E402
@@ -365,14 +366,35 @@ def dossier(slug, con_voz=True):
                     # **Lo que se oye, medido sobre la onda.** Ver `_suena`.
                     "suena": _suena(toma, rango[0], rango[1]),
                     }
-            if con_voz and rango[1] - rango[0] > 0.6:
+            # **El umbral es el de la medida, no uno propio.**
+            #
+            # Esto ponia 0,6 s y la medida necesita `beats.VENTANA_MIN`. Entre
+            # los dos numeros hay una franja donde el codigo llamaba a medir,
+            # `contorno` devolvia `None` por ventana corta y `expresividad`
+            # aplanaba ese `None` en **0.0** — asi que el trozo viajaba al
+            # contrato con «voz 0.0, tono 0.0», que es exactamente lo que se
+            # manda cuando algo se dijo sin una gota de entrega. El agente no
+            # tiene forma de distinguir «lo medi y esta muerto» de «no lo pude
+            # medir», y el prompt le promete los numeros sin condiciones.
+            #
+            # El contrato ya lo tenia declarado —`condicional` y `si_falta` en
+            # `montaje[].voz / .tono`— y era el codigo el que no lo cumplia. Con
+            # `cabe()` el campo **no viaja** cuando no se puede medir, que es lo
+            # que el contrato dice y lo unico honesto: un hueco se ve, un cero
+            # inventado no.
+            if con_voz and beats.cabe(rango[0], rango[1]):
+                # Y el `except` deja de ser mudo: con la precondicion delante,
+                # aqui ya no hay fallo esperado. Uno que salte es un fallo de
+                # verdad y tiene que llegar al log, no morir en un `pass`.
                 try:
                     fila["voz"] = round(
                         float(beats.expresividad(toma, rango[0], rango[1])), 2)
                     fila["tono"] = round(
                         beats.cambio_de_tono(toma, rango[0], rango[1]), 1)
-                except Exception:                  # noqa: BLE001
-                    pass
+                except Exception as e:             # noqa: BLE001
+                    registro.aviso("redundancia", "no se pudo medir un trozo",
+                                   detalle=f"{toma} {rango[0]:.2f}-{rango[1]:.2f}:"
+                                           f" {type(e).__name__} {e}", eco=False)
             out.append(fila)
         t += dur
     return out

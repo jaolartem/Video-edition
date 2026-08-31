@@ -275,7 +275,45 @@ def main():
     ap.add_argument("--ver", action="store_true", help="el camino, sin recorrerlo")
     ap.add_argument("--paso", type=int, metavar="N",
                     help="como mucho N saltos por pieza")
+    ap.add_argument("--volver", metavar="FASE",
+                    help="devuelve la pieza a esa fase y la vuelve a recorrer")
+    ap.add_argument("--por-que", default="", metavar="RAZON",
+                    help="por que vuelve; queda en el log de la pieza")
     a = ap.parse_args()
+
+    # **Devolver una pieza a una fase es del motor, no de un apano.**
+    #
+    # Solo se podia volver desde dentro de un servicio (`Resultado.volver_a`) o
+    # por el render caduco. Fuera de eso no habia manera, y eso deja un hueco
+    # real: un pedido de IA contestado **satisface la puerta** —comprueba que el
+    # fichero de respuesta exista— pero su decision no se aplica hasta que el
+    # servicio corre otra vez. Sin poder devolver la pieza, la respuesta se
+    # queda escrita y sin efecto, que es la forma de siempre de perder el
+    # estado: la etiqueta dice hecho y el trabajo no esta.
+    #
+    # Con esto la pieza vuelve a recorrer el camino y **el servicio consume su
+    # respuesta**, que es lo unico que convierte una decision en un montaje.
+    if a.volver:
+        con = _con()
+        destino = con.execute("select id, nombre from fase where nombre = ?",
+                              (a.volver,)).fetchone()
+        con.close()
+        if destino is None:
+            raise SystemExit(f"avanzar: no existe la fase «{a.volver}»."
+                             f" Mira la tabla `fase`.")
+        for n in (a.reels or rutas.piezas()):
+            pieza = Pieza(n)
+            if pieza.video_id is None:
+                continue
+            razon = a.por_que or f"devuelta a «{a.volver}» a mano"
+            if a.ver:
+                print(f"  {pieza.slug}: volveria a {a.volver} ({razon})")
+                continue
+            anotar(pieza.video_id, destino["id"], razon)
+            registro.aviso("avanzar", "pieza devuelta",
+                           detalle=f"{pieza.slug} -> {a.volver}: {razon}",
+                           eco=False)
+            print(f"  {pieza.slug}: vuelve a {a.volver} ({razon})")
     for n in (a.reels or rutas.piezas()):
         r = avanzar(n, ver=a.ver, tope=a.paso)
         if not r:

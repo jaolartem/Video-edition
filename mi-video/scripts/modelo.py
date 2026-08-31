@@ -373,8 +373,21 @@ CICLO = [
 
     (6.5, "repasado", None),
     (7, "descrito", "scripts/describir.mjs {n}"),
+    # **La composicion son dos pasos, no uno con dos sombreros.** Regla de
+    # Jaime: *«un agente se dedica a planear y verificar y otro agente a
+    # disenar»*, *«son dos tareas diferentes»*, *«uno define lo que va a haber y
+    # el otro lo monta»*, *«una cadena de produccion agentica»*.
+    #
+    # `descrito` define QUE va a haber —que etapas componen y que tiene que
+    # quedar dicho en cada una, que se ve mirando el argumento entero— y ademas
+    # **escribe el contrato del siguiente**: *«el contrato del segundo lo crea el
+    # primero»*. Este monta: forma, copy y familia.
+    #
+    # Va antes de `cortado` porque montar sobre un corte que todavia puede
+    # moverse es pagarlo dos veces, y despues de `descrito` porque sin encargo no
+    # hay nada que disenar.
+    (7.5, "disenado", None),         # servicio de IA: el diseno grafico
     (8, "cortado", "scripts/cortar.py {n}"),
-    (9, "voz_entregada", "scripts/voz-limpia.py --exportar {n}"),
     (10, "verificado", "scripts/verificar.py {n}"),
     (11, "montado", "scripts/montar.sh {n}"),
     # **El criterio humano es el escalon mas caro, y por eso va aqui.** Jaime:
@@ -383,6 +396,20 @@ CICLO = [
     # que se hace **una vez** y sobre algo que ya paso todos los filtros baratos.
     (12, "revisado", None),          # el mira y anota; lo mueve el
     (13, "aprobado", None),          # lo mueve Jaime, no un servicio
+    # **La voz virgen sale DESPUES de aprobar, no antes.** Regla de Jaime:
+    # *«o mejor despues de aprovacion dame un audio con mi voz y solo mi voz
+    # virgen»*.
+    #
+    # Estaba en la fase 9, antes de montar, y eso es trabajo tirado en cuanto la
+    # revision mueve un corte: el audio exportado deja de corresponder a la
+    # pieza, y encima habria pasado por Adobe Podcast —que es manual y en
+    # minutos suyos— para nada. Es la misma cuenta que le hizo quitar la musica
+    # de las piezas sin aprobar: *«sera mas facil con el audio final y
+    # definitivo, menos retrabajo»*.
+    #
+    # Aqui el corte ya lo cerro el, asi que lo que se exporta es lo que va a
+    # sonar en la entrega.
+    (13.5, "voz_entregada", "scripts/voz-limpia.py --exportar {n}"),
     (14, "voz_limpia", "scripts/voz-limpia.py {n}"),
     (15, "masterizado", "scripts/musica.sh {n}"),
     (16, "publicado", "scripts/publicar.py --finales {n}"),

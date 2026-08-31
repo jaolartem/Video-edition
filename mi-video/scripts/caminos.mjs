@@ -102,6 +102,40 @@ export const figuraDe = (grafico) => {
 };
 
 /**
+ * El copy que el gancho tipográfico pone en pantalla, **declarado, no deducido**.
+ *
+ * Regla de Jaime, y corrige lo que yo estaba haciendo: *«las escenas y tableros
+ * las debe hacer un agente especializado en diseño; eso es editorial, no sale
+ * con código»*. La primera versión de esto sacaba la palabra de la prosa de
+ * `grafico` con una expresión regular — o sea código decidiendo qué dice el
+ * plano que compite contra el pulgar. Eso es exactamente lo que no le toca.
+ *
+ * Lo que sí le toca es **leer lo que el diseño declaró** y negarse a inventar
+ * cuando no hay nada. El copy vive en `escena_desc.tablero`, que es el mismo
+ * sitio del que salen los tableros desde C-142: dato, no prosa, escrito por
+ * quien compone y leído por quien monta.
+ *
+ * Qué arregla, y es el sitio más caro de la pieza: el bloque no traía texto
+ * propio y `Reel.tsx` le pasaba `lineas[0]`, la primera línea del rótulo. El
+ * segundo gancho visual **repetía el primero** — en reel-04 el rótulo decía
+ * «NO ES POR / SER INMIGRANTE» y el bloque, encima y a la vez, «NO ES POR».
+ */
+export const copyDeclarado = (desc) => {
+  const t = desc?.tablero;
+  if (!t) return null;
+  let d = t;
+  if (typeof d === "string") {
+    try {
+      d = JSON.parse(d);
+    } catch {
+      return null;
+    }
+  }
+  const txt = d?.props?.texto ?? d?.props?.titulo ?? d?.texto ?? null;
+  return typeof txt === "string" && txt.trim() ? txt.trim().slice(0, 26) : null;
+};
+
+/**
  * De la prosa de `sonido` al efecto que existe en `src/brand/sfx.ts`.
  *
  * Mismo criterio: la descripción dice *«el golpe seco cuando la segunda barra
@@ -247,20 +281,24 @@ export const CAMINOS = {
       // 3bis · El gancho tipografico. Mismo trabajo que la figura —segundo y
       //     tercer gancho visual dentro de los 5 s— pero con el material que la
       //     escena pidio: tipo, en versales, entrando por bloques.
-      if (tipo) {
+      //     Y **con su propio texto**: el que la escena declaró en versales. Sin
+      //     él la capa no entra — repetir el rótulo es peor que una capa menos,
+      //     y `exige` lo cuenta para que lo resuelva quien describe.
+      const literal = tipo ? copyDeclarado(desc) : null;
+      if (tipo && literal) {
         const [t1, t2] = reparte(2, clave, fin - Math.round(0.6 * FPS));
         out.push({
           tipo: "bloque",
           at: t1,
           duration: fin - t1,
-          props: { lado, tinte: "gold", entrada: "corte" },
+          props: { lado, tinte: "gold", entrada: "corte", texto: literal },
         });
         out.push(...sonar("mark", t1));
         out.push({
           tipo: "remate",
           at: t2,
           duration: fin - t2,
-          props: { lado, tinte: "navy" },
+          props: { lado, tinte: "navy", texto: literal },
         });
         out.push(...sonar(motion ?? "land", t2));
       }
@@ -294,6 +332,18 @@ export const CAMINOS = {
         );
       if (!capas.some((c) => c.tipo === "punch"))
         faltas.push("el gancho no se mueve dentro de la toma");
+      // **El gancho tipográfico sin copy declarado no entra, y se cuenta.**
+      // La escena pide tipo —su `grafico` habla de versales— y nadie escribió
+      // qué dice. Antes eso se rellenaba con la primera línea del rótulo y el
+      // gancho se repetía a sí mismo; ahora falta una capa y **se dice**, que
+      // es lo que lo manda a quien compone la escena. Es editorial: no sale de
+      // aquí.
+      if (esTipografico(ctx.desc?.grafico) && !copyDeclarado(ctx.desc))
+        faltas.push(
+          "el gancho pide tipo y la escena no declara qué dice:" +
+            " escríbelo en `escena_desc.tablero`, que es de donde lo lee el" +
+            " render. Deducirlo de la prosa seria codigo decidiendo el copy.",
+        );
       if (
         !capas.some((c) => c.tipo === "subtitulo" && c.props.forma === "grande")
       )

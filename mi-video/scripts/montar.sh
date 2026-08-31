@@ -44,6 +44,16 @@ node scripts/guardas.mjs
 # Va aqui, al lado de las guardas, y por el mismo motivo — lee ficheros y es
 # barato, asi que se paga antes de gastar el peldano caro.
 python scripts/verdad.py
+# **Y los contratos, que son el corazon de la maquina.** Declaran que dato
+# viaja a cada paso de IA, que frase del prompt no se puede contestar sin el, y
+# que linea de codigo ejecuta lo que se contesta. Sin comprobarlo, un contrato
+# es una promesa: el payload cambia de forma, la aguja sigue apuntando a la
+# vieja y el paso sigue corriendo con un campo que ya no llega.
+#
+# No corria en ninguna parte, y ademas resolvia mal todas sus rutas —asi que
+# las 83 agujas daban «no esta» y el parte no lo miraba—. Va aqui por lo mismo
+# que las otras dos: lee ficheros y es barato.
+python scripts/contratos.py
 
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
@@ -238,7 +248,31 @@ for r in "${REELS[@]}"; do
     IDENTICAS+=("R$n")
   fi
 
-  bash scripts/musica.sh "$n"
+  # **Sin aprobar no lleva musica, igual que no lleva efectos.**
+  #
+  # Regla de Jaime, dicha dos veces: *«los videos para aprobacion van sin musica
+  # y sin audio adicional, no los necesitamos y sera mas facil con el audio
+  # final y definitivo, menos retrabajo»*, y hoy otra vez: *«renderiza sin
+  # musica y sin efectos; va al paso intermedio, con Adobe Podcast»*.
+  #
+  # Los efectos ya salian mudos —`sonido: aprobadas.has(slug)` en
+  # `reels-spec.mjs`— y la musica no: este paso corria siempre. O sea que la
+  # mitad de la regla estaba puesta y la otra mitad no, que es la peor forma de
+  # tenerla porque parece cumplida.
+  #
+  # **Y la pregunta se hace en un solo sitio.** `Pieza.aprobada` es la
+  # definicion; preguntarla aqui con otro SQL seria una segunda copia de la
+  # regla, que es como se separan las dos en cuanto una cambie.
+  if [ "$(PYTHONIOENCODING=utf-8 python -c "import sys;sys.path.insert(0,'scripts');from servicios import Pieza;print(1 if Pieza($((10#$n))).aprobada else 0)" 2>/dev/null)" = "1" ]; then
+    bash scripts/musica.sh "$n"
+  else
+    # La entrega existe igual —el paso siguiente la mide— pero es el render tal
+    # cual: la voz sola, sin nada encima. Copia de flujo, sin recodificar.
+    mkdir -p "$DESTINO/entrega"
+    ffmpeg -v error -y -i "$DESTINO/reels/reel-R$n.mp4" -c copy \
+           "$DESTINO/entrega/reel-R$n.mp4"
+    echo "  R$n sin aprobar: entrega sin musica ni efectos, solo la voz."
+  fi
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done
 # **La verificacion va DESPUES de entregar, y la llama el runner.** No la

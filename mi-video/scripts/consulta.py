@@ -9,6 +9,7 @@ este proyecto— el lado JS pide por nombre y aquí está la única implementaci
     python scripts/consulta.py guardar_escena '["reel-03", 2, {...}]'
 """
 import datetime
+import io
 import json
 import os
 import sqlite3
@@ -568,61 +569,104 @@ def repetido(slug, n=3):
         # es la razon de que la cinta sea un abanico — *«se grabo asi para poder
         # escoger una buena entre estas»* (C-81). Elegir «la segunda» seria tan
         # arbitrario como elegir la ultima.
+        import beats
+
         veces = []
         for k0 in sitios:
             tramo = seq[k0:k0 + n]
+            trozo = tramo[0][1]
+            ini, fin = round(tramo[0][3], 2), round(tramo[-1][4], 2)
+            # **La ventana que se mide no es la frase: es la frase con el aire
+            # que la medida necesita para existir.**
+            #
+            # Un trigrama dura 0,675 s de mediana y `contorno` no devuelve nada
+            # por debajo de `beats.VENTANA_MIN`. Midiendo los tres palabras
+            # sueltas, 52 de 78 apariciones salian sin medir y 19 de los 37
+            # grupos decidian sin una sola medida — y «no medido» llegaba al
+            # consumidor como `destaca = False`, o sea como «esto es ruido del
+            # corte», que es una conclusion que nadie saco.
+            #
+            # Se crece a los dos lados hasta el minimo y **se recorta al propio
+            # trozo**, que es lo que garantiza que no cruce una costura ni se
+            # meta en otra toma: se mide como suena, no como se cortó.
+            corte = edl["segmentos"][trozo]
+            falta = beats.VENTANA_MIN - (fin - ini)
+            if falta > 0:
+                ini, fin = ini - falta / 2, fin + falta / 2
+                if ini < corte[0]:
+                    ini, fin = corte[0], corte[0] + beats.VENTANA_MIN
+                if fin > corte[1]:
+                    ini, fin = max(corte[0], corte[1] - beats.VENTANA_MIN), corte[1]
             veces.append({
                 "empieza": round(tramo[0][3], 2),
                 "acaba": round(tramo[-1][4], 2),
-                "trozo": tramo[0][1],
+                "mide_desde": round(ini, 2),
+                "mide_hasta": round(fin, 2),
+                "trozo": trozo,
                 "toma": tramo[0][5],
                 "intensidad": None,
             })
-        try:
-            import beats
-
-            for v in veces:
-                m = beats.intensidad(v["toma"], v["empieza"], v["acaba"]) or {}
-                v["intensidad"] = (round(float(m["intensidad"]), 2)
-                                   if m.get("intensidad") is not None else None)
-        except Exception:                          # noqa: BLE001
-            pass
+        for v in veces:
+            # **El `try` va por medida, no por grupo.** Envolviendo el bucle,
+            # una ventana que no se puede medir dejaba sin medir a todas las
+            # demas del grupo — un fallo se convertia en ausencia de pruebas, y
+            # la ausencia de pruebas se leia como prueba.
+            try:
+                # Con las palabras: sin ellas `velocidad` es siempre `None` y la
+                # intensidad se queda con media dimension de las dos que tiene.
+                m = beats.intensidad(v["toma"], v["mide_desde"], v["mide_hasta"],
+                                     cache.get(v["toma"])) or {}
+            except Exception:                      # noqa: BLE001
+                continue
+            v["intensidad"] = (round(float(m["intensidad"]), 2)
+                               if m.get("intensidad") is not None else None)
         medidas = [v for v in veces if v["intensidad"] is not None]
         beat = seq[sitios[0]][2]
         una_toma = len({v["trozo"] for v in veces}) == 1
         en_libreto = " ".join(norm(lib.get(beat, ""))).count(g) >= len(sitios)
 
-        # **La mejor es la que mas comunica**, que es la vara del proyecto: la
-        # entrega, sin signo. Si no se pudo medir ninguna, no se decide aqui.
+        # **La entrega se mide; que sea enfasis no se decide aqui.**
+        #
+        # Regla de Jaime: *«lo de enfasis legitimo no se mide con codigo, se
+        # mide en las revisiones del agente»*, y la que la ordena: *«con el
+        # contrato; no es tu papel juzgarlo, ni arreglar algo que el codigo no
+        # puede arreglar»*.
+        #
+        # Este numero llego a ser un voto —si la mejor destacaba sobre las
+        # otras, el grupo se daba por enfasis y desaparecia del informe— y eso
+        # es el codigo absolviendo: 20 de 37 grupos se caian antes de que nadie
+        # leyera la frase. Distinguir «lo repitio para machacarlo» de «el
+        # montaje lo pego dos veces» exige entender lo que se dice, y para eso
+        # esta el contrato. Aqui la intensidad viaja como **prueba**, al lado
+        # del texto, que es el papel que las medidas tienen en este proyecto.
         mejor = max(medidas, key=lambda v: v["intensidad"]) if medidas else None
-        if mejor is not None and len(medidas) > 1:
-            segunda = sorted(v["intensidad"] for v in medidas)[-2]
-            destaca = (mejor["intensidad"] - segunda) > beats.PASO_VOZ
-        else:
-            destaca = False
 
-        # Una obligatoria y dos de tres: la toma manda, y ademas o lo pide el
-        # libreto o la repeticion sube de verdad la entrega.
-        cumple = sum([una_toma, en_libreto, destaca])
-        if una_toma and cumple >= 2:
+        # Lo unico que se resuelve por aritmetica es la regla de Jaime, literal:
+        # *«la redundancia o es explicita en el libreto, o es continua en la
+        # grabacion»*. Las dos son hechos comprobables —el mismo trozo, y el
+        # libreto pidiendola esas veces—, no lecturas de intencion.
+        if una_toma and en_libreto:
             continue
         if not una_toma:
             motivo = f"se dice {len(sitios)} veces cruzando cortes"
         elif not medidas:
             motivo = f"se dice {len(sitios)} veces y no se pudo medir la entrega"
-        elif not destaca:
-            motivo = (f"se dice {len(sitios)} veces y ninguna destaca"
-                      f" (intensidades {[v['intensidad'] for v in medidas]}):"
-                      f" es repetir, no enfatizar")
         else:
-            motivo = f"se dice {len(sitios)} veces y el libreto solo la pide una"
+            motivo = (f"se dice {len(sitios)} veces y el libreto la pide una"
+                      f" (entrega {[v['intensidad'] for v in medidas]}):"
+                      f" si es enfasis o sobra, lo dice quien lee la frase")
         fuera.append({"etapa": beat, "dice": g, "veces": len(sitios),
                       "separadas_por": sitios[1] - sitios[0] - n,
                       "trozos": sorted({v["trozo"] for v in veces}),
                       "motivo": motivo, "en_libreto": en_libreto,
                       "una_toma": una_toma, "tomas": veces,
-                      "decide_quien_compone": not medidas,
-                      # Cual se queda: la que mas comunica de las medidas.
+                      # **Siempre lo decide quien compone.** Esto valia `not
+                      # medidas`, o sea «solo cuando el codigo no supo»; con lo
+                      # anterior el codigo si creia saber, y por eso absolvia.
+                      "decide_quien_compone": True,
+                      # La que mas entrega de las medidas. Es una **pista para
+                      # quien decide**, no la elegida: cual se queda depende de
+                      # que dice cada una, y eso no esta aqui.
                       "se_queda": (None if mejor is None else
                                    {"empieza": mejor["empieza"],
                                     "acaba": mejor["acaba"],
@@ -746,8 +790,48 @@ def guardar_escena(slug, orden, d):
     return {"ok": True}
 
 
+def guardar_tablero(slug, orden, tablero):
+    """Guarda SOLO el tablero de una etapa. Es la entrega del paso de diseño.
+
+    Existe aparte de `guardar_escena` porque son dos oficios: quien planea
+    escribe la escena entera —qué pasa, qué emoción, qué encargo—, y quien
+    diseña contesta a ese encargo con una cosa sola. Pedirle que reenvíe la
+    descripción completa para cambiar un campo es invitarle a reescribir lo que
+    no le toca, y ya pasó: la descripción acaba siendo la prosa que justifica un
+    tablero ya imaginado.
+
+    `tablero` es `{"kind": …, "props": {…}}`, que es lo que el render sabe
+    montar. Si trae `fuente`, entra en `props.source` — el pie de cumplimiento.
+    """
+    import datetime
+
+    if not isinstance(tablero, dict) or not tablero.get("kind"):
+        raise SystemExit(f"{slug} e{orden}: el tablero necesita `kind`")
+    props = tablero.get("props")
+    if not isinstance(props, dict) or not props:
+        raise SystemExit(f"{slug} e{orden}: el tablero necesita `props` con copy")
+    f = tablero.get("fuente")
+    if f and f != "sin cifra":
+        props = {**props, "source": f}
+    con = sqlite3.connect(BASE)
+    n = con.execute(
+        "update escena_desc set tablero = ?, fecha = ?"
+        " where video_slug = ? and etapa_orden = ?",
+        (json.dumps({"kind": tablero["kind"], "props": props},
+                    ensure_ascii=False),
+         datetime.datetime.now().isoformat(timespec="seconds"),
+         slug, int(orden))).rowcount
+    con.commit()
+    con.close()
+    if not n:
+        raise SystemExit(f"{slug} e{orden}: no existe esa escena; descríbela antes")
+    return {"ok": True, "slug": slug, "etapa": int(orden),
+            "kind": tablero["kind"]}
+
+
 if __name__ == "__main__":
-    fn = {"escenas_por_describir": escenas_por_describir,
+    fn = {"guardar_tablero": guardar_tablero,
+          "escenas_por_describir": escenas_por_describir,
           "cc_afinado": cc_afinado,
           "bordes_sucios": bordes_sucios,
           "repetido": repetido,
@@ -758,5 +842,25 @@ if __name__ == "__main__":
           "pausas": pausas,
           "precio_vigente": precio_vigente,
           "guardar_escena": guardar_escena}[sys.argv[1]]
-    args = json.loads(sys.argv[2]) if len(sys.argv) > 2 else []
+    # **`@fichero` en vez del JSON en la linea de comandos.**
+    #
+    # El argumento viaja por la consola, y la consola de Windows es cp1252
+    # mientras que todo lo que se guarda aqui lleva tildes y comillas angulares.
+    # Pasar una descripcion de escena como argumento es meter «qué pasa» por un
+    # canal que no sabe escribir la «é»: se rompe, o peor, entra mutilada.
+    #
+    # Costo medido: seis agentes de composicion gastaron su turno entero
+    # peleando con el escapado —88 mensajes uno de ellos— y no escribieron ni
+    # una descripcion. No era torpeza suya: era que el unico camino que les di
+    # pasaba por ahi.
+    #
+    # Con `@`, el JSON viaja en un fichero UTF-8 y la linea de comandos lleva
+    # solo ASCII. Es el mismo acuerdo que ya usa `work/servicio/` para los pasos
+    # de IA, y por la misma razon.
+    #
+    #     python scripts/consulta.py guardar_escena @work/escena.json
+    if len(sys.argv) > 2 and sys.argv[2].startswith("@"):
+        args = json.load(io.open(sys.argv[2][1:], encoding="utf-8"))
+    else:
+        args = json.loads(sys.argv[2]) if len(sys.argv) > 2 else []
     print(json.dumps(fn(*args), ensure_ascii=False))

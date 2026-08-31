@@ -201,6 +201,30 @@ function valida(d) {
     }
     if (!t.kind) t.kind = KIND_DE[d.componente] ?? "comparacion";
   }
+  /**
+   * **Y la composición TIPOGRÁFICA es un tablero, aunque no lleve componente.**
+   *
+   * El gancho de reel-04 pide tipo —su `grafico` dice «una sola palabra, y es
+   * la que se oye: INMIGRANTE en Anton versales»— y `componente` es `ninguno`,
+   * así que la exigencia de arriba no le tocaba y la etapa salía sin copy. El
+   * render entonces rellenaba el bloque con `lineas[0]`, la primera línea del
+   * rótulo, y el segundo gancho visual **repetía el primero** encima de él, en
+   * el único segundo que compite contra el pulgar.
+   *
+   * No se arregla deduciendo la palabra de la prosa: eso sería código decidiendo
+   * el copy. Se arregla exigiéndolo aquí, que es donde el diseño entrega.
+   */
+  const ES_TIPO = /versales|el tipo es|la frase entera|solo texto|nada mas/i;
+  if (ES_TIPO.test(d.grafico ?? "")) {
+    const t = d.tablero;
+    const txt = t?.props?.texto ?? t?.props?.titulo ?? t?.texto;
+    if (typeof txt !== "string" || !txt.trim()) {
+      throw new Error(
+        `«tablero» falta y el gráfico de esta etapa es tipográfico: di qué dice` +
+        ` en \`tablero.props.texto\`. Si no, el render no tiene copy y la capa` +
+        ` no entra — o peor, repite el rótulo`);
+    }
+  }
   return d;
 }
 

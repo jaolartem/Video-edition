@@ -37,8 +37,8 @@ def oir(p, ini, fin):
     r = subprocess.run(gpu.whisper() + ["-m",
                         os.path.join(W, "ggml-medium.bin"), "-l", "es",
                         "-mc", "0", "-nt", "-f", WAV],
-                       capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       encoding="utf-8", errors="replace")
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
     return " ".join(r.stdout.split())
 
 

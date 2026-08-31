@@ -216,7 +216,6 @@ const CapaBloque: React.FC<{ props: Record<string, unknown>; texto: string }> = 
  */
 export const Capas: React.FC<{
   capas: Capa[];
-  kicker: string;
   /**
    * Si la pieza lleva los efectos de sonido de cada movimiento.
    *
@@ -227,7 +226,7 @@ export const Capas: React.FC<{
    * ponerlo sobre un corte que aún puede cambiar es pagarlo dos veces.
    */
   sonido?: boolean;
-}> = ({ capas, kicker, sonido }) => (
+}> = ({ capas, sonido }) => (
   <>
     {capas.map((c, i) => {
       const key = `${c.tipo}-${c.at}-${i}`;
@@ -248,7 +247,12 @@ export const Capas: React.FC<{
           ) : c.tipo === "remate" ? (
             <CapaRemate props={c.props} dura={dura} />
           ) : c.tipo === "bloque" ? (
-            <CapaBloque props={c.props} texto={kicker} />
+            // **El texto viene en la capa, declarado por la escena.** Aquí
+            // llegaba `kicker`, que era `lineas[0]` — la primera línea del
+            // rótulo—, así que el bloque repetía el rótulo palabra por palabra
+            // encima de él. El camino ya no emite la capa sin copy declarado,
+            // de modo que si llega es porque alguien lo escribió.
+            <CapaBloque props={c.props} texto={String(c.props.texto ?? "")} />
           ) : null}
         </Sequence>
       );
