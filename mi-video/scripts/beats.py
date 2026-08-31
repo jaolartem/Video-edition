@@ -527,6 +527,25 @@ def _baseline(toma, palabras):
     return _BASE[toma]
 
 
+def _hablado(toma, a, b):
+    """Cuantos segundos de ese tramo son voz de verdad, segun el audio.
+
+    Los tramos de `work/cuts/<toma>.json` los midio el detector de silencio
+    sobre la onda, asi que dicen donde hay voz **independientemente de lo que
+    el alineador haya hecho con las marcas de palabra**. Si no estan, se cae al
+    span entero: peor medida, pero medida.
+    """
+    try:
+        runs = json.load(open(f"work/cuts/{toma}.json",
+                              encoding="utf-8"))["segmentos"]
+    except Exception:                              # noqa: BLE001
+        return max(b - a, 1e-6)
+    t = sum(max(0.0, min(b, y) - max(a, x)) for x, y in runs)
+    # Nunca cero: un tramo sin voz medida se trata como el span, y ya lo dira
+    # la intensidad quedandose baja.
+    return t if t > 0.2 else max(b - a, 1e-6)
+
+
 def intensidad(toma, a, b, palabras=None):
     """Cuánta emoción lleva el tramo, **sin signo**.
 
@@ -556,7 +575,28 @@ def intensidad(toma, a, b, palabras=None):
         out["altura"] = round(12 * np.log2(float(np.median(f0)) / base["altura"]), 2)
     if palabras and base["velocidad"] > 0 and b > a:
         n = sum(1 for w in palabras if a <= w["start"] < b)
-        out["velocidad"] = round((n / (b - a)) / base["velocidad"] - 1.0, 2)
+        # **Se divide por lo que se HABLA, no por lo que dura el tramo.**
+        #
+        # Esto usaba el span entero, y un tramo con silencio dentro salia lento
+        # aunque se hablara rapido: la velocidad quedaba diluida por el aire.
+        # Medido en reel-06: la etapa 6 tiene 13,7 s mudos de 21,49 —el 64%— y
+        # puntuaba 0,12 de intensidad; la 7 tenia 5,0 s de 9,50 y puntuaba 0,36.
+        # Recortando solo el silencio, esa misma toma sube a 3,84.
+        #
+        # O sea que media tarde de «etapas tibias» no eran tomas flojas: eran
+        # tomas bien dichas medidas sobre el aire que las rodea. Y la trampa es
+        # doble, porque **el render ya quita ese silencio** —`plan-reel` corta
+        # todo hueco de mas de 0,16 s— asi que se estaba puntuando un tramo que
+        # el espectador nunca va a oir asi.
+        #
+        # El silencio se mide con el detector de voz, que mide el AUDIO, y no
+        # con las marcas de palabra: el alineador pega el silencio a la palabra
+        # anterior —en esa cinta «practicas.» dura 14,1 s y «ano» 7,1 con
+        # energia cero— asi que por palabras es invisible. Es la leccion de
+        # C-101 otra vez: cuando dos medidas del mismo hecho discrepan, gana la
+        # que mide el hecho.
+        util = _hablado(toma, a, b)
+        out["velocidad"] = round((n / util) / base["velocidad"] - 1.0, 2)
     partes = [abs(out["altura"]) / 2.0 if out["altura"] is not None else None,
               abs(out["velocidad"]) / 0.35 if out["velocidad"] is not None else None]
     partes = [p for p in partes if p is not None]
