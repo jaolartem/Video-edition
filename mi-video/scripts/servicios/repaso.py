@@ -59,6 +59,20 @@ class ServicioRepaso(Servicio):
         filas = redundancia.dossier(pieza.slug)
         if not filas:
             return Resultado(True, salida="sin material que repasar")
+        # **Y va la curva con el texto.** El contrato pregunta si el tono va con
+        # el momento, y sin la curva delante eso no se puede contestar: la
+        # intensidad es sin signo y el texto no dice como se dijo. Es el mismo
+        # error que costo C-100 —medir la direccion y no pasarsela a quien
+        # decide— y aqui seria peor, porque este es el ultimo que mira.
+        try:
+            import consulta
+
+            curva = consulta.onda(pieza.slug)
+        except Exception:                          # noqa: BLE001
+            curva = []
+        datos = {"montaje": filas, "onda": curva,
+                 "estructura": (pieza.edl or {}).get("estructura")
+                               or "Information Gap"}
         # **Tiene su propio contrato, y no es el de redundancia.** Jaime:
         # *«la revision de redundancia es revision de composicion, logica,
         # libreto, tono: es tu revision final»*. Reusar el prompt de la fase 5
@@ -68,7 +82,7 @@ class ServicioRepaso(Servicio):
             os.path.join(os.path.dirname(os.path.dirname(
                 os.path.abspath(__file__))), "repaso.prompt.md"),
             encoding="utf-8").read()
-        r = contrato.pedir("repaso", pieza.slug, prompt, filas)
+        r = contrato.pedir("repaso", pieza.slug, prompt, datos)
         if r is None:
             return Resultado(
                 False,
