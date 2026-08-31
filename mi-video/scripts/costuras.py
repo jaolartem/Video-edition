@@ -708,7 +708,7 @@ def sin_aire(slug, ver=False):
     if not os.path.exists(ruta):
         return 0
     edl = json.load(open(ruta, encoding="utf-8"))
-    segs, det, quitado = [], [], 0.0
+    segs, det, quitado, cambia = [], [], 0.0, False
     for rango, d in zip(edl["segmentos"], edl["detalle"]):
         a, b = float(rango[0]), float(rango[1])
         toma = d.get("toma") or rutas.TOMAS.get(slug)
@@ -718,13 +718,31 @@ def sin_aire(slug, ver=False):
             det.append(d)
             continue
         quitado += (b - a) - sum(y - x for x, y in trozos)
+        # **Se escribe si el borde cambio, no si sobro silencio.**
+        if (len(trozos) != 1 or abs(trozos[0][0] - a) > 0.005
+                or abs(trozos[0][1] - b) > 0.005):
+            cambia = True
         for x, y in trozos:
             segs.append([x, y])
             det.append({**d, "start": x, "end": y})
-    if quitado < 0.05:
+    # **Y `quitado` puede ser NEGATIVO, que es el caso bueno.**
+    #
+    # Esto paraba en `quitado < 0.05`, escrito cuando este paso solo quitaba
+    # silencio. Pero `_a_la_voz` tambien ajusta a la frontera de palabra
+    # (C-135), y ese ajuste **alarga**: recuperar «año» u «Ontario» suma cinta
+    # en vez de quitarla. Con el ajuste dentro, las seis piezas daban `quitado`
+    # negativo —de -0,13 a -0,84 s— y el guarda tiraba los 54 bordes que este
+    # paso acababa de calcular bien.
+    #
+    # Eso es lo que costo trece vueltas: la maquina acertaba cada vez, no
+    # escribia, y en la vuelta siguiente un agente volvia a encontrar el mismo
+    # borde partido y lo rescataba a mano, uno a uno. Medido: 60 de 202 bordes
+    # caian dentro de una palabra con los 54 arreglos calculados y sin aplicar.
+    if not cambia:
         return 0
     if ver:
-        print(f"  {slug}: quitaria {quitado:.1f}s de aire muerto")
+        print(f"  {slug}: {'quitaria' if quitado > 0 else 'anadiria'}"
+              f" {abs(quitado):.1f}s recolocando bordes")
         return quitado
     edl["segmentos"], edl["detalle"] = segs, det
     edl["fuentes"] = [x.get("toma") or "" for x in det]

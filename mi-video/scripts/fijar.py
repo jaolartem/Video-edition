@@ -227,6 +227,23 @@ def _a_la_voz(toma, a, b, margen=0.12):
         x = max(ini, g[0][0] - margen)
         y = min(fin, g[-1][1] + margen)
         if y - x > 0.25:
+            # **El ajuste a la palabra va AQUI, sobre el tramo que sale.**
+            #
+            # Estaba arriba, y despues de el pasaban dos cosas que lo deshacian:
+            # el `RETROCESO` tira `ini` hacia el arranque del tramo de voz, y
+            # estas dos lineas construyen el borde definitivo desde los tramos
+            # de voz —`g[0][0] - margen`— en vez de desde el borde ya ajustado.
+            # O sea que el ajuste solo sobrevivia cuando era el que mandaba.
+            #
+            # C-135 lo dejo escrito y el codigo hacia lo contrario: «primero se
+            # recorta a la voz medida sobre la onda, LUEGO se ajusta a la
+            # palabra». Aqui hacia voz, palabra, y voz otra vez.
+            #
+            # Medido sobre las seis piezas: 28 bordes a menos de 0,45 s de una
+            # frontera —o sea, dentro del margen que este paso si toca— seguian
+            # cayendo dentro de una palabra, y casi todos de entrada, que es el
+            # lado que el `RETROCESO` mueve.
+            x, y = _a_la_palabra(toma, x, y, voz=voz)
             trozos.append((round(x, 3), round(y, 3)))
     return trozos or None
 
