@@ -127,7 +127,49 @@ class ServicioRepaso(Servicio):
             _c.close()
         except Exception:                          # noqa: BLE001
             ve = []
+        # **El libreto, que es contra lo que se define la congruencia.**
+        # El contrato dice desde el principio «lo que se dice y lo que el
+        # libreto queria decir» y nunca se le dio el libreto: se pedia comparar
+        # sin el otro lado. Y ahora el piso lo hace obligatorio — *«respeto por
+        # la intencion comunicativa del libreto, no del libreto»*: sin tenerlo
+        # delante no se puede saber cual era la intencion que hay que respetar.
+        try:
+            import sqlite3 as _s2
+
+            _c2 = _s2.connect("ads/decisiones.db")
+            libreto = {r[0]: r[1] for r in _c2.execute(
+                "select orden, texto from libreto where video_id ="
+                " (select id from video where slug = ?) order by orden",
+                (pieza.slug,))}
+            # **La fecha del evento se deriva del ultimo escalon**, que es el
+            # que «cierra con el evento». El NOMBRE no esta declarado en ningun
+            # sitio, y por eso una pieza dice «bootcamp» y otra «curso»: no es
+            # que alguien se equivocara, es que no hay contra que comprobarlo.
+            _ev = _c2.execute(
+                "select hasta, nota from precio order by hasta desc limit 1").fetchone()
+            _c2.close()
+        except Exception:                          # noqa: BLE001
+            libreto, _ev = {}, None
+        evento = {"fecha": (_ev[0] if _ev else None),
+                  "nombre": None,
+                  "nota": "el nombre del evento no esta declarado en el"
+                          " proyecto: si las etapas lo llaman de dos maneras,"
+                          " dilo, no elijas tu"}
+        # **Cuantas vueltas lleva la pieza por aqui.** El contrato dice «si esta
+        # pieza ya dio tres vueltas, no falta un corte mas: o algo devuelve el
+        # texto entre vueltas o la manera de cortar es la que rompe» — y quien
+        # contesta no tenia forma de saber en que vuelta esta.
+        try:
+            import glob as _g
+
+            vuelta = 1 + len(_g.glob(
+                contrato.ruta_respuesta("repaso", pieza.slug).replace(
+                    ".respuesta.json", ".*.respuesta.json").replace(
+                    "repaso" + os.sep, "repaso" + os.sep + "usadas" + os.sep)))
+        except Exception:                          # noqa: BLE001
+            vuelta = 1
         datos = {"montaje": filas, "onda": curva, "se_ve": ve,
+                 "libreto": libreto, "evento": evento, "vuelta": vuelta,
                  "precio_vigente": precio,
                  "cierres_en_corpus": cierres,
                  "estructura": (pieza.edl or {}).get("estructura")
@@ -161,15 +203,45 @@ class ServicioRepaso(Servicio):
         # Un borde llega como `tramos` y se aplica por donde ya se aplicaban:
         # `fijar`, que lo mide contra las demas y lo deja declarado. Cortar y
         # mover un borde son las dos mitades de «esto no esta bien cosido».
+        # **Tres tipos, no dos, y el tercero es el que faltaba.**
+        #
+        # El contrato manda «dilo» en cuatro sitios —precio que no cuadra, arco
+        # que no levanta, dato que va a tablero, ningun cierre valido— y no
+        # tenia donde decirlo. Asi que `[]` significaba dos cosas opuestas: «la
+        # pieza esta limpia» y «esta rota y no se arregla cortando». El
+        # consumidor las trataba igual y **una pieza sin CTA salia marcada como
+        # limpia** camino del render.
+        #
+        # Lo dijeron los tres agentes de la primera vuelta, cada uno por su
+        # lado: *«no hay campo para esto sube a Jaime»*. Ahora lo hay, y no
+        # deja pasar la pieza: se anota con su regla y el paso devuelve que no
+        # pudo, que es la verdad.
         bordes = [c for c in (r or []) if c.get("tramos")]
-        cortes = [c for c in (r or []) if not c.get("tramos")]
+        subes = [c for c in (r or []) if not c.get("tramos") and c.get("sube")]
+        cortes = [c for c in (r or []) if not c.get("tramos")
+                  and not c.get("sube") and c.get("ancla")]
         movidos = _mover_bordes(pieza, bordes)
+        for x in subes:
+            revision.anotar(
+                pieza.slug, "otro", None, None, str(x.get("sube"))[:2000],
+                regla=str(x.get("por_que") or "")[:500] or
+                      "lo que no se arregla cortando lo decide Jaime",
+                estado="sube", pasada=2)
         n = redundancia.cargar(pieza.slug, cortes, pasada=2)
         # **Se aplican aqui mismo.** En la fase 5 anotar y aplicar son dos pasos
         # porque entre medias pasan cosas; aqui no queda nada entre el repaso y
         # el corte, y dejarlo anotado sin aplicar seria repetir el fallo que
         # este paso viene a cerrar.
         puestos = revision.aplicar(pieza.slug) if n else 0
+        # **Lo que sube para el paso.** No es un fallo del paso: es el paso
+        # haciendo su trabajo y encontrando algo que no es suyo. Pero la pieza
+        # no avanza, porque avanzar seria publicarlo.
+        if subes:
+            uno = str(subes[0].get("sube"))[:130]
+            resto = f" (+{len(subes) - 1} mas)" if len(subes) > 1 else ""
+            return Resultado(False, motivo=f"sube a Jaime: {uno}{resto}",
+                             salida=f"{len(subes)} cosa(s) que no se arreglan"
+                                    f" cortando, anotadas en revision")
         if not puestos and not movidos:
             return Resultado(True, salida="pieza limpia, sin repeticiones")
         if movidos and not puestos:

@@ -166,6 +166,46 @@ def cierres_en_corpus(margen=14):
     return out
 
 
+def _suena(toma, a, b, hueco=0.35):
+    """Cuanto se OYE en ese tramo, medido sobre la onda y no sobre el texto.
+
+    Regla de Jaime: *«escuchalo tambien, con el whisper no sabes si hay o no
+    sonido»*. Y tiene razon en lo literal: el transcript da palabras, asi que un
+    tramo con cinco segundos mudos dentro se lee como una frase entera. Es lo
+    que dejo el tablero de reel-01 sin explicacion en el segundo 30 y lo que
+    hundio tres etapas en C-114 — el mismo error por dos puertas.
+
+    Lo que mide el hecho es el detector de voz, que corre sobre la onda y vive
+    en `work/cuts/<toma>.json`. De ahi salen tres cosas que el texto no puede
+    dar: cuanto se habla, cuanto se calla, y **donde** estan los huecos, que es
+    lo unico que permite decir «aqui no dice nada» sin oirlo.
+
+    Solo se cuentan los huecos de mas de `hueco` segundos: por debajo de eso es
+    respiracion, no silencio.
+    """
+    import rutas as _ru
+
+    f = os.path.join(_ru.TRABAJO, "cuts", f"{toma}.json")
+    if not os.path.exists(f):
+        return None
+    try:
+        tramos = json.load(open(f, encoding="utf-8"))["segmentos"]
+    except (OSError, KeyError, json.JSONDecodeError):
+        return None
+    dentro = sorted((max(a, x), min(b, y)) for x, y in tramos
+                    if min(b, y) - max(a, x) > 0.01)
+    habla = sum(y - x for x, y in dentro)
+    huecos, cursor = [], a
+    for x, y in dentro:
+        if x - cursor > hueco:
+            huecos.append([round(cursor - a, 2), round(x - a, 2)])
+        cursor = max(cursor, y)
+    if b - cursor > hueco:
+        huecos.append([round(cursor - a, 2), round(b - a, 2)])
+    return {"habla_s": round(habla, 2), "mudo_s": round((b - a) - habla, 2),
+            "huecos": huecos}
+
+
 def dossier(slug, con_voz=True):
     """El texto de la pieza montada, por trozos y en orden, con su entrega.
 
@@ -211,6 +251,8 @@ def dossier(slug, con_voz=True):
                     # deja de ser una sospecha y pasa a ser una propuesta.
                     "antes": _vecinas(cache[toma], rango[0], "antes"),
                     "despues": _vecinas(cache[toma], rango[1], "despues"),
+                    # **Lo que se oye, medido sobre la onda.** Ver `_suena`.
+                    "suena": _suena(toma, rango[0], rango[1]),
                     }
             if con_voz and rango[1] - rango[0] > 0.6:
                 try:

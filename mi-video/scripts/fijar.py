@@ -69,6 +69,53 @@ def fijados(slug):
     return [dict(f) for f in filas]
 
 
+def _a_la_voz(toma, a, b, margen=0.12):
+    """Recorta los bordes de un tramo hasta donde de verdad se habla.
+
+    ## Por que esto no puede ser responsabilidad de quien propone
+
+    Un borde se propone copiando los segundos de una palabra del transcript, y
+    **ese final esta inflado**: el alineador estira la ultima palabra de cada
+    frase sobre el silencio que viene detras. Medido en la cinta de reel-06,
+    `ano` dura de 319,14 a 326,20 —siete segundos para una palabra— y `Ontario.`
+    de 417,89 a 424,20. Copiar ese final es tragarse la pausa entera.
+
+    El resultado no es un corte peor: es una pieza que **se queda muda**. reel-06
+    llevaba 15 s de silencio dentro, dos de ellos con un tablero encima, o sea
+    con el espectador mirando algo que nadie le explica. Y no se ve leyendo el
+    texto, porque por texto la frase esta completa.
+
+    Asi que no se le pide a quien propone que lo tenga en cuenta —eso es un paso
+    que depende de que alguien se acuerde—: se recorta aqui, que es por donde
+    pasan todos los caminos que declaran una etapa. Es C-101 otra vez: cuando
+    dos medidas del mismo hecho discrepan, gana la que mide el hecho. El
+    transcript mide texto y **rellena** los tiempos que no sabe; el detector de
+    voz mide la onda.
+
+    **Solo los bordes.** Un silencio en medio es una pausa del hablante y es
+    suya; quitarla es otra decision y la toma otro paso.
+
+    Devuelve `None` si en ese tramo no se habla en absoluto.
+    """
+    import rutas as _ru
+
+    f = os.path.join(_ru.TRABAJO, "cuts", f"{toma}.json")
+    if not os.path.exists(f):
+        return (a, b)
+    try:
+        voz = json.load(open(f, encoding="utf-8"))["segmentos"]
+    except (OSError, KeyError, json.JSONDecodeError):
+        return (a, b)
+    dentro = [(max(a, x), min(b, y)) for x, y in voz if min(b, y) - max(a, x) > 0.01]
+    if not dentro:
+        return None
+    # `margen` deja respirar el ataque de la primera silaba y la caida de la
+    # ultima: cortar exactamente en la frontera del detector suena amputado.
+    ini = max(a, min(x for x, _ in dentro) - margen)
+    fin = min(b, max(y for _, y in dentro) + margen)
+    return (round(ini, 3), round(fin, 3)) if fin - ini > 0.2 else None
+
+
 def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
     """Declara **cuáles son** los tramos de una etapa. Sustituye lo que hubiera.
 
@@ -98,10 +145,37 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
     """
     import revalidar
 
-    tramos = [(float(a), float(b)) for a, b in tramos if b > a]
-    if not tramos:
+    # **Cada tramo puede traer su cinta.** `[desde, hasta]` usa la de la etapa;
+    # `[desde, hasta, toma]` dice la suya. La columna `corte_fijo.toma` es por
+    # fila desde siempre y `aplicar` ya la respeta fila a fila: lo unico que lo
+    # impedia era esta firma, que aplicaba una sola cinta a toda la lista.
+    #
+    # Y no es un capricho de esquema: es lo que bloqueaba el piso. reel-05 y
+    # reel-06 no podian meter el escalon del precio —«luego sube», que esta en
+    # otra cinta— sin tirar la promesa entera de esa etapa, y sin escalon la
+    # pieza no sale. C-110 ya decia que una etapa puede llevar tramos de dos
+    # cintas; faltaba poder decirlo.
+    puestos = []
+    for t in tramos:
+        a, b = float(t[0]), float(t[1])
+        tk = t[2] if len(t) > 2 and t[2] else toma
+        if b > a:
+            puestos.append((a, b, tk))
+    if not puestos:
         return {"error": f"{slug} e{beat}: no se declara una etapa sin tramos"}
-    veredicto = revalidar.evaluar(slug, int(beat), tramos, toma=toma)
+    tramos = [(*(_a_la_voz(tk, a, b) or (None, None)), tk) for a, b, tk in puestos]
+    tramos = [t for t in tramos if t[0] is not None]
+    if not tramos:
+        return {"error": f"{slug} e{beat}: los tramos propuestos no tienen voz"}
+    # La medida se hace sobre la cinta principal —la que mas segundos aporta—,
+    # que es la que define el timbre de la etapa.
+    _por_cinta = {}
+    for a, b, tk in tramos:
+        _por_cinta[tk] = _por_cinta.get(tk, 0.0) + (b - a)
+    principal = max(_por_cinta, key=_por_cinta.get)
+    veredicto = revalidar.evaluar(slug, int(beat), [(a, b) for a, b, tk in tramos
+                                                   if tk == principal],
+                                  toma=principal)
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     con = _con()
     vid = _vid(con, slug)
@@ -112,7 +186,7 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
     con.executemany(
         "insert into corte_fijo (video_id, papel, orden, desde, hasta, toma,"
         " por_que, quien, fecha) values (?,'etapa',?,?,?,?,?,?,?)",
-        [(vid, int(beat), a, b, toma, por_que, quien, ahora) for a, b in tramos])
+        [(vid, int(beat), a, b, tk, por_que, quien, ahora) for a, b, tk in tramos])
     con.commit()
     con.close()
     return veredicto
@@ -281,6 +355,31 @@ def aplicar(slug):
             det.append({"beat": b, "toma": toma, "texto": texto, "fijado": f["id"],
                         "por_que": f["por_que"]})
         hechos.append(b)
+    # **Una etapa que vuelve al EDL vuelve con su camino.**
+    #
+    # La rama de arriba conserva el detalle entero con `{**d}`; la de abajo
+    # —la que mete una etapa que no estaba— construye un dict pelado, sin
+    # `etapa` ni `trato`. Y sin `trato` el render **para**: «el beat 2 pide el
+    # camino "undefined", que no existe». Paso con reel-04 b2.
+    #
+    # No se inventa aqui: se pregunta a quien lo decidio. `trato.decidido` lee
+    # lo que el paso de descripcion resolvio mirando la pieza entera, y el
+    # nombre de la etapa sale de `etapa`, que es donde vive el frame. Si nadie
+    # lo ha decidido todavia se queda sin poner, que es distinto de ponerlo mal.
+    import trato as _tr
+
+    # El nombre de la etapa vive en el frame y lo pone `beats`; aqui basta con
+    # que no se pierda el que ya trae el detalle. Lo que el render exige y se
+    # perdia es el `trato`.
+    for d in det:
+        b = d.get("beat")
+        if b is None:
+            continue
+        if not d.get("trato"):
+            t, porque = _tr.decidido(slug, b)
+            if t:
+                d["trato"], d["trato_porque"] = t, porque
+
     orden = sorted(range(len(det)), key=lambda i: (det[i].get("beat") or 0,
                                                   segs[i][0]))
     edl["segmentos"] = [segs[i] for i in orden]
