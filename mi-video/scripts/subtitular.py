@@ -22,6 +22,9 @@ import unicodedata
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gpu  # noqa: E402
+
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 FPS = 30
 # Medido sobre render: la Montserrat 800 gasta ~0,70 em por caracter, así que a
@@ -33,7 +36,7 @@ def transcribir(mp4, wav, base):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", mp4,
                     "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav],
                    check=True)
-    subprocess.run([os.path.join(W, "whisper-cli.exe"),
+    subprocess.run(gpu.whisper() + [
                     "-m", os.path.join(W, "ggml-medium.bin"),
                     "-l", "es", "-mc", "0", "-ml", "1", "-sow",
                     "-oj", "-of", base, "-f", wav],

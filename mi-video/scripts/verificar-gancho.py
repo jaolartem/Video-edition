@@ -12,10 +12,12 @@ que **cierre la frase**. Un gancho que corta a mitad de idea no se manda.
 import subprocess, sys, json, os, shutil
 
 sys.path.insert(0, os.path.dirname(__file__))
+import gpu  # noqa: E402
 import rutas  # noqa: E402
 
 WH = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
-MAIN = os.path.join(WH, "whisper-cli.exe")
+# El binario lo elige `gpu.py`, que es el unico que sabe si hay tarjeta.
+MAIN = gpu.whisper()[0]
 MODEL = os.path.join(WH, "ggml-medium.bin")
 VENTANA = 2.0
 # Solape entre ventanas. Sin el, la ULTIMA ventana era el resto —a veces 0,8 s—

@@ -26,15 +26,21 @@ Uso:
 import argparse
 import json
 import subprocess
+import os
+import sys
+
 
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gpu  # noqa: E402
+
 
 W = 480
 
 
 def frame(source, t):
     raw = subprocess.run(
-        ["ffmpeg", "-v", "error", "-ss", str(t), "-i", source,
+        ["ffmpeg", "-v", "error"] + gpu.decodifica() + ["-ss", str(t), "-i", source,
          "-frames:v", "1", "-vf", f"scale={W}:-1,format=gray",
          "-f", "rawvideo", "-"],
         capture_output=True).stdout

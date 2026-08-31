@@ -30,7 +30,11 @@ import os
 import subprocess
 import sys
 
-WHISPER = os.path.join("whisper.cpp", "whisper-cli.exe")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gpu  # noqa: E402
+
+# El binario lo elige `gpu.py`, que es el unico que sabe si hay tarjeta.
+WHISPER = gpu.whisper()[0]
 MODEL = os.path.join("whisper.cpp", "ggml-medium.bin")
 
 

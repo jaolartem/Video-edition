@@ -33,8 +33,13 @@ import argparse
 import json
 import os
 import subprocess
+import sys
+
 
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gpu  # noqa: E402
+
 
 
 def sample_frames(source, times, w=270):
@@ -42,7 +47,7 @@ def sample_frames(source, times, w=270):
     out = []
     for t in times:
         raw = subprocess.run(
-            ["ffmpeg", "-v", "error", "-ss", str(t), "-i", source,
+            ["ffmpeg", "-v", "error"] + gpu.decodifica() + ["-ss", str(t), "-i", source,
              "-frames:v", "1", "-vf", f"scale={w}:-1,format=gray",
              "-f", "rawvideo", "-"],
             capture_output=True,

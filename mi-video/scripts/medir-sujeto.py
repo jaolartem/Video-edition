@@ -30,6 +30,12 @@ import subprocess
 
 import numpy as np
 from scipy.ndimage import uniform_filter
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gpu  # noqa: E402
+
 
 
 def sample(source, t0, t1, n=14, w=270):
@@ -37,7 +43,7 @@ def sample(source, t0, t1, n=14, w=270):
     out = []
     for t in times:
         raw = subprocess.run(
-            ["ffmpeg", "-v", "error", "-ss", f"{t}", "-i", source,
+            ["ffmpeg", "-v", "error"] + gpu.decodifica() + ["-ss", f"{t}", "-i", source,
              "-frames:v", "1", "-vf", f"scale={w}:-1,format=gray",
              "-f", "rawvideo", "-"], capture_output=True).stdout
         if not raw:
