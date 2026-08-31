@@ -92,7 +92,7 @@ if __name__ == "__main__":
         ["ffprobe", "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height,r_frame_rate:format=duration",
          "-of", "default=nw=1:nk=1", args.video],
-        capture_output=True, text=True).stdout.split()
+        capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
     W, H = int(probe[0]), int(probe[1])
     num, den = probe[2].split("/")
     fps = float(num) / float(den)

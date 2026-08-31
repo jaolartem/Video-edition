@@ -90,7 +90,44 @@ class ServicioRepaso(Servicio):
             cierres = redundancia.cierres_en_corpus()
         except Exception:                          # noqa: BLE001
             cierres = []
-        datos = {"montaje": filas, "onda": curva,
+        # **Lo que se VE en cada etapa, para que el corte no lo deje huerfano.**
+        #
+        # Este paso decidia mirando solo lo que se oye, y un tablero es una
+        # promesa: ensena una comparacion, una cifra o un mecanismo que la voz
+        # tiene que sostener. Cortar la frase que lo sostiene deja la pieza mas
+        # limpia y el tablero sin explicacion.
+        #
+        # Lo vio Jaime en el reel-01, segundo 30: *«no dice nada, el tablero
+        # perdio su explicacion, pareciera que no se reviso el audio; eso es
+        # responsabilidad de la ultima revision»*. Y tenia razon en las dos
+        # mitades — el corte era correcto por texto (quitaba un fragmento roto)
+        # y dejaba a la etapa sin decir con que compara sus 25-30 mil.
+        #
+        # El contrato ya pedia juzgar «lo que se oye contra lo que se ve» y
+        # nunca se le habia dado lo que se ve. Tres agentes lo dijeron el mismo
+        # dia: *«no hay ni un tablero ni un subtitulo en `datos`»*.
+        try:
+            import sqlite3 as _sq
+
+            _c = _sq.connect("ads/decisiones.db")
+            _c.row_factory = _sq.Row
+            ve = [dict(r) for r in _c.execute(
+                # **`grafico` es lo que se ve.** Sin el, `se_ve` no servia
+                # para lo unico que motivo crearlo: `que_pasa` es la narrativa
+                # de la etapa, y el tablero vive en `grafico` —«Sobre negro, en
+                # versales: NO ES MALA SUERTE»—. 53 de 54 filas lo tienen.
+                #
+                # Y sin filtro: `remedio` guarda 'ninguno' como texto, asi que
+                # `is not null` no descartaba nada y ademas escondia por diseno
+                # la etapa sin remedio anotado, que es justo una que hay que ver.
+                "select etapa_orden, remedio, trato, componente, grafico,"
+                " sonido, que_pasa, integridad"
+                " from escena_desc where video_slug = ?"
+                " order by etapa_orden", (pieza.slug,))]
+            _c.close()
+        except Exception:                          # noqa: BLE001
+            ve = []
+        datos = {"montaje": filas, "onda": curva, "se_ve": ve,
                  "precio_vigente": precio,
                  "cierres_en_corpus": cierres,
                  "estructura": (pieza.edl or {}).get("estructura")
@@ -183,9 +220,20 @@ def _mover_bordes(pieza: Pieza, bordes) -> int:
         # ponia al lado. reel-05 acabo diciendo su cierre dos veces y la pieza
         # paso de 105 a 157 s sin que fallara nada. `declarar` recibe la lista y
         # borra dentro, para que no dependa de que quien llama se acuerde.
-        fijar.declarar(pieza.slug, int(beat), toma, tramos,
-                       (b.get("por_que") or "borde movido en el repaso")[:200],
-                       quien="repaso")
+        # **Y se cuenta lo que de verdad se escribio.** `declarar` rechaza un
+        # tramo invertido y devuelve `error` sin tocar nada; esto sumaba igual
+        # y anunciaba «1 borde movido» con cero filas escritas — y con eso la
+        # pieza daba otra vuelta del ciclo sin haber cambiado.
+        #
+        # El `por_que` va entero. Estaba cortado a 200 caracteres y de los 39
+        # bordes reales **34 pasan de 200**: se tiraba la mitad del diagnostico
+        # justo donde el contrato pide decir de donde venia el fallo, que es lo
+        # que convierte un rescate en un arreglo. `corte_fijo.por_que` es TEXT.
+        vd = fijar.declarar(pieza.slug, int(beat), toma, tramos,
+                            (b.get("por_que") or "borde movido en el repaso")[:1000],
+                            quien="repaso")
+        if (vd or {}).get("error"):
+            continue
         n += 1
     if n:
         fijar.aplicar(pieza.slug)

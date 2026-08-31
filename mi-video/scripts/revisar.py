@@ -113,7 +113,7 @@ def main():
             r = subprocess.run(
                 ["ffmpeg", "-v", "error", "-y", "-ss", f"{ini:.3f}",
                  "-i", fuente, "-t", f"{dur:.3f}", "-c", "copy", salida],
-                capture_output=True, text=True)
+                capture_output=True, text=True, encoding="utf-8", errors="replace")
             if r.returncode != 0 or not os.path.exists(salida):
                 registro.error("revisar", "no se pudo recortar del render",
                                detalle=f"{slug} etapa {orden}: {(r.stderr or '')[-140:]}")

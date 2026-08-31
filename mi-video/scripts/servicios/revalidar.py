@@ -148,10 +148,37 @@ def aplicar(pieza: Pieza, veredictos) -> str:
             # **La lista entera, de una vez.** Antes esto borraba a mano y luego
             # fijaba en bucle; el borrado vive ahora dentro de `declarar`, que
             # es donde no se puede olvidar (ver su docstring).
-            toma = v.get("toma") or (pieza.edl or {}).get("detalle", [{}])[0].get("toma")
-            fijar.declarar(pieza.slug, beat, toma, nuevos,
-                           (v.get("edicion") or v.get("por_que") or "")[:200],
-                           quien="revalidado")
+            # **La cinta del BEAT, no la del primer segmento del EDL.**
+            # `detalle[0]` es el primer trozo de la pieza y sirve solo si toda
+            # la pieza es de una cinta. reel-01 tiene tres, asi que cualquier
+            # respuesta con `tramos` declaraba segundos de una cinta con el
+            # nombre de otra — el mismo fallo de C-115, reintroducido en el
+            # lado de la escritura despues de arreglarlo en el de la medida.
+            toma = v.get("toma") or next(
+                (d.get("toma") for d in (pieza.edl or {}).get("detalle", [])
+                 if d.get("beat") == beat), None)
+            if not toma:
+                registro.aviso(
+                    "revalidar", "no se sabe de que cinta es la etapa",
+                    detalle=f"{pieza.slug} e{beat}: llega `tramos` y ni la"
+                            f" respuesta ni el EDL dicen la toma. No se declara.")
+                continue
+            # **Y el veredicto de la medida no se tira.** El contrato promete
+            # «la maquina vuelve a medir lo que propongas y te dira si gano»:
+            # `declarar` lo devuelve y aqui se perdia, asi que se aplicaba un
+            # corte medido como peor sin que nadie se enterara.
+            vd = fijar.declarar(pieza.slug, beat, toma, nuevos,
+                                (v.get("edicion") or v.get("por_que") or "")[:1000],
+                                quien="revalidado")
+            if (vd or {}).get("error"):
+                registro.aviso("revalidar", "tramo rechazado al declarar",
+                               detalle=f"{pieza.slug} e{beat}: {vd['error']}")
+                continue
+            if (vd or {}).get("veredicto") == "peor":
+                registro.aviso(
+                    "revalidar", "se declaro un tramo que mide peor",
+                    detalle=f"{pieza.slug} e{beat}: marca {vd.get('marca')},"
+                            f" margen {vd.get('margen')}. Cambiar por cambiar.")
             cambiados += 1
         # **Un falso positivo que no cambia nada no es una decision: es un
         # aviso perdido.** Marcarlo solo escribe en `descartado` y deja la pieza

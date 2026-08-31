@@ -231,8 +231,19 @@ class ServicioScript(Servicio):
             partes = ["node"] + partes
         elif partes[0].endswith(".sh"):
             partes = ["bash"] + partes
+        # **Las dos mitades del mismo acuerdo.** `PYTHONIOENCODING` dice al
+        # hijo que escriba UTF-8 y hacia falta la otra: sin `encoding` aqui,
+        # el padre decodifica con la pagina de codigos de Windows y **un paso
+        # que imprime una tilde mata la linea entera**. Paso al renderizar
+        # reel-05: la fuente del umbral traia comillas angulares y el montaje
+        # murio con UnicodeDecodeError sin producir un solo fichero.
+        #
+        # `errors="replace"` porque esto es el canal de diagnostico: perder un
+        # caracter de un mensaje es barato, perder el mensaje entero —y con el,
+        # el motivo por el que un paso no pudo— es lo que deja una pieza parada
+        # sin nadie sepa por que.
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
-        r = subprocess.run(partes, capture_output=True, text=True, env=env)
+        r = subprocess.run(partes, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
         salida = (r.stdout or "") + (r.stderr or "")
         if r.returncode == 0:
             return Resultado(True, salida=salida)

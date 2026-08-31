@@ -39,7 +39,7 @@ BASE = "ads/decisiones.db"
 def _commit():
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                              capture_output=True, text=True,
+                              capture_output=True, text=True, encoding="utf-8", errors="replace",
                               cwd="..").stdout.strip()
     except Exception:                              # noqa: BLE001
         return "?"

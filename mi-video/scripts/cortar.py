@@ -137,7 +137,7 @@ def main():
                 + ["-ss", str(d), "-i", src,
                    "-t", str(round(h - d, 3)),
                    "-vf", "format=yuv420p," + filtro, *ENCODE, salida],
-                capture_output=True, text=True)
+                capture_output=True, text=True, encoding="utf-8", errors="replace")
             if r.returncode != 0 or not os.path.exists(salida):
                 registro.error("cortar", "no se pudo cortar el fragmento",
                                toma=toma,
@@ -146,7 +146,7 @@ def main():
             dur = float(subprocess.run(
                 ["ffprobe", "-v", "error", "-show_entries", "format=duration",
                  "-of", "csv=p=0", salida], capture_output=True,
-                text=True).stdout.strip() or 0)
+                text=True, encoding="utf-8", errors="replace").stdout.strip() or 0)
             # **Se comprueba que existe y cuanto dura**, no solo que ffmpeg
             # dijera que si: es la leccion de C-11, donde un fallo rapido se
             # midio como render rapido porque nadie miro el fichero.

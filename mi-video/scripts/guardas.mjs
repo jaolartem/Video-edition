@@ -137,6 +137,61 @@ for (const e of entradas) {
   }
 }
 
+/**
+ * **Dos entradas con el mismo numero, y las citas que apuntan a ellas.**
+ *
+ * Lo pidio Jaime despues de fusionar dos ramas: *«cada C-NN citado en docs/
+ * tiene que existir; es la misma idea que guardas.mjs ya aplica a los ficheros,
+ * aplicada a los numeros»*.
+ *
+ * Y hay que mirar las dos cosas, porque la cara es la primera. Las dos ramas
+ * partieron de un log que llegaba a C-81 y las dos escribieron un **C-82
+ * distinto**: la colision existia antes de renumerar, y si hubiera fallado el
+ * build ahi, no habria hecho falta perseguir punteros despues.
+ *
+ * Lo que hace cara a la segunda es lo que dijo el: *«no son enlaces muertos,
+ * son enlaces a otra cosa que tambien parece plausible»*. Un puntero a C-82 que
+ * sobrevive a la renumeracion sigue resolviendo — a la correccion equivocada, y
+ * sin romper nada. Por eso la cita muerta se denuncia y la viva no se puede
+ * comprobar sola: lo unico que la evita es no dejar que dos entradas compartan
+ * numero.
+ */
+{
+  const vistos = new Map();
+  for (const e of entradas) {
+    if (vistos.has(e.num)) {
+      fallos.push(
+        `C-${e.num} esta dos veces en el log: «${vistos.get(e.num)}» y ` +
+          `«${e.titulo}». Renumera una y mueve lo que la cite: mientras ` +
+          `compartan numero, cada puntero apunta a las dos.`,
+      );
+    }
+    vistos.set(e.num, e.titulo);
+  }
+
+  const sitios = [LOG, path.join(RAIZ, "docs")];
+  const ficheros = [];
+  for (const sitio of sitios) {
+    if (!fs.existsSync(sitio)) continue;
+    if (fs.statSync(sitio).isDirectory()) {
+      for (const f of fs.readdirSync(sitio)) {
+        if (f.endsWith(".md")) ficheros.push(path.join(sitio, f));
+      }
+    } else ficheros.push(sitio);
+  }
+  for (const f of new Set(ficheros)) {
+    const txt = fs.readFileSync(f, "utf8");
+    for (const m of txt.matchAll(/C-(\d{2,3})/g)) {
+      if (!vistos.has(m[1])) {
+        fallos.push(
+          `${path.relative(RAIZ, f)} cita C-${m[1]} y esa correccion no ` +
+            `existe en el log.`,
+        );
+      }
+    }
+  }
+}
+
 console.log(
   `guardas: ${entradas.length} correcciones · ${comprobadas} agujas · ` +
   `${fallos.length ? `${fallos.length} ROTAS` : "todas en pie"}`,

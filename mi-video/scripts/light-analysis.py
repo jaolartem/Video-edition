@@ -63,7 +63,7 @@ def sample(video):
         ["ffmpeg", "-v", "error"] + gpu.decodifica() + ["-i", video,
          "-vf", f"fps=1/{SAMPLE_EVERY_S},scale=320:-1,signalstats,metadata=print:file=-",
          "-f", "null", "-"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     rows, cur = [], {}
     for line in proc.stdout.splitlines():

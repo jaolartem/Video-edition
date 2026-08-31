@@ -25,7 +25,7 @@ VENTANA = 6.0
 def dur(p):
     return float(subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", p], capture_output=True, text=True).stdout.strip())
+         "-of", "csv=p=0", p], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip())
 
 
 def oir(p, ini, fin):
@@ -37,7 +37,7 @@ def oir(p, ini, fin):
     r = subprocess.run(gpu.whisper() + ["-m",
                         os.path.join(W, "ggml-medium.bin"), "-l", "es",
                         "-mc", "0", "-nt", "-f", WAV],
-                       capture_output=True, text=True,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace",
                        encoding="utf-8", errors="replace")
     return " ".join(r.stdout.split())
 

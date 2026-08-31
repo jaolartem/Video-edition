@@ -143,7 +143,7 @@ def exportar(n):
 def duracion(f):
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", f], capture_output=True, text=True)
+         "-of", "csv=p=0", f], capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:
         return float(out.stdout.strip())
     except ValueError:

@@ -41,7 +41,7 @@ MUCHAS_PIEZAS = 3
 
 def cambios():
     r = subprocess.run(["git", "status", "--porcelain"],
-                       capture_output=True, text=True, cwd=RAIZ)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=RAIZ)
     return [ln[3:].strip().strip('"') for ln in r.stdout.splitlines() if ln.strip()]
 
 

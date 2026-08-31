@@ -33,7 +33,7 @@ def detect_silences(wav, noise_db, min_dur):
     proc = subprocess.run(
         ["ffmpeg", "-v", "info", "-i", wav,
          "-af", f"silencedetect=noise={noise_db}dB:d={min_dur}", "-f", "null", "-"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     silences, start = [], None
     for line in proc.stderr.splitlines():
@@ -50,7 +50,7 @@ def duration(wav):
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
          "-of", "csv=p=0", wav],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     return float(out.stdout.strip())
 

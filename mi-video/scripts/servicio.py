@@ -52,6 +52,29 @@ sys.path.insert(0, os.path.dirname(__file__))
 RAIZ = "work/servicio"
 
 
+# Entre el piso y el contrato del paso, para que se lean como dos bloques.
+SEPARA = chr(10) * 2 + "---" + chr(10) * 2
+
+PISO = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "docs", "piso.md")
+_piso_cache = None
+
+
+def _piso():
+    """El minimo que toda pieza tiene que cumplir, para todos los pasos.
+
+    Se lee del fichero y no se copia: un criterio que vive en cinco sitios es
+    cinco criterios en cuanto alguien toca uno.
+    """
+    global _piso_cache
+    if _piso_cache is None:
+        try:
+            _piso_cache = io.open(PISO, encoding="utf-8").read().strip()
+        except OSError:
+            _piso_cache = ""
+    return _piso_cache
+
+
 def _dir(paso):
     d = os.path.join(RAIZ, paso)
     os.makedirs(d, exist_ok=True)
@@ -79,6 +102,18 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # signifique algo. Reescribiendolo en cada corrida, el pedido era siempre
     # mas nuevo que cualquier respuesta y no habia forma de saber si la
     # respuesta contestaba a ESTA pregunta o a la de hace dos vueltas.
+    # **El piso va delante de todo prompt, y por un solo sitio.**
+    #
+    # Jaime: *«redundancia y fuentes debe estar en todos los contratos»*. La
+    # forma equivocada de hacer eso es copiar la prosa en los cinco ficheros:
+    # se desincronizan, y entonces cinco pasos juzgan lo mismo con criterios
+    # distintos — que es justo lo que el dijo que no puede ser estable.
+    #
+    # `docs/piso.md` es el minimo que no se puede evitar, con sus palabras, y se
+    # antepone aqui. Cambiarlo cambia los cinco contratos a la vez, que es lo
+    # unico que mantiene un criterio siendo uno.
+    if _piso():
+        prompt = _piso() + SEPARA + prompt
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
                         "datos": payload}, ensure_ascii=False, indent=1)
     try:
@@ -210,7 +245,7 @@ def _hay_cli():
     """
     try:
         out = subprocess.run(["claude", "-p", "ok", "--output-format", "json"],
-                             capture_output=True, text=True, timeout=40)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40)
         d = json.loads(out.stdout or "{}")
         return not d.get("is_error")
     except Exception:                              # noqa: BLE001
@@ -222,7 +257,7 @@ def _por_cli(prompt, payload):
         out = subprocess.run(
             ["claude", "-p", "--output-format", "json"],
             input=f"{prompt}\n\n---\n\n{json.dumps(payload, ensure_ascii=False)}",
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
         d = json.loads(out.stdout or "{}")
         if d.get("is_error"):
             return None

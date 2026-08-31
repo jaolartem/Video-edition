@@ -259,7 +259,7 @@ if __name__ == "__main__":
     probe = json.loads(subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height", "-of", "json", args.source],
-        capture_output=True, text=True).stdout)
+        capture_output=True, text=True, encoding="utf-8", errors="replace").stdout)
     sw, sh = probe["streams"][0]["width"], probe["streams"][0]["height"]
     # El movil graba vertical con metadato de rotacion: ffmpeg lo endereza al
     # decodificar, asi que el frame real es el alto por el ancho.
