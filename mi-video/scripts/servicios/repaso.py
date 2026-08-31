@@ -59,16 +59,15 @@ class ServicioRepaso(Servicio):
         filas = redundancia.dossier(pieza.slug)
         if not filas:
             return Resultado(True, salida="sin material que repasar")
-        prompt = (open(redundancia.PROMPT, encoding="utf-8").read()
-                  + "\n\n---\n\n## Esta es la SEGUNDA pasada, sobre la pieza cosida\n\n"
-                    "Lo que ves es el montaje final, tal y como va a sonar. La\n"
-                    "primera pasada ya quito lo que se repetia entonces; lo que\n"
-                    "quede aqui **nacio despues**: de una etapa reconstruida, de\n"
-                    "un cambio de toma, o de una costura nueva.\n\n"
-                    "Asi que no busques lo mismo otra vez. Lee la pieza seguida y\n"
-                    "pregunta lo unico que importa a estas alturas: **¿algo se\n"
-                    "dice dos veces, o alguna costura dejo una palabra suelta?**\n"
-                    "Si esta limpia, devuelve `[]` — que es la respuesta normal.")
+        # **Tiene su propio contrato, y no es el de redundancia.** Jaime:
+        # *«la revision de redundancia es revision de composicion, logica,
+        # libreto, tono: es tu revision final»*. Reusar el prompt de la fase 5
+        # pedia buscar frases repetidas, que es una de las cinco cosas que hay
+        # que mirar aqui y la menos grave de todas.
+        prompt = open(
+            os.path.join(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__))), "repaso.prompt.md"),
+            encoding="utf-8").read()
         r = contrato.pedir("repaso", pieza.slug, prompt, filas)
         if r is None:
             return Resultado(
@@ -87,5 +86,12 @@ class ServicioRepaso(Servicio):
         # texto ya no es el que se juzgo, y describir sobre un texto viejo es el
         # fallo que este paso viene a cerrar. Jaime: *«asegurate de hacerlo
         # ciclico: si no pasa redundancia, no se compone»*.
+        # **Y se dice lo que significa.** Jaime: *«si no pasa perfecta, no
+        # hiciste un buen trabajo»*. Un corte aqui no es este paso funcionando:
+        # es este paso rescatando algo que tenia que haber llegado limpio. Que
+        # el numero salga en el parte es lo que impide que el rescate se vuelva
+        # rutina — un paso que siempre corta algo deja de ser una red y pasa a
+        # ser parte del proceso, y entonces nadie arregla lo que lo llena.
         return Resultado(True, volver_a="cosido",
-                         salida=f"{puestos} corte(s) aplicados")
+                         salida=f"{puestos} corte(s) aplicados — la pieza no"
+                                f" llego limpia, mira que paso antes")
