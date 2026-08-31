@@ -181,7 +181,13 @@ ${fuentes.length ? fuentes.join("\n") : "- Ningún tablero muestra cifras."}
   fs.mkdirSync(rutas.destino, { recursive: true });
   fs.writeFileSync(out, md);
   console.log(
-    `${r.id}: ${r.duracion.toFixed(1)}s${r.duracion > INDICACION.ad ? " 🛑" : r.duracion > INDICACION.reel ? " (no cabe como reel)" : ""} · CTA ${r.cta ? "1" : "0"} · ` +
+    // **Se dice que CABE, no sólo dónde no cabe.** Ponía «(no cabe como reel)»
+    // a secas y eso se lee como un defecto: yo mismo se lo reporté a Jaime
+    // como problema en tres piezas y su respuesta fue *«son ads, están bien»*.
+    // Lo eran, y el código ya lo sabía —el 🛑 sólo salta por encima de los
+    // 120 s de un ad—; lo que fallaba era la frase. Un aviso que se lee como
+    // alarma cuando no lo es enseña a ignorar los avisos.
+    `${r.id}: ${r.duracion.toFixed(1)}s${r.duracion > INDICACION.ad ? " 🛑 pasa de ad" : r.duracion > INDICACION.reel ? " (ad sí, reel no)" : ""} · CTA ${r.cta ? "1" : "0"} · ` +
       `cifras ${pedidas.length - faltan.length}/${pedidas.length}` +
       `${faltan.length ? ` ⚠️ faltan ${faltan.join(", ")}` : ""}`,
   );

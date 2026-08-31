@@ -1237,10 +1237,13 @@ DISENO = Contrato(
     unidad="tablero, con la pieza entera delante",
     llave="etapa_orden",
     envoltura=("pieza", "tableros"),
-    valida=Aguja("scripts/servicio.py", "def recoger(",
-                 pendiente="validar contra `contratos.por_paso('disenar')` y"
-                           " contra los topes de `src/brand/copy.ts`, que hoy"
-                           " fallan en el render y no al recibir la respuesta"),
+    valida=Aguja("scripts/reels-spec.mjs", "for (const m of revisarTablero(b.kind, b.props))",
+                 pendiente="mover la comprobacion al momento de RECOGER la"
+                           " respuesta. Hoy corre al armar el spec, que es"
+                           " mucho antes del render —y ahi ya evita la corrida"
+                           " muerta— pero despues de que el diseñador se haya"
+                           " ido: no puede corregir lo suyo, lo corrige quien"
+                           " monta"),
     momentos=(
         Momento("disenado", 7.5,
                 trae=("encargo", "canon", "otras_etapas", "topes"),

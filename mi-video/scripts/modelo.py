@@ -390,6 +390,27 @@ CICLO = [
     (8, "cortado", "scripts/cortar.py {n}"),
     (10, "verificado", "scripts/verificar.py {n}"),
     (11, "montado", "scripts/montar.sh {n}"),
+    # **Nivelar y medir el sonido son pasos de la linea, no algo que yo haga
+    # despues.** Regla de Jaime, y viene de verme hacerlo a mano: *«integra todo
+    # al contrato, no debe ser por fuera del pipeline para la proxima»*.
+    #
+    # Los dos existian como scripts sueltos —`sonoridad.sh` desde hace dias,
+    # `suena.py` desde hoy— y **no los llamaba nadie**, que en este proyecto
+    # significa que no existen: los seis salian a −10 LUFS con pico +0,1 dBTP y
+    # la tabla `medicion` llevaba seis tipos declarados y cero filas.
+    #
+    # Van ANTES de `revisado` a proposito: el criterio humano es el escalon mas
+    # caro, y gastarlo en una pieza a un nivel que la plataforma va a cambiar es
+    # pedirle que juzgue algo que no es lo que se publica.
+    #
+    # Nivelar **no es «audio adicional»** —eso son la musica y los efectos, que
+    # siguen fuera hasta que apruebe—: es dejar la pieza donde las plataformas
+    # normalizan, para que el nivel sea una decision del montaje y no de donde
+    # se publique.
+    (11.2, "nivelado", "scripts/sonoridad.sh {n}"),
+    # Y medir como suena, que es lo unico que tengo en lugar de oido. Jaime:
+    # *«no se escucha con subtitulos, el sonido no es escrito»*.
+    (11.4, "medido", "scripts/suena.py {n} --guardar"),
     # **El criterio humano es el escalon mas caro, y por eso va aqui.** Jaime:
     # *«lo mas caro es criterio humano, por eso es el paso anterior a la
     # aprobacion»*. Mirar una pieza montada cuesta su tiempo y su atencion, asi

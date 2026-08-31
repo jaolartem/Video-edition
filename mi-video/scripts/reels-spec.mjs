@@ -17,6 +17,7 @@ import fs from "fs";
 import { execFileSync } from "child_process";
 import { DatabaseSync } from "node:sqlite";
 import { construir, revisarPieza, sonidosMudos } from "./caminos.mjs";
+import { revisarTablero } from "./formas.mjs";
 
 const FPS = 30;
 /**
@@ -852,10 +853,16 @@ const PANELES = {
    * - **Beat 3 anuncia** el tablero de las dos trayectorias. Un grafico que
    *   aparece es una promesa, asi que entra justo antes y le entrega el cuadro.
    *   No repite el tablero: pone la cifra y deja que el tablero la desarrolle.
-   * - **Beat 5 acompana.** Ahi no hay tablero que anunciar, hay algo que
-   *   sostener: es la demolicion de la objecion —*«no importa si usted es
-   *   blanco, negro, azul o canadiense de quinta generacion»*— y el panel dice
-   *   el mecanismo mientras el sigue en cuadro.
+   * - **Beat 5 se quedo SIN panel**, y lo decidio Jaime: *«quita el Tarjeta del
+   *   beat 5»*. Este panel se escribio cuando ahi no habia tablero que anunciar
+   *   —solo la demolicion de la objecion, que habia que sostener mientras el
+   *   seguia en cuadro—. Al describir la escena, el paso de diseno puso un
+   *   `BeliefSwap` en ese mismo beat, asi que el panel dejo de acompanar y paso
+   *   a competir: dos capas subrayando en el mismo segundo, que es exactamente
+   *   lo que la nota del beat 6 prohibe tres lineas mas abajo.
+   *
+   *   Es la senal de que un literal por pieza envejece: se escribio cuando la
+   *   pieza no tenia composicion y siguio ahi cuando si la tuvo.
    *
    * El beat 6 se queda **sin panel a proposito**: lleva la marca de humanidad
    * («comercio» que se lee FINANZAS) y la regla es un beat, un tratamiento. Dos
@@ -866,11 +873,6 @@ const PANELES = {
       { texto: "De cada $100", placa: "c7-orbit" },
       { texto: "$21 de diferencia", fuerte: true },
       { texto: "Vendiendo lo mismo", placa: "r2-horizontes" },
-    ] },
-    { beat: 5, bloques: [
-      { texto: "No es de dónde viene", placa: "c3-routes-vertical" },
-      { texto: "Es la estructura", fuerte: true },
-      { texto: "Nadie se la explicó", placa: "c1-extraction-vertical" },
     ] },
   ],
   /**
@@ -1707,6 +1709,25 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
    * —reel-07 hoy— y cuando se usa se dice, porque una pieza que se monta desde
    * el código es una pieza que no responde a las correcciones.
    */
+  /**
+   * **`escena_desc.tablero` tiene DOS lectores, y sólo uno dibuja un tablero.**
+   *
+   * El otro es `copyDeclarado()` en `caminos.mjs`: el gancho tipográfico declara
+   * ahí la palabra que sale en pantalla —`{"kind":"tipo","props":{"texto":…}}`—
+   * porque `describir.mjs` lo exige por su nombre («escríbelo en
+   * `escena_desc.tablero`, que es de donde lo lee el render»). Eso es copy de
+   * una capa que va **encima de la cara**, no un tablero que sustituye el plano.
+   *
+   * Sin esta guarda, esa fila entraba aquí igual y salía como `board` en el
+   * segundo 0,0: `Ad.tsx` no reconoce el `kind`, cae en `TwoPaths` por defecto y
+   * revienta al leer `byDefault.steps`. O sea, declarar el gancho como pedía el
+   * paso anterior tumbaba el render de la pieza entera.
+   *
+   * Así que aquí sólo pasan los `kind` que `Ad.tsx` sabe dibujar. Lo que no
+   * pasa no se pierde en silencio: se dice, y entonces es un encargo de código
+   * —una forma que hace falta construir— y no un tablero roto.
+   */
+  const DIBUJA = new Set(["causal", "comparacion", "acumulacion", "twopaths"]);
   const deLaBase = (() => {
     try {
       const filas = db.prepare(
@@ -1717,11 +1738,108 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
       return filas.map((f) => {
         const t = JSON.parse(f.tablero);
         return { beat: Number(f.etapa_orden), kind: t.kind, props: t.props };
+      }).filter((b) => {
+        // **El tablero se comprueba contra SU forma, y aqui dentro.**
+        //
+        // Jaime: *«integra todo al contrato, no debe ser por fuera del pipeline
+        // para la proxima»*. Esto lo corri a mano una vez y caza justo lo que
+        // no avisa: `reel-04 e3` traia una premisa de 54 caracteres contra un
+        // tope de 42 y `assertShort` **tumba el render** —no advierte— con las
+        // seis piezas ya cortadas. Encontrarlo aqui cuesta milisegundos;
+        // encontrarlo alli cuesta la corrida entera.
+        //
+        // Tambien dice cuando un tablero usa props que su forma no declara, que
+        // es la deriva que `formas.mjs` viene a parar: `BeliefSwap` se pidio
+        // cinco veces con 18 props distintos y ni uno en comun.
+        for (const m of revisarTablero(b.kind, b.props))
+          faltas.push(`${slug} e${b.beat}: ${m}`);
+        return true;
+      }).filter((b) => {
+        // **Ya NO se descarta lo que no tiene componente propio.**
+        //
+        // Este filtro era la desconexión: dejaba pasar cuatro formas y tiraba
+        // las otras diecinueve con un `console.log` que nadie leía. Resultado
+        // medido: 29 de 38 tableros declarados no salían en pantalla, y por eso
+        // tres ciclos de cambios duros entregaron el mismo vídeo. Jaime: *«lo
+        // que hace el diseñador no llega a renderizarse»*, *«hay que conectar
+        // al diseñador con el render»*.
+        //
+        // Ahora `Ad.tsx` dibuja cualquier forma declarada: la que tiene
+        // componente propio con él, y el resto con `TableroDeclarado`, que pone
+        // su copy con la jerarquía y la familia que el diseñador escribió. Que
+        // exista un componente a medida pasa a ser una mejora, no el requisito
+        // para aparecer.
+        //
+        // `tipo` sigue fuera: es el gancho, lo consume `caminos.mjs` como copy
+        // del bloque tipográfico y aquí saldría repetido encima de sí mismo.
+        if (b.kind === "tipo") return false;
+        if (!DIBUJA.has(b.kind))
+          console.log(
+            `    ${slug} e${b.beat}: «${b.kind}» sale con TableroDeclarado;` +
+            ` construir su componente es una mejora, no un bloqueo.`,
+          );
+        return true;
       });
     } catch {
       return [];
     }
   })();
+  /**
+   * **Lo que el diseñador declaró tiene que llegar a la pantalla, y se cuenta.**
+   *
+   * Regla de Jaime, después de tres ciclos de cambios duros entregando el mismo
+   * vídeo: *«lo que hace el diseñador no llega a renderizarse»*, *«hay que
+   * conectar al diseñador con el render»*, *«deja de medir contra lo que
+   * producen y mide contra los videos»*.
+   *
+   * El fallo pudo durar tres ciclos por una razón concreta: **nadie comparaba
+   * las dos cifras**. La base decía 38 tableros descritos y la pantalla mostraba
+   * 9, y como cada lado informaba de lo suyo, los dos parecían correctos. Yo
+   * mismo reporté «36/36 tableros hechos» leyendo la base.
+   *
+   * Esto compara lo declarado con lo emitido y nombra la diferencia. No hace
+   * falta que alguien se acuerde de mirarlo: sale como falta, con la etapa y la
+   * forma, cada vez que se arma el spec.
+   */
+  const declarados = db.prepare(
+    "select count(*) n from escena_desc where video_slug = ?" +
+    " and tablero is not null and tablero <> ''",
+  ).get(slug)?.n ?? 0;
+  /**
+   * **Lo que sale de un literal escrito a mano se dice, cada vez.**
+   *
+   * Jaime, cerrando el diagnóstico: *«estaba conectada a un "arreglo" hecho a
+   * mano por fuera del pipeline»*. Eso es exactamente lo que eran `PANELES`,
+   * `LINEAS` y `TARJETAS`: parches escritos en este fichero que acabaron siendo
+   * **la fuente** de lo que se ve. El diseñador no los escribe, no los puede
+   * tocar, y llevaban cinco ciclos idénticos mientras todo lo demás cambiaba.
+   *
+   * No se pueden quitar hoy sin dejar esas piezas sin nada. Lo que sí se puede
+   * es que **dejen de ser invisibles**: mientras un elemento salga de un
+   * literal, el montaje lo cuenta con su nombre. Un parche declarado es deuda;
+   * un parche callado es la fuente de verdad de facto.
+   */
+  const literales = [
+    ["paneles", (PANELES[slug] ?? []).length],
+    ["rotulo del gancho", (LINEAS[slug] ?? []).length ? 1 : 0],
+    ["tarjetas", (TARJETAS[slug] ?? []).length],
+  ].filter(([, n]) => n > 0);
+  if (literales.length) {
+    faltas.push(
+      `${slug}: ${literales.map(([q, n]) => `${n} ${q}`).join(", ")} salen de ` +
+      `un literal de \`reels-spec.mjs\`, no del diseñador — re-describir la ` +
+      `pieza no los cambia.`,
+    );
+  }
+
+  if (declarados > deLaBase.length) {
+    faltas.push(
+      `${slug}: el diseñador declaró ${declarados} tablero(s) y sólo ` +
+      `${deLaBase.length} llegan al render. Lo que no llega no se ve y no ` +
+      `avisa: es la diferencia entre corregir y entregar.`,
+    );
+  }
+
   if (!deLaBase.length && (TABLEROS[slug] ?? []).length) {
     faltas.push(
       `${slug}: el tablero se monta desde el literal de \`reels-spec.mjs\`, no ` +

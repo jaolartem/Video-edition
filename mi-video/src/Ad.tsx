@@ -10,6 +10,7 @@ import { CausalChain, type CausalChainProps } from "./components/CausalChain";
 import { Comparacion, type ComparacionProps } from "./components/Comparacion";
 import { Acumulacion, type AcumulacionProps } from "./components/Acumulacion";
 import { TwoPaths, type TwoPathsProps } from "./components/TwoPaths";
+import { TableroDeclarado } from "./components/TableroDeclarado";
 import { CaptionBand, type Compuesto } from "./components/CaptionBand";
 import { color } from "./brand/tokens";
 import { mode as modes, type Mode } from "./brand/tokens";
@@ -26,7 +27,22 @@ export type BoardCue =
   | { at: number; duration: number; kind: "causal"; props: CausalChainProps }
   | { at: number; duration: number; kind: "twopaths"; props: TwoPathsProps }
   | { at: number; duration: number; kind: "comparacion"; props: ComparacionProps }
-  | { at: number; duration: number; kind: "acumulacion"; props: AcumulacionProps };
+  | { at: number; duration: number; kind: "acumulacion"; props: AcumulacionProps }
+  /**
+   * **Cualquier otra forma que el diseñador declare.**
+   *
+   * Regla de Jaime: *«hay que conectar al diseñador con el render»*, después de
+   * tres ciclos de cambios duros con el mismo vídeo. La causa era ésta: la unión
+   * tenía cuatro miembros, el diseño usó veintitrés, y las otras diecinueve
+   * caían por el final del ternario **sin dibujar nada y sin decirlo**.
+   *
+   * Cerrar la lista aquí convertía el catálogo de componentes en el techo del
+   * diseño. Ahora la forma declarada entra siempre: si tiene componente propio
+   * lo usa, y si no, `TableroDeclarado` dibuja su copy con la jerarquía y la
+   * familia que el diseñador puso. Que exista un componente a medida es una
+   * mejora, no el requisito para aparecer.
+   */
+  | { at: number; duration: number; kind: string; props: Record<string, unknown> };
 
 export type CaptionCue = {
   at: number;
@@ -147,13 +163,23 @@ export const Ad: React.FC<AdProps> = ({
               frameworks distintos hace que los cuatro se vean iguales, y
               entonces el tablero deja de significar nada. */}
           {cue.kind === "causal" ? (
-            <CausalChain {...cue.props} mode={cue.props.mode ?? mode} />
+            <CausalChain {...(cue.props as CausalChainProps)} mode={mode} />
           ) : cue.kind === "comparacion" ? (
-            <Comparacion {...cue.props} />
+            <Comparacion {...(cue.props as ComparacionProps)} />
           ) : cue.kind === "acumulacion" ? (
-            <Acumulacion {...cue.props} />
+            <Acumulacion {...(cue.props as AcumulacionProps)} />
+          ) : cue.kind === "twopaths" ? (
+            <TwoPaths {...(cue.props as TwoPathsProps)} mode={mode} />
           ) : (
-            <TwoPaths {...cue.props} mode={cue.props.mode ?? mode} />
+            /* **Y lo demás también se dibuja.** Aquí caían diecinueve formas
+               declaradas por el diseñador y no salía nada — ni en pantalla ni
+               en el log. `TwoPaths` era el `else`, así que una forma que no
+               fuera ninguna de las tres primeras se intentaba dibujar como dos
+               trayectorias y reventaba o salía vacía. */
+            <TableroDeclarado
+              kind={cue.kind}
+              props={cue.props as Record<string, unknown>}
+            />
           )}
         </Sequence>
       ))}
