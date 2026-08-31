@@ -389,13 +389,32 @@ def contorno(toma, a, b):
     recorrido amplio si deriva despacio de grave a agudo, y sonar plana igual.
     Para saber si hay *cambio de tono* hace falta el contorno, no su rango.
     """
-    wav = f"{rutas.TEMPORAL}/exp.wav"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(a), "-to", str(b),
-                    "-i", f"{rutas.ORIGEN}/{toma}.mp4", "-ar", "16000", "-ac", "1",
-                    "-c:a", "pcm_s16le", wav], check=True)
+    # **Un fichero por llamada, no uno para todas.** Esto escribia siempre
+    # `exp.wav`, y con dos procesos midiendo a la vez —la linea avanzando piezas
+    # en segundo plano y una consulta a mano— uno lee lo que el otro esta
+    # escribiendo: `EOFError` en mitad de una corrida, intermitente y sin decir
+    # de donde viene. Aparecio tres veces esta sesion antes de que mirara el
+    # nombre del fichero.
+    #
+    # El nombre lleva el proceso y el tramo, asi que dos medidas nunca compiten
+    # y ademas se puede saber de quien es un temporal que quedo suelto.
     import wave
-    with wave.open(wav) as w:
-        x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(float)
+
+    wav = (f"{rutas.TEMPORAL}/f0-{os.getpid()}-"
+           f"{abs(hash((toma, round(a, 2), round(b, 2)))) % 10**8}.wav")
+    try:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(a), "-to", str(b),
+                        "-i", f"{rutas.ORIGEN}/{toma}.mp4", "-ar", "16000", "-ac", "1",
+                        "-c:a", "pcm_s16le", wav], check=True)
+        with wave.open(wav) as w:
+            x = np.frombuffer(w.readframes(w.getnframes()),
+                              dtype=np.int16).astype(float)
+    finally:
+        # No se deja basura: son cientos de recortes por corrida.
+        try:
+            os.remove(wav)
+        except OSError:
+            pass
     if x.size < 16000:
         return None
     # F0 por autocorrelacion en ventanas de 40 ms.
