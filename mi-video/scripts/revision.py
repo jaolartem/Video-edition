@@ -196,6 +196,38 @@ def _por_ancla(edl, ancla, slug="", cual=1):
     return None
 
 
+def _retirar_fijados(slug, edl, antes):
+    """Una etapa que se corta entera **deja de estar declarada**.
+
+    Sin esto los dos mecanismos se pelean y gana el que corre despues. La nota
+    dice «esta seccion sobra» y `corte_fijo` sigue diciendo «esta etapa es este
+    tramo», asi que `fijar.aplicar` la vuelve a meter en la corrida siguiente —
+    y lo hace en silencio, porque desde su punto de vista esta cumpliendo.
+
+    Paso con el reel-01: Jaime pidio sacar el mecanismo entero, la nota lo
+    corto, y la pieza volvio a salir con el dentro y ocho segundos mas larga.
+
+    Retirar la declaracion no es perder el registro: la nota de corte queda, con
+    su porque y su ancla, y es la que explica por que esa etapa ya no esta.
+    """
+    import sqlite3 as _sq
+
+    vivos = {d.get("beat") for d in edl.get("detalle", [])}
+    fuera = [b for b in antes if b is not None and b not in vivos]
+    if not fuera:
+        return 0
+    con = _sq.connect(BASE)
+    con.executemany(
+        "delete from corte_fijo where papel='etapa' and orden = ?"
+        " and video_id = (select id from video where slug = ?)",
+        [(b, slug) for b in fuera])
+    con.commit()
+    con.close()
+    print(f"  {slug}: etapa(s) {sorted(fuera)} fuera de la pieza —"
+          f" se retira su declaracion para que no vuelvan")
+    return len(fuera)
+
+
 def slug_de(edl):
     return edl.get("slug") or edl.get("video_slug") or ""
 
@@ -212,6 +244,8 @@ def aplicar(slug, ver=False):
     if not os.path.exists(ruta):
         return 0
     edl = json.load(open(ruta, encoding="utf-8"))
+    # Que etapas habia ANTES de cortar, para saber cual desaparecio.
+    _beats_antes = {d.get("beat") for d in edl.get("detalle", [])}
     # **Los cortes se re-aplican, no se dan por hechos.** `seleccionar.py`
     # regenera el EDL desde cero en cada corrida, asi que un corte «ya aplicado»
     # desaparece en la siguiente y la correccion se pierde sin que nadie se
@@ -333,6 +367,9 @@ def aplicar(slug, ver=False):
     edl["revision"] = rev
     json.dump(edl, open(ruta, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
+    # Si algun corte se llevo una etapa entera, su declaracion se retira: si no,
+    # `fijar` la vuelve a meter en la corrida siguiente y el corte se deshace.
+    _retirar_fijados(slug, edl, _beats_antes)
     for nid, d, h, que in hechos:
         con.execute("update revision set estado='aplicada' where id=?", (nid,))
     con.commit()
