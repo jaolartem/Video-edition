@@ -764,7 +764,11 @@ def afinar(toma, tramos, pasadas=4):
     # hueco: la cinta pierde ese trozo y todo lo que dependa de el se queda sin
     # texto. Medido: `20260825_135637` con seis huecos, y ocho de los once
     # trozos del reel-01 sin una sola palabra.
-    hechos, nuevas, tocados = [], [], 0
+    # `hechos` son los tramos cuyas palabras se SUSTITUYEN; `oidos`, todos los
+    # que pasaron por el modelo bueno — incluidos aquellos en los que se decidio
+    # quedarse con lo viejo. Son cosas distintas y hacen falta las dos: lo
+    # primero manda el borrado, lo segundo es lo que la puerta pregunta.
+    hechos, oidos, nuevas, tocados = [], [], [], 0
     for a, b in tramos:
         va, vb = a_voz(a), a_voz(max(a, b - 0.01))
         if va is None or vb is None:
@@ -790,6 +794,16 @@ def afinar(toma, tramos, pasadas=4):
             if dentro and not alucinado(txt) and not atascado(dentro):
                 cands.append({"texto": txt, "ws": dentro, "borde": 0.0})
         if not cands:
+            # **Y no se calla.** Este `continue` era la unica salida muda del
+            # afinado: si las cuatro pasadas salian vacias, alucinadas o
+            # atascadas, la funcion devolvia «0 afinados» sin decir de que
+            # tramo ni por que. Eso bloquea la linea entera, porque la puerta
+            # de composicion exige el CC afinado y no hay forma de saber que
+            # falta: paso con el remate del reel-01 traido de otra cinta.
+            registro.aviso("transcribir", "ningun candidato sobrevivio",
+                           toma=toma,
+                           detalle=f"{a:.2f}-{b:.2f}: {pasadas} pasadas, todas"
+                                   f" vacias, alucinadas o atascadas", eco=True)
             continue
         elegido, acuerdo = medoide(cands)
         # **Y no se acepta si trae menos de lo que se va a llevar.**
@@ -809,6 +823,13 @@ def afinar(toma, tramos, pasadas=4):
                            toma=toma,
                            detalle=f"{a:.2f}-{b:.2f}: {len(viejas)} palabras ->"
                                    f" {len(elegido['ws'])}", eco=False)
+            # **Pero el tramo queda oido.** Se paso por el modelo bueno y la
+            # decision fue conservar lo que habia, que es un resultado del
+            # afinado y no una ausencia de el. Sin esto la puerta de
+            # composicion pedia el barrido caro, el barrido se negaba a empeorar
+            # el texto, y la pieza se quedaba trabada entre las dos — le paso al
+            # remate del reel-01 traido de otra cinta.
+            oidos.append((a, b))
             continue
         for w in elegido["ws"]:
             ini = a_cinta(w["a"], mapa)
@@ -827,6 +848,11 @@ def afinar(toma, tramos, pasadas=4):
                               f" ({len(cands)} pasadas)")
 
     if not nuevas:
+        if oidos:
+            d["afinado"] = sorted(set(
+                [tuple(x) for x in d.get("afinado", [])] + oidos))
+            json.dump(d, open(ruta, "w", encoding="utf-8"),
+                      ensure_ascii=False, indent=1)
         return d, 0
     # **La costura duplica si no se corta por los dos lados.** Se quitaban las
     # palabras viejas cuyo CENTRO caia dentro del tramo, pero las nuevas se
@@ -865,7 +891,7 @@ def afinar(toma, tramos, pasadas=4):
     d["segmentos"] = sin_fantasmas(fuera + nuevas)
     d["afinado"] = sorted(set(tuple(t) for t in
                               [tuple(x) for x in d.get("afinado", [])] +
-                              [tuple(t) for t in hechos]))
+                              [tuple(t) for t in hechos] + oidos))
     json.dump(d, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return d, tocados
 

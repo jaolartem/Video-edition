@@ -80,10 +80,44 @@ def exportar(n):
     sys.path.insert(0, os.path.dirname(__file__))
     import rutas as _ru
     edl = json.load(open(ruta, encoding="utf-8"))
+    # **La voz se exporta del PLAN, que es lo que se renderiza.**
+    #
+    # Salia del EDL, y el EDL no es la pieza: `plan-reel` quita el aire de cada
+    # corte antes de repartirlo en escenas. Medido en reel-01: el wav duraba
+    # 109,2 s y el video 100,9. Eso no es un detalle de contabilidad — este wav
+    # se manda a limpiar fuera y **vuelve para pegarse encima del montaje**, asi
+    # que ocho segundos de mas significan que la voz limpia entra desfasada y
+    # creciendo, que es exactamente el fallo que costo C-97 por la puerta de las
+    # capas. Jaime lo vio al instante: *«entonces si no cuadra»*.
+    #
+    # Si no hay plan todavia se cae al EDL, que es mejor que no exportar nada.
+    plan = None
+    try:
+        plan = json.load(open(f"work/scenes/{slug}/plan-full.json",
+                              encoding="utf-8"))["escenas"]
+    except Exception:                              # noqa: BLE001
+        plan = None
+    if plan:
+        # Las escenas del plan no llevan de que cinta salen, asi que se resuelve
+        # **por contenido**: la escena cae dentro del corte del EDL que la
+        # engendro, y ese corte si sabe su cinta. Por indice no vale — el plan
+        # parte un corte en varias escenas, asi que las listas no se
+        # corresponden. Y con el remate del reel-01 viniendo de otra cinta, dar
+        # por hecha la del reel seria traerse el audio equivocado.
+        def _toma(e):
+            for (x, y), d in zip(edl["segmentos"], edl["detalle"]):
+                if e["origen_desde"] >= x - 0.05 and e["origen_hasta"] <= y + 0.05:
+                    return d.get("toma")
+            return edl["detalle"][0].get("toma")
+
+        pares = [([e["origen_desde"], e["origen_hasta"]], {"toma": _toma(e)})
+                 for e in plan]
+    else:
+        pares = list(zip(edl["segmentos"], edl["detalle"]))
     os.makedirs("out/audio-voz", exist_ok=True)
     os.makedirs("F:/tmp-video/voz", exist_ok=True)
     trozos = []
-    for i, (r, d) in enumerate(zip(edl["segmentos"], edl["detalle"])):
+    for i, (r, d) in enumerate(pares):
         f = f"F:/tmp-video/voz/{slug}-{i:03d}.wav"
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-ss", str(r[0]),
