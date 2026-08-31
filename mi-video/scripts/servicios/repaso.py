@@ -122,7 +122,7 @@ class ServicioRepaso(Servicio):
                 # la etapa sin remedio anotado, que es justo una que hay que ver.
                 "select etapa_orden, remedio, trato, componente, grafico,"
                 " sonido, que_pasa, integridad"
-                " from escena_desc where video_slug = ?"
+                " from escena_desc where video_id = (select id from video where slug = ?)"
                 " order by etapa_orden", (pieza.slug,))]
             _c.close()
         except Exception:                          # noqa: BLE001

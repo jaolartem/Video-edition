@@ -567,7 +567,7 @@ def main():
             # seguir anotando no cambia nada: el handicap ya esta puesto y la
             # que mas comunique se queda igual.
             ya = con.execute(
-                "select count(*) from descartado where video_slug=? and etapa_orden=?",
+                "select count(*) from descartado where video_id=(select id from video where slug = ?) and etapa_orden=?",
                 (slug, beat)).fetchone()[0]
             if ya >= 2:
                 print(f"    (ya se descartaron {ya} para esta etapa: se queda"
@@ -575,8 +575,9 @@ def main():
                 continue
             if r:
                 con.execute(
-                    "insert or replace into descartado (video_slug, etapa_orden,"
-                    " desde, hasta, motivo, fecha) values (?,?,?,?,?,?)",
+                    "insert or replace into descartado (video_id, etapa_orden,"
+                    " desde, hasta, motivo, fecha) values"
+                    " ((select id from video where slug = ?),?,?,?,?,?)",
                     (slug, beat, brutos.get(beat, (0, 0))[0],
                      brutos.get(beat, (0, 0))[1],
                      f"mensaje roto: {rotas}/{costuras} costuras saltan idea,"

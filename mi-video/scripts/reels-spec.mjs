@@ -1739,8 +1739,8 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
    * enfasis, es ruido.
    */
   for (const row of db
-    .prepare("select corrige_dice, corrige_es from escena_desc" +
-             " where video_slug = ? and corrige_dice is not null")
+    .prepare("select dice as corrige_dice, es as corrige_es from enmienda" +
+             " where video_id = (select id from video where slug = ?)")
     .all(slug)) {
     let puesta = false;
     marca.captions = marca.captions.map((c) => {
@@ -1786,7 +1786,8 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
   const caminos = (() => {
     const desc = Object.fromEntries(
       db
-        .prepare("select * from escena_desc where video_slug = ?")
+        .prepare("select * from escena_desc where video_id ="
+                 + " (select id from video where slug = ?)")
         .all(slug)
         .map((r) => [r.etapa_orden, r]),
     );

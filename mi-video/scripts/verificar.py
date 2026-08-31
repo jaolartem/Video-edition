@@ -73,7 +73,7 @@ def revisar(slug):
     dice = Pieza(int(slug[-2:])).texto
     filas = con.execute(
         "select etapa_orden, sobre_texto, integridad, remedio from escena_desc"
-        " where video_slug = ?", (slug,)).fetchall()
+        " where video_id = (select id from video where slug = ?)", (slug,)).fetchall()
     if not filas:
         mal.append(f"{slug}: sin descripción de escena — corre el paso 4")
     else:
@@ -153,7 +153,7 @@ def revisar(slug):
     try:
         _c = sqlite3.connect(BASE)
         for (q,) in _c.execute(
-                "select que from revision where video_slug = ? and accion='cortar'"
+                "select que from revision where video_id = (select id from video where slug = ?) and accion='cortar'"
                 " and estado='aplicada' and regla='seccion que sobra'", (slug,)):
             for _b in re.findall(r"e(\d+)", q or ""):
                 quitadas.add(int(_b))
@@ -247,7 +247,7 @@ def revisar(slug):
     except Exception:                              # noqa: BLE001
         _h = None
     pend = con.execute(
-        "select count(*) from revision where video_slug = ? and accion='cortar'"
+        "select count(*) from revision where video_id = (select id from video where slug = ?) and accion='cortar'"
         " and estado='pendiente' and huella is ?", (slug, _h)).fetchone()[0]
     if pend:
         mal.append(f"{slug}: {pend} corte(s) de revisión sin aplicar")

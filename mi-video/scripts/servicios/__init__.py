@@ -11,6 +11,7 @@ tabla — así los pasos que aún no se han envuelto siguen funcionando y la
 migración es gradual, que es la única manera de no rehacer la máquina.
 """
 from .base import Espera, Pieza, Resultado, Servicio, ServicioScript  # noqa: F401
+from .coser import ServicioCoser
 from .redundancia import ServicioRedundancia
 from .repaso import ServicioRepaso
 from .revalidar import ServicioRevalidar
@@ -19,6 +20,7 @@ from .verificar import ServicioVerificar
 # Los que ya son objetos. El resto entra por `ServicioScript` con la plantilla
 # que diga la tabla `fase`.
 REGISTRO: dict[str, Servicio] = {
+    "cosido": ServicioCoser(),
     "sin_redundancia": ServicioRedundancia(),
     "repasado": ServicioRepaso(),
     "revalidado": ServicioRevalidar(),

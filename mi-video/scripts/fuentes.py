@@ -72,11 +72,12 @@ def dossier(slug):
     con = _con()
     filas = con.execute(
         "select e.orden, l.texto as libreto, d.trato, d.grafico, d.que_pasa,"
-        "       d.corrige_dice, d.corrige_es"
+        "       n.dice as corrige_dice, n.es as corrige_es"
         "  from etapa e"
         "  join video v on v.id = e.video_id"
         "  left join libreto l on l.video_id = v.id and l.orden = e.orden"
         "  left join escena_desc d on d.video_id = v.id and d.etapa_orden = e.orden"
+        "  left join enmienda n on n.video_id = v.id and n.etapa_orden = e.orden"
         " where v.slug = ? order by e.orden", (slug,)).fetchall()
     con.close()
     out = []

@@ -119,8 +119,9 @@ def aplicar(pieza: Pieza, veredictos) -> str:
             continue
         if v.get("falso_positivo"):
             con.execute(
-                "insert or replace into descartado (video_slug, etapa_orden,"
-                " desde, hasta, motivo, fecha) values (?,?,?,?,?,?)",
+                "insert or replace into descartado (video_id, etapa_orden,"
+                " desde, hasta, motivo, fecha) values"
+                " ((select id from video where slug = ?),?,?,?,?,?)",
                 (pieza.slug, beat, v.get("desde") or 0, v.get("hasta") or 0,
                  "falso positivo al revalidar: "
                  + (v.get("por_que") or "")[:120], ahora))
@@ -203,7 +204,7 @@ def aplicar(pieza: Pieza, veredictos) -> str:
         if v.get("compone"):
             con.execute(
                 "update escena_desc set remedio = coalesce(remedio,'tablero')"
-                " where video_slug = ? and etapa_orden = ?", (pieza.slug, beat))
+                " where video_id = (select id from video where slug = ?) and etapa_orden = ?", (pieza.slug, beat))
             componen += 1
     con.commit()
     con.close()

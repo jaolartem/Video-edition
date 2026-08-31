@@ -648,7 +648,7 @@ CORTE = Contrato(
         Clave("falso_positivo",
               dispara=(Aguja("scripts/servicios/revalidar.py", "insert or replace into descartado"),
                        Aguja("scripts/seleccionar.py",
-                             "select etapa_orden, desde, hasta from descartado where video_slug = ?")),
+                             "select etapa_orden, desde, hasta from descartado where video_id = (select id from video where slug = ?)")),
               efecto="descarta ese tramo para que la selección tome la siguiente"
                      " candidata",
               exige_ademas=("desde", "hasta"),
@@ -878,8 +878,8 @@ COMPONE = Contrato(
               nota="Texto libre: lo que `sonidoDe` no reconozca cae en silencio."
                    " O es lista cerrada, o `sonidoDe` avisa."),
         Clave("corrige",
-              dispara=(Aguja("scripts/reels-spec.mjs", "select corrige_dice, corrige_es from escena_desc"),
-                       Aguja("scripts/fuentes.py", "d.corrige_dice, d.corrige_es")),
+              dispara=(Aguja("scripts/reels-spec.mjs", "select dice as corrige_dice, es as corrige_es from enmienda"),
+                       Aguja("scripts/fuentes.py", "n.dice as corrige_dice, n.es as corrige_es")),
               efecto="coloca la corrección sobre la línea de CC y falla el build"
                      " si no encuentra las palabras",
               nota="NO ESTÁ EN `CAMPOS`: no se valida, no se exige, y una"

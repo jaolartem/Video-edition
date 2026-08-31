@@ -95,9 +95,9 @@ def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
     except Exception:                              # noqa: BLE001
         _huella = None
     con.execute(
-        "insert into revision (video_slug, huella, pasada, desde_s, hasta_s, ancla,"
+        "insert into revision (video_id, huella, pasada, desde_s, hasta_s, ancla,"
         " cual, accion, que, regla, estado, fecha)"
-        " values (?,?,?,?,?,?,?,?,?,?,?,?)",
+        " values ((select id from video where slug = ?),?,?,?,?,?,?,?,?,?,?,?)",
         (slug, _huella, pasada, desde, hasta, ancla, int(cual or 1), accion, que,
          regla, estado, datetime.datetime.now().isoformat(timespec="seconds")))
     con.commit()
@@ -257,7 +257,7 @@ def aplicar(slug, ver=False):
     ya = set(edl.get("revision", {}).get("notas_aplicadas") or [])
     con = _con()
     notas = [n for n in con.execute(
-        "select * from revision where video_slug = ? and accion = 'cortar'"
+        "select * from revision where video_id = (select id from video where slug = ?) and accion = 'cortar'"
         " and estado in ('pendiente','aplicada') order by desde_s",
         (slug,)).fetchall() if n["id"] not in ya]
     if not notas:
@@ -381,8 +381,9 @@ def aplicar(slug, ver=False):
 
 def ver(reels=None):
     con = _con()
-    filas = con.execute("select * from revision order by video_slug, pasada,"
-                        " desde_s").fetchall()
+    filas = con.execute("select r.*, v.slug as video_slug from revision r"
+                        " join video v on v.id = r.video_id"
+                        " order by v.slug, r.pasada, r.desde_s").fetchall()
     con.close()
     if reels:
         slugs = {f"reel-{int(n):02d}" for n in reels}

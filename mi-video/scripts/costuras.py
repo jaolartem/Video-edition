@@ -764,7 +764,7 @@ def arreglar(slug, ver=False):
 
             cx = sqlite3.connect("ads/decisiones.db")
             compone = {r[0] for r in cx.execute(
-                "select etapa_orden from escena_desc where video_slug = ?"
+                "select etapa_orden from escena_desc where video_id = (select id from video where slug = ?)"
                 " and componente is not null", (slug,))}
             cx.close()
         except Exception:                          # noqa: BLE001
@@ -802,6 +802,45 @@ def arreglar(slug, ver=False):
     print(f"{slug}: {total} empalmes · {movidas} movidas · {len(duras)} a disimular")
 
 
+def coser(slug, ver=False):
+    """El paso completo de la fase `cosido`, entero y en un sitio.
+
+    Estaba dentro de `main()`, asi que la fase solo se podia correr
+    lanzando un proceso con sus argumentos. Sacarlo aqui no cambia lo que
+    hace —son las mismas seis llamadas en el mismo orden— y permite que
+    `ServicioCoser` lo llame como lo que es: una funcion.
+    """
+    # **El paso completo, que es lo que corre la fase `cosido`.**
+    #
+    # Estaba a medias: la fase solo movia costuras, y las garantias
+    # —que ningun corte caiga dentro de una palabra, que dos trozos no
+    # se pisen, que no quede un resto sin palabras— solo corrian si
+    # alguien las lanzaba a mano. O sea que **no corrian**: el remate
+    # del gancho de reel-01 volvio a quedar cortado dentro de «suerte»
+    # despues de cada arreglo, y habia que descubrirlo mirando.
+    #
+    # Van antes del optimizador y en este orden: primero se deja el
+    # corte sano, luego se busca que la union suene bien. Al reves, el
+    # optimizador afina una costura que despues se mueve.
+    # **`bordes` NO va aqui, y es a proposito.** Decide —si la palabra
+    # de delante es la cabeza que falta o la cola de otra idea— y eso
+    # es criterio: Jaime lo saco del automatismo *«el detector apunta y
+    # tu decidas caso a caso»*. Metido en la fase, deshacia las
+    # decisiones del paso anterior: devolvia «Yo conte» al gancho y
+    # «500,» al beat del precio, y la pieza volvia a repetirse.
+    #
+    # Aqui solo lo que es aritmetica y no puede equivocarse.
+    sin_solapes(slug, ver=ver)
+    palabras_enteras(slug, ver=ver)
+    # Despues de cuadrar los bordes a palabra entera, porque es ese
+    # ajuste el que deja el corte pegado al ataque.
+    ataques(slug, ver=ver)
+    # Y fuera el aire de los bordes, que es donde estaba.
+    colas(slug, ver=ver)
+    mudos(slug, ver=ver)
+    arreglar(slug, ver=ver)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
@@ -822,35 +861,7 @@ def main():
             sin_solapes(slug, ver=a.ver)
             palabras_enteras(slug, ver=a.ver)
         else:
-            # **El paso completo, que es lo que corre la fase `cosido`.**
-            #
-            # Estaba a medias: la fase solo movia costuras, y las garantias
-            # —que ningun corte caiga dentro de una palabra, que dos trozos no
-            # se pisen, que no quede un resto sin palabras— solo corrian si
-            # alguien las lanzaba a mano. O sea que **no corrian**: el remate
-            # del gancho de reel-01 volvio a quedar cortado dentro de «suerte»
-            # despues de cada arreglo, y habia que descubrirlo mirando.
-            #
-            # Van antes del optimizador y en este orden: primero se deja el
-            # corte sano, luego se busca que la union suene bien. Al reves, el
-            # optimizador afina una costura que despues se mueve.
-            # **`bordes` NO va aqui, y es a proposito.** Decide —si la palabra
-            # de delante es la cabeza que falta o la cola de otra idea— y eso
-            # es criterio: Jaime lo saco del automatismo *«el detector apunta y
-            # tu decidas caso a caso»*. Metido en la fase, deshacia las
-            # decisiones del paso anterior: devolvia «Yo conte» al gancho y
-            # «500,» al beat del precio, y la pieza volvia a repetirse.
-            #
-            # Aqui solo lo que es aritmetica y no puede equivocarse.
-            sin_solapes(slug, ver=a.ver)
-            palabras_enteras(slug, ver=a.ver)
-            # Despues de cuadrar los bordes a palabra entera, porque es ese
-            # ajuste el que deja el corte pegado al ataque.
-            ataques(slug, ver=a.ver)
-            # Y fuera el aire de los bordes, que es donde estaba.
-            colas(slug, ver=a.ver)
-            mudos(slug, ver=a.ver)
-            arreglar(slug, ver=a.ver)
+            coser(slug, ver=a.ver)
 
 
 if __name__ == "__main__":

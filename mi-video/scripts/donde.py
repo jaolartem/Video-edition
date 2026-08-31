@@ -65,7 +65,7 @@ def estado(slug):
         "select * from publicacion where version_id = ?",
         (ult["id"],)).fetchone() if ult else None
     pend = con.execute(
-        "select count(*) from revision where video_slug = ? and accion='cortar'"
+        "select count(*) from revision where video_id = (select id from video where slug = ?) and accion='cortar'"
         " and estado='pendiente'", (slug,)).fetchone()[0]
     con.close()
     # **La huella dice si el corte se movió desde la versión registrada.** Es la

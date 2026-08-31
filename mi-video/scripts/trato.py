@@ -120,7 +120,7 @@ def densidad(slug, orden, base="ads/decisiones.db"):
     import sqlite3
     con = sqlite3.connect(base)
     r = con.execute("select nivel, figura, por_que from densidad"
-                    " where video_slug = ? and etapa_orden = ?",
+                    " where video_id = (select id from video where slug = ?) and etapa_orden = ?",
                     (slug, orden)).fetchone()
     con.close()
     return r if r else (None, None, "sin juzgar")
@@ -153,7 +153,7 @@ def decidido(slug, orden, base="ads/decisiones.db"):
     con = sqlite3.connect(base)
     try:
         r = con.execute("select trato, trato_porque from escena_desc"
-                        " where video_slug = ? and etapa_orden = ?",
+                        " where video_id = (select id from video where slug = ?) and etapa_orden = ?",
                         (slug, orden)).fetchone()
     except sqlite3.OperationalError:      # base vieja, sin la columna
         r = None

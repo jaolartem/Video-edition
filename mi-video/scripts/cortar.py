@@ -110,8 +110,13 @@ def main():
             salida = os.path.join(carpeta, nombre + ".mp4")
             filtro = filtro_de(slug, d, h)
             hue = huella(toma, d, h, filtro)
-            ya = con.execute("select fichero, por_que from paso where fragmento_id = ?",
-                             (fid,)).fetchone()
+            # **La huella se busca por fragmento Y por fase.** `paso` guarda
+            # ahora una fila por fase, no una por fragmento, asi que sin la
+            # fase esto leeria la de otro paso y saltaria un corte que si
+            # habia que rehacer.
+            ya = con.execute("select fichero, huella from paso"
+                             " where fragmento_id = ? and fase_id = ?",
+                             (fid, fases["cortado"])).fetchone()
             if (not a.todo and ya and ya[1] == hue and os.path.exists(salida)):
                 saltados += 1
                 continue
@@ -155,10 +160,10 @@ def main():
                                detalle=f"{slug} {nombre}: {dur:.2f}s de {h - d:.2f}s")
             con.execute(
                 "insert into paso (fragmento_id, fase_id, fichero, duracion,"
-                " por_que, fecha) values (?,?,?,?,?,?)"
-                " on conflict(fragmento_id) do update set fase_id=excluded.fase_id,"
+                " huella, fecha) values (?,?,?,?,?,?)"
+                " on conflict(fragmento_id, fase_id) do update set"
                 " fichero=excluded.fichero, duracion=excluded.duracion,"
-                " por_que=excluded.por_que, fecha=excluded.fecha",
+                " huella=excluded.huella, fecha=excluded.fecha",
                 (fid, fases["cortado"], salida, round(dur, 3), hue, ahora))
             hechos += 1
         con.commit()

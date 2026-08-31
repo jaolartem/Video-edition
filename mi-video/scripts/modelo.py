@@ -443,9 +443,38 @@ def validar():
     for t in POR_SLUG:
         if t in hay:
             cols = {r[1] for r in con.execute(f"pragma table_info({t})")}
+            pk = [r[1] for r in con.execute(f"pragma table_info({t})") if r[5]]
             if "video_id" not in cols:
                 mal.append(f"«{t}» refiere al video por texto y no por clave"
                            f" (2NF)")
+            elif "video_slug" in cols:
+                # **La columna vieja no es inofensiva mientras siga ahi.** Con
+                # el slug en la clave compuesta, `video_id` depende de parte de
+                # la clave: eso es 2FN. Y peor, nadie rellena `video_id` en los
+                # INSERT nuevos, asi que las filas de esta semana nacen sin el.
+                sueltas = con.execute(
+                    f"select count(*) from {t} where video_id is null"
+                ).fetchone()[0]
+                forma = "2NF" if "video_slug" in pk else "3NF"
+                mal.append(
+                    f"«{t}» arrastra `video_slug` junto a `video_id` ({forma}),"
+                    f" y {sueltas} de sus filas tienen `video_id` nulo")
+    if "revision" in hay:
+        cols = {r[1] for r in con.execute("pragma table_info(revision)")}
+        if "regla_id" in cols:
+            mal.append("«revision.regla_id» no lo escribe ningun script y no"
+                       " coincide con `revision.regla` en las filas que lo"
+                       " tienen: una columna que contesta plausible y falso")
+    if "paso" in hay:
+        pk = [r[1] for r in con.execute("pragma table_info(paso)") if r[5]]
+        if pk == ["fragmento_id"]:
+            mal.append("«paso» solo cabe un paso por fragmento: cada fase pisa"
+                       " a la anterior y el historial no existe")
+    if "escena_desc" in hay:
+        cols = {r[1] for r in con.execute("pragma table_info(escena_desc)")}
+        if "corrige_dice" in cols:
+            mal.append("«escena_desc» lleva dentro la enmienda de un dato"
+                       " (`corrige_dice`/`corrige_es`), que es otra entidad")
     vivas = [t for t in MUERTAS if t in hay]
     if vivas:
         mal.append(f"tablas vacias y sin uso, confunden el esquema: {vivas}")
@@ -528,6 +557,217 @@ def _corte_fijo_etapa(con):
     return True
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Cerrar las migraciones a medias. Ver docs/auditoria.md
+# ─────────────────────────────────────────────────────────────────────────
+#
+# `video_id` se anadio a cuatro tablas y `video_slug` se conservo «por
+# compatibilidad». Eso deja dos cosas, y la segunda no es deuda ordenada sino
+# averia: con el slug DENTRO de la clave compuesta, `video_id` depende de parte
+# de la clave y no de la clave entera —**2FN, por debajo del piso**— y sobre
+# todo, `migrar()` rellenaba `video_id` **una sola vez**, al crear la columna.
+# Los INSERT de `revision.py` y `depurar.py` siguen escribiendo el slug, asi que
+# cada fila nueva nace sin la clave que manda: medido, `descartado` con
+# `video_id` nulo en 24 de 24 y `revision` en 197 de 262.
+#
+# Se cierra ahora porque **donde hay valor, discrepa en 0 filas**: la migracion
+# es mecanica hoy y sera una reparacion de datos el dia que no lo sea.
+
+
+def _rehacer(con, tabla, ddl, columnas, indices=()):
+    """Reconstruye una tabla entera. SQLite no sabe cambiar una clave primaria.
+
+    Es el mismo patron que `_corte_fijo_etapa`, sacado aparte porque ahora lo
+    usan cinco tablas. Las claves foraneas se apagan durante el cambio: con
+    ellas puestas, el `DROP` intermedio ve un estado que no existira medio
+    segundo despues.
+    """
+    cols = ", ".join(columnas)
+    con.execute("pragma foreign_keys = off")
+    con.executescript(
+        f"CREATE TABLE {tabla}_nuevo ({ddl});\n"
+        f"INSERT INTO {tabla}_nuevo ({cols}) SELECT {cols} FROM {tabla};\n"
+        f"DROP TABLE {tabla};\n"
+        f"ALTER TABLE {tabla}_nuevo RENAME TO {tabla};\n"
+        + "".join(f"{i};\n" for i in indices))
+    con.execute("pragma foreign_keys = on")
+
+
+def _enmienda(con, hay):
+    """`corrige_dice`/`corrige_es` salen de `escena_desc` a su propia tabla.
+
+    Son otra cosa: no describen la escena, corrigen un dato que se dice — *«dice
+    comercio, es Finanzas»*. Aparecen y desaparecen juntas y estan en el 11% de
+    las filas. Un par opcional con vida propia dentro de una tabla de veinte
+    columnas es una tabla que no se creo.
+    """
+    if "enmienda" in hay:
+        return False
+    con.executescript("""
+      CREATE TABLE enmienda (
+        video_id    INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+        etapa_orden INTEGER NOT NULL,
+        -- Lo que la toma dice, y lo que tenia que decir. Las dos, porque sin la
+        -- primera no se puede encontrar en el subtitulo lo que hay que cambiar.
+        dice        TEXT NOT NULL,
+        es          TEXT NOT NULL,
+        fecha       TEXT,
+        PRIMARY KEY (video_id, etapa_orden)
+      );
+    """)
+    cols = {r[1] for r in con.execute("pragma table_info(escena_desc)")}
+    if {"corrige_dice", "corrige_es", "video_id"} <= cols:
+        con.execute(
+            "insert into enmienda (video_id, etapa_orden, dice, es, fecha)"
+            " select video_id, etapa_orden, corrige_dice, corrige_es, fecha"
+            "   from escena_desc"
+            "  where corrige_dice is not null and corrige_es is not null"
+            "    and video_id is not null")
+    return True
+
+
+def _clave_por_video(con):
+    """El video se refiere por clave y **solo** por clave.
+
+    Antes de reconstruir se rellena `video_id` donde falta: si no, las 221 filas
+    que hoy lo tienen nulo violarian el `NOT NULL` o se perderian en silencio,
+    que es peor.
+    """
+    hecho = []
+    vid = {r["slug"]: r["id"] for r in con.execute("select id, slug from video")}
+    for t in POR_SLUG:
+        cols = {r[1] for r in con.execute(f"pragma table_info({t})")}
+        if "video_slug" not in cols or "video_id" not in cols:
+            continue
+        for slug, i in vid.items():
+            con.execute(f"update {t} set video_id = ? "
+                        f"where video_id is null and video_slug = ?", (i, slug))
+        # Una fila cuyo slug no existe en `video` no se puede migrar sin
+        # inventarse a que pieza pertenece. Se para y se dice cual.
+        sueltas = con.execute(
+            f"select count(*) from {t} where video_id is null").fetchone()[0]
+        if sueltas:
+            hecho.append(f"!{t}: {sueltas} filas con un slug que no es de"
+                         f" ningun video; no se migra")
+            continue
+
+        if t == "densidad":
+            _rehacer(con, t, """
+                video_id    INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+                etapa_orden INTEGER NOT NULL,
+                nivel       TEXT NOT NULL CHECK (nivel IN ('baja','media','alta')),
+                figura      TEXT,
+                por_que     TEXT NOT NULL,
+                quien       TEXT NOT NULL DEFAULT 'ia',
+                fecha       TEXT,
+                PRIMARY KEY (video_id, etapa_orden)""",
+                ["video_id", "etapa_orden", "nivel", "figura", "por_que",
+                 "quien", "fecha"])
+        elif t == "descartado":
+            _rehacer(con, t, """
+                video_id     INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+                etapa_orden  INTEGER NOT NULL,
+                fragmento_id INTEGER REFERENCES fragmento(id) ON DELETE CASCADE,
+                desde        REAL NOT NULL,
+                hasta        REAL NOT NULL,
+                motivo       TEXT NOT NULL,
+                fecha        TEXT,
+                PRIMARY KEY (video_id, etapa_orden, desde, hasta)""",
+                ["video_id", "etapa_orden", "fragmento_id", "desde", "hasta",
+                 "motivo", "fecha"])
+        elif t == "escena_desc":
+            _rehacer(con, t, """
+                video_id     INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+                etapa_orden  INTEGER NOT NULL,
+                que_pasa     TEXT NOT NULL,
+                emocion      TEXT,
+                componente   TEXT,
+                grafico      TEXT,
+                color        TEXT CHECK (color IN ('avivar','apagar','dejar')),
+                sonido       TEXT,
+                plano        TEXT CHECK (plano IN ('en cuadro','cerrado','fuera')),
+                quien        TEXT NOT NULL DEFAULT 'ia',
+                fecha        TEXT,
+                trato        TEXT,
+                trato_porque TEXT,
+                prioridad    TEXT,
+                integridad   TEXT,
+                remedio      TEXT,
+                sobre_texto  TEXT,
+                PRIMARY KEY (video_id, etapa_orden)""",
+                ["video_id", "etapa_orden", "que_pasa", "emocion", "componente",
+                 "grafico", "color", "sonido", "plano", "quien", "fecha",
+                 "trato", "trato_porque", "prioridad", "integridad", "remedio",
+                 "sobre_texto"])
+        elif t == "revision":
+            # **Y aqui se va `regla_id` con el slug.** Nulo en 197 de 262, y en
+            # los 65 que tiene, el texto de `revision.regla` NO coincide con el
+            # `regla.enunciado` apuntado: 65 de 65. Ademas 51 de esos 65 apuntan
+            # todos a la regla 1 — el rastro de un relleno que adivino, y no lo
+            # lee ni lo escribe ningun script.
+            #
+            # No se arregla poblandolo: los 65 textos **no existen** en `regla`,
+            # asi que `revision.regla` no es una copia de nada. Es texto propio,
+            # y lo que sobra es la clave. Una columna que contesta plausible y
+            # falso hace mas dano que una que no esta.
+            _rehacer(con, t, """
+                id       INTEGER PRIMARY KEY,
+                video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+                huella   TEXT,
+                pasada   INTEGER NOT NULL DEFAULT 1,
+                desde_s  REAL,
+                hasta_s  REAL,
+                ancla    TEXT,
+                cual     INTEGER NOT NULL DEFAULT 1,
+                accion   TEXT NOT NULL CHECK (accion IN
+                           ('cortar','sonido','grafico','subtitulo','ritmo','otro')),
+                que      TEXT NOT NULL,
+                regla    TEXT,
+                estado   TEXT NOT NULL DEFAULT 'pendiente'
+                           CHECK (estado IN ('pendiente','aplicada','automatizada','sube')),
+                fecha    TEXT""",
+                ["id", "video_id", "huella", "pasada", "desde_s", "hasta_s",
+                 "ancla", "cual", "accion", "que", "regla", "estado", "fecha"],
+                indices=["CREATE INDEX revision_pieza ON revision"
+                         " (video_id, pasada)"])
+        hecho.append(f"{t}: sin video_slug")
+    return hecho
+
+
+def _paso_con_historia(con):
+    """`paso` deja de guardar un solo paso por fragmento.
+
+    La clave era `fragmento_id` a secas, asi que cabia **una fila por fragmento**
+    y `cortar.py` escribia con `ON CONFLICT DO UPDATE`: cada fase pisaba a la
+    anterior. Con diecinueve fases declaradas, `paso` sabia de una —medido: 96
+    filas, 96 fragmentos, **1 fase distinta**— y no podia contestar cuando paso
+    una pieza por depurado, que es para lo que existe.
+
+    No era una violacion de forma normal. Era una clave primaria decidiendo, sin
+    decirlo, que el historial no se guarda.
+
+    Y `por_que` pasa a llamarse `huella`, que es lo que lleva dentro: un sha de
+    la colocacion, no una razon. Una columna que miente en el nombre se lee mal
+    una vez y se copia mal siempre.
+    """
+    cols = [r[1] for r in con.execute("pragma table_info(paso)")]
+    pk = [r[1] for r in con.execute("pragma table_info(paso)") if r[5]]
+    if pk == ["fragmento_id", "fase_id"]:
+        return False
+    if "por_que" in cols:
+        con.execute("alter table paso rename column por_que to huella")
+    _rehacer(con, "paso", """
+        fragmento_id INTEGER NOT NULL REFERENCES fragmento(id) ON DELETE CASCADE,
+        fase_id      INTEGER NOT NULL REFERENCES fase(id),
+        fichero      TEXT,
+        duracion     REAL,
+        huella       TEXT,
+        fecha        TEXT,
+        PRIMARY KEY (fragmento_id, fase_id)""",
+        ["fragmento_id", "fase_id", "fichero", "duracion", "huella", "fecha"])
+    return True
+
+
 def migrar():
     con = _con()
     cols = {r[1] for r in con.execute("pragma table_info(fase)")}
@@ -574,6 +814,18 @@ def migrar():
                 hecho.append(f"-{t}")
         except sqlite3.OperationalError:
             pass
+
+    # Y el cierre de lo que quedo a medias. El orden importa: la enmienda sale
+    # de `escena_desc` **antes** de que `_clave_por_video` reconstruya la tabla
+    # sin esas columnas.
+    hay = {r[0] for r in con.execute(
+        "select name from sqlite_master where type='table'")}
+    if _enmienda(con, hay):
+        hecho.append("+enmienda")
+    hecho += _clave_por_video(con)
+    if _paso_con_historia(con):
+        hecho.append("paso: una fila por fase, no una por fragmento")
+
     con.commit()
     con.close()
     return hecho

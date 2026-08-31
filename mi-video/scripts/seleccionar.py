@@ -75,6 +75,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
 import depurar  # noqa: E402
+import dominio  # noqa: E402
 import estado  # noqa: E402
 import registro  # noqa: E402
 import rutas  # noqa: E402
@@ -286,18 +287,28 @@ def ventanas(runs, palabras):
             ant = " ".join(w["text"] for w in por_tramo[i - 1]) if i else ""
             sig = (" ".join(w["text"] for w in por_tramo[j + 1])
                    if j + 1 < len(runs) else "")
-            out.append({
-                "i": i, "j": j, "a": round(a, 3), "b": round(b, 3),
-                "voz": round(voz, 2), "aire": round((b - a) - voz, 2),
-                "entra": round(min(antes[i], 9.9), 2),
-                "sale": round(min(despues[j], 9.9), 2),
+            # **Se construye por el tipo y se entrega como diccionario.**
+            #
+            # Los campos de una ventana no estaban declarados en ningun sitio:
+            # eran las claves que este `append` ponia y que otras mil lineas
+            # leian de memoria. Ahora los declara `dominio.Ventana`, y aqui se
+            # devuelve `a_dict()` para que los consumidores no se enteren — que
+            # es lo que permite tipar el productor sin reescribir a quien lee.
+            #
+            # Comprobado sobre las 1.823 ventanas del corpus: la ida y vuelta
+            # devuelve los mismos campos con los mismos valores.
+            out.append(dominio.Ventana(
+                rango=dominio.Rango(round(a, 3), round(b, 3)),
+                texto=texto, i=i, j=j,
+                voz=round(voz, 2), aire=round((b - a) - voz, 2),
+                entra=round(min(antes[i], 9.9), 2),
+                sale=round(min(despues[j], 9.9), 2),
                 # Sobra por delante si el arranque repite la cola del tramo
                 # anterior; queda truncada por detras si su cola reaparece en el
                 # siguiente.
-                "sobra": round(_solapa(ant, texto), 2),
-                "trunca": round(_solapa(texto, sig), 2),
-                "texto": texto,
-            })
+                sobra=round(_solapa(ant, texto), 2),
+                trunca=round(_solapa(texto, sig), 2),
+            ).a_dict())
     return out
 
 
@@ -1324,7 +1335,7 @@ def main():
     # empata, pierde.
     _con = sqlite3.connect(BASE)
     fuera_pic = _con.execute(
-        "select etapa_orden, desde, hasta from descartado where video_slug = ?",
+        "select etapa_orden, desde, hasta from descartado where video_id = (select id from video where slug = ?)",
         (slug,)).fetchall()
     _con.close()
     rotas = set()
@@ -1357,7 +1368,7 @@ def main():
         try:
             prioridades = dict(_con.execute(
                 "select etapa_orden, prioridad from escena_desc"
-                " where video_slug = ? and prioridad is not null", (slug,)))
+                " where video_id = (select id from video where slug = ?) and prioridad is not null", (slug,)))
         except sqlite3.OperationalError:
             prioridades = {}
         _con.close()

@@ -44,7 +44,7 @@ def _quitadas(slug):
     try:
         c = sqlite3.connect(BASE)
         filas = c.execute(
-            "select que from revision where video_slug = ? and accion='cortar'"
+            "select que from revision where video_id = (select id from video where slug = ?) and accion='cortar'"
             " and estado='aplicada' and regla='seccion que sobra'", (slug,)).fetchall()
         c.close()
     except Exception:                              # noqa: BLE001
@@ -98,8 +98,8 @@ def escenas_por_describir(reels=None, rehacer=False):
     con2.row_factory = sqlite3.Row
     guardado = {(r["video_slug"], r["etapa_orden"]): (r["sobre_texto"] or "")
                 for r in con2.execute(
-                    "select video_slug, etapa_orden, sobre_texto"
-                    " from escena_desc")}
+                    "select v.slug as video_slug, e.etapa_orden, e.sobre_texto"
+                    " from escena_desc e join video v on v.id = e.video_id")}
     con2.close()
 
     salida, textos, avisos = [], {}, {}
@@ -706,19 +706,18 @@ def guardar_escena(slug, orden, d):
     sobre = (_montaje(slug) or {}).get(int(orden))
     con = sqlite3.connect(BASE)
     con.execute(
-        "insert into escena_desc (video_slug, etapa_orden, que_pasa, emocion,"
+        "insert into escena_desc (video_id, etapa_orden, que_pasa, emocion,"
         " componente, grafico, color, sonido, plano, trato, trato_porque,"
-        " prioridad, integridad, remedio, corrige_dice, corrige_es,"
+        " prioridad, integridad, remedio,"
         " sobre_texto, quien, fecha)"
-        " values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
-        " on conflict(video_slug, etapa_orden) do update set"
+        " values ((select id from video where slug = ?),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+        " on conflict(video_id, etapa_orden) do update set"
         " que_pasa=excluded.que_pasa, emocion=excluded.emocion,"
         " componente=excluded.componente, grafico=excluded.grafico,"
         " color=excluded.color, sonido=excluded.sonido, plano=excluded.plano,"
         " trato=excluded.trato, trato_porque=excluded.trato_porque,"
         " prioridad=excluded.prioridad,"
         " integridad=excluded.integridad, remedio=excluded.remedio,"
-        " corrige_dice=excluded.corrige_dice, corrige_es=excluded.corrige_es,"
         " sobre_texto=excluded.sobre_texto,"
         " quien=excluded.quien, fecha=excluded.fecha",
         (slug, int(orden), d["que_pasa"], d.get("emocion"),
@@ -726,12 +725,29 @@ def guardar_escena(slug, orden, d):
          d.get("grafico"), d.get("color"), d.get("sonido"), d.get("plano"),
          d.get("trato"), d.get("trato_porque"), d.get("prioridad"),
          d.get("integridad"), d.get("remedio"),
-         (d.get("corrige") or {}).get("dice"), (d.get("corrige") or {}).get("es"),
          sobre,
          # `quien` decia «gemini» y esa via se descarto —*«no quiero a
          # Google»*—, asi que el campo mentia sobre quien decidio.
          d.get("quien", "cli"),
          datetime.datetime.now().isoformat(timespec="seconds")))
+    # **La enmienda es otra tabla, y se retira si deja de venir.** Vive aparte
+    # porque no describe la escena: corrige un dato que se dice —«dice comercio,
+    # es Finanzas»— y solo aparece en el 11% de las etapas. Y el `delete`
+    # importa tanto como el `insert`: una descripcion nueva sin `corrige` que
+    # dejara la vieja seguiria pintando en pantalla una correccion que el paso
+    # anterior ya desecho.
+    c = d.get("corrige") or {}
+    if c.get("dice") and c.get("es"):
+        con.execute(
+            "insert into enmienda (video_id, etapa_orden, dice, es, fecha)"
+            " values ((select id from video where slug = ?),?,?,?,?)"
+            " on conflict(video_id, etapa_orden) do update set"
+            " dice=excluded.dice, es=excluded.es, fecha=excluded.fecha",
+            (slug, int(orden), c["dice"], c["es"],
+             datetime.datetime.now().isoformat(timespec="seconds")))
+    else:
+        con.execute("delete from enmienda where etapa_orden = ? and video_id ="
+                    " (select id from video where slug = ?)", (int(orden), slug))
     con.commit()
     con.close()
     return {"ok": True}

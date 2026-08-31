@@ -64,6 +64,10 @@ paso "0 · guardas y modelo de datos"
 # tiene donde registrarse.
 node scripts/guardas.mjs || exit 1
 PYTHONIOENCODING=utf-8 python scripts/modelo.py || exit 1
+# La forma del codigo **avisa, no para**: dieciocho ficheros ya pasan del techo
+# y bloquear el lote no arregla ninguno. Lo que sirve es que el numero se vea en
+# cada corrida, para que el que cruce el techo se note el dia que lo cruza.
+PYTHONIOENCODING=utf-8 python scripts/forma.py || true
 
 paso "el motor: cada etiqueta llama a su servicio"
 # **La linea dejo de ser una secuencia.** Jaime: *«las fases y los estados son
