@@ -709,8 +709,8 @@ def guardar_escena(slug, orden, d):
         "insert into escena_desc (video_slug, etapa_orden, que_pasa, emocion,"
         " componente, grafico, color, sonido, plano, trato, trato_porque,"
         " prioridad, integridad, remedio, corrige_dice, corrige_es,"
-        " sobre_texto, quien, fecha)"
-        " values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+        " sobre_texto, tablero, quien, fecha)"
+        " values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         " on conflict(video_slug, etapa_orden) do update set"
         " que_pasa=excluded.que_pasa, emocion=excluded.emocion,"
         " componente=excluded.componente, grafico=excluded.grafico,"
@@ -719,7 +719,7 @@ def guardar_escena(slug, orden, d):
         " prioridad=excluded.prioridad,"
         " integridad=excluded.integridad, remedio=excluded.remedio,"
         " corrige_dice=excluded.corrige_dice, corrige_es=excluded.corrige_es,"
-        " sobre_texto=excluded.sobre_texto,"
+        " sobre_texto=excluded.sobre_texto, tablero=excluded.tablero,"
         " quien=excluded.quien, fecha=excluded.fecha",
         (slug, int(orden), d["que_pasa"], d.get("emocion"),
          None if d.get("componente") in (None, "ninguno") else d["componente"],
@@ -728,6 +728,15 @@ def guardar_escena(slug, orden, d):
          d.get("integridad"), d.get("remedio"),
          (d.get("corrige") or {}).get("dice"), (d.get("corrige") or {}).get("es"),
          sobre,
+         # **El tablero, como DATO y no como prosa.** Era un literal por
+         # pieza en `reels-spec.mjs`, asi que re-describir una etapa no
+         # cambiaba su tablero: tres entregas iguales despues de dos
+         # refactorizaciones. Jaime: *«la decision de componer esta
+         # escuchando las indicaciones viejas»*. Ahora lo escribe quien
+         # compone y lo lee el render, que es el unico orden en el que
+         # una correccion llega a la pantalla.
+         (None if d.get("tablero") in (None, "", {})
+          else json.dumps(d["tablero"], ensure_ascii=False)),
          # `quien` decia «gemini» y esa via se descarto —*«no quiero a
          # Google»*—, asi que el campo mentia sobre quien decidio.
          d.get("quien", "cli"),

@@ -91,17 +91,20 @@ export const sfxFile: Record<Motion, string> = {
  * objetivo se declara al lado. La regla de Jaime sigue mandando: todos quedan
  * por debajo de la voz, que en el máster pica alrededor de −12 dBFS.
  */
-const PICO_DEL_FICHERO: Record<Motion, number> = {
-  // Medido con `ffmpeg -af volumedetect` sobre `public/sfx/`. Si se regeneran
-  // los efectos, se vuelve a medir: es lo que hace que el nivel signifique algo.
-  mark: -17.5,
-  draw: -16.5,
-  fork: -15.6,
-  land: -12.6,
-  type: -9.6,
-  whoosh: -15.5,
-  glitch: -7.4,
-};
+/**
+ * El pico real de cada fichero, **medido por `scripts/sfx.sh` al generarlo**.
+ *
+ * Estaba escrito a mano aquí, con los números copiados de una medición. Se
+ * quedó viejo en cuanto los efectos se regeneraron —los picos pasaron de
+ * −17,5/−7,4 a −2,4/−8,0— y entonces el nivel se calculaba contra ficheros que
+ * ya no existían. Es el patrón que costó el día: la decisión en dos sitios, y
+ * el que lee no es el que se corrige.
+ *
+ * Ahora lo escribe quien genera el sonido y lo lee quien lo reproduce.
+ */
+import picos from "./sfx-picos.json";
+
+const PICO_DEL_FICHERO = picos as Record<Motion, number>;
 
 /**
  * Dónde tiene que picar cada efecto en la mezcla, en dBFS. Un transitorio se

@@ -1683,7 +1683,52 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
     }
   };
 
-  const tableros = (TABLEROS[slug] ?? [])
+  /**
+   * **El tablero sale de la DESCRIPCIÓN, no de un literal por pieza.**
+   *
+   * `TABLEROS[slug]` era un objeto escrito a mano, uno por reel: el
+   * `if (slug === …)` que el proyecto prohíbe, y que C-66 ya nombró y sólo
+   * arregló a medias. La consecuencia no era estética: **re-describir una
+   * etapa no cambiaba su tablero.** El paso que compone escribía una
+   * descripción nueva en la base, el render seguía leyendo el literal, y la
+   * pieza salía idéntica.
+   *
+   * Jaime, después de tres entregas iguales: *«la decisión de componer está
+   * escuchando las indicaciones viejas»*, y lo que lo cierra: *«se persiste
+   * después de dos refactorizaciones mayores: el problema no son las
+   * instrucciones»*. Tenía razón — las instrucciones eran nuevas y nadie las
+   * leía.
+   *
+   * Ahora el tablero es un campo de `escena_desc`, escrito por quien compone y
+   * leído por quien monta. Ése es el único orden en el que una corrección
+   * llega a la pantalla.
+   *
+   * El literal se queda **sólo como respaldo para una pieza sin describir**
+   * —reel-07 hoy— y cuando se usa se dice, porque una pieza que se monta desde
+   * el código es una pieza que no responde a las correcciones.
+   */
+  const deLaBase = (() => {
+    try {
+      const filas = db.prepare(
+        "select etapa_orden, tablero from escena_desc" +
+        " where video_slug = ? and tablero is not null and tablero <> ''" +
+        " order by etapa_orden",
+      ).all(slug);
+      return filas.map((f) => {
+        const t = JSON.parse(f.tablero);
+        return { beat: Number(f.etapa_orden), kind: t.kind, props: t.props };
+      });
+    } catch {
+      return [];
+    }
+  })();
+  if (!deLaBase.length && (TABLEROS[slug] ?? []).length) {
+    faltas.push(
+      `${slug}: el tablero se monta desde el literal de \`reels-spec.mjs\`, no ` +
+      `desde su descripción — re-describir la etapa no lo va a cambiar.`,
+    );
+  }
+  const tableros = (deLaBase.length ? deLaBase : TABLEROS[slug] ?? [])
       .map((b) => {
         b = { ...b, props: { ...b.props, ...pieDe(b.beat) } };
         // **Por beat, no por palabra.** Anclar a una palabra del subtítulo no

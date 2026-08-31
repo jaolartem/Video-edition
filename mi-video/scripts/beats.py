@@ -81,6 +81,7 @@ import rutas  # noqa: E402
 # El reconstruido queda en `libretos-reconstruido.md` marcado NO USAR, para
 # poder ver que cambio. **Una sola fuente**: dos ficheros para el mismo dato se
 # separan en cuanto uno cambia, y eso ya costo cuatro fallos en este proyecto.
+BASE = os.path.join("ads", "decisiones.db")
 LIBRETOS = os.path.join("..", "docs", "libretos.md")
 FRAMES = os.path.join("ads", "frames.json")
 # Palabras que no distinguen un beat de otro.
@@ -135,22 +136,39 @@ def norm(t):
 
 
 def beats_del_libreto(n):
-    """Cada párrafo del libreto es un beat: una función en el argumento."""
-    libro = open(LIBRETOS, encoding="utf-8").read()
-    bloque = next(
-        (b for b in libro.split("\n## ") if b.startswith(f"Reel {n} ")), None)
-    if not bloque:
-        raise SystemExit(f"sin libreto para el reel {n}")
-    cuerpo = bloque.split("---")[0]
-    out = []
-    for p in cuerpo.split("\n\n"):
-        p = " ".join(p.split())
-        # Fuera el encabezado, el hook duplicado y las líneas de metadatos.
-        if not p or p.startswith(("**Hook", "Reel ", "#")) or len(p) < 40:
-            continue
-        out.append(p)
-    return out
+    """Los beats de la pieza, **desde la base**. Un párrafo, un beat.
 
+    ## Por qué ya no se lee el markdown
+
+    El libreto vivía en dos sitios: la tabla `libreto` y `docs/libretos.md`.
+    Quien corrige escribe en uno; quien monta leía el otro. Es el patrón que
+    costó el día entero — Jaime, después de recibir tres veces la misma pieza:
+    *«la decisión de componer está escuchando las indicaciones viejas»*, y
+    *«se persiste después de dos refactorizaciones mayores: el problema no son
+    las instrucciones»*.
+
+    Y no era teórico: el parser del markdown **tiraba en silencio los párrafos
+    de menos de 40 caracteres**, un filtro puesto para saltarse encabezados.
+    La séptima pieza tiene ocho etapas en la base y el markdown devolvía siete:
+    la que faltaba era *«Le dejo el link abajo.»* — el registro, que es la
+    etapa que pide la acción. Ocho filas puestas y el paso decía «sin libreto».
+
+    La base manda. El markdown se queda como documento para leer, y **no se
+    lee desde aquí**: si hace falta regenerarlo, se genera desde la base, nunca
+    al revés.
+    """
+    import sqlite3
+
+    con = sqlite3.connect(BASE)
+    filas = con.execute(
+        "select l.texto from libreto l join video v on v.id = l.video_id"
+        " where v.slug = ? order by l.orden", (f"reel-{n:02d}",)).fetchall()
+    con.close()
+    if not filas:
+        raise SystemExit(
+            f"sin libreto para el reel {n} — la tabla `libreto` no tiene filas."
+            " El libreto se declara ahi, no en docs/libretos.md.")
+    return [" ".join(str(f[0]).split()) for f in filas]
 
 def frame_del_reel(n, beats):
     """
