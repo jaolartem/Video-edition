@@ -69,6 +69,11 @@ def fijados(slug):
     return [dict(f) for f in filas]
 
 
+# Cuanto se puede retroceder para no entrar a mitad de frase. Mas que esto y
+# lo que se recupera ya no es la cabeza de lo que se dice: es lo anterior.
+RETROCESO = 1.5
+
+
 def _a_la_voz(toma, a, b, margen=0.12):
     """Recorta los bordes de un tramo hasta donde de verdad se habla.
 
@@ -109,10 +114,26 @@ def _a_la_voz(toma, a, b, margen=0.12):
     dentro = [(max(a, x), min(b, y)) for x, y in voz if min(b, y) - max(a, x) > 0.01]
     if not dentro:
         return None
-    # `margen` deja respirar el ataque de la primera silaba y la caida de la
-    # ultima: cortar exactamente en la frontera del detector suena amputado.
+    # **Y no se entra a mitad de una frase.** Si el borde cae DENTRO de un
+    # tramo de habla, lo que se corta no es silencio: es el principio de lo que
+    # se esta diciendo. Se retrocede hasta donde ese tramo empieza.
+    #
+    # Es la otra cara de lo mismo que C-129, y la mas cara: el alineador estira
+    # una palabra sobre el silencio que la precede igual que sobre el que la
+    # sigue. En la cinta de reel-05 la palabra «14» figura de 519,62 a 532,38
+    # —doce segundos— y el corte entraba en 532,3, dentro de ella. Resultado: la
+    # pieza decia «mil dolares de impuesto adicional» y **la cifra no aparecia
+    # ni en el trozo ni en `antes`**, porque por texto la palabra cruzaba el
+    # borde. Tres pasadas la dieron por no grabada. La cinta dice «14 mil».
+    #
+    # El limite existe para no arrastrar la frase anterior: si el tramo empezo
+    # mucho antes, el borde se puso ahi por una razon y no se toca.
     ini = max(a, min(x for x, _ in dentro) - margen)
     fin = min(b, max(y for _, y in dentro) + margen)
+    for x, y in voz:
+        if x < a < y and a - x <= RETROCESO:
+            ini = min(ini, max(0.0, x - margen))
+            break
     return (round(ini, 3), round(fin, 3)) if fin - ini > 0.2 else None
 
 
