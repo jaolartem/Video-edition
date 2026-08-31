@@ -32,6 +32,30 @@ def _montaje(slug):
     return Pieza(int(slug.split("-")[1])).texto
 
 
+def _quitadas(slug):
+    """Las etapas que una nota de corte saco de la pieza a proposito.
+
+    Lo mismo que mira `verificar` para no contar como falta lo que alguien
+    mando quitar (C-106). Vive aqui tambien porque las dos preguntas son la
+    misma: **una etapa ausente por decision no es una etapa ausente por falta**.
+    """
+    import re as _re
+
+    try:
+        c = sqlite3.connect(BASE)
+        filas = c.execute(
+            "select que from revision where video_slug = ? and accion='cortar'"
+            " and estado='aplicada' and regla='seccion que sobra'", (slug,)).fetchall()
+        c.close()
+    except Exception:                              # noqa: BLE001
+        return set()
+    out = set()
+    for (q,) in filas:
+        for b in _re.findall(r"e(\d+)", q or ""):
+            out.add(int(b))
+    return out
+
+
 def escenas_por_describir(reels=None, rehacer=False):
     """Cada etapa con su función, su libreto y lo que se dijo de verdad."""
     con = sqlite3.connect(BASE)
@@ -92,9 +116,23 @@ def escenas_por_describir(reels=None, rehacer=False):
         # descripcion de la etapa 5 del reel-01 despues de que Jaime la mandara
         # sacar, y la pieza no podia avanzar por describir algo que ya no suena.
         #
-        # Se mira el montaje, que es lo que el espectador oye: si esa etapa no
-        # aporta texto **y no es de las que van a tablero sin toma**, no esta.
-        if not (d["montaje"] or "").strip() and (d.get("dicho") or "").strip():
+        # **Y la diferencia es por que no esta, no que no este.**
+        #
+        # Una etapa fuera del montaje puede serlo por dos razones opuestas, y
+        # solo una de ellas significa «no la describas»:
+        #
+        # - **Se corto por decision.** Hay una nota de seccion que lo dice. Esa
+        #   etapa ya no existe en la pieza y describirla es trabajo perdido.
+        # - **Nunca tuvo material.** La frase no esta grabada —reel-04 e5, «el
+        #   CRA no ve a un empresario», tiene cero candidatas—. Esa **si** hay
+        #   que describirla, porque el frame la necesita y va a tablero: es
+        #   justo el caso que `verificar` contempla cuando acepta una etapa «con
+        #   toma o con tablero».
+        #
+        # La primera version miraba si habia `dicho`, y eso mezclaba las dos:
+        # dejaba sin describir la etapa que mas lo necesita, la que solo puede
+        # existir como tablero.
+        if not (d["montaje"] or "").strip() and int(d["orden"]) in _quitadas(d["slug"]):
             continue
         # **Los bordes que hay que mirar van con la etapa**, para que quien
         # compone los resuelva con el texto delante en vez de dejarselos a un
