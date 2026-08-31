@@ -72,6 +72,9 @@ def fijados(slug):
 # Cuanto se puede retroceder para no entrar a mitad de frase. Mas que esto y
 # lo que se recupera ya no es la cabeza de lo que se dice: es lo anterior.
 RETROCESO = 1.5
+# Por encima de esto un silencio deja de ser una pausa del hablante y pasa a ser
+# aire muerto: se parte el tramo y se deja fuera.
+HUECO = 1.2
 
 
 def _a_la_voz(toma, a, b, margen=0.12):
@@ -134,7 +137,35 @@ def _a_la_voz(toma, a, b, margen=0.12):
         if x < a < y and a - x <= RETROCESO:
             ini = min(ini, max(0.0, x - margen))
             break
-    return (round(ini, 3), round(fin, 3)) if fin - ini > 0.2 else None
+    if fin - ini <= 0.2:
+        return None
+    # **Y un silencio largo DENTRO tampoco es una pausa: es aire muerto.**
+    #
+    # Esto solo recortaba los bordes, con el argumento de que un hueco en medio
+    # es una pausa del hablante y es suya. Cierto hasta cierta duracion: siete
+    # segundos no son una pausa. reel-04 llevaba 18,3 s mudos sobre 83, dos de
+    # ellos con un tablero encima, y **cuatro vueltas de revision no lo vieron**
+    # porque por texto el trozo parece una frase entera — el `hasta` estaba
+    # clavado en la marca de la palabra siguiente.
+    #
+    # Se agrupan los tramos de voz que estan a menos de `HUECO` unos de otros;
+    # cada grupo sale como un tramo. Deja de ser trabajo que alguien tiene que
+    # ver y repetir en cada vuelta.
+    grupos, act = [], []
+    for x, y in dentro:
+        if act and x - act[-1][1] > HUECO:
+            grupos.append(act)
+            act = []
+        act.append((x, y))
+    if act:
+        grupos.append(act)
+    trozos = []
+    for g in grupos:
+        x = max(ini, g[0][0] - margen)
+        y = min(fin, g[-1][1] + margen)
+        if y - x > 0.25:
+            trozos.append((round(x, 3), round(y, 3)))
+    return trozos or None
 
 
 def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
@@ -184,8 +215,22 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
             puestos.append((a, b, tk))
     if not puestos:
         return {"error": f"{slug} e{beat}: no se declara una etapa sin tramos"}
-    tramos = [(*(_a_la_voz(tk, a, b) or (None, None)), tk) for a, b, tk in puestos]
-    tramos = [t for t in tramos if t[0] is not None]
+    # `_a_la_voz` puede devolver VARIOS tramos: si el propuesto llevaba un
+    # silencio largo dentro, sale partido en los trozos que si tienen voz.
+    tramos = []
+    for a, b, tk in puestos:
+        for x, y in (_a_la_voz(tk, a, b) or []):
+            tramos.append((x, y, tk))
+    # **Y sin repetidos.** Al partir por los huecos, dos tramos propuestos que
+    # se solapaban pueden acabar empezando en el mismo segundo, y la clave de
+    # `corte_fijo` es `(video, papel, orden, desde)`: el segundo no entra, hace
+    # saltar la insercion entera y con ella la etapa. Se quedan una vez, y el
+    # mas largo de los que empiecen igual.
+    vistos = {}
+    for x, y, tk in sorted(tramos, key=lambda t: (t[0], -(t[1] - t[0]))):
+        if x not in vistos:
+            vistos[x] = (x, y, tk)
+    tramos = [vistos[k] for k in sorted(vistos)]
     if not tramos:
         return {"error": f"{slug} e{beat}: los tramos propuestos no tienen voz"}
     # La medida se hace sobre la cinta principal —la que mas segundos aporta—,

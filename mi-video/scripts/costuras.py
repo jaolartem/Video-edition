@@ -682,10 +682,67 @@ def bordes(slug, ver=False):
     return movidos, sucios
 
 
+def sin_aire(slug, ver=False):
+    """Quita de TODOS los segmentos el silencio que no es una pausa.
+
+    ## Por que aqui y no en quien declara
+
+    `fijar.declarar` ya recorta a la voz lo que se le declara (C-129, C-134),
+    pero por el EDL entran segmentos por tres puertas mas —la seleccion, los
+    cortes de revision y el cosido— y ninguna pasa por ahi. Resultado medido:
+    piezas con 14 y 18 segundos mudos que **cuatro vueltas de revision no
+    vieron**, porque por texto el trozo parece una frase entera; el `hasta`
+    estaba clavado en la marca de la palabra siguiente y el alineador estira esa
+    palabra por encima del silencio.
+
+    Cada vuelta lo arreglaba a mano, etapa por etapa, y volvia a aparecer por
+    otra puerta. Este paso es el sitio: `cosido` existe justamente para arreglar
+    lo que las costuras dejaron mal, y el aire muerto es eso.
+
+    Un segmento con un hueco largo dentro sale partido en los trozos que si
+    tienen voz. Un silencio corto se respeta: es la respiracion del hablante.
+    """
+    import fijar
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    segs, det, quitado = [], [], 0.0
+    for rango, d in zip(edl["segmentos"], edl["detalle"]):
+        a, b = float(rango[0]), float(rango[1])
+        toma = d.get("toma") or rutas.TOMAS.get(slug)
+        trozos = fijar._a_la_voz(toma, a, b) if toma else None
+        if not trozos:
+            segs.append([a, b])
+            det.append(d)
+            continue
+        quitado += (b - a) - sum(y - x for x, y in trozos)
+        for x, y in trozos:
+            segs.append([x, y])
+            det.append({**d, "start": x, "end": y})
+    if quitado < 0.05:
+        return 0
+    if ver:
+        print(f"  {slug}: quitaria {quitado:.1f}s de aire muerto")
+        return quitado
+    edl["segmentos"], edl["detalle"] = segs, det
+    edl["fuentes"] = [x.get("toma") or "" for x in det]
+    json.dump(edl, open(ruta, "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    registro.nota("costuras", "aire muerto fuera",
+                  detalle=f"{slug}: {quitado:.1f}s")
+    return quitado
+
+
 def arreglar(slug, ver=False):
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
         return
+    # **Primero el aire, luego las costuras.** Quitar un silencio cambia donde
+    # cae cada empalme, asi que medir las costuras antes seria medir las de
+    # otro corte.
+    sin_aire(slug, ver=ver)
     edl = json.load(open(ruta, encoding="utf-8"))
     cache = {}
     movidas, duras, total = 0, [], 0
