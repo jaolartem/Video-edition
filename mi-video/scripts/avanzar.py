@@ -80,6 +80,61 @@ def anotar(video_id, fase_id, por_que=None):
     con.close()
 
 
+#: Fase a la que vuelve una pieza cuyo render ya no corresponde a su corte.
+VUELVE_SI_CADUCO = "verificado"
+
+
+def _render_caduco(pieza):
+    """El fichero entregado, ¿es mas viejo que el corte del que sale?
+
+    **Una fase que dice «hecho» sin artefacto es la forma exacta en que este
+    proyecto pierde el estado.** Paso dos veces el mismo dia: `montar.sh` se
+    saltaba la pieza bloqueada y salia con exito, asi que reel-01 quedo en
+    `montado` con el mp4 de siete horas antes; y despues, con el corte
+    recalculado por `a_lo_callado`, reel-02 y reel-03 seguian en `montado` y
+    `avanzar` no las tocaba —no hay salto que dar desde el final del camino—,
+    de modo que se entregaba un video anterior al arreglo.
+
+    Devolverlas a mano es el parche. Regla de Jaime: *«si sale error, paras,
+    reparas el pipeline, no un parche; el problema resuelto y vuelves a
+    correr»*. Asi que la comprobacion es del motor: **el render tiene que ser
+    mas nuevo que el EDL del que sale.** Si no lo es, la pieza no esta montada,
+    diga lo que diga la etiqueta.
+
+    No se compara contra el codigo ni contra la fecha del ultimo commit: se
+    compara contra el corte, que es el unico insumo que define lo que el render
+    tiene que mostrar. Un cambio de codigo que no mueve el corte no obliga a
+    rehacer nada.
+    """
+    edl = os.path.join("ads", pieza.slug, "edl-sell.json")
+    if not os.path.exists(edl):
+        return None
+    n = int(pieza.slug[-2:])
+    video = rutas.salida("reels", f"reel-R{n}.mp4")
+    if not os.path.exists(video):
+        return f"no hay render de {pieza.slug}: la fase dice montado y el fichero no esta"
+    if os.path.getmtime(video) < os.path.getmtime(edl):
+        return (f"el render de {pieza.slug} es anterior a su corte"
+                f" — se rehace, la etiqueta no basta")
+    # **Y la descripcion tambien cambia el video.** El corte decide que se oye;
+    # la descripcion decide los tableros y lo que se lee. Comparar solo con el
+    # EDL dejaba pasar una pieza re-descrita: reel-03 y reel-06 quedaron
+    # montadas con la descripcion vieja porque su corte no se habia movido.
+    con = _con()
+    f = con.execute("select max(fecha) from escena_desc where video_slug = ?",
+                    (pieza.slug,)).fetchone()[0]
+    con.close()
+    if f:
+        try:
+            descrito = datetime.datetime.fromisoformat(f).timestamp()
+        except ValueError:
+            descrito = 0
+        if os.path.getmtime(video) < descrito:
+            return (f"el render de {pieza.slug} es anterior a su descripcion"
+                    f" — los tableros y los subtitulos salen de ahi")
+    return None
+
+
 def avanzar(n, ver=False, tope=None):
     """Recorre el camino con una pieza hasta donde pueda.
 
@@ -96,6 +151,17 @@ def avanzar(n, ver=False, tope=None):
         actual = ruta[0]
         if not ver:
             anotar(pieza.video_id, actual["id"])
+    # **Y si la etiqueta miente, se corrige antes de recorrer nada.**
+    orden = {f["nombre"]: k for k, f in enumerate(ruta)}
+    if orden.get(actual["nombre"], -1) >= orden.get("montado", 10 ** 9):
+        caduco = _render_caduco(pieza)
+        if caduco:
+            destino = next((f for f in ruta if f["nombre"] == VUELVE_SI_CADUCO), None)
+            if destino is not None:
+                print(f"  {pieza.slug}: {caduco}")
+                if not ver:
+                    anotar(pieza.video_id, destino["id"], caduco)
+                actual = destino
 
     saltos, motivo, atras = 0, None, {}
     while True:

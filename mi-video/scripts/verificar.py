@@ -221,6 +221,47 @@ def revisar(slug):
                 f" — es rearranque del hablante o repeticion del corte, no"
                 f" enfasis")
 
+    # 6a · **Una cifra en la descripción tiene que estar declarada.**
+    #
+    # Jaime cerró que la cifra de reel-05 e6 es $14.000 —*«los 300 los quité
+    # porque complica las cuentas»*—, se aplicó, y **volvió**: al re-describir
+    # la etapa, el paso copió el número viejo del texto anterior. La decisión
+    # existía y no estaba registrada donde el paso siguiente la lee.
+    #
+    # El registro de cifras es la tabla `dato`. Una descripción que rotula un
+    # importe que ninguna fila declara es una cifra inventada o una decisión
+    # perdida, y las dos son cumplimiento. No se compara el texto entero: se
+    # comparan los importes, que son explícitos y no admiten lectura.
+    import re as _re
+
+    _IMPORTE = _re.compile(r"\$ ?\d{1,3}(?:[.,]\d{3})+")
+
+    def _importes(t):
+        return {x.replace(" ", "").replace(".", ",") for x in _IMPORTE.findall(t or "")}
+
+    # **El registro es de la PIEZA, no del beat.** Exigirlo por etapa obligaba a
+    # duplicar la fila cada vez que una cifra se recuerda: reel-02 declara los
+    # $189.000 en la etapa 3 y los vuelve a enseñar en el cierre, y eso no es una
+    # cifra sin declarar — es la misma cifra. Lo que hay que impedir es que
+    # aparezca en pantalla un importe que la pieza no declaró en ningún sitio.
+    declarados = set()
+    for f in con.execute(
+            "select d.cifra, d.afirmacion from dato d"
+            "  join video v on v.id = d.video_id where v.slug = ?", (slug,)):
+        declarados |= _importes(f["cifra"]) | _importes(f["afirmacion"])
+    for f in con.execute(
+            "select etapa_orden, que_pasa, grafico, corrige_es from escena_desc"
+            " where video_slug = ?", (slug,)):
+        dice = set()
+        for c in ("que_pasa", "grafico", "corrige_es"):
+            dice |= _importes(f[c])
+        sueltas = dice - declarados
+        if sueltas:
+            mal.append(
+                f"{slug} e{f['etapa_orden']}: la descripción rotula"
+                f" {', '.join(sorted(sueltas))} y ninguna fila de `dato` lo"
+                f" declara. O se declara con su fuente, o no sale en pantalla.")
+
     # 6b · **El sonido también pasa por la puerta.**
     #
     # Jaime: *«el sonido también forma parte de la verificación final»*, dicho
