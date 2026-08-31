@@ -1,10 +1,10 @@
 # Normaliza saltos de línea: LF en el repo, nativo en el working tree.
 * text=auto
 
-# El lanzador de workflows rechaza los retornos de carro como caracteres de
-# control (C-44). Con `autocrlf=true` el checkout los pone en cada clon de
-# Windows, asi que la guarda de C-44 fallaba sin que nadie tocara el fichero:
-# no era un fichero mal escrito, era un fichero mal declarado.
+# El lanzador de workflows rechaza el retorno de carro como caracter de control
+# (C-44). Con `text=auto` y `core.autocrlf=true` este fichero salia en CRLF en
+# **cada checkout nuevo**, asi que la guarda no fallaba por una edicion: fallaba
+# por existir en Windows. Se ancla a LF; el resto del repo sigue como estaba.
 *.wf.js text eol=lf
 
 # Binarios: nunca aplicar conversión de texto ni intentar diff.

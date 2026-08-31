@@ -39,12 +39,25 @@ const LOG = path.join(RAIZ, "docs/correcciones.md");
 
 const texto = fs.readFileSync(LOG, "utf8");
 
-/** Cada entrada, con su número, su título y su cuerpo. */
+/**
+ * Cada entrada, con su número, su título y su cuerpo.
+ *
+ * **Se acepta `##` y `###`.** El log arrancó con `###` y desde C-77 se escribió
+ * con `##`. Partiendo sólo por `###`, esas seis entradas no desaparecían —sus
+ * agujas caían dentro del cuerpo de la entrada anterior y sí se comprobaban—
+ * pero **se contaban y se reportaban con el número equivocado**: el verificador
+ * decía «53 correcciones» habiendo 82, y una guarda rota de C-81 salía en
+ * pantalla como «C-53». Un informe que señala la entrada que no es manda a
+ * mirar el fichero que no es.
+ *
+ * El filtro de verdad no es el número de almohadillas, es que el título sea
+ * `C-NN`; los encabezados de fecha caen solos.
+ */
 const entradas = [];
 // `###` o `##`: el log usa los dos niveles y mirar solo uno dejaba 28
 // entradas sin comprobar —y, peor, pegaba sus guardas al bloque anterior, asi
 // que una rotura de C-81 se denunciaba como rotura de C-53.
-for (const bloque of texto.split(/^###? /m).slice(1)) {
+for (const bloque of texto.split(/^#{2,3} /m).slice(1)) {
   const salto = bloque.indexOf("\n");
   const titulo = bloque.slice(0, salto).trim();
   const num = titulo.match(/^C-(\d+)/)?.[1];

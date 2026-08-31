@@ -93,15 +93,45 @@ VACIAS = {
 }
 
 
+# Los mismos textos se parten una y otra vez. `seleccionar.py` puntúa cada
+# ventana contra cada etapa, así que las 5.373 ventanas del corpus se
+# re-tokenizan una vez por etapa: **50 millones de llamadas a
+# `unicodedata.category` sobre los mismos 9.951 textos**, medido con cProfile.
+# Eran 93 s de las dos barridas de las seis piezas, y bajan a 8 s.
+#
+# No hace falta una tarjeta gráfica para esto — se probó la pregunta y la
+# respuesta era un `dict`. Recordar lo que ya se calculó es más barato que
+# calcularlo en paralelo.
+#
+# El tamaño se acota solo: la clave es el texto y los textos son los del corpus.
+# Medido, 9.951 entradas por proceso; y cada script corre en el suyo, así que no
+# hay nada que vaciar.
+_PARTIDO, _NORMADO = {}, {}
+
+
 def palabras(t):
-    """Las palabras tal cual, sin tildes ni puntuación. No filtra nada."""
-    t = unicodedata.normalize("NFD", t.lower())
-    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
-    return re.findall(r"[a-z0-9]+", t)
+    """Las palabras tal cual, sin tildes ni puntuación. No filtra nada.
+
+    **Devuelve una copia, no lo guardado.** La lista cacheada se devolvía tal
+    cual —un 14% más rápido— y eso cambia el contrato en silencio: hoy nadie
+    muta lo que sale de aquí, pero el día que alguien haga un `.append` sobre el
+    resultado envenena la caché y **el fallo aparece en otra función**. Copiar
+    una lista de veinte palabras cuesta menos que ese rato de depuración.
+    """
+    ws = _PARTIDO.get(t)
+    if ws is None:
+        u = unicodedata.normalize("NFD", t.lower())
+        u = "".join(c for c in u if unicodedata.category(c) != "Mn")
+        ws = _PARTIDO[t] = re.findall(r"[a-z0-9]+", u)
+    return list(ws)
 
 
 def norm(t):
-    return [w for w in palabras(t) if len(w) > 2 and w not in VACIAS]
+    ws = _NORMADO.get(t)
+    if ws is None:
+        ws = _NORMADO[t] = [w for w in palabras(t)
+                            if len(w) > 2 and w not in VACIAS]
+    return list(ws)
 
 
 def beats_del_libreto(n):

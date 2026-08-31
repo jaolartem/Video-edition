@@ -38,8 +38,13 @@ Uso:
 import json
 import subprocess
 import sys
+import os
+
 
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gpu  # noqa: E402
+
 
 SAMPLE_EVERY_S = 15
 
@@ -55,7 +60,7 @@ def sample(video):
     medias de luma y croma apenas cambian al reducir.
     """
     proc = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", video,
+        ["ffmpeg", "-v", "error"] + gpu.decodifica() + ["-i", video,
          "-vf", f"fps=1/{SAMPLE_EVERY_S},scale=320:-1,signalstats,metadata=print:file=-",
          "-f", "null", "-"],
         capture_output=True, text=True,

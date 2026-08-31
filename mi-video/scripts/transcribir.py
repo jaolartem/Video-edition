@@ -69,6 +69,7 @@ import unicodedata
 import wave
 
 sys.path.insert(0, os.path.dirname(__file__))
+import gpu  # noqa: E402
 import registro  # noqa: E402
 import rutas  # noqa: E402
 
@@ -98,6 +99,10 @@ LARGA = 1.5      # una palabra no dura mas (aprendizaje 12)
 # misma ventana de 40 s: 4 -> 35,1 s; 8 -> 27,8 s; 12 -> 25,0 s; 16 -> 48,3 s.
 # Con 16 se sobresuscribe y **tarda mas del doble** que con 12, asi que no es
 # «cuantos mas mejor»: el valor esta medido, no supuesto.
+#
+# Con la tarjeta puesta este numero **ya no manda** —4 hilos 8,5 s contra 12
+# hilos 8,7 s, que es ruido— porque el encoder dejo de estar en la CPU. Se queda
+# en 12 porque sigue siendo el bueno para la caida a CPU. Ver `gpu.py`.
 HILOS = 12
 # Decodificacion voraz. Medido sobre la misma ventana de 30 s: beam 5 -> 17,0 s;
 # `-bs 1 -bo 1` -> 15,4 s con **0,992 de parecido** al de beam 5, o sea el mismo
@@ -173,7 +178,7 @@ def recorte(wav, a, b, destino, sr, anchura):
 
 def pasada(wav, salida, modelo=None):
     """whisper sobre una ventana, con granularidad de palabra."""
-    r = subprocess.run([os.path.join(W, "whisper-cli.exe"), "-m", modelo or MODELO, "-f", wav,
+    r = subprocess.run(gpu.whisper() + ["-m", modelo or MODELO, "-f", wav,
                     "-l", "es", "-mc", "0", "-ml", "1", "-sow", "-oj",
                     "-of", salida, "-np", "-nf", "-t", str(HILOS)] + VORAZ,
                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -375,9 +380,13 @@ def transcribir(toma, runs, verbose=True, modelo=None, paso=None):
 
     voz_wav = os.path.join(tmp, "voz.wav")
     mapa, dur, sr, anchura = sin_silencios(audio(toma), runs, voz_wav)
+    # Que corre esto se dice ANTES, no despues. Una corrida que iba a durar
+    # cuarenta minutos y dura ochenta no se nota mientras pasa.
+    d = gpu.aviso_si_cae("transcribir")
     if verbose:
         print(f"  {dur:.0f}s de voz en {len(runs)} tramos "
-              f"→ {int(dur // PASO) + 1} ventanas de {VENTANA:.0f}s")
+              f"→ {int(dur // PASO) + 1} ventanas de {VENTANA:.0f}s"
+              f"  ·  {d['tarjeta'] if d['backend'] else 'CPU'}")
 
     salto = paso or PASO
     ventanas = []
@@ -511,6 +520,14 @@ def guardar(toma, palabras, mapa, dudosos, modelo=None, paso=None):
     # lo que existe.
     json.dump({"toma": toma, "ventana": VENTANA, "paso": paso or PASO,
                "modelo": os.path.basename(modelo or MODELO).replace("ggml-", "").replace(".bin", ""),
+               # **Quien lo transcribio va en el sello.** El fichero ya declara
+               # con que modelo y con cuantas pasadas se hizo, por el mismo
+               # motivo: `comparar.py` contrasta dos corridas y sin saber de
+               # donde sale cada una la comparacion no significa nada. Ahora hay
+               # dos caminos —la tarjeta y la CPU— y aunque el texto sale igual
+               # (medido, 1,000 de parecido), eso es un hecho a comprobar en
+               # cada corrida, no una suposicion a heredar.
+               "dispositivo": gpu.sello(),
                SELLO: len(con_texto) and round(
                    sum(m["pasadas"] for m in con_texto) / len(con_texto), 2),
                "dudosos": dudosos,

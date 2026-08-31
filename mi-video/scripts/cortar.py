@@ -32,6 +32,7 @@ import sys
 import unicodedata
 
 sys.path.insert(0, os.path.dirname(__file__))
+import gpu  # noqa: E402
 import registro  # noqa: E402
 import rutas  # noqa: E402
 
@@ -115,9 +116,27 @@ def main():
                 saltados += 1
                 continue
             src = f"{rutas.ORIGEN}/{toma}.mp4"
+            # **Codificaba por la tarjeta y decodificaba en CPU.** El bruto es
+            # 4K y eso era la mitad del coste: 9,0 s -> 4,7 s en un corte de
+            # 12 s, **1,91x**.
+            #
+            # El `format=yuv420p` delante no es adorno, es la condicion. Con
+            # `-hwaccel` los frames vuelven en NV12 y `crop`/`scale` los tratan
+            # distinto: sin el, el corte salia con el 47,9% de los pixeles
+            # cambiados —PSNR 42,9 dB, invisible pero real— y esto es el video
+            # que se entrega. Con el, **el fichero sale con el mismo SHA-256**.
+            # Comprobado ademas que el codificador si es determinista: CPU
+            # contra CPU y tarjeta contra tarjeta dan cero diferencia.
+            #
+            # Y **no entra en `huella`** a proposito. La huella dice que corte
+            # es, no como se decodifico; meterlo ahi invalidaria los 452
+            # fragmentos y los volveria a cortar todos para producir los mismos
+            # bytes. Eso es rehacer el lote por una tuerca.
             r = subprocess.run(
-                ["ffmpeg", "-v", "error", "-y", "-ss", str(d), "-i", src,
-                 "-t", str(round(h - d, 3)), "-vf", filtro, *ENCODE, salida],
+                ["ffmpeg", "-v", "error", "-y"] + gpu.decodifica()
+                + ["-ss", str(d), "-i", src,
+                   "-t", str(round(h - d, 3)),
+                   "-vf", "format=yuv420p," + filtro, *ENCODE, salida],
                 capture_output=True, text=True)
             if r.returncode != 0 or not os.path.exists(salida):
                 registro.error("cortar", "no se pudo cortar el fragmento",
