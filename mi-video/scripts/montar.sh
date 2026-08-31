@@ -38,6 +38,12 @@ source "$(dirname "$0")/entorno.sh"
 # reproducir el defecto en las seis piezas. Es barato —lee ficheros— y va
 # primero justo por eso.
 node scripts/guardas.mjs
+# **Y la fuente de verdad de cada decision, comprobada.** Jaime: *«deja clara
+# en codigo la fuente de verdad»*. Una correccion que se escribe en una copia y
+# un render que lee la otra no falla al corregir: falla al entregar, y calla.
+# Va aqui, al lado de las guardas, y por el mismo motivo — lee ficheros y es
+# barato, asi que se paga antes de gastar el peldano caro.
+python scripts/verdad.py
 
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
@@ -63,6 +69,8 @@ done
 # del embudo. Lo que cambia es que al final se dice cuales faltan y se sale con
 # error, para que la fase no avance sobre un hueco.
 BLOQUEADAS=()
+#: Piezas cuyo render salio byte a byte igual que el anterior.
+IDENTICAS=()
 
 # **Paso 1: los subtitulos de toda la cinta, y van delante de todo.** El montaje
 # leia una sola pasada de whisper y la trataba como verdad; el modelo se come
@@ -207,6 +215,29 @@ for r in "${REELS[@]}"; do
   # Estuvo suelto y por eso las entregas salian mudas de musica: un paso que hay
   # que acordarse de correr no es un paso del proceso, es una intencion. Si
   # falta el mp3 de la pieza, masteriza solo la voz y lo dice.
+  # **Si el render sale IDENTICO al anterior, se dice.**
+  #
+  # Cuatro entregas iguales seguidas, y ninguna maquina lo noto: se re-cortaba,
+  # se re-describia, se re-renderizaba, y el fichero salia byte a byte igual.
+  # Jaime lo dijo cuatro veces —*«el mismo video»*, *«me has dado los mismos
+  # videos 3 o 4 veces»*— y era el unico que lo estaba comprobando.
+  #
+  # Un render identico no es un error: es informacion. Significa que lo que se
+  # cambio no llega a la pantalla, y eso es exactamente lo que hay que saber
+  # ANTES de entregar, no despues de que alguien lo mire por cuarta vez.
+  #
+  # Se compara la huella del video, no la del fichero: los metadatos llevan
+  # fecha y harian que dos renders identicos parecieran distintos.
+  HUELLA_ANTES=""
+  [ -f "$DESTINO/reels/reel-R$n.sha" ] && HUELLA_ANTES=$(cat "$DESTINO/reels/reel-R$n.sha")
+  HUELLA=$(ffmpeg -v error -i "$DESTINO/reels/reel-R$n.mp4" -map 0 -c copy -f hash -hash sha256 - 2>/dev/null | tail -1)
+  echo "$HUELLA" > "$DESTINO/reels/reel-R$n.sha"
+  if [ -n "$HUELLA_ANTES" ] && [ "$HUELLA" = "$HUELLA_ANTES" ]; then
+    echo "  OJO: Reel-R$n sale IDENTICO al render anterior."
+    echo "       Lo que se cambio no llega a la pantalla. No lo entregues como nuevo."
+    IDENTICAS+=("R$n")
+  fi
+
   bash scripts/musica.sh "$n"
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done
@@ -221,5 +252,8 @@ if [ ${#BLOQUEADAS[@]} -gt 0 ]; then
   echo "MONTAJE INCOMPLETO — ${#BLOQUEADAS[@]} pieza(s) sin renderizar:"
   for b in "${BLOQUEADAS[@]}"; do echo "  · $b"; done
   exit 1
+fi
+if [ ${#IDENTICAS[@]} -gt 0 ]; then
+  echo "SIN CAMBIOS EN PANTALLA — ${IDENTICAS[*]} salieron identicas al render anterior."
 fi
 echo "MONTAJE COMPLETO"

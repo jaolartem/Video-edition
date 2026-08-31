@@ -163,12 +163,43 @@ const sql = (q, args = []) =>
   });
 
 /** El esquema se comprueba aquí: lo que no encaja se rechaza. */
+const KIND_DE = {
+  TwoPaths: "comparacion",
+  ComparisonTable: "comparacion",
+  CausalChain: "causal",
+  BeliefSwap: "comparacion",
+  ThenNow: "comparacion",
+  EvidenceCard: "acumulacion",
+};
+
 function valida(d) {
   for (const [k, admitidos] of Object.entries(CAMPOS)) {
     if (!(k in d)) throw new Error(`falta «${k}»`);
     if (admitidos && !admitidos.includes(d[k])) {
       throw new Error(`«${k}» = ${JSON.stringify(d[k])} no es de la lista`);
     }
+  }
+  /**
+   * **Un componente sin `tablero` es una etapa que no va a cambiar nunca.**
+   *
+   * El contenido del tablero vivía en un literal por pieza y la descripción no
+   * lo tocaba: cuatro entregas idénticas, y Jaime contándolas una a una. Ahora
+   * el campo existe (`escena_desc.tablero`) y lo lee el render — pero si este
+   * paso no lo escribe, la etapa se queda con lo que hubiera, que es
+   * exactamente el mismo agujero por dentro.
+   *
+   * Así que se exige donde tiene sentido exigirlo: si la etapa declara un
+   * componente, tiene que traer su contenido.
+   */
+  if (d.componente && d.componente !== "ninguno") {
+    const t = d.tablero;
+    if (!t || typeof t !== "object" || !t.props) {
+      throw new Error(
+        `«tablero» falta y la etapa declara componente «${d.componente}»:` +
+        ` sin él, el tablero se queda con lo que ya hubiera y la descripción` +
+        ` no llega a la pantalla`);
+    }
+    if (!t.kind) t.kind = KIND_DE[d.componente] ?? "comparacion";
   }
   return d;
 }
