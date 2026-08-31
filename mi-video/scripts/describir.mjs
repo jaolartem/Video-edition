@@ -267,6 +267,33 @@ function describePieza(slug, filas) {
   dejaPedido(slug, entrada);
   const arr = porCli(entrada);
   if (!arr) return null;
+  /**
+   * **Una respuesta a medias no se guarda como la respuesta.**
+   *
+   * Esto la escribia en `<slug>.respuesta.json` sin mirar si cubria lo pedido,
+   * y a partir de ahi `leeRespuesta` la devolvia en CADA vuelta: el paso
+   * repetia el mismo hueco para siempre. reel-01 contesto 1 de 4 dos veces
+   * seguidas y reel-06 dio cuatro vueltas con la etapa 7 — el mismo motivo
+   * cada vez, que es justo lo que `avanzar` detecta como bucle y no podia
+   * arreglar, porque el arreglo estaba aqui.
+   *
+   * Regla de Jaime: *«si sale error, paras, reparas el pipeline, no un parche;
+   * el problema resuelto y vuelves a correr»*. La reparacion es no cachear una
+   * respuesta incompleta: el pedido ya esta escrito -`dejaPedido` va antes de
+   * preguntar- asi que dejandolo abierto cualquiera puede contestarlo, que es
+   * la via que ya existe para cuando el CLI no puede.
+   */
+  const pedidas = new Set(filas.map((f) => Number(f.orden)));
+  const traidas = new Set(arr.map((d) => Number(d.etapa_orden)));
+  const faltan = [...pedidas].filter((o) => !traidas.has(o));
+  if (faltan.length) {
+    console.error(
+      `  ${slug}: el CLI contesto ${traidas.size}/${pedidas.size} —` +
+        ` faltan las etapas [${faltan.join(", ")}]. La respuesta parcial NO se` +
+        ` guarda: el pedido queda abierto.`,
+    );
+    return null;
+  }
   fs.writeFileSync(rutaRespuesta(slug), JSON.stringify(arr, null, 1));
   return arr.map(valida).map((d) => ({ ...d, quien: "cli" }));
 }

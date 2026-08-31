@@ -753,6 +753,191 @@ def sin_aire(slug, ver=False):
     return quitado
 
 
+# ── el corte cae donde no suena ──────────────────────────────────────────────
+#
+# **Un corte no se pone a mitad de vocal.** Jaime, despues de verlo volver:
+# *«los cortes siguen solapando palabras, no estan limpios»*, y acto seguido lo
+# que lo cierra: *«pero si eso ya lo hemos pasado al menos unas 20 veces; eso
+# debe estar en codigo»*.
+#
+# Tenia razon en las dos cosas. Se estaba encontrando a mano, vuelta tras
+# vuelta, con un agente leyendo el dossier y devolviendo «sobra "mas"», «falta
+# "ano"». Eso no es un hallazgo: es un paso que faltaba.
+#
+# **Y no exige entender ninguna frase**, que es lo que decide si algo puede ir
+# en codigo: un corte suena mal cuando cae donde el audio esta fuerte —en medio
+# de una vocal— y suena limpio cuando cae en un minimo de energia: entre
+# palabras, en una oclusiva, en el aire. Eso se mide en la onda.
+#
+# **Por que no bastaba con `_a_la_palabra` (C-135, C-137).** Ese ajuste va a la
+# frontera de palabra **segun el transcript**, y el transcript entra 0,25 s
+# tarde de mediana y sale 0,05-0,14 s pronto, con 0,7 s de dispersion entre p10
+# y p90 — medido sobre las ocho cintas. O sea que la frontera que dice el texto
+# no es donde de verdad deja de sonar la palabra. Este paso no pregunta al
+# texto: mira la senal.
+VENTANA_CALLADO = 0.12   # cuanto se permite mover un corte: +-120 ms
+GRANO = 0.005            # cada 5 ms
+MEDIDA = 0.020           # RMS sobre 20 ms
+GANA = 3.0               # solo se mueve si baja al menos 3 dB
+PUERTA = 12.0            # por encima de esto, el corte se OYE sucio
+
+
+def _onda(toma, _cache={}):
+    """La senal de la cinta, entera y en memoria. Se lee una vez por cinta."""
+    if toma in _cache:
+        return _cache[toma]
+    import wave as _w
+    try:
+        import numpy as np
+    except ImportError:                                   # noqa: BLE001
+        _cache[toma] = (None, None)
+        return _cache[toma]
+    ruta = None
+    for cand in (f"work/audio/{toma}_full.wav", f"work/audio/{toma}.wav"):
+        if os.path.exists(cand):
+            ruta = cand
+            break
+    if ruta is None:
+        _cache[toma] = (None, None)
+        return _cache[toma]
+    with _w.open(ruta, "rb") as f:
+        sr = f.getframerate()
+        x = np.frombuffer(f.readframes(f.getnframes()), dtype=np.int16)
+        if f.getnchannels() > 1:
+            x = x.reshape(-1, f.getnchannels()).mean(axis=1)
+    _cache[toma] = (x.astype(np.float32) / 32768.0, sr)
+    return _cache[toma]
+
+
+def _energia(x, sr, t):
+    import numpy as np
+    a = int(max(0, (t - MEDIDA / 2) * sr))
+    b = int(min(len(x), (t + MEDIDA / 2) * sr))
+    return float(np.sqrt(np.mean(x[a:b] ** 2))) if b > a else 0.0
+
+
+def _a_lo_callado(toma, t, hacia):
+    """Mueve el corte al punto mas callado que haya a menos de `VENTANA_CALLADO`.
+
+    **La ventana se ancla al corte ORIGINAL, no al movido.** Sin eso el paso no
+    converge: cada movimiento arrastra la ventana con el, la ventana nueva abre
+    territorio que la vieja no cubria, y a la pasada siguiente vuelve a haber
+    donde bajar. Medido: 10 cortes sucios en reel-01, se aplica, quedan 6; se
+    aplica otra vez, quedan menos. Un paso que nunca termina no es un paso — es
+    lo que Jaime lleva veinte vueltas viendo a mano.
+
+    Anclada, la respuesta es un punto fijo: el minimo de un intervalo que no se
+    mueve. Correrlo dos veces da lo mismo, que es lo que permite que la puerta
+    pregunte por el en seco.
+
+    `hacia` queda como documentacion del lado del corte; el intervalo es
+    simetrico a proposito — 120 ms no cambian lo que se dice, solo donde se pega
+    la tijera.
+    """
+    import numpy as np
+    del hacia
+    x, sr = _onda(toma)
+    if x is None:
+        return t, 0.0
+    aqui = _energia(x, sr, t)
+    if aqui <= 1e-6:
+        return t, 0.0
+    # El intervalo se calcula UNA vez, sobre el corte que trae el EDL.
+    lo, hi = t - VENTANA_CALLADO, t + VENTANA_CALLADO
+    mejor, mejor_e = t, aqui
+    u = lo
+    while u <= hi:
+        if 0 < u < len(x) / sr:
+            e = _energia(x, sr, u)
+            if e < mejor_e:
+                mejor, mejor_e = u, e
+        u += GRANO
+    if mejor_e <= 0 or aqui / max(mejor_e, 1e-9) < 10 ** (GANA / 20):
+        return t, 0.0
+    return round(mejor, 3), 20 * float(np.log10(aqui / max(mejor_e, 1e-9)))
+
+
+def _pasada_callado(slug, ver, minimo):
+    """Una pasada: mueve cada corte al minimo de su ventana. Devuelve (n, dB)."""
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0, 0.0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    bar = GANA if minimo is None else minimo
+    movidos, ganado = 0, []
+    for i, ((a, b), d) in enumerate(zip(edl["segmentos"], edl["detalle"])):
+        toma = d.get("toma") or rutas.TOMAS.get(slug)
+        if not toma:
+            continue
+        na, ga = _a_lo_callado(toma, float(a), "entra")
+        nb, gb = _a_lo_callado(toma, float(b), "sale")
+        if ga < bar:
+            na, ga = float(a), 0.0
+        if gb < bar:
+            nb, gb = float(b), 0.0
+        if nb - na <= 0.25:               # no se estrecha un tramo hasta romperlo
+            continue
+        if na != float(a) or nb != float(b):
+            movidos += (na != float(a)) + (nb != float(b))
+            ganado += [g for g in (ga, gb) if g > 0]
+            if not ver:
+                edl["segmentos"][i] = [na, nb]
+                edl["detalle"][i] = {**d, "start": na, "end": nb}
+    if movidos and not ver:
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    return movidos, (sum(ganado) / len(ganado) if ganado else 0.0)
+
+
+#: Tope de pasadas. Con la ventana de 120 ms converge en dos o tres; el tope
+#: existe para que un caso raro no cuelgue el montaje, no porque se espere.
+VUELTAS_CALLADO = 6
+
+
+def a_lo_callado(slug, ver=False, minimo=None):
+    """Pega los cortes al punto callado **hasta que deja de moverlos**.
+
+    ## Por que itera, que es lo que costo la vuelta
+
+    Una sola pasada no era un punto fijo: la ventana de busqueda se mueve CON el
+    corte, asi que despues de bajar al minimo de su ventana el corte tiene una
+    ventana nueva, que abre territorio que la vieja no cubria. Medido en
+    reel-01: 21 cortes movidos, se vuelve a preguntar y quedan 10; se aplica,
+    quedan 6. Cada pasada la mitad, sin llegar nunca.
+
+    Y eso importa mas de lo que parece, porque **la puerta pregunta por este
+    mismo paso en seco** (`verificar.py`): si el paso no converge, la puerta no
+    se puede pasar nunca, y una puerta que no se puede pasar esta rota.
+
+    Iterando hasta que no mueve nada, la segunda llamada devuelve cero. Ese es
+    el contrato entre el paso y la puerta.
+
+    ## Las dos barras, y son distintas a proposito
+
+    `GANA` (3 dB) es cuando MERECE LA PENA mover: mejorar es gratis.
+    `PUERTA` (12 dB) es cuando el corte SE OYE sucio. La puerta usa la segunda:
+    exigirle el optimo a una pieza es no dejarla salir nunca.
+    """
+    total, medio = 0, []
+    for _ in range(1 if ver else VUELTAS_CALLADO):
+        n, db = _pasada_callado(slug, ver, minimo)
+        if not n:
+            break
+        total += n
+        if db:
+            medio.append(db)
+    if not total:
+        return 0
+    db = sum(medio) / len(medio) if medio else 0.0
+    if ver:
+        print(f"  {slug}: moveria {total} corte(s), {db:.0f} dB mas callados")
+        return total
+    registro.nota("costuras", "cortes pegados a lo callado",
+                  detalle=f"{slug}: {total} corte(s), {db:.0f} dB")
+    print(f"  {slug}: {total} corte(s) pegados a lo callado ({db:.0f} dB)")
+    return total
+
+
 def arreglar(slug, ver=False):
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
@@ -761,6 +946,10 @@ def arreglar(slug, ver=False):
     # cae cada empalme, asi que medir las costuras antes seria medir las de
     # otro corte.
     sin_aire(slug, ver=ver)
+    # **Y despues de recortar, se pega a lo callado.** El orden importa: primero
+    # la voz y la palabra (C-135, C-137), que deciden QUE entra; luego esto, que
+    # decide DONDE se pega la tijera dentro de un margen de 120 ms.
+    a_lo_callado(slug, ver=ver)
     edl = json.load(open(ruta, encoding="utf-8"))
     cache = {}
     movidas, duras, total = 0, [], 0

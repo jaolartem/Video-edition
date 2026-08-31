@@ -121,9 +121,33 @@ const SONIDOS = [
   [/distorsi|glitch|corte sucio/i, "glitch"],
 ];
 
-export const sonidoDe = (sonido) => {
+/**
+ * Lo que se describió y no sonó. Se acumula y lo lee `reels-spec.mjs`, que es
+ * quien puede decirlo con el reel y la etapa delante.
+ */
+export const sonidosMudos = [];
+
+export const sonidoDe = (sonido, donde = "") => {
   if (!sonido) return null;
   for (const [re, m] of SONIDOS) if (re.test(sonido)) return m;
+  /**
+   * **Un sonido descrito que no suena tiene que decirlo.**
+   *
+   * Esto devolvía `null` en silencio, y el propio contrato lo llevaba escrito
+   * como deuda: *«texto libre: lo que `sonidoDe` no reconozca cae en silencio.
+   * O es lista cerrada, o `sonidoDe` avisa»*. Se pagó al oír el reel-01
+   * montado — Jaime: *«el tablero sin sonido»*, y después *«el sonido del
+   * tablero deben ser las acciones animadas del tablero»*.
+   *
+   * Quien compone escribe frases como «zumbido corto ascendente mientras la
+   * barra sube, un golpe metálico seco al cruzar el umbral». Si ninguna
+   * expresión de `SONIDOS` la reconoce, la capa se monta muda **y nadie se
+   * entera**: la descripción existe, está bien escrita, y no produce nada.
+   *
+   * No se inventa un sonido —eso rompería la regla de que el sonido sigue al
+   * movimiento— pero tampoco se calla: se anota con su sitio.
+   */
+  sonidosMudos.push({ donde, dice: String(sonido).slice(0, 90) });
   return null;
 };
 
@@ -175,7 +199,7 @@ export const CAMINOS = {
       const clave = at + Math.round(GANCHO_CLAVE_S * FPS);
       const tipo = esTipografico(desc?.grafico);
       const fig = tipo ? null : figuraDe(desc?.grafico);
-      const motion = sonidoDe(desc?.sonido);
+      const motion = sonidoDe(desc?.sonido, `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`);
       const out = [];
 
       // 1 · El plano se mueve dentro de sí mismo. No es un plano fijo con cosas
@@ -303,7 +327,7 @@ export const CAMINOS = {
     porque: "la idea es compleja y el espectador no puede rebobinar",
     capas(ctx) {
       const { at, duration, desc, det } = ctx;
-      const motion = sonidoDe(desc?.sonido);
+      const motion = sonidoDe(desc?.sonido, `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`);
       return [
         {
           tipo: "tablero",
@@ -404,7 +428,7 @@ export const CAMINOS = {
     capas(ctx) {
       const { at, duration, desc, det, lado } = ctx;
       const fig = figuraDe(desc?.grafico) ?? det.figura ?? null;
-      const motion = sonidoDe(desc?.sonido);
+      const motion = sonidoDe(desc?.sonido, `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`);
       const t = at + Math.round(0.5 * FPS);
       const out = [];
       if (fig) {

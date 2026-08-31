@@ -67,15 +67,67 @@ export const sfxFile: Record<Motion, string> = {
   glitch: "sfx/glitch.wav",
 };
 
-/** Nivel por defecto de cada efecto. Bajo a propósito: la voz manda. */
+/**
+ * Nivel de cada efecto, **derivado del pico real de su fichero**.
+ *
+ * Era un número por efecto puesto a ojo, con la regla correcta detrás —*«la voz
+ * manda»*— y el resultado equivocado: Jaime, viendo el reel-01 montado, *«el
+ * tablero sin sonido»*. Y tenía razón, con la aritmética delante:
+ *
+ *   `mark.wav` pica a −17,5 dBFS · a 0,18 son −14,9 dB · en la mezcla, −32,4
+ *
+ * Después `musica.sh` normaliza a −14 LUFS con la voz mandando, así que el clic
+ * quedaba **unos 20 dB por debajo de la voz, durando 140 ms, encima de una
+ * frase hablada**. Eso no es «por debajo de la voz»: es inaudible. La prueba
+ * cruzada estaba en el propio lote — `glitch.wav` pica a −7,4 dB, diez más
+ * alto, y ése sí se oía.
+ *
+ * El fallo de fondo es que el número no dependía del fichero. Los efectos los
+ * sintetiza `scripts/sfx.sh` y cada uno sale con su propio pico —de −7,4 a
+ * −17,5, diez decibelios de diferencia entre ellos—, así que un volumen fijo
+ * por efecto significa siete niveles distintos sin querer.
+ *
+ * Ahora cada nivel se calcula para dejar el efecto en un pico objetivo, y el
+ * objetivo se declara al lado. La regla de Jaime sigue mandando: todos quedan
+ * por debajo de la voz, que en el máster pica alrededor de −12 dBFS.
+ */
+const PICO_DEL_FICHERO: Record<Motion, number> = {
+  // Medido con `ffmpeg -af volumedetect` sobre `public/sfx/`. Si se regeneran
+  // los efectos, se vuelve a medir: es lo que hace que el nivel signifique algo.
+  mark: -17.5,
+  draw: -16.5,
+  fork: -15.6,
+  land: -12.6,
+  type: -9.6,
+  whoosh: -15.5,
+  glitch: -7.4,
+};
+
+/**
+ * Dónde tiene que picar cada efecto en la mezcla, en dBFS. Un transitorio se
+ * oye entre 8 y 12 dB por debajo de la voz; por debajo de 20 desaparece.
+ */
+const PICO_OBJETIVO: Record<Motion, number> = {
+  mark: -21,      // el clic de cada entrada: tiene que leerse, no destacar
+  draw: -22,      // continuo y largo, molesta antes que el clic
+  fork: -21,
+  land: -18,      // el remate: es el que cierra el tablero
+  type: -24,      // se repite mucho, así que va más abajo
+  whoosh: -21,
+  glitch: -14,    // tapa un corte: es el único que puede pisar la voz
+};
+
+const nivel = (m: Motion): number =>
+  Math.min(1, 10 ** ((PICO_OBJETIVO[m] - PICO_DEL_FICHERO[m]) / 20));
+
 export const sfxVolume: Record<Motion, number> = {
-  mark: 0.18,
-  draw: 0.14,
-  fork: 0.2,
-  land: 0.3,
-  type: 0.16,
-  whoosh: 0.22,
-  glitch: 0.26,
+  mark: nivel("mark"),
+  draw: nivel("draw"),
+  fork: nivel("fork"),
+  land: nivel("land"),
+  type: nivel("type"),
+  whoosh: nivel("whoosh"),
+  glitch: nivel("glitch"),
 };
 
 export const sfxSrc = (motion: Motion): string => staticFile(sfxFile[motion]);

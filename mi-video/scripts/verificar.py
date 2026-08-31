@@ -221,6 +221,46 @@ def revisar(slug):
                 f" — es rearranque del hablante o repeticion del corte, no"
                 f" enfasis")
 
+    # 6b · **El sonido también pasa por la puerta.**
+    #
+    # Jaime: *«el sonido también forma parte de la verificación final»*, dicho
+    # después de oír el reel-01 montado y encontrar dos cosas que ninguna puerta
+    # miraba: cortes que se oyen sucios y un tablero mudo.
+    #
+    # **Los cortes.** No se comprueba con una regla propia: se le pregunta al
+    # paso que los arregla si todavía movería alguno. Una puerta con su propio
+    # criterio se separa del arreglo en la primera corrección, y entonces avisa
+    # de lo que ya está bien o calla lo que está mal. Aquí no puede pasar,
+    # porque es el mismo código en seco.
+    import costuras as _co
+
+    quedan = _co.a_lo_callado(slug, ver=True, minimo=_co.PUERTA)
+    if quedan:
+        mal.append(f"{slug}: {quedan} corte(s) caen en pleno sonido y hay un"
+                   f" punto callado a menos de 120 ms. Corre el paso `cosido`.")
+
+    # **El tablero mudo.** Un tablero se construye por tiempo de lectura: cada
+    # nodo entra cuando el anterior ya se pudo leer, o sea que **es una
+    # animación**, y la ley del proyecto es que el sonido sigue al movimiento.
+    # Jaime lo dijo así: *«el sonido del tablero deben ser las acciones animadas
+    # del tablero»*. Un tablero sin `sound` es una animación que nadie oye.
+    spec = "src/reels.json"
+    if os.path.exists(spec):
+        try:
+            n_reel = int(slug[-2:])
+            for r in json.load(open(spec, encoding="utf-8")):
+                if r.get("id") != f"Reel-R{n_reel}":
+                    continue
+                mudos = [b for b in r.get("boards", [])
+                         if not (b.get("props") or {}).get("sound")]
+                if mudos:
+                    mal.append(
+                        f"{slug}: {len(mudos)} tablero(s) sin sonido. El tablero"
+                        f" se construye por tiempo de lectura: es animación, y"
+                        f" el sonido sigue al movimiento.")
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
     # 7 · **Un tramo fijado que no llegó al corte es una decisión perdida.**
     #
     # Fijar una etapa es declarar cuál es su tramo, y esa decisión tiene que

@@ -16,7 +16,7 @@
 import fs from "fs";
 import { execFileSync } from "child_process";
 import { DatabaseSync } from "node:sqlite";
-import { construir, revisarPieza } from "./caminos.mjs";
+import { construir, revisarPieza, sonidosMudos } from "./caminos.mjs";
 
 const FPS = 30;
 /**
@@ -577,6 +577,41 @@ const TABLEROS = {
       },
       condicion:
         "No aplica a todos los negocios ni a toda la utilidad, y depende de la provincia. Consúltelo.",
+    },
+  }],
+  // R7 · Polarizing Thesis · el beat que carga el argumento.
+  //
+  // **La cinta no tiene ni una cifra en 160 s**, y Polarizing Thesis pone
+  // «cálculo o evidencia» en la tercera etapa: sin este tablero la pieza es
+  // actitud entera. La cifra la aprobó Jaime —*«sí, puede ser lo que
+  // propones»*— y son las mismas fuentes que ya sostienen reel-03, no copias:
+  // una cifra con dos fichas distintas es una cifra sin ficha.
+  //
+  // **Tres bloques, no ocho.** Criterio suyo, y está en `docs/canon.md`: *«el
+  // tablero es un mecanismo de reducir carga cognitiva, esa es su función:
+  // facilitar la decisión»*. La premisa fija lo que NO cambia —la facturación—
+  // para que lo único que se lea distinto sean las dos cifras.
+  //
+  // **Y el 32% se rotula PROYECCIÓN.** No lo publica ninguna fuente: sale de la
+  // mezcla salario/dividendos y depende del caso. Rotularlo como dato medido
+  // sería exactamente lo que el piso prohíbe.
+  "reel-07": [{
+    beat: 3,
+    kind: "comparacion",
+    props: {
+      premisa: "Misma facturación · dos estructuras",
+      izquierda: {
+        titulo: "Todo salario",
+        cifra: "53,53%",
+        pie: "Tasa marginal en Ontario.",
+      },
+      derecha: {
+        titulo: "Salario + dividendos",
+        cifra: "32%",
+        pie: "PROYECCIÓN. Exige sociedad incorporada.",
+      },
+      remate: "La misma plata, dos resultados distintos",
+      sound: true,
     },
   }],
 };
@@ -2622,6 +2657,25 @@ if (parados.length) {
  * invisible, que era el problema: *«hay muchas decisiones sueltas que
  * simplemente no se están cumpliendo»*.
  */
+/**
+ * **Un sonido descrito que no suena entra aqui, no se calla.**
+ *
+ * `sonidoDe` reconoce la descripcion de la escena por expresiones —«golpe
+ * seco», «se traza», «barrido»—; lo que no encaja con ninguna se montaba mudo
+ * sin decir nada, con la descripcion escrita y correcta. Jaime, oyendo el
+ * reel-01: *«el tablero sin sonido»*, y la regla que lo ordena: *«el sonido del
+ * tablero deben ser las acciones animadas del tablero»*.
+ *
+ * No se inventa el sonido —eso romperia la ley de que el sonido sigue al
+ * movimiento— pero se dice que etapa lo describio y que escribio, que es lo
+ * que permite arreglarlo en la descripcion, que es de donde sale.
+ */
+for (const s of sonidosMudos) {
+  faltas.push(
+    `${s.donde}: describe un sonido que no suena — «${s.dice}». Ninguna ` +
+    `expresion de SONIDOS lo reconoce, asi que la capa se monta muda.`,
+  );
+}
 if (faltas.length) {
   console.log(`\nFALTAS DE CAMINO — ${faltas.length}:`);
   for (const f of faltas) console.log(`  · ${f}`);
