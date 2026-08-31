@@ -19,3 +19,9 @@ mi-video/.parcel-cache/
 # La base de decisiones pesa 1 MB y es el registro de todo lo decidido —
 # libretos, elecciones, descripciones, revisiones. Sin ella el repo tiene el
 # código pero no la memoria.
+
+# El diario transitorio de SQLite: existe solo mientras hay una transaccion
+# abierta, y comprometerlo guarda el estado A MEDIAS de una escritura.
+*.db-journal
+*.db-wal
+*.db-shm
