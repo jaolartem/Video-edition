@@ -49,8 +49,27 @@ class ServicioRespaldo(Servicio):
             # Una pieza sin cifras en pantalla no tiene nada que respaldar, y
             # eso es un pase legítimo, no un hueco.
             return Resultado(True, salida="ninguna cifra en pantalla")
+        # **Y el catalogo de fuentes ya comprobadas.** Sin esto, cada vuelta
+        # empieza de cero: quien contesta no sabe que la tasa que busca ya se
+        # verifico para otra pieza, y o la vuelve a buscar o la deja sin
+        # respaldo. Son las mismas cifras en seis anuncios del mismo tema.
+        #
+        # Se manda el catalogo, no la asignacion: cual fuente sostiene cual
+        # cifra sigue siendo la decision del paso.
+        try:
+            import sqlite3 as _s
+
+            _c = _s.connect("ads/decisiones.db")
+            _c.row_factory = _s.Row
+            catalogo = [dict(x) for x in _c.execute(
+                "select rotulo, organismo, url, vigencia, cita from fuente"
+                " where url is not null and url <> '' order by rotulo")]
+            _c.close()
+        except Exception:                          # noqa: BLE001
+            catalogo = []
         prompt = open(fuentes.PROMPT, encoding="utf-8").read()
-        r = contrato.pedir("fuentes", pieza.slug, prompt, filas)
+        r = contrato.pedir("fuentes", pieza.slug,
+                           prompt, {"cifras": filas, "catalogo": catalogo})
         if r is None:
             return Resultado(
                 False,
