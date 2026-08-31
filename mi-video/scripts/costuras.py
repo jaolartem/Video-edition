@@ -329,6 +329,83 @@ def ataques(slug, ver=False):
     return tocados
 
 
+# Lo que se deja despues de la ultima palabra: el aire justo para que la frase
+# cierre sin sonar cortada. Mas que esto ya es silencio, y el silencio se declara.
+COLA = 0.25
+
+
+def colas(slug, ver=False):
+    """Ningun trozo entra antes de hablar ni se queda despues de callar.
+
+    Jaime, sobre las piezas largas: *«ve cortando silencios entre frases, que
+    quede todo muy justo»*, y luego la prediccion: *«eso da unos segundos
+    siempre»*. Lo medi antes de tocar nada y el aire **no estaba entre frases**
+    —`plan-reel` ya corta cualquier hueco de mas de 0,16 s— sino en los bordes de
+    cada trozo, y concentrado en unos pocos:
+
+        reel-06 e3   5,40 s despues de la ultima palabra
+        reel-06 e5   3,12 s antes de la primera
+        reel-05 e9   4,82 s despues de callar
+
+    En el lote son 15,4 s en reel-06 y 9,1 en reel-05: la primera baja de 129 a
+    114 **sin tocar una sola idea**. Tenia razon en que siempre da segundos, y
+    daba mas de los que parecia.
+
+    Es aritmetica —un trozo que no dice nada en sus extremos no dice nada— y por
+    eso corre sola. Con dos respetos:
+
+    - **La pausa declarada no se toca.** Regla suya: quitar aire es aritmetica,
+      *conservarlo* es una decision, y se declara con `[pausa]` en el libreto de
+      esa etapa. Ahi el silencio es el trabajo del beat.
+    - **El ataque tampoco.** Por delante se deja `ATAQUE`, que es lo que hace que
+      se oiga la consonante con la que arranca la palabra (C-101).
+    """
+    import transcribir
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return 0
+    edl = json.load(open(ruta, encoding="utf-8"))
+    segs, det = edl["segmentos"], edl["detalle"]
+    try:
+        import consulta
+
+        pausas = {int(k) for k in (consulta.pausas(slug) or {})}
+    except Exception:                              # noqa: BLE001
+        pausas = set()
+    cache, ganado, tocados = {}, 0.0, 0
+    for i, ((a0, b0), d) in enumerate(zip(segs, det)):
+        if d.get("beat") in pausas:
+            continue
+        toma = d.get("toma")
+        if toma not in cache:
+            try:
+                cache[toma] = sorted(transcribir.exigir(toma)["segmentos"],
+                                     key=lambda w: w["start"])
+            except SystemExit:
+                cache[toma] = []
+        ws = [w for w in cache[toma] if transcribir.suena(w, a0, b0)]
+        if not ws:
+            continue
+        na = max(a0, ws[0]["start"] - ATAQUE)
+        nb = min(b0, ws[-1]["end"] + COLA)
+        if (na - a0) + (b0 - nb) < 0.15:
+            continue
+        ganado += (na - a0) + (b0 - nb)
+        tocados += 1
+        if ver:
+            print(f"  {slug} e{d.get('beat')}: [{a0:.2f}-{b0:.2f}] ->"
+                  f" [{na:.2f}-{nb:.2f}]  (-{(na - a0) + (b0 - nb):.2f}s)")
+        else:
+            segs[i] = [round(na, 3), round(nb, 3)]
+    if tocados and not ver:
+        edl["duracion_s"] = round(sum(y - x for x, y in segs), 2)
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    print(f"{slug}: {tocados} trozo(s) ajustados al habla, -{ganado:.1f}s")
+    return tocados
+
+
 def mudos(slug, ver=False):
     """Fuera los trozos que no dicen ni una palabra entera.
 
@@ -769,6 +846,8 @@ def main():
             # Despues de cuadrar los bordes a palabra entera, porque es ese
             # ajuste el que deja el corte pegado al ataque.
             ataques(slug, ver=a.ver)
+            # Y fuera el aire de los bordes, que es donde estaba.
+            colas(slug, ver=a.ver)
             mudos(slug, ver=a.ver)
             arreglar(slug, ver=a.ver)
 

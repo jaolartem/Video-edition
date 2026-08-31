@@ -297,6 +297,30 @@ CREATE TABLE IF NOT EXISTS hueco_oido (
   fecha     TEXT,
   UNIQUE (toma, desde, hasta)
 );
+
+-- Lo que la POSTPRODUCCION le hace a una etapa cuando la cinta no da mas.
+--
+-- Hay tibiezas que no se arreglan editando: la toma es la que es y no hay otra
+-- mejor en las siete cintas. Jaime, al ver el mecanismo del reel-01 condenado a
+-- ir grave: *«ahora estas son las tomas que hay, podemos intentar hacer cosas en
+-- postproduccion para esto — subir un poquito el registro pasando la voz a 1.15x
+-- de velocidad en ciertos espacios»*.
+--
+-- **Y el factor entra en el reloj de la pieza, no encima.** Una escena a 1,15x
+-- dura menos en el montaje que en la cinta, asi que `plan-reel` avanza por
+-- `duracion / velocidad`. Si esto no fuera asi volveriamos a tener dos lineas de
+-- tiempo, que es el fallo mas caro de esta sesion (C-97 y C-103).
+CREATE TABLE IF NOT EXISTS tratamiento (
+  id          INTEGER PRIMARY KEY,
+  video_slug  TEXT NOT NULL,
+  etapa_orden INTEGER NOT NULL,
+  -- 1.0 es sin tocar. Por encima de ~1,2 se nota como prisa, no como energia.
+  velocidad   REAL NOT NULL DEFAULT 1.0,
+  por_que     TEXT NOT NULL,
+  quien       TEXT,
+  fecha       TEXT,
+  UNIQUE (video_slug, etapa_orden)
+);
 """
 
 # El ciclo completo, en orden. Cada fase dice **que servicio la mueve a la
