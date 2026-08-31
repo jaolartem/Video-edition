@@ -1236,8 +1236,15 @@ def main():
 
     # La cinta propia primero —para que la cadena secuencial siga teniendo
     # sentido— y detras el resto del corpus.
+    # **El corpus se descubre, no se lee del mapa.** Esto decia
+    # `rutas.TOMAS.values()`, que es el mapa reel -> cinta escrito a mano, y por
+    # eso la busqueda no salia de lo que alguien se habia acordado de apuntar.
+    # `rutas.material()` existe justo para esto desde C-74 y no estaba
+    # enchufada aqui, que es el unico sitio donde decide algo: una cinta que la
+    # busqueda no mira no tiene candidatas, y entonces «esa frase no esta
+    # grabada» es una afirmacion sobre el mapa, no sobre el material.
     otras = ([] if a.propia
-             else [t for t in dict.fromkeys(rutas.TOMAS.values()) if t != toma])
+             else [t for t in rutas.material() if t != toma])
     vs, datos = corpus([toma] + otras)
     palabras_de = {t: datos[t][0]["segmentos"] for t in datos}
     runs_de = {t: datos[t][1] for t in datos}

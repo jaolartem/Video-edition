@@ -84,7 +84,7 @@ def main():
     fases = dict(con.execute("select nombre, id from fase").fetchall())
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
 
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         filas = con.execute("""
             select f.id, t.nombre, f.desde, f.hasta, e.orden, ec.nombre

@@ -170,7 +170,7 @@ def main():
     if a.ver:
         ver(con, f"reel-{a.ver:02d}")
     else:
-        for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+        for n in (a.reels or rutas.piezas()):
             slug = f"reel-{n:02d}"
             print(f"{slug}: {volcar(con, slug)} colocaciones")
         con.commit()

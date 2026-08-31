@@ -202,6 +202,25 @@ def marca(m, sal=None):
     return round(base - duras * beats.PASO_VOZ, 3)
 
 
+def _toma_montada(slug, beat):
+    """De que cinta es esa etapa **en el montaje**, segun el EDL.
+
+    Es la fuente de la verdad para medir: el EDL es lo que se oye. Devuelve
+    `None` si la etapa no esta en el corte, y ahi si toca preguntar a la base.
+    """
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return None
+    try:
+        edl = json.load(open(ruta, encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    for d in edl.get("detalle") or []:
+        if d.get("beat") == beat and d.get("toma"):
+            return d["toma"]
+    return None
+
+
 def evaluar(slug, beat, tramos, toma=None, excluir=None, contra=None):
     """Re-evalua **el segmento que monto la IA** y lo pone frente a las demas.
 
@@ -222,16 +241,28 @@ def evaluar(slug, beat, tramos, toma=None, excluir=None, contra=None):
     dentro del error, quedarse con la que ya estaba es quedarse por inercia, no
     por criterio.
     """
-    con = sqlite3.connect("ads/decisiones.db")
-    con.row_factory = sqlite3.Row
-    r = con.execute(
-        "select t.nombre from etapa e join video v on v.id = e.video_id"
-        " join eleccion el on el.etapa_id = e.id"
-        " join fragmento f on f.id = el.fragmento_id"
-        " join toma t on t.id = f.toma_id"
-        " where v.slug = ? and e.orden = ?", (slug, beat)).fetchone()
-    con.close()
-    toma = toma or (r["nombre"] if r else None)
+    # **La cinta del montaje la dice el EDL, no `eleccion`.** Son dos cosas
+    # distintas en cuanto `fijar` cambia una etapa: `eleccion` guarda lo que se
+    # eligio, el EDL lo que suena. Medir los segundos del montaje contra las
+    # palabras de otra cinta no devuelve un numero peor: devuelve el numero de
+    # otra frase, y el veredicto que sale de ahi no es utilizable — ni siquiera
+    # se nota, porque llega con la misma pinta que uno bueno.
+    #
+    # Medido en las seis: reel-01 b3 y b8, reel-03 b2, b6 y b7, reel-06 b7 y b9
+    # se evaluaban contra la cinta que no era. `dossier()` ya la tomaba del EDL;
+    # esto es la otra mitad del mismo dato, que se habia quedado atras.
+    toma = toma or _toma_montada(slug, beat)
+    if not toma:
+        con = sqlite3.connect("ads/decisiones.db")
+        con.row_factory = sqlite3.Row
+        r = con.execute(
+            "select t.nombre from etapa e join video v on v.id = e.video_id"
+            " join eleccion el on el.etapa_id = e.id"
+            " join fragmento f on f.id = el.fragmento_id"
+            " join toma t on t.id = f.toma_id"
+            " where v.slug = ? and e.orden = ?", (slug, beat)).fetchone()
+        con.close()
+        toma = r["nombre"] if r else None
     if not toma:
         return {"error": f"{slug} e{beat}: no se sabe de que toma es"}
     try:
@@ -519,7 +550,7 @@ def main():
                 print(f"      {h['texto'][:110]}")
         return
     todo = {}
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         filas = dossier(slug)
         if not filas:

@@ -39,6 +39,7 @@ import os
 import re
 import sqlite3
 import sys
+import rutas  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -160,7 +161,7 @@ def main():
     ap.add_argument("reels", nargs="*", type=int)
     a = ap.parse_args()
     import servicio as contrato
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         filas = dossier(slug)
         if not filas:

@@ -69,24 +69,116 @@ def fijados(slug):
     return [dict(f) for f in filas]
 
 
-def fijar(slug, beat, toma, desde, hasta, por_que="", quien="servicio"):
-    """Declara el tramo de una etapa. Devuelve lo que dice la medida."""
+def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
+    """Declara **cuáles son** los tramos de una etapa. Sustituye lo que hubiera.
+
+    ## Por qué esta función existe y `fijar` es ahora una envoltura suya
+
+    `corte_fijo` empezó con la clave en `(video, papel, orden)`: una etapa, un
+    tramo. Declarar era **sustituir por construcción** — el `on conflict` pisaba
+    lo anterior y no había forma de equivocarse.
+
+    Luego la clave se amplió con `desde`, porque una etapa puede necesitar dos
+    trozos de verdad: la idea de reel-01 e2 vive en 118 y su remate en 220. Eso
+    era necesario, y a cambio —sin que nadie lo notara— **sacó una garantía del
+    esquema y la metió en la memoria de quien llama**: a partir de ahí, «declara
+    el tramo de esta etapa» eran dos operaciones, borrar y luego insertar, y
+    sólo una de las dos estaba en la firma.
+
+    Uno de los dos sitios que declaran lo hacía bien y el otro no. El que no,
+    dejó reel-05 diciendo su cierre dos veces y la pieza pasó de 105 a 157
+    segundos — y no fallo nada: un tramo de más no da error, alarga.
+
+    Es la regla del proyecto aplicada al código: **un paso que depende de que
+    alguien se acuerde no es un paso del proceso.** Así que la operación pasa a
+    ser una sola y recibe **la lista entera**: no existe una manera de añadir un
+    tramo sin sustituir, porque no hay función que lo haga.
+
+    Devuelve lo que dice la medida sobre el conjunto propuesto.
+    """
     import revalidar
 
-    veredicto = revalidar.evaluar(slug, int(beat), [(float(desde), float(hasta))],
-                                  toma=toma)
+    tramos = [(float(a), float(b)) for a, b in tramos if b > a]
+    if not tramos:
+        return {"error": f"{slug} e{beat}: no se declara una etapa sin tramos"}
+    veredicto = revalidar.evaluar(slug, int(beat), tramos, toma=toma)
+    ahora = datetime.datetime.now().isoformat(timespec="seconds")
     con = _con()
-    con.execute(
+    vid = _vid(con, slug)
+    # Lo que hubiera declarado para esta etapa se va, **venga de donde venga**.
+    # `tramos` dice cuál ES la etapa, no qué se le suma.
+    con.execute("delete from corte_fijo where video_id = ? and papel = 'etapa'"
+                " and orden = ?", (vid, int(beat)))
+    con.executemany(
         "insert into corte_fijo (video_id, papel, orden, desde, hasta, toma,"
-        " por_que, quien, fecha) values (?,'etapa',?,?,?,?,?,?,?)"
-        " on conflict(video_id, papel, orden, desde) do update set"
-        " hasta=excluded.hasta, toma=excluded.toma,"
-        " por_que=excluded.por_que, quien=excluded.quien, fecha=excluded.fecha",
-        (_vid(con, slug), int(beat), float(desde), float(hasta), toma, por_que,
-         quien, datetime.datetime.now().isoformat(timespec="seconds")))
+        " por_que, quien, fecha) values (?,'etapa',?,?,?,?,?,?,?)",
+        [(vid, int(beat), a, b, toma, por_que, quien, ahora) for a, b in tramos])
     con.commit()
     con.close()
     return veredicto
+
+
+def fijar(slug, beat, toma, desde, hasta, por_que="", quien="servicio"):
+    """Un solo tramo. Envoltura de `declarar` — y sustituye, como ella.
+
+    Se conserva porque es lo que escribe la línea de comandos y lo que leen los
+    dos servicios. Lo que **no** se conserva es la posibilidad de llamarla en
+    bucle para declarar dos tramos: eso ahora deja sólo el último, a propósito,
+    porque era justo el uso que rompía. Para dos tramos, `declarar`.
+    """
+    return declarar(slug, beat, toma, [(desde, hasta)], por_que, quien)
+
+
+def solapes(slug):
+    """Etapas cuyos tramos declarados se pisan entre sí. Es una contradicción.
+
+    Una etapa de dos trozos dice «esto y luego esto». Dos trozos que se solapan
+    dicen «esto, y otra vez esto», que no es una declaración: es el resto de una
+    que no se retiró. Se mira aquí para que la puerta pueda mirarlo.
+    """
+    por_beat = {}
+    for f in fijados(slug):
+        por_beat.setdefault(f["beat"], []).append(f)
+    malos = []
+    for beat, fs in sorted(por_beat.items()):
+        fs = sorted(fs, key=lambda x: x["desde"])
+        for a, b in zip(fs, fs[1:]):
+            if b["desde"] < a["hasta"] - 1e-3 and a["toma"] == b["toma"]:
+                malos.append((beat, a, b))
+    return malos
+
+
+def rehacer(slug, beats=None):
+    """Reconstruye esas etapas del EDL **desde su declaración**.
+
+    `aplicar` es incremental a propósito: salta la etapa cuyas declaraciones ya
+    están puestas, para no deshacer lo que otro paso recortó por dentro. El
+    efecto colateral es que **no hay camino de vuelta**: si el EDL de una etapa
+    quedó mal —duplicado, a medias, con un tramo que ya no se declara—, la
+    declaración puede estar perfecta y `aplicar` no la toca, porque desde su
+    punto de vista está hecha.
+
+    Eso obligaba a repararlo a mano: borrar la marca `fijado` del JSON y volver
+    a correr. Se hizo una vez, funcionó, y no quedó en ningún sitio — que es
+    exactamente la forma de perder el estado que este proyecto persigue. Aquí
+    está, con nombre y con argumentos.
+
+    Sin `beats`, rehace **todas** las etapas declaradas de la pieza.
+    """
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        raise SystemExit(f"{slug}: no hay EDL que rehacer")
+    quiere = ({int(b) for b in beats} if beats is not None
+              else {f["beat"] for f in fijados(slug)})
+    if not quiere:
+        return 0, []
+    edl = json.load(open(ruta, encoding="utf-8"))
+    for d in edl.get("detalle") or []:
+        if d.get("beat") in quiere:
+            d.pop("fijado", None)
+    json.dump(edl, open(ruta, "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    return aplicar(slug)
 
 
 def aplicar(slug):
@@ -208,6 +300,9 @@ def main():
     ap.add_argument("hasta", nargs="?", type=float)
     ap.add_argument("--por-que", default="")
     ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--rehacer", nargs="*", type=int, metavar="BEAT",
+                    help="reconstruye esas etapas desde su declaracion"
+                         " (sin numeros, todas las declaradas)")
     ap.add_argument("--aplicar", action="store_true")
     a = ap.parse_args()
     slug = f"reel-{a.reel:02d}" if a.reel else None
@@ -215,6 +310,13 @@ def main():
         for f in fijados(slug):
             print(f"  e{f['beat']:<3} {f['toma']} [{f['desde']}-{f['hasta']}]"
                   f"  {f['por_que'][:70]}")
+        return
+    if a.rehacer is not None:
+        n, cuales = rehacer(slug, a.rehacer or None)
+        print(f"{slug}: {n} etapa(s) rehechas desde su declaracion {cuales}")
+        for beat, x, y in solapes(slug):
+            print(f"  aviso e{beat}: los tramos declarados se pisan"
+                  f" ({x['desde']}-{x['hasta']} y {y['desde']}-{y['hasta']})")
         return
     if a.aplicar:
         n, cuales = aplicar(slug)

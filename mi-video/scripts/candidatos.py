@@ -80,7 +80,7 @@ if __name__ == "__main__":
     a = ap.parse_args()
 
     os.makedirs("work/candidatos", exist_ok=True)
-    for n in ([a.reel] if a.reel else [1, 2, 3, 4, 5, 6]):
+    for n in ([a.reel] if a.reel else rutas.piezas()):
         d = para(n)
         f = f"work/candidatos/reel-{n:02d}.json"
         json.dump(d, open(f, "w", encoding="utf-8"), ensure_ascii=False, indent=1)

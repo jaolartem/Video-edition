@@ -60,7 +60,7 @@ def main():
     a = ap.parse_args()
 
     con = sqlite3.connect(BASE)
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug, pieza = f"reel-{n:02d}", f"reel-R{n}"
         fuente = os.path.join(rutas.DESTINO, "entrega", f"{pieza}.mp4")
         if not os.path.exists(fuente):

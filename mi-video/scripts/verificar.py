@@ -44,6 +44,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from servicios import Pieza  # noqa: E402
+import rutas  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
@@ -87,6 +88,42 @@ def revisar(slug):
             mal.append(
                 f"{slug}: la descripción de las etapas {viejas} habla de otro"
                 f" texto — vuelve a describir ESAS, no la pieza entera.")
+
+    # 1b · **Una etapa no puede sonar dos veces.**
+    #
+    # Este es el que faltaba, y su ausencia es la razon de que un fallo caro
+    # pasara desapercibido: `_mover_bordes` declaraba sin retirar lo anterior,
+    # reel-05 quedo diciendo su cierre entero dos veces, la pieza paso de 105 a
+    # 157 segundos — y **la puerta la dejo pasar**, porque miraba que cada
+    # fijado estuviera en el EDL y ninguno sobrara.
+    #
+    # Se mira en los dos sitios a proposito, porque son dos averias distintas:
+    # en la declaracion es una contradiccion —«esta etapa es esto, y otra vez
+    # esto»—, y en el montaje es lo que el espectador oye. Puede haber lo
+    # segundo sin lo primero: la declaracion se arreglo y el EDL se quedo con la
+    # version vieja, que es justo cuando hay que correr `fijar --rehacer`.
+    try:
+        import fijar as _fj
+
+        for beat, x, y in _fj.solapes(slug):
+            mal.append(f"{slug} e{beat}: los tramos declarados se pisan"
+                       f" ({x['desde']}-{x['hasta']} y {y['desde']}-{y['hasta']})"
+                       f" — una etapa no se declara dos veces")
+    except Exception:                              # noqa: BLE001
+        pass
+    _por_beat = {}
+    for _r, _d in zip(edl.get("segmentos") or [], edl.get("detalle") or []):
+        _por_beat.setdefault(_d.get("beat"), []).append((_d.get("toma"), _r))
+    for _b, _v in sorted(_por_beat.items(), key=lambda x: (x[0] is None, x[0])):
+        _v = sorted(_v, key=lambda x: (str(x[0]), x[1][0]))
+        for (_t1, _a), (_t2, _c) in zip(_v, _v[1:]):
+            if _t1 == _t2 and _c[0] < _a[1] - 1e-3:
+                mal.append(
+                    f"{slug} e{_b}: el montaje repite {_a[0]:.1f}-{_a[1]:.1f}s"
+                    f" y {_c[0]:.1f}-{_c[1]:.1f}s de la misma cinta — se va a"
+                    f" oir dos veces. Corre: python scripts/fijar.py"
+                    f" {int(slug[-2:])} --rehacer {_b}")
+                break
 
     # 2 · **Ninguna etapa se queda muda.** Ni sin material ni con dos palabras:
     # una etapa que no dice nada es una etapa que no está.
@@ -193,9 +230,25 @@ def revisar(slug):
 
     # 7 · **Lo que Jaime pidió cortar está cortado.** Una nota pendiente con
     # ancla que ya no resuelve es una corrección perdida en silencio (C-79).
+    #
+    # **Y sólo las de ESTE montaje.** Una nota se estampa con la huella del
+    # corte en que se apuntó y `revision.aplicar` se salta —con razón— las de
+    # otro: hablan de un sitio que ya no existe. Pero la puerta las contaba
+    # igual, así que la pieza quedaba bloqueada por tres notas que ningún paso
+    # puede aplicar nunca. reel-06 se paró así con notas de un montaje anterior.
+    #
+    # Es la cuenta falsa contra la que ya avisa `revision.aplicar`: mientras el
+    # número incluye lo inaplicable, tapa a la nota que sí falta. Las viejas se
+    # quedan en la tabla —son el recorrido del vídeo— y dejan de ser tarea.
+    try:
+        import modelo as _mo
+
+        _h = _mo.huella_edl(slug)
+    except Exception:                              # noqa: BLE001
+        _h = None
     pend = con.execute(
         "select count(*) from revision where video_slug = ? and accion='cortar'"
-        " and estado='pendiente'", (slug,)).fetchone()[0]
+        " and estado='pendiente' and huella is ?", (slug, _h)).fetchone()[0]
     if pend:
         mal.append(f"{slug}: {pend} corte(s) de revisión sin aplicar")
     con.close()
@@ -209,7 +262,7 @@ def main():
                     help="informa y no bloquea")
     a = ap.parse_args()
     todo = []
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         mal = revisar(slug)
         todo += mal

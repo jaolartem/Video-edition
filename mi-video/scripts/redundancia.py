@@ -37,6 +37,7 @@ la pieza se vuelva a montar (C-79).
 import argparse
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -52,6 +53,117 @@ REGLA = ("la repeticion del bruto es un abanico para elegir, no basura que"
          " recortar: sobra UNA version, la que mas comunique. Reconocerlo es"
          " prediccion de lenguaje, no coincidencia de n-gramas: por eso vive en"
          " el paso de IA y no en Python.")
+
+
+# Cuantas palabras de contexto se dan a cada lado de un borde.
+#
+# Empezo en ocho, por no convertir el dossier en la cinta entera. Se quedaba
+# corta justo donde mas se necesita: en reel-05 b6 la pieza dice «mil dolares de
+# impuesto adicional» sin el numero, y el numero cae **fuera** de las ocho —lo
+# que se ve es «mientras que las cosas que las cosas no»—, asi que la cifra que
+# sostiene toda la incomodidad del SELL parecia irrecuperable cuando estaba a un
+# par de palabras.
+#
+# Y hay un segundo caso que la ventana corta no sabe resolver: en b5, `antes`
+# acaba en «el no tuvo un no tuvo un mes» y no se puede saber si ese «no» es de
+# esta frase o de la anterior. Un «no» de mas invierte la etapa igual que uno de
+# menos, asi que con la duda no se toca — y la duda la crea la ventana.
+#
+# Dieciseis sigue siendo una mirada y cubre las dos cosas.
+VECINAS = 16
+
+
+def _vecinas(palabras, borde, lado):
+    """Las palabras de la cinta pegadas a un borde del corte, por fuera.
+
+    Es lo que el montaje **dejo fuera** justo ahi. Un borde que decapita una
+    cifra o se come un «no» solo se reconoce mirando esto: por dentro el texto
+    parece una frase entera.
+
+    **Cada palabra va con su segundo**, y esa es la mitad util. Sin el tiempo
+    solo se puede decir «falta una palabra delante» y hay que estimar donde
+    empieza — y un borde estimado es el mismo defecto otra vez: se pasa de largo
+    y se lleva la cola de la toma fallida de antes. Paso en reel-01 b7, donde lo
+    que hay pegado al borde no es la palabra que falta sino un intento roto que
+    termina en «hasta 500», una cifra que contradice a la buena.
+
+    Con el segundo delante, proponer el borde deja de ser un calculo: es copiar
+    el `en` de la primera palabra que hay que recuperar.
+    """
+    if lado == "antes":
+        fuera = [w for w in palabras if w["end"] <= borde + 1e-3][-VECINAS:]
+    else:
+        fuera = [w for w in palabras if w["start"] >= borde - 1e-3][:VECINAS]
+    return [[round(w["start"], 3), round(w["end"], 3), w["text"].strip()]
+            for w in fuera]
+
+
+# Lo que hace que una frase sea un cierre: manda a algun sitio. No es una lista
+# de palabras bonitas, son las cuatro formas en que este proyecto pide la accion
+# —el link, la descripcion, inscribirse, el cupo— y estan tomadas de lo que
+# Jaime dice de verdad en las cintas, no inventadas.
+def _sin_tildes(t):
+    import unicodedata
+    t = unicodedata.normalize("NFD", t.lower())
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
+CIERRE = re.compile(
+    r"(link|enlace|descripci|inscri|registrar|apunt|cupo|reserv|primer comentario)")
+
+
+def cierres_en_corpus(margen=14):
+    """Los cierres grabados en **todas** las cintas, con su cinta y sus segundos.
+
+    ## Por que esto tiene que estar en el dossier
+
+    El repaso ve el montaje y ~16 palabras a cada lado de cada corte. Con eso
+    puede arreglar un borde, y **no puede arreglar una pieza sin CTA**: tres
+    agentes distintos devolvieron la misma frase —«no puedo proponer un cierre
+    de otra toma»— y tenian razon, porque el contrato no les enseñaba ninguna.
+
+    Y el material estaba. Jaime lo dijo antes de que se midiera: *«hay varios,
+    todo eso se grabo; la pregunta es por que no se esta encontrando o por que
+    no se esta buscando»*. Medido despues: **seis de las siete cintas** tienen
+    un cierre entero. Las dos piezas sin CTA fallaban por razones distintas —
+    reel-02 lo tiene en su propia cinta y no se encontro; reel-04 no lo tiene en
+    la suya y esta en otras cuatro, y ahi no se buscaba.
+
+    Que una etapa pueda venir de otra cinta no es una excepcion: es la unidad de
+    analisis del proyecto. *«La unidad basica es la seccion de frame, y eso sale
+    de la union de la teorica —el libreto— con la practica —la grabacion»*. El
+    modelo lo permite y `fijar` lo aplica; lo unico que faltaba era **enseñarlo
+    a quien decide**.
+    """
+    import rutas as _ru
+
+    out = []
+    for toma in _ru.material():
+        f = os.path.join(_ru.TRABAJO, "transcripts", f"{toma}.json")
+        if not os.path.exists(f):
+            continue
+        try:
+            ws = json.load(open(f, encoding="utf-8")).get("segmentos") or []
+        except (OSError, json.JSONDecodeError):
+            continue
+        vistos = set()
+        for i, w in enumerate(ws):
+            if not CIERRE.search(_sin_tildes(w.get("text") or "")):
+                continue
+            a, b = max(0, i - margen), min(len(ws), i + margen + 1)
+            # Un cierre se dice varias veces seguidas al grabar; la ventana de
+            # la segunda solapa con la de la primera y seria la misma frase dos
+            # veces. Se queda una por region.
+            if any(a < y and x < b for x, y in vistos):
+                continue
+            vistos.add((a, b))
+            out.append({
+                "toma": toma,
+                "desde": round(ws[a]["start"], 3),
+                "hasta": round(ws[b - 1]["end"], 3),
+                "texto": " ".join(x["text"].strip() for x in ws[a:b]),
+            })
+    return out
 
 
 def dossier(slug, con_voz=True):
@@ -83,7 +195,23 @@ def dossier(slug, con_voz=True):
         dur = (rango[1] - rango[0]) / beats.VELOCIDAD
         if ws:
             fila = {"en": round(t, 1), "beat": det.get("beat"),
-                    "etapa": det.get("etapa"), "texto": " ".join(ws)}
+                    "etapa": det.get("etapa"), "texto": " ".join(ws),
+                    # **Los segundos del trozo y su cinta.** Sin esto, quien lee
+                    # el dossier puede senalar que un borde esta mal y no puede
+                    # decir donde va: proponer un tramo exige saber de que
+                    # segundo a que segundo va el que hay.
+                    "toma": toma,
+                    "desde": round(rango[0], 3), "hasta": round(rango[1], 3),
+                    # **Y lo que quedo fuera a cada lado.** Este era el agujero
+                    # que dos agentes en frio encontraron por separado: el
+                    # dossier daba el texto cosido y nada del contexto, asi que
+                    # se podia ver que una frase estaba decapitada —«mil dolares»
+                    # sin la cifra, «de septiembre» sin el dia— y no se podia
+                    # decir que palabra falta. Con el contexto, el borde roto
+                    # deja de ser una sospecha y pasa a ser una propuesta.
+                    "antes": _vecinas(cache[toma], rango[0], "antes"),
+                    "despues": _vecinas(cache[toma], rango[1], "despues"),
+                    }
             if con_voz and rango[1] - rango[0] > 0.6:
                 try:
                     fila["voz"] = round(
@@ -136,7 +264,7 @@ def main():
                     help="ensena el dossier sin pedir nada")
     a = ap.parse_args()
     prompt = open(PROMPT, encoding="utf-8").read()
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         filas = dossier(slug)
         if not filas:

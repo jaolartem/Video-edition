@@ -31,6 +31,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import modelo  # noqa: E402
 import servicio  # noqa: E402
+import rutas  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
@@ -93,7 +94,7 @@ def main():
     print(f"commit {_commit()}\n")
     print(f"{'pieza':<9} {'ver':>3} {'corte':>7} {'dur':>7}  "
           f"{'aprobada':<9} {'audio':<22} {'pendiente'}")
-    for n in range(1, 7):
+    for n in rutas.piezas():
         slug = f"reel-{n:02d}"
         e = estado(slug)
         if not e:
@@ -112,6 +113,31 @@ def main():
         print(f"{slug:<9} {str(e['version'] or '-'):>3} {corte:>7} {dur:>7}"
               f"  {(e['aprobada'] or '-'):<9} {audio:<22}"
               f" {'; '.join(pend) or '-'}")
+    # **Y el material que todavia no es pieza.** Esto es lo que hacia que la
+    # septima grabacion fuera invisible: la tabla recorre piezas, asi que una
+    # cinta sin pieza no salia ni como pendiente ni como nada. No es que
+    # estuviera mal contada — es que **no se podia echar de menos**, que es la
+    # unica averia que este comando existe para no tener.
+    #
+    # Se dice en que punto esta, porque lo que le falta a cada una es distinto:
+    # una sin copiar se pide, una sin transcribir se transcribe, y una
+    # transcrita y sin libreto **espera a Jaime**, no a la maquina.
+    huerfanas = []
+    for t in rutas.material():
+        if t in set(rutas.TOMAS.values()):
+            continue
+        hay_mp4 = os.path.exists(f"{rutas.ORIGEN}/{t}.mp4")
+        hay_tr = os.path.exists(f"{rutas.TRABAJO}/transcripts/{t}.json")
+        falta = ("sin copiar de origen" if not hay_mp4
+                 else "sin transcribir — corre transcribir.py" if not hay_tr
+                 else "transcrita y sin libreto: la construye Jaime")
+        huerfanas.append((t, falta))
+    if huerfanas:
+        print()
+        print(f"Y {len(huerfanas)} grabacion(es) que todavia no son pieza:")
+        for t, falta in huerfanas:
+            print(f"    · {t}: {falta}")
+
     print("\nY lo que dice la puerta ahora mismo:")
     subprocess.run([sys.executable, "scripts/verificar.py", "--avisa"])
 

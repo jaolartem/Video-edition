@@ -51,6 +51,7 @@ import json
 import os
 import sqlite3
 import sys
+import rutas  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -354,14 +355,22 @@ CICLO = [
     # apuntaron, asi que si el corte cambia primero, las notas quedan huerfanas.
     (5.2, "recortado", "scripts/revision.py --aplicar {n}"),
     (5.5, "revalidado", None),       # servicio de IA con decision acotada
-    (6, "cosido", "scripts/costuras.py {n}"),
-    # **Y un ultimo repaso de redundancia, con la pieza ya cosida.** Jaime:
-    # *«revisemos si otra pasada extra de redundancia al final antes de
-    # renderizar vale la pena — siempre»*. La de la fase 5 juzga el corte de
-    # entonces, y entre medias `fijar`, `revalidado` y `cosido` lo rehacen:
-    # medido en una tarde, la misma repeticion volvio tres veces. Va aqui
-    # porque es el ultimo punto donde el texto ya esta cerrado y cortar
-    # todavia no obliga a rehacer descripciones ni recortes.
+    (6, "cosido", "scripts/costuras.py {n}"),
+
+    # **Y un ultimo repaso de redundancia, con la pieza ya cosida.** Jaime:
+
+    # *«revisemos si otra pasada extra de redundancia al final antes de
+
+    # renderizar vale la pena — siempre»*. La de la fase 5 juzga el corte de
+
+    # entonces, y entre medias `fijar`, `revalidado` y `cosido` lo rehacen:
+
+    # medido en una tarde, la misma repeticion volvio tres veces. Va aqui
+
+    # porque es el ultimo punto donde el texto ya esta cerrado y cortar
+
+    # todavia no obliga a rehacer descripciones ni recortes.
+
     (6.5, "repasado", None),
     (7, "descrito", "scripts/describir.mjs {n}"),
     (8, "cortado", "scripts/cortar.py {n}"),
@@ -642,7 +651,7 @@ def main():
         hecho = migrar()
         print("modelo migrado:", ", ".join(hecho) if hecho else "nada que hacer")
     if a.registrar:
-        for n in range(1, 7):
+        for n in rutas.piezas():
             slug = f"reel-{n:02d}"
             v = registrar_version(slug)
             print(f"{slug}: version {v}" if v else f"{slug}: sin EDL")

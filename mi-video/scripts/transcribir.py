@@ -898,7 +898,7 @@ def afinar(toma, tramos, pasadas=4):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--toma", type=int, help="sólo el reel N")
+    ap.add_argument("--toma", help="sólo el reel N, o el nombre de una cinta")
     ap.add_argument("--todas", action="store_true", help="incluye reel-03-alt")
     ap.add_argument("--pasadas", type=int, default=None,
                     help="cuantas veces se oye cada tramo; el paso sale de"
@@ -919,7 +919,21 @@ def main():
     a = ap.parse_args()
 
     if a.toma:
-        tomas = [rutas.TOMAS[f"reel-{a.toma:02d}"]]
+        # **Se admite el nombre de la cinta, no solo el numero de reel.**
+        # Esto resolvia siempre por `rutas.TOMAS`, o sea que la unica manera de
+        # transcribir algo era que ya estuviera mapeado a una pieza — y este es
+        # justo el paso por el que una grabacion nueva **entra** al sistema.
+        # Circulo cerrado: para transcribirla tenia que ser pieza, y para ser
+        # pieza tenia que estar transcrita. La cinta del 14 de agosto llevaba
+        # ahi desde el principio por esto.
+        if str(a.toma).isdigit() and len(str(a.toma)) <= 2:
+            tomas = [rutas.TOMAS[f"reel-{int(a.toma):02d}"]]
+        elif str(a.toma) in rutas.material():
+            tomas = [str(a.toma)]
+        else:
+            raise SystemExit(
+                f"«{a.toma}» no es un reel ni una cinta del material."
+                f" Hay: {', '.join(rutas.material())}")
     else:
         # **El catalogo es del MATERIAL, no de las piezas.** Antes esto recorria
         # los seis reels y la cinta `20260825_231011` —4,6 GB— solo entraba con

@@ -433,7 +433,7 @@ def main():
     ap.add_argument("--ver", action="store_true", help="dice que quitaria")
     a = ap.parse_args()
 
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         ruta = os.path.join("ads", slug, "edl-sell.json")
         if not os.path.exists(ruta):

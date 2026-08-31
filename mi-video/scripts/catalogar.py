@@ -101,7 +101,7 @@ def main():
 
     con = sqlite3.connect(BASE)
     con.execute("PRAGMA foreign_keys = ON")
-    reels = [a.toma] if a.toma else [1, 2, 3, 4, 5, 6]
+    reels = [a.toma] if a.toma else rutas.piezas()
     for n in reels:
         slug = f"reel-{n:02d}"
         toma = rutas.TOMAS[slug]

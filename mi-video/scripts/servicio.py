@@ -41,6 +41,7 @@ pero nadie improvisa. Cuando la respuesta aparece —la escriba quien la escriba
     python scripts/servicio.py            # que pedidos hay sin contestar
 """
 import argparse
+import io
 import json
 import os
 import subprocess
@@ -73,15 +74,119 @@ def pedir(paso, slug, prompt, payload, cli=True):
     ahí, y el paso no inventa nada mientras tanto.
     """
     p = ruta_pedido(paso, slug)
-    json.dump({"paso": paso, "slug": slug, "prompt": prompt, "datos": payload},
-              open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    # **El pedido solo se reescribe si la pregunta cambio.** Parece un detalle
+    # de eficiencia y no lo es: es lo que hace que la fecha del fichero
+    # signifique algo. Reescribiendolo en cada corrida, el pedido era siempre
+    # mas nuevo que cualquier respuesta y no habia forma de saber si la
+    # respuesta contestaba a ESTA pregunta o a la de hace dos vueltas.
+    nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
+                        "datos": payload}, ensure_ascii=False, indent=1)
+    try:
+        igual = io.open(p, encoding="utf-8").read() == nuevo
+    except OSError:
+        igual = False
+    if not igual:
+        io.open(p, "w", encoding="utf-8").write(nuevo)
+        # **Y si la pregunta ya se hizo antes, se conserva CUANDO se hizo.**
+        #
+        # Sin esto la guarda se muerde la cola: al consumirse una respuesta el
+        # par se archiva, la vuelta siguiente reescribe el pedido —con fecha de
+        # ahora aunque el texto sea identico— y la respuesta que acaba de
+        # llegar queda «anterior a su pedido». Se archiva por desfasada, se
+        # vuelve a preguntar lo mismo, y otra vez. reel-01 dio cuatro vueltas
+        # asi con la respuesta correcta escrita en disco.
+        #
+        # La fecha del pedido tiene que significar **cuando cambio la
+        # pregunta**, no cuando se escribio el fichero. Si el texto coincide
+        # con una version ya archivada, esa es su fecha.
+        arch = os.path.join(_dir(paso), "usadas")
+        if os.path.isdir(arch):
+            for f in sorted(os.listdir(arch)):
+                if not (f.startswith(f"{slug}.") and f.endswith(".pedido.json")):
+                    continue
+                q = os.path.join(arch, f)
+                try:
+                    if io.open(q, encoding="utf-8").read() == nuevo:
+                        t = os.path.getmtime(q)
+                        os.utime(p, (t, t))
+                        break
+                except OSError:
+                    continue
     if cli and _hay_cli():
         r = _por_cli(prompt, payload)
         if r is not None:
             json.dump(r, open(ruta_respuesta(paso, slug), "w", encoding="utf-8"),
                       ensure_ascii=False, indent=1)
             return r
-    return recoger(paso, slug)
+    r = recoger(paso, slug)
+    # **Y una respuesta mas vieja que su pedido no contesta a este pedido.**
+    #
+    # Los dos ficheros se emparejan por el nombre y nada mas, asi que una
+    # respuesta escrita para la pregunta de hace dos vueltas entraba como si
+    # fuera de esta. Paso con `describir` de reel-01: el agente describio las
+    # etapas 2 y 3 —las que estaban caducadas cuando se escribio su pedido— y
+    # para cuando contesto, la pieza se habia vuelto a cortar y las caducadas
+    # eran la 6, la 7 y la 8. Aplicarla no arregla nada y **la puerta vuelve a
+    # pedir lo mismo**: un bucle que no converge, y cada vuelta parece trabajo.
+    #
+    # Es C-92 otra vez —la huella que ata una nota a su montaje— en el otro
+    # canal. Aqui la huella es la fecha, y solo sirve porque el pedido ya no se
+    # reescribe cuando no cambia.
+    if r is not None and os.path.exists(p):
+        rp = ruta_respuesta(paso, slug)
+        if os.path.getmtime(rp) < os.path.getmtime(p) - 1:
+            # **Se archiva la respuesta y NO el pedido.** Son dos casos
+            # opuestos: cuando una respuesta se consume, la pregunta ya esta
+            # contestada y el par entero es historia; cuando llega desfasada,
+            # **la pregunta sigue en pie** y es lo unico que hay. Llevarse el
+            # pedido dejaba a quien tiene que contestar sin contrato —y sin
+            # contrato lo correcto es no contestar, asi que la pieza se paraba
+            # entera. Lo dijo el agente al que le toco: *«no lei ningun pedido;
+            # un fichero inventado en esa ruta lo leeria el paso siguiente como
+            # respuesta buena»*.
+            _archivar(paso, slug, sufijo="desfasada", solo_respuesta=True)
+            print(f"  {paso}/{slug}: la respuesta es anterior al pedido —"
+                  f" contesta a otra pregunta. Se archiva y se vuelve a pedir.")
+            return None
+    if r is not None:
+        # **Una respuesta se consume UNA vez.** El repaso es ciclico: aplica sus
+        # cortes, manda la pieza a `cosido` y vuelve a pasar por aqui. Si la
+        # respuesta sigue en su sitio, la segunda vuelta se come la misma otra
+        # vez —y la tercera— y cada vuelta reinserta las mismas notas hablando
+        # de un montaje que ya no existe.
+        #
+        # Medido: reel-04 tiene las notas #234-236 repetidas tres veces, y las
+        # de la tercera vuelta ya llegaron marcadas «el texto ya no esta en la
+        # pieza», que es como se ve desde dentro un bucle que se responde solo.
+        # Peor que el ruido es lo que tapa: mientras el paso se contesta con lo
+        # de antes, **nadie mira el corte de ahora**.
+        #
+        # Se archiva el par entero, no solo la respuesta: un pedido sin
+        # respuesta se queda en la cola de `pendientes()` para siempre, y una
+        # cola que miente sobre lo que falta es la misma averia por el otro
+        # lado.
+        _archivar(paso, slug)
+    return r
+
+
+def _archivar(paso, slug, sufijo="", solo_respuesta=False):
+    """Guarda el par pedido/respuesta ya consumido y lo saca de la cola.
+
+    No se borra: el recorrido de una pieza es lo que explica por que quedo como
+    quedo, y una vuelta del ciclo sin su pedido es una decision sin origen.
+    """
+    d = os.path.join(_dir(paso), "usadas")
+    os.makedirs(d, exist_ok=True)
+    marca = f".{sufijo}" if sufijo else ""
+    n = 1
+    while os.path.exists(os.path.join(d, f"{slug}.{n}{marca}.respuesta.json")):
+        n += 1
+    mover = [(ruta_respuesta(paso, slug), f"{slug}.{n}{marca}.respuesta.json")]
+    if not solo_respuesta:
+        mover.append((ruta_pedido(paso, slug), f"{slug}.{n}{marca}.pedido.json"))
+    for orig, dest in mover:
+        if os.path.exists(orig):
+            os.replace(orig, os.path.join(d, dest))
 
 
 def recoger(paso, slug):

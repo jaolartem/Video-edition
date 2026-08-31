@@ -15,6 +15,7 @@ bruto (reel 5, apertura en frio). Aqui no se reordena nada.
 """
 import json
 import sys
+import rutas  # noqa: E402
 
 
 def solapan(a, b):
@@ -53,5 +54,5 @@ def limpiar(reel):
 
 if __name__ == "__main__":
     total = sum(limpiar(r) for r in sys.argv[1:] or
-                [f"reel-{i:02d}" for i in range(1, 7)])
+                [f"reel-{i:02d}" for i in rutas.piezas()])
     print(f"\nsolapes eliminados: {total}")

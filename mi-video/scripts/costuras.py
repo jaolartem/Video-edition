@@ -44,6 +44,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
 import registro  # noqa: E402
 import transcribir  # noqa: E402
+import rutas  # noqa: E402
 
 # Por debajo de esto la costura no se oye. Medido sobre el lote.
 TONO_OK = 2.5
@@ -810,7 +811,7 @@ def main():
     ap.add_argument("--palabras", action="store_true",
                     help="saca los cortes de dentro de una palabra")
     a = ap.parse_args()
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         if a.palabras:
             sin_solapes(slug, ver=a.ver)

@@ -209,7 +209,7 @@ def main():
                     help="paso 1: saca la voz sin modificar a la carpeta")
     a = ap.parse_args()
     if a.exportar:
-        for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+        for n in (a.reels or rutas.piezas()):
             f = exportar(n)
             if f:
                 d = duracion(f)
@@ -217,7 +217,7 @@ def main():
         print(f"\nen {CARPETAS[0]}")
         return
     hechos = []
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         if integrar(n, ver=a.ver):
             hechos.append(n)
     if hechos and not a.ver:

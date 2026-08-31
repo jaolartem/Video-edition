@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import registro  # noqa: E402
 import servicios  # noqa: E402
 from servicios import Pieza  # noqa: E402
+import rutas  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
@@ -209,7 +210,7 @@ def main():
     ap.add_argument("--paso", type=int, metavar="N",
                     help="como mucho N saltos por pieza")
     a = ap.parse_args()
-    for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+    for n in (a.reels or rutas.piezas()):
         r = avanzar(n, ver=a.ver, tope=a.paso)
         if not r:
             continue

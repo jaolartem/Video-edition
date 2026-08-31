@@ -430,7 +430,7 @@ def main():
         print("anotada")
         return
     if a.aplicar or a.seco:
-        for n in (a.reels or [1, 2, 3, 4, 5, 6]):
+        for n in (a.reels or rutas.piezas()):
             aplicar(f"reel-{n:02d}", ver=a.seco)
         return
     ver(a.reels)

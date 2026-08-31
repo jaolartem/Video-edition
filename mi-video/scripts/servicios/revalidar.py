@@ -145,16 +145,13 @@ def aplicar(pieza: Pieza, veredictos) -> str:
         if nuevos:
             import fijar
 
-            con.execute(
-                "delete from corte_fijo where papel='etapa' and orden = ?"
-                " and video_id = (select id from video where slug = ?)",
-                (beat, pieza.slug))
-            con.commit()
+            # **La lista entera, de una vez.** Antes esto borraba a mano y luego
+            # fijaba en bucle; el borrado vive ahora dentro de `declarar`, que
+            # es donde no se puede olvidar (ver su docstring).
             toma = v.get("toma") or (pieza.edl or {}).get("detalle", [{}])[0].get("toma")
-            for a0, b0 in nuevos:
-                fijar.fijar(pieza.slug, beat, toma, a0, b0,
-                            (v.get("edicion") or v.get("por_que") or "")[:200],
-                            quien="revalidado")
+            fijar.declarar(pieza.slug, beat, toma, nuevos,
+                           (v.get("edicion") or v.get("por_que") or "")[:200],
+                           quien="revalidado")
             cambiados += 1
         # **Un falso positivo que no cambia nada no es una decision: es un
         # aviso perdido.** Marcarlo solo escribe en `descartado` y deja la pieza
