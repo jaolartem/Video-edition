@@ -325,6 +325,45 @@ const raiz = (w) => w.slice(0, 5);
  * que se te olvidó es un tablero que aparece incompleto.
  */
 const lectura = (t) => Math.max(36, Math.ceil((String(t).trim().split(/\s+/).length / 2.8) * FPS));
+/**
+ * **La condicion que cabe en pantalla, no la ficha entera.**
+ *
+ * Jaime, viendo el reel-01 bloqueado: *«lo que hace falta es simplificar el
+ * tablero y animarlo mas, reducir la carga cognitiva; para eso son los
+ * tableros»*. Y antes: *«ponemos pies de foto con la info complementaria que no
+ * cabe en el video»*.
+ *
+ * El tablero dura lo que cuesta leerlo, y eso esta bien — es lo que impide que
+ * un dato pase sin poder leerse. Pero la condicion de la etapa 3 del reel-01
+ * llevaba **100 palabras**: una nota de metodo —CCPC, capital gravable, personal
+ * services business— escrita para dejar constancia, no para leerse en pantalla.
+ * A 2,8 palabras por segundo son 39 s, y el tablero salia de 40,9 s sobre una
+ * pieza de 101,5 s. Con eso Jaime se quedaba en 59,7% de cara —el suelo es 60—
+ * y sin un segundo limpio en el tercio central, asi que la pieza no se
+ * renderizaba **y el motivo que se imprimia era el equivocado**: decia que
+ * Jaime no aparecia en mitad, cuando la causa era la letra pequena.
+ *
+ * Se corta por frases enteras, nunca a mitad de una: una condicion partida dice
+ * otra cosa que la condicion. Lo que no entra viaja como `condicion_completa`
+ * para el copy, que es donde Jaime dijo que va.
+ */
+const CONDICION_PALABRAS = 25;
+const enPantalla = (t) => {
+  const limpio = String(t).trim().replace(/\s+/g, " ");
+  if (limpio.split(" ").length <= CONDICION_PALABRAS) return limpio;
+  const frases = limpio.match(/[^.!?]+[.!?]*/g) ?? [limpio];
+  let salida = "";
+  for (const f of frases) {
+    const cand = (salida + f).trim();
+    if (salida && cand.split(" ").length > CONDICION_PALABRAS) break;
+    salida = cand;
+  }
+  // Si la primera frase ya se pasa, se corta por palabra y se dice que sigue.
+  if (!salida) {
+    salida = limpio.split(" ").slice(0, CONDICION_PALABRAS).join(" ") + "…";
+  }
+  return salida;
+};
 const duracionTarjeta = (p) => {
   // `Tarjeta` encadena: un bloque cada 8 frames, luego el remate, luego el pie.
   const escalon = 8;
@@ -1597,7 +1636,12 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
       if (!r) return {};
       const out = {};
       if (r.rotulo) out.fuente = String(r.rotulo);
-      if (r.condiciones) out.condicion = String(r.condiciones);
+      if (r.condiciones) {
+        const entera = String(r.condiciones);
+        out.condicion = enPantalla(entera);
+        // Lo que no cabe NO se tira: viaja en el spec para el copy del video.
+        if (out.condicion !== entera) out.condicion_completa = entera;
+      }
       return out;
     } catch {
       return {};
@@ -2337,6 +2381,34 @@ for (const r of spec) {
     }
     return fin > 0 ? (fin - cubierto) / fin : 1;
   })();
+  /**
+   * **Un tablero que se come un tercio de la pieza es un tablero, no la pieza.**
+   *
+   * Jaime, y queda como criterio de edicion: *«el tablero es un mecanismo de
+   * reducir carga cognitiva, esa es su funcion: facilitar la decision»*, y
+   * *«lo que hace falta es simplificar el tablero y animarlo mas»*.
+   *
+   * Va **antes** de la comprobacion de presencia a proposito. En reel-01 el
+   * tablero de la etapa 3 duraba 40,9 s sobre 101,5 —el 40% del anuncio— y lo
+   * unico que se leia era «Jaime no aparece en mitad»: el motivo correcto,
+   * pero la causa equivocada. Nadie iba a mover la cara; habia que simplificar
+   * el tablero. Un diagnostico que apunta al sitio equivocado cuesta la vuelta
+   * entera.
+   *
+   * El tope es un tercio porque es exactamente lo que la regla de presencia
+   * necesita para poder cumplirse por reparto.
+   */
+  for (const b of r.boards) {
+    if (b.duration <= fin / 3) continue;
+    const cond = (b.props?.condicion ?? "").trim().split(/\s+/).filter(Boolean).length;
+    para(r,
+      `${r.id}: el tablero del beat ${b.beat ?? "?"} dura ` +
+      `${(b.duration / FPS).toFixed(1)}s de una pieza de ${(fin / FPS).toFixed(1)}s ` +
+      `— mas de un tercio. La duracion la decide la lectura, asi que hay que ` +
+      `simplificarlo: menos bloques y mas animacion` +
+      (cond ? `, y su condicion lleva ${cond} palabra(s) en pantalla` : ""),
+    );
+  }
   if (enCuadroTotal <= MINIMO_CARA && libres.length < 3) {
     const donde = ["comienzo", "mitad", "final"].filter((_, i) => !libres.includes(i));
     para(r,

@@ -51,6 +51,19 @@ for a in "$@"; do
 done
 [ ${#REELS[@]} -eq 0 ] && REELS=(01 02 03 04 05 06)
 
+# **Lo que no se renderiza se cuenta al final, y el paso falla.**
+#
+# Una pieza bloqueada se saltaba con un aviso y el script salia con exito, asi
+# que `avanzar.py` la marcaba `montado` **sin que existiera el video**: reel-01
+# quedo en `montado` con el mp4 de las 00:38, de antes de la vuelta. Es la forma
+# exacta de perder el estado que este proyecto persigue — la fase dice hecho y
+# el artefacto no esta.
+#
+# Las demas siguen renderizando: bloquear el lote por una pieza es lo contrario
+# del embudo. Lo que cambia es que al final se dice cuales faltan y se sale con
+# error, para que la fase no avance sobre un hueco.
+BLOQUEADAS=()
+
 # **Paso 1: los subtitulos de toda la cinta, y van delante de todo.** El montaje
 # leia una sola pasada de whisper y la trataba como verdad; el modelo se come
 # frases, se queda pegado y con `-ml 1 -sow` borra la puntuacion, asi que el
@@ -144,6 +157,7 @@ for r in "${REELS[@]}"; do
   if [ -n "$MOTIVOS" ]; then
     echo "── Reel-R$n NO se renderiza ──"
     echo "   $MOTIVOS"
+    BLOQUEADAS+=("R$n: $MOTIVOS")
     continue
   fi
   # **Si falla por carga, se repite con menos carga.** No es reintentar lo
@@ -203,4 +217,9 @@ done
 # lo que se entrega es peor que no tenerlo, porque se firma igual. Es el
 # aprendizaje 24: arreglar el generador no arregla lo generado.
 node scripts/verificacion.mjs
+if [ ${#BLOQUEADAS[@]} -gt 0 ]; then
+  echo "MONTAJE INCOMPLETO — ${#BLOQUEADAS[@]} pieza(s) sin renderizar:"
+  for b in "${BLOQUEADAS[@]}"; do echo "  · $b"; done
+  exit 1
+fi
 echo "MONTAJE COMPLETO"
