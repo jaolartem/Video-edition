@@ -236,12 +236,20 @@ class ServicioRepaso(Servicio):
         # **Lo que sube para el paso.** No es un fallo del paso: es el paso
         # haciendo su trabajo y encontrando algo que no es suyo. Pero la pieza
         # no avanza, porque avanzar seria publicarlo.
-        if subes:
-            uno = str(subes[0].get("sube"))[:130]
-            resto = f" (+{len(subes) - 1} mas)" if len(subes) > 1 else ""
+        # **No todo lo que sube para la pieza.** Jaime ya decidio que un arco
+        # plano se levanta en postproduccion —con musica o subiendo ese
+        # segmento a 1,15x—, asi que bloquear por eso seria pedirle dos veces
+        # una decision que ya tomo. Lo que para es lo que no tiene remedio
+        # despues de renderizar: una cifra sin fuente, un dato que contradice
+        # al mensaje, una etapa del frame que no existe.
+        paran = [x for x in subes if x.get("cuando") != "postproduccion"]
+        if paran:
+            uno = str(paran[0].get("sube"))[:130]
+            resto = f" (+{len(paran) - 1} mas)" if len(paran) > 1 else ""
             return Resultado(False, motivo=f"sube a Jaime: {uno}{resto}",
-                             salida=f"{len(subes)} cosa(s) que no se arreglan"
-                                    f" cortando, anotadas en revision")
+                             salida=f"{len(paran)} que paran y"
+                                    f" {len(subes) - len(paran)} para"
+                                    f" postproduccion, anotadas en revision")
         if not puestos and not movidos:
             return Resultado(True, salida="pieza limpia, sin repeticiones")
         if movidos and not puestos:
