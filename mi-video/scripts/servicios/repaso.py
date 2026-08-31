@@ -81,4 +81,11 @@ class ServicioRepaso(Servicio):
         # el corte, y dejarlo anotado sin aplicar seria repetir el fallo que
         # este paso viene a cerrar.
         puestos = revision.aplicar(pieza.slug) if n else 0
-        return Resultado(True, salida=f"{n} corte(s) del repaso, {puestos} aplicado(s)")
+        if not puestos:
+            return Resultado(True, salida="pieza limpia, sin repeticiones")
+        # **Si corto algo, no se compone: se vuelve a coser y se relee.** El
+        # texto ya no es el que se juzgo, y describir sobre un texto viejo es el
+        # fallo que este paso viene a cerrar. Jaime: *«asegurate de hacerlo
+        # ciclico: si no pasa redundancia, no se compone»*.
+        return Resultado(True, volver_a="cosido",
+                         salida=f"{puestos} corte(s) aplicados")

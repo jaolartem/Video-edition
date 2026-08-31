@@ -96,7 +96,7 @@ def avanzar(n, ver=False, tope=None):
         if not ver:
             anotar(pieza.video_id, actual["id"])
 
-    saltos, motivo = 0, None
+    saltos, motivo, atras = 0, None, {}
     while True:
         i = next((k for k, f in enumerate(ruta) if f["id"] == actual["id"]), None)
         if i is None or i + 1 >= len(ruta):
@@ -148,6 +148,48 @@ def avanzar(n, ver=False, tope=None):
                     " Se para aqui a proposito: corrige y vuelve a correr,"
                     " que el detalle esta en el log.")
             break
+
+        if r.volver_a:
+            # **El ciclo, y acotado.** Un paso puede mandar la pieza atras
+            # porque cambio algo que ya se habia dado por bueno. Se permite,
+            # pero se cuenta: si no converge en tres vueltas es que hay algo
+            # que no se arregla repitiendo, y entonces vale la regla de siempre
+            # —*«el loop no es intentar hacer lo mismo con resultados
+            # distintos»*— y se para con el motivo escrito.
+            atras.setdefault(siguiente["nombre"], []).append(r.salida or "?")
+            vueltas = atras[siguiente["nombre"]]
+            if len(vueltas) > 3:
+                # **Y el error trae el diagnostico, no la invitacion a
+                # buscarlo.** Jaime: *«si pasa mas de 3 veces es un bug, y lo
+                # bueno es que ya tendrias info para resolverlo»*. Esa info es
+                # QUE se corto en cada vuelta: si son cortes distintos, la pieza
+                # se esta desmontando poco a poco; si es el mismo tres veces,
+                # algo lo esta devolviendo entre vuelta y vuelta — que es
+                # exactamente la familia de fallos de esta sesion (C-105, C-107).
+                # Ponerlo en el mensaje ahorra el rato de reconstruirlo del log.
+                raise SystemExit(
+                    f"avanzar: {pieza.slug} lleva {len(vueltas)} vueltas en"
+                    f" «{siguiente['nombre']}» sin quedar limpia. Esto es un"
+                    f" bug, no una espera. Lo que corto cada vuelta:"
+                    + "".join(f"{chr(10)}    {k + 1}. {v}"
+                              for k, v in enumerate(vueltas))
+                    + f"{chr(10)}  Si es lo mismo cada vez, algo lo devuelve"
+                      f" entre vueltas; si cambia, la pieza se esta"
+                      f" desmontando.")
+            destino = next((f for f in ruta if f["nombre"] == r.volver_a), None)
+            if destino is None:
+                motivo = f"{siguiente['nombre']}: no existe la fase «{r.volver_a}»"
+                break
+            anotar(pieza.video_id, destino["id"],
+                   f"vuelve desde {siguiente['nombre']}: {r.salida}")
+            print(f"  {pieza.slug}: {siguiente['nombre']} -> vuelve a"
+                  f" {r.volver_a} ({r.salida})")
+            actual = destino
+            saltos += 1
+            if tope and saltos >= tope:
+                motivo = "tope de saltos"
+                break
+            continue
 
         anotar(pieza.video_id, siguiente["id"])
         actual = siguiente

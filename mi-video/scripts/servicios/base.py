@@ -57,6 +57,15 @@ class Resultado:
     ok: bool
     motivo: str = ""
     salida: str = ""
+    # **Y puede pedir volver.** La linea no es una secuencia —eso quedo cuando
+    # las fases pasaron a ser un dato— asi que un paso puede decir «esto cambio
+    # lo que ya habiamos dado por bueno, hay que rehacerlo desde ahi».
+    #
+    # Lo pide el repaso final: si corta algo, el texto ya no es el que se
+    # cosio, y componer sobre un texto viejo es justo el fallo que ese paso
+    # viene a cerrar. Regla de Jaime: *«asegurate de hacerlo ciclico: si no
+    # pasa redundancia, no se compone»*.
+    volver_a: str = ""
 
 
 class Pieza:
