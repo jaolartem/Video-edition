@@ -55,6 +55,30 @@ CIFRA = re.compile(r"(\$\s?[\d.,]+|\d[\d.,]*\s?(?:%|mil|millones|dólares|"
                    re.IGNORECASE)
 
 
+def _normal(c):
+    """La misma cifra escrita de dos maneras es una cifra, no dos.
+
+    Sin esto la puerta contaba `$20` y `$20.` como dos rotulos distintos, y
+    `$180,000` y `$180.000` como dos cifras — cada una pidiendo su fuente. Una
+    puerta que reclama el doble de lo que hay se aprende a ignorar, y entonces
+    deja de ser una puerta.
+
+    Se quita la puntuacion que arrastra el final de una frase y se unifica el
+    separador de miles. Lo que NO se toca es el valor: `25.000` y `25` son
+    cifras distintas y tienen que seguir siendolo.
+    """
+    c = (c or "").strip().rstrip(".,;:)")
+    if not c:
+        return ""
+    # El separador de miles se escribe con punto o con coma segun quien teclee;
+    # se unifica a coma para que `180.000` y `180,000` sean el mismo rotulo.
+    c = re.sub("(?<=[0-9])[.](?=[0-9]{3})", ",", c)
+    # Y el decimal: `53.53%` y `53,53%` son el mismo numero escrito por dos
+    # teclados distintos, no dos rotulos que respaldar por separado.
+    c = re.sub("(?<=[0-9])[.](?=[0-9]{1,2}(?![0-9]))", ",", c)
+    return re.sub(r"\s+", " ", c)
+
+
 def _con():
     c = sqlite3.connect(BASE)
     c.row_factory = sqlite3.Row
@@ -82,7 +106,8 @@ def dossier(slug):
     out = []
     for f in filas:
         texto = " ".join(x for x in (f["libreto"], f["grafico"]) if x)
-        cifras = sorted(set(m.group(0).strip() for m in CIFRA.finditer(texto)))
+        cifras = sorted({_normal(m.group(0)) for m in CIFRA.finditer(texto)})
+        cifras = [c for c in cifras if c]
         if not cifras:
             continue
         out.append({"etapa": f["orden"], "cifras": cifras,
