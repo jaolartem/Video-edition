@@ -286,7 +286,13 @@ def _mover_bordes(pieza: Pieza, bordes) -> int:
     n = 0
     for b in bordes:
         beat = b.get("beat")
-        tramos = [t for t in (b.get("tramos") or []) if len(t) == 2]
+        # **Dos o tres: `[desde, hasta]` o `[desde, hasta, cinta]`.** Esto
+        # exigia exactamente dos y tiraba el tercero en silencio, que es justo
+        # el que trae un trozo de otra grabacion — o sea que el escalon del
+        # precio de reel-06 se descartaba aqui despues de que el contrato lo
+        # permitiera y `declarar` supiera aplicarlo. Las dos mitades de la
+        # misma decision, una hecha y otra olvidada, por enesima vez.
+        tramos = [t for t in (b.get("tramos") or []) if len(t) in (2, 3)]
         if beat is None or not tramos:
             continue
         toma = b.get("toma") or next(

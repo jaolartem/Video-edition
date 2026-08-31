@@ -116,8 +116,31 @@ def pedir(paso, slug, prompt, payload, cli=True):
         prompt = _piso() + SEPARA + prompt
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
                         "datos": payload}, ensure_ascii=False, indent=1)
+    # **Y hay campos que cambian sin que cambie la pregunta.** `vuelta` cuenta
+    # cuantas veces ha pasado la pieza por aqui, asi que sube cada vez que se
+    # archiva un par — y con eso el pedido nunca era identico a si mismo, su
+    # fecha se movia sola, y la guarda de C-122 rechazaba **todas** las
+    # respuestas por «anteriores al pedido». Una pieza que convergia se quedaba
+    # rebotando: contestaba bien tres veces y las tres se archivaban por
+    # desfasadas.
+    #
+    # Se comparan las dos preguntas sin esos campos. Siguen viajando —quien
+    # contesta necesita saber en que vuelta esta—, pero dejan de contar como
+    # pregunta distinta.
+    VOLATILES = ("vuelta",)
+
+    def _pregunta(txt):
+        try:
+            d = json.loads(txt)
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if isinstance(d.get("datos"), dict):
+            d["datos"] = {k: v for k, v in d["datos"].items()
+                          if k not in VOLATILES}
+        return json.dumps(d, ensure_ascii=False, sort_keys=True)
+
     try:
-        igual = io.open(p, encoding="utf-8").read() == nuevo
+        igual = _pregunta(io.open(p, encoding="utf-8").read()) == _pregunta(nuevo)
     except OSError:
         igual = False
     if not igual:

@@ -162,6 +162,17 @@ def cierres_en_corpus(margen=14):
                 "desde": round(ws[a]["start"], 3),
                 "hasta": round(ws[b - 1]["end"], 3),
                 "texto": " ".join(x["text"].strip() for x in ws[a:b]),
+                # **Con sus tiempos por palabra, como `antes` y `despues`.**
+                # Sin ellos un cierre del corpus solo se puede tomar entero, y
+                # los de verdad vienen con dos arranques pegados o con un «el
+                # link esta abajo» de mas. Tres piezas se quedaron sin poder
+                # meter el escalon del precio por esto —«viene sin tiempos de
+                # palabra, no puedo recortarlo sin estimar»— teniendo el
+                # material delante. Es C-118 otra vez: cuando un paso tiene que
+                # devolver segundos, los segundos tienen que estar en lo que se
+                # le da.
+                "palabras": [[round(x["start"], 3), round(x["end"], 3),
+                              x["text"].strip()] for x in ws[a:b]],
             })
     return out
 

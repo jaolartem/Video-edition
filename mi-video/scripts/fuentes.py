@@ -85,6 +85,50 @@ def _con():
     return c
 
 
+def propias():
+    """Las cifras cuya fuente es el proyecto, no un organismo.
+
+    El precio del bootcamp no lo respalda la CRA: lo pone Jaime, y vive en la
+    tabla `precio` con su escalon y su fecha de cierre. Pedirle una fuente
+    externa es pedirle que demuestre su propio precio, y una puerta que reclama
+    lo que no tiene sentido reclamar es una puerta que se aprende a saltar.
+
+    Cinco de las treinta y ocho cifras del lote eran esto. Se declaran aqui como
+    respaldadas por su origen —la escalera— y siguen siendo comprobables: si el
+    escalon cambia, la cifra deja de casar y vuelve a salir.
+
+    Lo que esto **no** cubre: cualquier numero que no sea exactamente un importe
+    de la escalera. Un `$21` derivado de un calculo no es el precio.
+    """
+    con = _con()
+    filas = con.execute("select importe, desde, hasta, nota from precio"
+                        " order by hasta").fetchall()
+    con.close()
+    fuera = {}
+    # **La fecha del evento tambien es de la casa.** Es su bootcamp: la fija el
+    # y vive en el ultimo escalon, el que «cierra con el evento». Pedirle un
+    # organismo que respalde cuando da su propia charla es la misma clase de
+    # ruido que pedirle que demuestre su precio.
+    ult = filas[-1] if filas else None
+    if ult and (ult["hasta"] or ""):
+        d = (ult["hasta"] or "")[:10].split("-")
+        MES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+               "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+        if len(d) == 3:
+            dia = f"{int(d[2])} de {MES[int(d[1]) - 1]}"
+            respaldo = ("Jaime Olarte Finanzas · fecha del evento",
+                        f"el evento es el {dia} de {d[0]}")
+            for forma in (dia, f"El {dia}", f"el {dia}", d[0]):
+                fuera[forma] = respaldo
+    for f in filas:
+        vale = f"${f['importe']}"
+        cierra = (f["hasta"] or "")[:10]
+        fuera[vale] = ("Jaime Olarte Finanzas · escalera de precios del evento",
+                       f"escalon de {vale} hasta el {cierra}"
+                       + (f" · {f['nota']}" if f["nota"] else ""))
+    return fuera
+
+
 def dossier(slug):
     """Las etapas que ponen una cifra delante del espectador, con su contexto.
 
@@ -108,9 +152,15 @@ def dossier(slug):
         texto = " ".join(x for x in (f["libreto"], f["grafico"]) if x)
         cifras = sorted({_normal(m.group(0)) for m in CIFRA.finditer(texto)})
         cifras = [c for c in cifras if c]
+        # **El precio no necesita fuente externa: es de la casa.** Se marca aqui
+        # para que el paso de respaldo no lo pregunte y quien contesta no gaste
+        # una decision en ello. Ver `propias()`.
+        de_casa = propias()
+        propia = {c: de_casa[c] for c in cifras if c in de_casa}
         if not cifras:
             continue
         out.append({"etapa": f["orden"], "cifras": cifras,
+                    "ya_respaldadas": propia,
                     "libreto": f["libreto"], "trato": f["trato"],
                     "grafico": f["grafico"], "que_pasa": f["que_pasa"],
                     "corrige": ({"dice": f["corrige_dice"], "es": f["corrige_es"]}
@@ -164,6 +214,14 @@ def cargar(slug, respuesta):
     return n
 
 
+# La marca con la que una cifra se declara parte de un caso construido. Va en
+# `nota` porque `respalda` tiene su CHECK cerrado en la base y ampliarlo seria
+# migrar la tabla para decir algo que cabe en el texto. Lo importante es que sea
+# **una sola cadena**, escrita en el contrato: un agente la invento por su
+# cuenta y funciono, y lo que funciona por casualidad se rompe a la tercera.
+HIPOTETICO = "CASO_HIPOTETICO"
+
+
 def sin_respaldo(slug):
     """Las cifras que la pieza pone en pantalla y no se sostienen.
 
@@ -171,12 +229,27 @@ def sin_respaldo(slug):
     no se encontró respaldo; `no` es que la fuente **dice otra cosa**, y eso ya
     no es un hueco, es una afirmación contradicha.
     """
+    #
+    # **Y un caso hipotetico declarado no es un hueco.** Regla del proyecto,
+    # escrita al resolver la etapa 5 de reel-04: *«un caso hipotetico declarado
+    # no necesita fuente externa: necesita que el mecanismo que describe sea
+    # cierto. Si la relacion causal se sostiene, la afirmacion se sostiene
+    # aunque no exista un documento que la diga»*.
+    #
+    # Un electricista que factura 180 mil no es una afirmacion sobre el mundo:
+    # es un ejemplo construido para explicar una mecanica. Pedirle una fuente es
+    # pedirle un documento a algo que nadie dijo que hubiera pasado — y con eso
+    # reel-02 paraba por 21 cifras de las que 8 eran esto.
+    #
+    # Lo que si tiene que estar es **declarado**: la nota dice que es un ejemplo,
+    # y el tablero lo rotula. Un hipotetico sin declarar sigue siendo un hueco.
     con = _con()
     filas = con.execute(
         "select d.etapa_orden, d.cifra, d.respalda, d.nota from dato d"
         "  join video v on v.id = d.video_id"
         " where v.slug = ? and d.respalda in ('no','sin_fuente')"
-        " order by d.etapa_orden", (slug,)).fetchall()
+        "   and coalesce(d.nota,'') not like ?"
+        " order by d.etapa_orden", (slug, f"%{HIPOTETICO}%")).fetchall()
     con.close()
     return [dict(f) for f in filas]
 
