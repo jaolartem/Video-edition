@@ -27,7 +27,7 @@
  */
 import { FPS } from "./reloj.mjs";
 import { pal, raiz } from "./texto.mjs";
-import { precioVigente } from "./material.mjs";
+import { FRAMES, precioVigente } from "./material.mjs";
 
 /** El rótulo del gancho, línea a línea. */
 export const LINEAS = {
@@ -131,9 +131,26 @@ export const CUENTA = {
  * (C-28). Y aquí carga además la urgencia, porque el reel 3 no la dice en voz —
  * la única toma que la tenía colgaba del precio sin antecedente.
  */
-export const PRECIO = {
-  "reel-03": PRECIO_HOY?.vale ?? null,
-};
+/**
+ * **El escalón va en pantalla en TODAS, y sale de la tabla `precio`.**
+ *
+ * Esto era un literal con una sola pieza dentro —`"reel-03"`— así que las demás
+ * salían sin precio o, peor, diciéndolo en voz sin decir que sube: reel-03,
+ * reel-05 y reel-06 dicen «20 dólares» y se callan el escalón, y el día 5 las
+ * tres mienten sin que nadie toque nada. reel-02 no lo decía en absoluto.
+ *
+ * Jaime, el 1 de septiembre: *«rotula el escalón en pantalla en las cuatro»*. Y
+ * el mecanismo ya estaba hecho: `precioVigente()` devuelve el escalón entero con
+ * su fecha de cierre. Lo único que faltaba era dárselo a todas en vez de a una.
+ *
+ * Las que llevan las dos cuentas (`CUENTA`) no lo repiten: ahí el precio ya está
+ * enfrentado a lo que cuesta no saberlo, y ponerlo dos veces lo desarma.
+ */
+export const PRECIO = Object.fromEntries(
+  Object.keys(FRAMES.reels)
+    .filter((slug) => !CUENTA[slug])
+    .map((slug) => [slug, PRECIO_HOY?.vale ?? null]),
+);
 
 /**
  * **La comparación como texto fuerza.**

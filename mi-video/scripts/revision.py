@@ -95,6 +95,42 @@ def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
         _huella = _mo.huella_edl(slug)
     except Exception:                              # noqa: BLE001
         _huella = None
+    # **Lo que sube a Jaime se cuenta, no se apila.**
+    #
+    # Cada vuelta que veía lo mismo escribía una fila nueva, así que la misma
+    # observación acababa repetida con la cifra remedida: el cierre del reel-01
+    # que no levanta estaba ocho veces, con 0,86 / 0,98 / 1,02 / 1,08 de
+    # intensidad. Medido el 1 de septiembre: **134 notas para 7 piezas**, y
+    # Jaime, mirándolas: *«no veo qué tengo que decidir»*. Tenía razón — no se
+    # veía porque estaban ocho veces.
+    #
+    # Es exactamente lo que `instruccion.guardar` ya resuelve subiendo `veces`.
+    # Aquí la clave no puede ser el texto entero: la cifra cambia cada vez que se
+    # remide. Son las **palabras de contenido** las que dicen si es la misma
+    # observación, y `veces` pasa a ser lo que era en la otra tabla: la medida de
+    # cuántas vueltas lleva esperando una decisión.
+    ya = None
+    if estado == "sube":
+        try:
+            from dominio.texto import contenido
+
+            clave = " ".join(contenido(que or "")[:14])
+            for i, otro in con.execute(
+                    "select id, que from revision where video_slug = ?"
+                    " and estado = 'sube'", (slug,)).fetchall():
+                if " ".join(contenido(otro or "")[:14]) == clave:
+                    ya = i
+                    break
+        except Exception:                          # noqa: BLE001
+            ya = None
+    if ya is not None:
+        con.execute("update revision set veces = coalesce(veces, 1) + 1,"
+                    " que = ?, fecha = ? where id = ?",
+                    (que, datetime.datetime.now().isoformat(timespec="seconds"),
+                     ya))
+        con.commit()
+        con.close()
+        return
     con.execute(
         "insert into revision (video_slug, huella, pasada, desde_s, hasta_s, ancla,"
         " cual, accion, que, regla, estado, fecha)"
