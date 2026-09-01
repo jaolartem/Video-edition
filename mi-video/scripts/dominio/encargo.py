@@ -120,7 +120,14 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
     # que nada hubiera cambiado salvo el enfoque de quien miraba.
     filas_desc = list(con.execute(
         "select video_slug, etapa_orden, sobre_texto, que_pasa, emocion,"
-        " componente, grafico, color, sonido, plano from escena_desc"))
+        # **Y el tablero, que es la mitad cara de la escena.** Se quedo
+        # fuera de la primera version de `ya_dicho` y el efecto fue medio
+        # arreglo: la descripcion llegaba aprobada y el tablero no, asi
+        # que quien describe tenia que volver a inventarlo aunque la
+        # escena no hubiera cambiado. Lo dijo el paso al contestar
+        # reel-04: cinco etapas tipograficas rehechas por esto.
+        " componente, grafico, color, sonido, plano, tablero"
+        " from escena_desc"))
     guardado = {(r["video_slug"], r["etapa_orden"]): (r["sobre_texto"] or "")
                 for r in filas_desc}
     aprobada = {(r["video_slug"], r["etapa_orden"]): dict(r) for r in filas_desc}
