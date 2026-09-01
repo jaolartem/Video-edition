@@ -177,8 +177,22 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
         // Acompañando se va al tercio inferior y deja la cara libre; a pleno
         // toma el cuadro entero.
         justifyContent: acompana ? "flex-end" : "center",
+        // **Y a pleno se reserva la banda del subtítulo.**
+        //
+        // Esto centraba en el alto útil entero, sin descontar los 200 px que
+        // `layout.captionBand` guarda para el subtítulo: **cualquier tablero a
+        // pleno con pie invadía 960-1160**, o sea escribía encima de lo que se
+        // está oyendo. Es literalmente lo que Jaime vio en el primer render —
+        // *«los tableros y paneles están sobrepuestos en todos lados»*— y la
+        // reserva ya existía: `boardHeight` está en `lienzo.ts` justo para esto
+        // y nadie la usaba aquí.
+        //
+        // Acompañando no hace falta: ya se va al tercio inferior con su propio
+        // margen, que es lo que lo aparta de la cara.
         padding: `${layout.safe.top}px ${layout.safe.right}px ${
-          acompana ? layout.safe.bottom + 120 : layout.safe.bottom
+          acompana
+            ? layout.safe.bottom + 120
+            : layout.safe.bottom + layout.captionBand
         }px ${layout.safe.left}px`,
         // La familia decide el fondo, y viene declarada: `cargada` deja ver el
         // plano, `tranquila` va sobre placa lisa para que las cifras se lean.

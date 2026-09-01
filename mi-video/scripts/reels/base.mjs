@@ -73,16 +73,35 @@ export const aprobadas = (() => {
  * Si no hay dato comprobado se deja lo que hubiera: una pieza sin verificar no
  * se queda muda de golpe.
  */
-export const pieDe = (slug, beat) => {
+export const pieDe = (slug, beat, props) => {
   try {
-    const r = db.prepare(
-      "select f.rotulo, d.condiciones from dato d" +
+    // **El pie es el de la cifra que SE ROTULA, no el de la mas larga.**
+    //
+    // Esto ordenaba `by length(d.cifra) desc`, o sea elegia la fila cuyo texto
+    // de cifra ocupara mas caracteres. En reel-07 e3 eso saca «53.53%
+    // (corroboracion independiente)» y el tablero rotula **32 %**: el pie salia
+    // con la nota de metodo de PwC debajo de una cifra que no es la suya, que es
+    // peor que no poner pie — parece respaldar lo que no respalda.
+    //
+    // Se busca la fila cuya cifra aparece en lo que el tablero pinta. Si no se
+    // puede saber, manda la que MAS necesita el pie: una proyeccion
+    // (`respalda = 'parcial'`) tiene condiciones que hay que decir; una cifra
+    // publicada se sostiene sola. Eso es un criterio; la longitud no era ninguno.
+    const pintado = JSON.stringify(props ?? {});
+    const filas = db.prepare(
+      "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d" +
       "  left join fuente f on f.id = d.fuente_id" +
       "  join video v on v.id = d.video_id" +
       " where v.slug = ? and d.etapa_orden = ?" +
-      "   and d.respalda in ('si','parcial')" +
-      " order by length(d.cifra) desc limit 1",
-    ).get(slug, beat);
+      "   and d.respalda in ('si','parcial')",
+    ).all(slug, beat);
+    const suya = filas.find((x) => {
+      const n = String(x.cifra ?? "").match(/[\d.,]+\s*%?|\$[\d.,]+/);
+      return n && pintado.includes(n[0].trim());
+    });
+    const r = suya
+      ?? filas.find((x) => x.respalda === "parcial")
+      ?? filas[0];
     if (!r) return {};
     const out = {};
     if (r.rotulo) out.fuente = String(r.rotulo);
@@ -141,10 +160,37 @@ const DIBUJA = new Set(["causal", "comparacion", "acumulacion", "twopaths"]);
  */
 export function tablerosDe(slug) {
   const faltas = [];
-  const declarados = db.prepare(
-    "select count(*) n from escena_desc where video_slug = ?" +
-    " and tablero is not null and tablero <> ''",
-  ).get(slug)?.n ?? 0;
+  // **Se cuentan los comparables, y `tipo` no lo es.**
+  //
+  // Esto contaba TODOS los tableros declarados y abajo se filtran los de
+  // `kind: "tipo"` —que existen y se dibujan, sólo que por el camino
+  // tipográfico—. La resta acusaba entonces una falta que no existe: «declaró 3
+  // y sólo llegan 2», y el paso terminaba en código 1.
+  //
+  // No saltaba porque hasta hoy nadie había diseñado un gancho: los rótulos
+  // salían de un literal. La primera composición de un gancho en la historia
+  // del proyecto lo disparó, que es justo cuando una guarda mal puesta hace más
+  // daño — bloquea lo que viene a estrenar.
+  //
+  // La comparación sigue haciendo su trabajo, que es el de C-14x: denunciar que
+  // la base diga 38 y la pantalla muestre 9. Sólo que ahora compara lo mismo
+  // contra lo mismo.
+  const declarados = (() => {
+    try {
+      return db.prepare(
+        "select tablero from escena_desc where video_slug = ?" +
+        " and tablero is not null and tablero <> ''",
+      ).all(slug).filter((f) => {
+        try {
+          return JSON.parse(f.tablero)?.kind !== "tipo";
+        } catch {
+          return true;
+        }
+      }).length;
+    } catch {
+      return 0;
+    }
+  })();
   let tableros;
   try {
     tableros = db.prepare(

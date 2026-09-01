@@ -51,15 +51,47 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja }) {
   const fin = Math.round(duracion * FPS);
   return bs
     .map((b) => {
-      const at = empuja(reloj.anclaDe(b.beat));
-      const dur = Math.min(
-        Math.max(reloj.duracionDe(b.beat) ?? 0,
-                 duracionTablero(b.kind, b.props)) + SOLAPE,
-        fin - at,
-      );
+      // **El tablero arranca con la palabra, no con la etapa.**
+      //
+      // Regla de Jaime, sobre el primer render: *«el tablero inicia con lo que
+      // se dice, y lo que se dice queda repartido por el tablero, siempre; se
+      // puede cortar el texto por la mitad o dejar más espacio, pero el
+      // arranque no se negocia»*.
+      //
+      // Esto anclaba al inicio del beat. Medido en reel-03 e6: el precio se dice
+      // en 54,7 s y la etapa empieza en 47,93 s — **6,8 s** de tablero puesto
+      // antes de que nadie diga lo que rotula. Desde el diseño no había forma de
+      // corregirlo, y por eso el paso lo declara: `props.anclas` trae el segundo
+      // exacto de cada bloque.
+      //
+      // Si no viene declarado, se ancla al beat como siempre: una pieza vieja no
+      // se rompe porque el mecanismo nuevo exista.
+      const at = empuja(_anclaDeclarada(b, reloj) ?? reloj.anclaDe(b.beat));
+      // **Y no se come la etapa siguiente.**
+      //
+      // El `Math.max` dejaba que un tablero durase lo que su forma pide aunque
+      // su beat fuera mas corto: una forma sin componente propio recibe 8,5 s
+      // fijos, y con eso el tablero de reel-06 e3 se comia la etapa 4 entera y
+      // el de e7 la etapa 8. **Esa es la causa mecanica de «estan sobrepuestos»**
+      // — no una decision de nadie, un maximo mal puesto.
+      //
+      // Lo que dura una etapa es lo que dura: el tablero se estira hasta ella y
+      // hasta `SOLAPE`, que son los 0,8 s deliberados con los que se esconde la
+      // costura. Si su forma pide mas tiempo del que hay, lo que sobra es la
+      // forma, y eso lo dice la puerta de legibilidad — no se roba del beat de
+      // al lado, donde se esta diciendo otra cosa.
+      const suyo = reloj.duracionDe(b.beat) ?? duracionTablero(b.kind, b.props);
+      const dur = Math.min(suyo + SOLAPE, fin - at);
       return {
         at,
         duration: dur,
+        // **El beat viaja con el tablero.** `armarPaneles` lo buscaba por
+        // `t.at === inicio`, o sea suponiendo que un tablero empieza donde
+        // empieza su etapa. Desde que puede anclarse a la palabra eso deja de
+        // ser cierto, y el panel que anuncia un tablero no encontraba el suyo:
+        // caia al camino de acompanamiento y se colocaba solo, ocho segundos
+        // antes de que nadie dijera lo que anuncia (reel-06 e2).
+        beat: b.beat,
         kind: b.kind,
         // La placa del beat, si la hay: **los fondos son para usarse**. El
         // collage asoma alrededor y los bloques opacos sostienen las cifras, que
@@ -116,7 +148,8 @@ export function armarPaneles(bs, reloj, tableros) {
     .filter((b) => b.bloques.length)
     .map((b) => {
       const inicio = reloj.anclaDe(b.beat);
-      const suyo = tableros.find((t) => t.at === inicio);
+      // Se busca **por etapa**, no por el frame en que arranca: ver arriba.
+      const suyo = tableros.find((t) => t.beat === b.beat);
       if (suyo) {
         const dur = ADELANTO(b.bloques);
         const at = suyo.at - dur;
@@ -124,8 +157,11 @@ export function armarPaneles(bs, reloj, tableros) {
       }
       const dur = reloj.duracionDe(b.beat);
       const tope = ADELANTO(b.bloques) + 3 * FPS;
+      // Y si el diseno declaro cuando entra, manda eso: es la misma regla que
+      // el tablero —arranca con la palabra— y el panel dice lo mismo antes.
+      const at = _anclaDeclarada(b, reloj) ?? inicio;
       return dur
-        ? { at: inicio, duration: Math.min(dur, tope), bloques: b.bloques }
+        ? { at, duration: Math.min(dur, tope), bloques: b.bloques }
         : null;
     })
     .filter(Boolean)
@@ -149,3 +185,23 @@ export function armarPaneles(bs, reloj, tableros) {
     });
 }
 
+
+/**
+ * El frame donde el tablero tiene que entrar, si el diseño lo declaró.
+ *
+ * `props.anclas` son segundos de la PIEZA MONTADA —lo que se oye—, que es la
+ * misma referencia con la que se compuso. Se toma el primero: es cuando se dice
+ * lo que el tablero nombra.
+ */
+function _anclaDeclarada(b, reloj) {
+  const a = b?.props?.anclas;
+  const s = Array.isArray(a) ? a[0] : a;
+  const seg = typeof s === "object" && s !== null ? (s.segundo ?? s.en) : s;
+  const n = Number(seg);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const at = Math.round(n * FPS);
+  // No se adelanta a la etapa: un tablero que entra antes de que su beat exista
+  // se pinta sobre lo que dice otra cosa.
+  const inicio = reloj.anclaDe(b.beat);
+  return at >= inicio ? at : null;
+}

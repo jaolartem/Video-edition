@@ -31,6 +31,7 @@
 import fs from "fs";
 import { sonidosMudos } from "./caminos.mjs";
 import { FPS, Reloj } from "./reels/reloj.mjs";
+import { FRAMES } from "./reels/material.mjs";
 import { duracionDelCorte, edlDe, marcoDe, planDe, subsDe }
   from "./reels/material.mjs";
 import { aprobadas, correccionesDe, descDe, pieDe, tablerosDe }
@@ -53,7 +54,13 @@ import { revisar } from "./reels/puerta.mjs";
  */
 const faltas = [];
 
-const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
+// **Las piezas salen de lo declarado, no de un literal de copy.** Esto iteraba
+// `LINEAS` —los rotulos del gancho, escritos a mano— asi que una pieza que no
+// estuviera ahi no generaba spec ni existia para el render: reel-07 llevaba dias
+// en la linea, invisible aqui. Es el `if (slug === ...)` con otra cara.
+const spec = Object.keys(FRAMES.reels).map((slug) => {
+  // El rotulo: `LINEAS` solo mientras queden ganchos sin componer.
+  const lineas = LINEAS[slug] ?? [];
   const marco = marcoDe(slug);
   const edl = edlDe(slug);
   const plan = planDe(slug);
@@ -108,7 +115,7 @@ const spec = Object.entries(LINEAS).map(([slug, lineas]) => {
   const tableros = armarTableros(
     // El pie sale de la fuente comprobada, no de una cadena a mano. Va antes
     // del horario porque la condición cuenta para el tiempo de lectura.
-    pleno.map((b) => ({ ...b, props: { ...b.props, ...pieDe(slug, b.beat) } })),
+    pleno.map((b) => ({ ...b, props: { ...b.props, ...pieDe(slug, b.beat, b.props) } })),
     { slug, reloj, duracion, empuja: empujaTablero(cartas) },
   );
 
