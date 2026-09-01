@@ -99,6 +99,7 @@ class Recorte(Puntual):
     def aplicar(self) -> str:
         import revision
 
+        antes = _linea(self.pieza)
         revision.anotar(self.pieza, "cortar", None, None, self.ancla,
                         regla=self.por_que[:500], estado="pendiente",
                         pasada=3, ancla=self.ancla, cual=self.cual)
@@ -106,7 +107,18 @@ class Recorte(Puntual):
         if not puestos:
             return (f"«{self.ancla}» no se pudo anclar en el montaje de hoy:"
                     f" queda anotado, no aplicado")
-        return f"cortado «{self.ancla}» del corte y del audio"
+        # **Y el mismo trozo sale del audio limpiado, en la misma operacion.**
+        #
+        # Si no, `voz-limpia` se planta —con razon— porque el video y el audio
+        # dejan de durar lo mismo, y la unica salida es pedirle a Jaime que lo
+        # limpie otra vez. Su limpieza es trabajo manual suyo: perderla por un
+        # recorte de tres palabras es el peor cambio posible.
+        fuera = _lo_que_falta(antes, _linea(self.pieza))
+        voz = Voz(self.pieza)
+        hecho = voz.quitar(fuera) if fuera and voz.fichero else None
+        return (f"cortado «{self.ancla}» del corte"
+                + (f" y del audio limpiado ({os.path.basename(hecho)})"
+                   if hecho else ""))
 
 
 class Voz:
@@ -198,3 +210,41 @@ def pendientes(slug: str) -> list:
     return [{"id": t["id"], "segundo": t.get("segundo"), "beat": t.get("beat"),
              "dijo": t["dijo"], "tipo": t["tipo"]}
             for t in tk.abiertos(slug)]
+
+
+def _linea(slug: str) -> list:
+    """La linea de tiempo del montaje: `(desde, hasta, cinta)` por trozo.
+
+    Son segundos de CINTA con su duracion; comparando la de antes con la de
+    despues se sabe **que trozo desaparecio y donde caia en la pieza**, que es lo
+    unico que hace falta para recortar el audio igual.
+    """
+    try:
+        from .montaje import Montaje
+
+        return [(t.desde, t.hasta, t.cinta) for t, _ in Montaje(slug).tramos()]
+    except Exception:                              # noqa: BLE001
+        return []
+
+
+def _lo_que_falta(antes: list, despues: list) -> list:
+    """Donde caia, en la PIEZA, lo que ya no esta. `[(desde, hasta), ...]`.
+
+    Se recorre la linea vieja llevando la cuenta del tiempo de pieza; cada trozo
+    que no sobrevive marca su hueco. No se comparan segundos absolutos porque el
+    corte los desplaza: se compara **quien sigue estando**.
+    """
+    vivos, fuera, t = set(despues), [], 0.0
+    for tr in antes:
+        dur = tr[1] - tr[0]
+        if tr not in vivos:
+            fuera.append((round(t, 3), round(t + dur, 3)))
+        t += dur
+    # Se funden los huecos pegados: dos trozos seguidos que se van son un hueco.
+    junto = []
+    for a, b in fuera:
+        if junto and a - junto[-1][1] < 0.01:
+            junto[-1] = (junto[-1][0], b)
+        else:
+            junto.append((a, b))
+    return junto

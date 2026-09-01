@@ -52,6 +52,33 @@ from dominio.aritmetica import SOLAPE_MIN as _SOLAPE_MIN  # noqa: E402
 BASE = "ads/decisiones.db"
 
 
+#: **Lo que se anota y NO para la pieza, declarado en un solo sitio.**
+#:
+#: La puerta la miran dos: el servicio `verificado` y `montar.sh` por la CLI. Y
+#: discrepaban — el servicio apartaba la caducidad como ticket y la CLI seguia
+#: bloqueando por ella, asi que la pieza pasaba una y no la otra. Es la averia de
+#: siempre: la misma decision escrita dos veces y solo una aplicada.
+#:
+#: Las dos que no paran, con su porque:
+#:
+#: - **la descripcion habla de otro texto** — rehacerla es rehacer criterio ya
+#:   tomado, y la IA no es determinista. Jaime: *«solo hacemos una descripcion y
+#:   una sola composicion grafica; no se devuelve a hacer un reproceso»*.
+#: - **dice algo dos veces seguidas** — el eco de la costura ya lo cierra el
+#:   cosido; lo que llega aqui es tropiezo dentro de la toma o **figura**, y
+#:   distinguirlos es entender, no medir.
+NO_PARAN = ("habla de otro texto", "sin contestar: ['describir']",
+            "dos veces seguidas")
+
+
+def separa(mal):
+    """Parte los motivos en los que paran la pieza y los que solo se anotan."""
+    paran, avisan = [], []
+    for m in mal:
+        (avisan if any(x in m for x in NO_PARAN) else paran).append(m)
+    return paran, avisan
+
+
 def revisar(slug):
     """Todo lo que tiene que cumplirse. Devuelve la lista de motivos para parar."""
     ruta = f"ads/{slug}/edl-sell.json"
@@ -399,11 +426,14 @@ def main():
     todo = []
     for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
-        mal = revisar(slug)
-        todo += mal
-        print(f"{slug}: {'OK' if not mal else str(len(mal)) + ' motivo(s)'}")
-        for m in mal:
+        paran, avisan = separa(revisar(slug))
+        todo += paran
+        print(f"{slug}: {'OK' if not paran else str(len(paran)) + ' motivo(s)'}"
+              + (f"  ({len(avisan)} anotado(s))" if avisan else ""))
+        for m in paran:
             print(f"    · {m}")
+        for m in avisan:
+            print(f"    ~ {m}")
     if todo and not a.avisa:
         print(f"\nEL CAMINO SE PARA — {len(todo)} motivo(s). Nada se renderiza"
               f" hasta que esten resueltos.")

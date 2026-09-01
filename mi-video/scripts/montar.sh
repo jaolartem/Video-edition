@@ -102,10 +102,24 @@ IDENTICAS=()
 # Las comprobaciones existian sueltas y dependian de que alguien se acordara de
 # correrlas — o sea que no existian. Aqui corren como conjunto y paran el
 # montaje: mejor no renderizar que renderizar seis piezas inservibles.
-PYTHONIOENCODING=utf-8 python scripts/verificar.py "$@" || {
-  echo "montar.sh: no se renderiza nada hasta resolver lo de arriba."
+# **La ULTIMA linea tiene que decir QUE falta, no firmar.**
+#
+# El motor guarda como motivo la ultima linea que imprime el paso, y esto acababa
+# con «no se renderiza nada hasta resolver lo de arriba»: cierto, y sin una sola
+# pista de que es «lo de arriba». En el log del despachador las siete piezas
+# decian lo mismo y ninguna decia por que — que es el mismo fallo que ya costo un
+# dia con el aviso de disco, sólo que ahora la frase inutil la escribimos aqui.
+#
+# Se repite el primer motivo real al final. Lo de arriba sigue entero para quien
+# mire la salida completa; la ultima linea deja de mentir por omision.
+_SALIDA=$(PYTHONIOENCODING=utf-8 python scripts/verificar.py "$@" 2>&1) || {
+  echo "$_SALIDA"
+  echo "montar.sh: $(printf '%s
+' "$_SALIDA" | grep -m1 '·' | sed 's/^ *· *//')"
   exit 1
 }
+printf '%s
+' "$_SALIDA"
 
 for r in "${REELS[@]}"; do
   TOMA=$(node -e "console.log(JSON.parse(require('fs').readFileSync('rutas.json','utf8')).tomas['reel-$r']||'')")
