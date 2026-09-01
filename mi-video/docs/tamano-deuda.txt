@@ -1,0 +1,5 @@
+# Ficheros por encima de las 300 lineas, con lo que median
+# el dia que el techo paso a ser contrato. SOLO BAJA: si uno
+# crece, el build para; si baja, se vuelve a declarar.
+420 scripts/assemble.py
+301 scripts/transcribir.py

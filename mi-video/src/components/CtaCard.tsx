@@ -1,74 +1,24 @@
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
+import { useEntrada } from "../brand/horario";
+import { cuerpoQueCabe, masLarga } from "../brand/medida";
 import { Cinta, Fondo } from "./Fondo";
+import { Cuenta } from "./ctaCard/Cuenta";
+import { horarioDe } from "./ctaCard/horario";
 import {
   accentChoice,
   color,
-  duration,
-  ease,
   layout,
   mode as modes,
   size,
   tone as tones,
   tracking,
-  type Accent,
-  type Mode,
-  type Tone,
 } from "../brand/tokens";
+import type { CtaCardProps } from "./ctaCard/tipos";
 
-export type CtaCardProps = {
-  /** La promesa, en corto. No el guion entero. */
-  promesa: string;
-  /** Los datos duros de la oferta. Un CTA incompleto no sirve. */
-  fecha: string;
-  /**
-   * Precio suelto. Se conserva para las piezas que no declaran `cuenta`.
-   *
-   * **Sólo entra con su fecha de cierre.** Sin ella caduca en silencio: «$20»
-   * deja de ser cierto el día que sube y la pieza sigue publicada.
-   */
-  precio?: string;
-  /**
-   * El desliz que se señala. Se oye `dice`, se lee `es`.
-   *
-   * En el reel 1 Jaime dice «550» y el cálculo de su propio libreto da `$576`.
-   * La diferencia es de redondeo y no cambia el mensaje — por eso se señala en
-   * vez de corregirse, y por eso lo tachado es pequeño y lo cierto es lo grande.
-   */
-  corrige?: { dice: string; es: string };
-  /**
-   * **Las dos cuentas**, que es de lo que va la pieza.
-   *
-   * Corrección de Jaime: *«el precio del bootcamp es 20, 30 o 40 dólares; el
-   * precio de NO conocerlos es de 576»*. Antes los 576 ocupaban la fila de
-   * precio, así que la tarjeta decía que el bootcamp costaba 576 — el número
-   * correcto en la fila equivocada.
-   *
-   * Van **en dos columnas, navy contra oro**, que es como el canon resuelve una
-   * comparación: el navy es el camino por defecto y el oro es donde hay que
-   * mirar. Y **la pregunta no se escribe**: la hace la voz —*«revise qué cuenta
-   * le sale mejor»*— y aquí sólo están las dos cuentas para que tenga a qué
-   * referirse.
-   */
-  cuenta?: { cuesta: string; vale: string; nota?: string };
-  accion: string;
-  kicker?: string;
-  /**
-   * Cuánto dura la tarjeta, en frames. **El horario se reparte sobre ella.**
-   *
-   * Jaime: *«todo el panel final pasa muy rápido»*. La duración la calcula
-   * `reels-spec.mjs` a partir de lo que la tarjeta lleva dentro, no de un
-   * número redondo: así cada bloque tiene su tiempo de lectura.
-   */
-  duracion?: number;
-  /** Placa de fondo recortada. El CTA es el último frame: no puede ser un plano negro. */
-  placa?: string;
-  mode?: Mode;
-  tone?: Tone;
-  accent?: Accent;
-};
+export type { CtaCardProps } from "./ctaCard/tipos";
 
 /**
  * La tarjeta de cierre, **en el vocabulario de los tableros**.
@@ -91,6 +41,13 @@ export type CtaCardProps = {
  * condensada, las dos cuentas enfrentadas ocupando el centro y la banda de pie
  * con la fecha y la acción. Mismo lenguaje que el tablero del minuto 19, que es
  * lo que hace que la pieza cierre donde abrió.
+ *
+ * ## Aquí sólo se dibuja y se ata
+ *
+ * El contrato de la oferta está en [`ctaCard/tipos`](./ctaCard/tipos.ts), el
+ * reparto sobre la duración en [`ctaCard/horario`](./ctaCard/horario.ts) y la
+ * columna en [`ctaCard/Cuenta`](./ctaCard/Cuenta.tsx) — que además vivía
+ * declarada dentro del cuerpo de este componente.
  */
 export const CtaCard: React.FC<CtaCardProps> = ({
   promesa,
@@ -106,7 +63,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
   duracion,
   placa,
 }) => {
-  const frame = useCurrentFrame();
+  const entra = useEntrada();
   const base = modes[mode];
   const t = {
     ...base,
@@ -114,113 +71,14 @@ export const CtaCard: React.FC<CtaCardProps> = ({
     accent: accent ? accentChoice[accent] : base.accent,
   };
 
-  const T = duracion ?? 120;
-  const enter = (at: number) =>
-    interpolate(frame, [at, at + duration.entry], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: ease.out,
-    });
-
-  /** Ancho de cada columna. Dos cuentas, un filete de 24 px entre ellas. */
-  const ancho = (layout.width - layout.safe.left - layout.safe.right - 24) / 2;
-
-  /**
-   * Una cuenta: etiqueta arriba, cifra grande, condición debajo.
-   *
-   * `oro` marca cuál es la que el espectador debe mirar. En el canon la
-   * distinción entre lo que se atiende y lo que no se hace **con oro contra
-   * navy**, nunca con semáforo — no hay rojo en el sistema.
-   */
-  const Cuenta: React.FC<{
-    etiqueta: string;
-    cifra: string;
-    pie?: string;
-    tachado?: string;
-    oro?: boolean;
-    at: number;
-  }> = ({ etiqueta, cifra, pie, tachado, oro, at }) => {
-    const p = enter(at);
-    return (
-      <div
-        style={{
-          width: ancho,
-          minHeight: 420,
-          backgroundColor: oro ? color.gold : color.navy,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 22,
-          padding: "34px 26px",
-          opacity: p,
-          transform: `translateY(${((1 - p) * 26).toFixed(1)}px)`,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: fontFamily.bloque,
-            fontSize: 42,
-            lineHeight: 1.02,
-            textAlign: "center",
-            textTransform: "uppercase",
-            color: oro ? color.richBlack : color.secondaryBlue,
-          }}
-        >
-          {etiqueta}
-        </div>
-        {tachado ? (
-          <div
-            style={{
-              fontFamily: fontFamily.bloque,
-              fontSize: 44,
-              textDecoration: "line-through",
-              textTransform: "uppercase",
-              color: oro ? color.richBlack : color.secondaryBlue,
-              opacity: 0.75,
-            }}
-          >
-            {tachado}
-          </div>
-        ) : null}
-        <div
-          style={{
-            fontFamily: fontFamily.bloque,
-            // Anton gasta ~0,47 em por caracter en versales, medido sobre
-            // render. El margen se paga en cuerpo, que es barato.
-            fontSize: Math.min(156, (ancho - 52) / (cifra.length * 0.47)),
-            lineHeight: 0.94,
-            whiteSpace: "nowrap",
-            textTransform: "uppercase",
-            color: oro ? color.richBlack : color.lightNeutral,
-          }}
-        >
-          {cifra}
-        </div>
-        {pie ? (
-          <div
-            style={{
-              fontFamily: fontFamily.video,
-              fontSize: 28,
-              fontWeight: 800,
-              lineHeight: 1.2,
-              textAlign: "center",
-              textTransform: "uppercase",
-              letterSpacing: "0.02em",
-              color: oro ? color.richBlack : color.secondaryBlue,
-            }}
-          >
-            {pie}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
+  const h = horarioDe(duracion);
+  const abre = entra(0);
+  const promesaP = entra(h.promesaAt);
 
   return (
     <AbsoluteFill style={{ backgroundColor: t.ground }}>
       {placa ? (
-        <Fondo placa={placa} recorte="cuna" fuerza={1} deriva={T} />
+        <Fondo placa={placa} recorte="cuna" fuerza={1} deriva={h.total} />
       ) : null}
 
       {/**
@@ -234,11 +92,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
           top: layout.safe.top - 60,
           bottom: layout.safe.bottom - 300,
           backgroundColor: t.ground,
-          opacity: interpolate(frame, [0, duration.entry], [0, 0.93], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: ease.out,
-          }),
+          opacity: abre * 0.93,
         }}
       />
 
@@ -259,7 +113,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
             style={{
               display: "flex",
               fontFamily: fontFamily.bloque,
-              opacity: enter(Math.round(T * 0.05)),
+              opacity: entra(h.kickerAt),
             }}
           >
             <Cinta tinte={color.lightNeutral} giro={-1.5} cuerpo={40}>
@@ -277,18 +131,19 @@ export const CtaCard: React.FC<CtaCardProps> = ({
         <div
           style={{
             fontFamily: fontFamily.bloque,
-            fontSize: Math.min(
-              92,
-              (layout.width - layout.safe.left * 2) /
-                (Math.max(...promesa.split(" ").map((w) => w.length), 1) * 0.47) /
-                1.1,
-            ),
+            fontSize: cuerpoQueCabe({
+              ancho: layout.width - layout.safe.left * 2,
+              largo: masLarga(promesa.split(" ")),
+              registro: "anton",
+              holgura: 1.1,
+              tope: 92,
+            }),
             lineHeight: 0.98,
             letterSpacing: "0.004em",
             textTransform: "uppercase",
             color: t.text,
-            opacity: enter(Math.round(T * 0.18)),
-            transform: `translateY(${(1 - enter(Math.round(T * 0.18))) * 14}px)`,
+            opacity: promesaP,
+            transform: `translateY(${(1 - promesaP) * 14}px)`,
           }}
         >
           {assertShort(promesa, "title", "CtaCard.promesa")}
@@ -309,20 +164,25 @@ export const CtaCard: React.FC<CtaCardProps> = ({
                 cifra={corrige?.es ?? cuenta.cuesta}
                 pie={corrige ? cuenta.cuesta.replace(/^\$\d+\s*/, "") : undefined}
                 tachado={corrige?.dice}
-                at={Math.round(T * 0.34)}
+                progreso={entra(h.cuestaAt)}
               />
               <Cuenta
                 etiqueta="El bootcamp"
-                cifra={cuenta.vale.split(" ")[0]}
+                cifra={cuenta.vale.split(" ")[0] ?? ""}
                 pie={[cuenta.vale.split(" ").slice(1).join(" "), cuenta.nota]
                   .filter(Boolean)
                   .join(" · ")}
                 oro
-                at={Math.round(T * 0.5)}
+                progreso={entra(h.valeAt)}
               />
             </>
           ) : precio ? (
-            <Cuenta etiqueta="Precio" cifra={precio} oro at={Math.round(T * 0.34)} />
+            <Cuenta
+              etiqueta="Precio"
+              cifra={precio}
+              oro
+              progreso={entra(h.cuestaAt)}
+            />
           ) : null}
         </div>
 
@@ -338,7 +198,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
             justifyContent: "space-between",
             alignItems: "center",
             gap: 24,
-            opacity: enter(Math.round(T * 0.68)),
+            opacity: entra(h.pieAt),
           }}
         >
           <div

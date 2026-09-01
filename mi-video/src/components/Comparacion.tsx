@@ -1,18 +1,17 @@
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
+import { useEntrada } from "../brand/horario";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo } from "./Fondo";
-import {
-  color,
-  duration,
-  ease,
-  layout,
-  readingFrames,
-  size,
-  tracking,
-} from "../brand/tokens";
+import { Columna } from "./comparacion/Columna";
+import { horarioDe } from "./comparacion/horario";
+import { color, layout, size, tracking } from "../brand/tokens";
+import type { ComparacionProps } from "./comparacion/tipos";
+
+export type { Columna, ComparacionProps } from "./comparacion/tipos";
+export { duracionDe } from "./comparacion/horario";
 
 /**
  * Dos columnas, mismas condiciones de partida, resultados distintos.
@@ -40,78 +39,13 @@ import {
  * distintos se vieran idénticos, y entonces el componente deja de significar
  * nada.
  *
- * ## Cumplimiento por construcción
+ * ## Aquí sólo se dibuja y se ata
  *
- * `fuente` es obligatoria: si el tablero enseña cifras, lleva de dónde salen.
- * `condicion` también — sin ella la comparación se lee como promesa de
- * resultado, y el playbook prohíbe garantizar resultados individuales.
+ * El contrato de cumplimiento está en
+ * [`comparacion/tipos`](./comparacion/tipos.ts), el reparto del horario sobre
+ * la escena en [`comparacion/horario`](./comparacion/horario.ts) y la columna
+ * en [`comparacion/Columna`](./comparacion/Columna.tsx).
  */
-export type Columna = {
-  /** Cabecera de la columna. Versales condensadas. */
-  titulo: string;
-  /** La cifra o el estado. Es el remate de la columna. */
-  cifra: string;
-  /** Una línea de detalle, si hace falta. */
-  pie?: string;
-};
-
-export type ComparacionProps = {
-  /** Cinta superior: la condición común. «Misma facturación», «De cada $100». */
-  premisa: string;
-  /** La columna del estado por defecto. Va en navy: no es donde hay que mirar. */
-  izquierda: Columna;
-  /** La columna que importa. Va en oro. */
-  derecha: Columna;
-  /** Cinta inferior: la diferencia, o la pregunta que deja. */
-  remate?: string;
-  /** De dónde salen las cifras. **Obligatoria.** */
-  fuente: string;
-  /** Qué cambiaría la comparación. **Obligatoria.** */
-  condicion: string;
-  /**
-   * Placa de fondo, si el tablero la lleva. **El collage asoma por los bordes y
-   * el panel opaco sostiene las cifras** — que es como lo hace el canon: una
-   * tabla sobre un fotomontaje no se lee, pero una tabla flotando en negro deja
-   * medio cuadro muerto. Jaime: *«más color y movimiento»*.
-   */
-  placa?: string;
-  /**
-   * Cuánto dura la escena que este tablero **reemplaza**, en frames.
-   *
-   * Jaime: *«el tablero reemplaza la escena, y el tablero es un instrumento
-   * pedagógico»*; y *«se tiene que presentar poco a poco y durar toda la
-   * escena»*. Así que el horario no es fijo: se **reparte** sobre el tiempo
-   * disponible.
-   *
-   * Con un horario fijo el tablero se montaba en 10 s y se quedaba quieto el
-   * resto — que es justo lo que hace que un tablero se sienta relleno. Repartido,
-   * cada elemento entra cuando el anterior ya se pudo leer Y hay algo entrando
-   * hasta el final.
-   */
-  duracion?: number;
-  /** Requiere los ficheros de `public/sfx/`. */
-  sound?: boolean;
-};
-
-// **Aire.** Jaime: *«dales aire y espacio a los tableros, que se sientan útiles
-// y no un comodity para cambiar escenas»*. Las columnas ocupaban 500-1200 y el
-// resto era negro apretado arriba y vacío abajo; ahora respiran de verdad y el
-// pie legal tiene su banda.
-/**
- * Caja de las columnas, **por encima de la banda de subtítulos**.
- *
- * Jaime: *«en los tableros también hay cc»*. Y es distinto del panel: bajo un
- * panel la voz dice lo que el panel muestra, así que el subtítulo repetiría;
- * bajo un tablero la voz **sigue diciendo cosas que el tablero no enseña** —es
- * un L-cut— y el 85% mira sin sonido.
- *
- * La banda vive en 960–1160 (`captionBottom` 760 + `captionBand` 200), así que
- * las columnas acaban en 900 y el remate y el pie se van por debajo de ella.
- */
-const COL = { y: 260, alto: 640 } as const;
-/** Donde empieza la banda de subtítulos. Nada del tablero la invade. */
-const CC = layout.height - layout.captionBottom;
-
 export const Comparacion: React.FC<ComparacionProps> = ({
   premisa,
   izquierda,
@@ -123,7 +57,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   duracion,
   sound = false,
 }) => {
-  const frame = useCurrentFrame();
+  const entra = useEntrada();
 
   assertShort(premisa, "title", "Comparacion.premisa");
   assertShort(condicion, "legal", "Comparacion.condicion");
@@ -134,113 +68,25 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   }
   if (remate) assertShort(remate, "title", "Comparacion.remate");
 
-  const p = (desde: number, dura = duration.entry) =>
-    interpolate(frame, [desde, desde + dura], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: ease.out,
-    });
+  const t = horarioDe({ izquierda, derecha, duracion });
 
-  /**
-   * Las columnas entran **de una en una**, no a la vez. Ver las dos juntas es
-   * un dato; verlas aparecer una tras otra es una comparación — el espectador
-   * tiene tiempo de leer la primera antes de que llegue la que la desmiente.
-   */
-  /**
-   * **El horario se reparte sobre la escena.** Las proporciones salen de lo que
-   * cada cosa tiene que dejar leer: la premisa abre, la primera columna se
-   * asienta, la segunda la desmiente, y el remate llega cuando las dos ya se
-   * compararon.
-   *
-   * Sin `duracion` cae al horario mínimo por tiempo de lectura, que es lo que
-   * hace falta para una vista suelta.
-   */
-  const minimo =
-    duration.entry * 2 +
-    Math.max(20, readingFrames(izquierda.cifra)) +
-    Math.max(20, readingFrames(derecha.cifra));
-  const total = Math.max(duracion ?? 0, minimo + 40);
-  const entraIzq = Math.round(total * 0.14);
-  const entraDer = Math.round(total * 0.38);
-  const finColumnas = Math.round(total * 0.62);
-
+  // **Aire.** Jaime: *«dales aire y espacio a los tableros, que se sientan
+  // útiles y no un comodity para cambiar escenas»*. Las columnas ocupaban
+  // 500-1200 y el resto era negro apretado arriba y vacío abajo; ahora respiran
+  // de verdad y el pie legal tiene su banda.
   const util = layout.width - layout.safe.left * 2;
   const ancho = (util - 34) / 2;
-
-  const columna = (c: Columna, x: number, oro: boolean, desde: number) => {
-    const q = p(desde);
-    return (
-      <div
-        style={{
-          position: "absolute",
-          left: x,
-          top: COL.y,
-          width: ancho,
-          height: COL.alto,
-          backgroundColor: oro ? color.gold : color.navy,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 40,
-          padding: "0 34px",
-          opacity: q,
-          transform: `translateY(${(1 - q) * 26}px)`,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: fontFamily.bloque,
-            fontSize: 46,
-            lineHeight: 1.02,
-            textAlign: "center",
-            textTransform: "uppercase",
-            color: oro ? color.richBlack : color.secondaryBlue,
-          }}
-        >
-          {c.titulo}
-        </div>
-        <div
-          style={{
-            fontFamily: fontFamily.bloque,
-            // Ajustado a la línea: Anton gasta ~0,47 em por carácter en
-            // versales, medido sobre render. El margen se paga en cuerpo, que
-            // es barato, no en texto cortado, que no lo es.
-            fontSize: Math.min(128, (ancho - 52) / (c.cifra.length * 0.47)),
-            lineHeight: 0.94,
-            whiteSpace: "nowrap",
-            textTransform: "uppercase",
-            color: oro ? color.richBlack : color.lightNeutral,
-          }}
-        >
-          {c.cifra}
-        </div>
-        {c.pie ? (
-          <div
-            style={{
-              fontFamily: fontFamily.video,
-              fontSize: 27,
-              fontWeight: 700,
-              lineHeight: 1.3,
-              textAlign: "center",
-              color: oro ? color.richBlack : color.secondaryBlue,
-            }}
-          >
-            {c.pie}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
+  /** Donde empieza la banda de subtítulos. Nada del tablero la invade. */
+  const cc = layout.height - layout.captionBottom;
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
-      {placa ? <Fondo placa={placa} recorte="esquina" fuerza={1} deriva={finColumnas + 60} /> : null}
+      {placa ? <Fondo placa={placa} recorte="esquina" fuerza={1} deriva={t.finColumnas + 60} /> : null}
       {sound ? (
         <>
-          <MotionSound motion="mark" at={entraIzq} />
-          <MotionSound motion="mark" at={entraDer} />
-          {remate ? <MotionSound motion="land" at={finColumnas + 6} /> : null}
+          <MotionSound motion="mark" at={t.entraIzq} />
+          <MotionSound motion="mark" at={t.entraDer} />
+          {remate ? <MotionSound motion="land" at={t.remateAt} /> : null}
         </>
       ) : null}
 
@@ -272,7 +118,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
           right: layout.safe.right,
           display: "flex",
           justifyContent: "center",
-          opacity: p(0),
+          opacity: entra(0),
           fontFamily: fontFamily.bloque,
         }}
       >
@@ -281,19 +127,31 @@ export const Comparacion: React.FC<ComparacionProps> = ({
         </Cinta>
       </div>
 
-      {columna(izquierda, layout.safe.left, false, entraIzq)}
-      {columna(derecha, layout.safe.left + ancho + 34, true, entraDer)}
+      <Columna
+        datos={izquierda}
+        x={layout.safe.left}
+        ancho={ancho}
+        oro={false}
+        progreso={entra(t.entraIzq)}
+      />
+      <Columna
+        datos={derecha}
+        x={layout.safe.left + ancho + 34}
+        ancho={ancho}
+        oro
+        progreso={entra(t.entraDer)}
+      />
 
       {remate ? (
         <div
           style={{
             position: "absolute",
-            top: CC + layout.captionBand + 30,
+            top: cc + layout.captionBand + 30,
             left: layout.safe.left,
             right: layout.safe.right,
             display: "flex",
             justifyContent: "center",
-            opacity: p(finColumnas + 6),
+            opacity: entra(t.remateAt),
             fontFamily: fontFamily.bloque,
           }}
         >
@@ -316,11 +174,11 @@ export const Comparacion: React.FC<ComparacionProps> = ({
           position: "absolute",
           left: 0,
           right: 0,
-          top: CC + layout.captionBand + 210,
+          top: cc + layout.captionBand + 210,
           backgroundColor: color.lightNeutral,
           transform: "rotate(0.8deg)",
           padding: "20px 74px 24px",
-          opacity: p(Math.round(total * 0.78)),
+          opacity: entra(t.pieAt),
         }}
       >
         <div
@@ -350,11 +208,3 @@ export const Comparacion: React.FC<ComparacionProps> = ({
     </AbsoluteFill>
   );
 };
-
-/** Cuánto dura el tablero completo, en frames. El spec pregunta, no supone. */
-export const duracionDe = (props: ComparacionProps): number =>
-  duration.entry * 2 +
-  Math.max(20, readingFrames(props.izquierda.cifra)) +
-  Math.max(20, readingFrames(props.derecha.cifra)) +
-  readingFrames(props.condicion) +
-  24;

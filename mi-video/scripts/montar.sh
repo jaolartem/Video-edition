@@ -55,6 +55,14 @@ python scripts/verdad.py
 # que las otras dos: lee ficheros y es barato.
 python scripts/contratos.py
 
+# **El techo de 300 lineas, y aqui porque es donde para.** Jaime: *«maximo 300
+# lineas; 1000 lineas es espagueti»*. Esto imprimia «33 ficheros pasan del
+# techo» y salia con codigo 0, o sea que el techo no existia — la misma averia
+# que `contratos.py` tuvo hasta ayer. Ahora la deuda esta declarada en
+# `docs/tamano-deuda.txt`, **solo puede bajar**, y un fichero nuevo por encima
+# del techo no nace. Cuesta menos de un segundo: solo cuenta lineas.
+python scripts/tamano.py > /dev/null
+
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
 echo "origen  $ORIGEN"

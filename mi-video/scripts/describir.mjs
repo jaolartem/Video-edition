@@ -31,12 +31,9 @@
  * migración»*. Y el porqué de que se pueda: *«tú eres muy superior, y no tengo
  * que hacer llamadas a API»*.
  *
- * O sea: el asistente describe las escenas leyendo los libretos, y se cargan con
- *
- *     python scripts/consulta.py guardar_escena '["reel-03", 2, {...}]'
- *
- * La tabla es la misma y el resto del montaje no se entera de quién la escribió;
- * sólo la columna `quien` dice si fue el CLI o la sesión.
+ * Eso ya no es un apaño: es **el contrato del servicio** (`servicio.mjs`), y la
+ * sesión contesta por el mismo sitio que el CLI y pasa por la misma validación.
+ * Quien conteste cambia; lo que se exige, no.
  *
  * El CLI devolvió `OAuth access token has been revoked`. Se arregla con
  * `claude setup-token` — que **imprime el token una sola vez**, así que si se ve
@@ -46,281 +43,57 @@
  * ## Las cuatro condiciones que el proyecto pone a un paso de IA
  *
  * Las mismas del paso 2, porque es la misma clase de decisión —*«lo que es por
- * IA debe tener un mecanismo para que siempre lo hagas exactamente igual»*—:
+ * IA debe tener un mecanismo para que siempre lo hagas exactamente igual»*—, y
+ * **cada una vive donde se cumple**, que es lo que hace que no se puedan
+ * incumplir por separado:
  *
  * 1. **El prompt vive en el repositorio** (`describir.prompt.md`) y se manda
- *    literal. No se improvisa por sesión.
+ *    literal. No se improvisa por sesión. → `describir-pedido.mjs`
  * 2. **La entrada la genera código**: la etapa, su función en el frame, el
- *    párrafo del libreto y lo que de verdad se dijo. Siempre el mismo formato.
- * 3. **La salida es un esquema fijo**, validado aquí al recibirla. Lo que no
- *    encaja se rechaza; no se arregla a mano.
+ *    párrafo del libreto y lo que de verdad se dijo. → `describir-pedido.mjs`
+ * 3. **La salida es un esquema fijo**, validado al recibirla. Lo que no encaja
+ *    se rechaza; no se arregla a mano. → `describir-esquema.mjs`
  * 4. **Se guarda.** Decidido una vez, se reutiliza: `escena_desc` es la memoria
- *    de esta decisión y no se vuelve a pedir salvo con `--rehacer`.
+ *    de esta decisión y no se vuelve a pedir salvo con `--rehacer`. → aquí.
  *
  * Y una quinta que sale de la experiencia de este proyecto: **si no se puede
  * describir, se dice y no se rellena con un valor por defecto.** Un `dejar`
  * puesto por si acaso es indistinguible de un `dejar` decidido, y eso convierte
  * la descripción en un adorno.
  *
+ * Este fichero es **el paso**: recorre el lote, pregunta por cada pieza, mira si
+ * la respuesta cubre lo pedido y la guarda.
+ *
  *   node scripts/describir.mjs            # las etapas sin describir
  *   node scripts/describir.mjs 3          # solo ese reel
  *   node scripts/describir.mjs --rehacer  # vuelve a pedir todo
  */
-import { execFileSync } from "child_process";
-import fs from "fs";
+import { sql } from "./consulta.mjs";
+import { valida } from "./describir-esquema.mjs";
+import { PROMPT, pedidoDe } from "./describir-pedido.mjs";
+import {
+  dejaPedido, guardaRespuesta, leeRespuesta, porCli, rutaPedido,
+} from "./servicio.mjs";
 
-const PROMPT = fs.readFileSync("scripts/describir.prompt.md", "utf8");
-
-/**
- * **El contrato del servicio, el mismo que usan redundancia y revalidar.**
- *
- *     work/servicio/describir/<slug>.pedido.json      lo que el paso pregunta
- *     work/servicio/describir/<slug>.respuesta.json   lo que contesta el servicio
- *
- * Antes este paso llamaba al CLI y, sin credencial, moria. Lo que pasaba
- * entonces esta escrito arriba: la descripcion se hacia «en sesion» y se
- * cargaba a mano. Eso no es un paso manual, es **el paso saltado** — 54 escenas
- * cargadas en 37 segundos, ninguna anclada al montaje, y la puerta comprobando
- * un texto que ninguna linea de codigo mantenia.
- *
- * Con el contrato, la sesion contesta **por el mismo sitio que el CLI** y pasa
- * por la misma validacion. Quien conteste cambia; lo que se exige, no.
- */
-const DIR = "work/servicio/describir";
-const rutaPedido = (slug) => `${DIR}/${slug}.pedido.json`;
-const rutaRespuesta = (slug) => `${DIR}/${slug}.respuesta.json`;
-
-function dejaPedido(slug, entrada) {
-  fs.mkdirSync(DIR, { recursive: true });
-  fs.writeFileSync(
-    rutaPedido(slug),
-    JSON.stringify({ paso: "describir", slug, prompt: PROMPT, datos: entrada },
-                   null, 1),
-  );
-}
-
-function leeRespuesta(slug) {
-  if (!fs.existsSync(rutaRespuesta(slug))) return null;
-  const arr = JSON.parse(fs.readFileSync(rutaRespuesta(slug), "utf8"));
-  if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
-  return arr;
-}
+/** El paso al que pertenecen el pedido y la respuesta, dentro del contrato. */
+const PASO = "describir";
 
 /**
- * El CLI, si tiene credencial aqui. `null` si no la tiene: **eso no es un
- * fallo, es una espera**, y el motor distingue las dos cosas. Un fallo del
- * prompt si sube, porque ese hay que arreglarlo.
+ * Describe **la pieza entera de una vez**, no etapa a etapa. `null` si nadie ha
+ * contestado todavía — que es una espera, no un fallo.
  */
-function porCli(entrada) {
-  let salida;
-  try {
-    salida = execFileSync(
-      "claude",
-      ["-p", `${PROMPT}\n\n---\n\n${entrada}\nResponde SOLO el array JSON.`,
-       "--output-format", "json"],
-      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
-        stdio: ["ignore", "pipe", "pipe"] },
-    );
-  } catch {
-    return null;                       // ni siquiera arranco: no hay CLI aqui
-  }
-  const d = JSON.parse(salida);
-  const txt = String(d.result ?? "");
-  if (d.is_error) {
-    if (/revoked|authenticat|401|not logged in|please run \/login/i.test(txt)) {
-      return null;
-    }
-    throw new Error(txt.slice(0, 200));
-  }
-  const m = txt.match(/\[[\s\S]*\]/);
-  if (!m) throw new Error("el CLI no devolvio un array JSON");
-  const arr = JSON.parse(m[0]);
-  if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
-  return arr;
-}
-
-/** Las claves que la descripción tiene que traer, y sus valores admitidos. */
-const CAMPOS = {
-  etapa_orden: null,
-  que_pasa: null,
-  trato: ["portada", "tablero", "cercano", "metafora", "diapositiva"],
-  trato_porque: null,
-  prioridad: ["entrega", "limpieza"],
-  integridad: null,
-  remedio: ["recuperar", "tablero", "cortar", "ninguno"],
-  emocion: null,
-  componente: ["CausalChain", "TwoPaths", "BeliefSwap", "ThenNow",
-               "EvidenceCard", "ComparisonTable", "ninguno"],
-  grafico: null,
-  color: ["avivar", "apagar", "dejar"],
-  sonido: null,
-  plano: ["en cuadro", "cerrado", "fuera"],
-};
-
-const sql = (q, args = []) =>
-  execFileSync("python", ["scripts/consulta.py", q, JSON.stringify(args)], {
-    encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
-  });
-
-/** El esquema se comprueba aquí: lo que no encaja se rechaza. */
-const KIND_DE = {
-  TwoPaths: "comparacion",
-  ComparisonTable: "comparacion",
-  CausalChain: "causal",
-  BeliefSwap: "comparacion",
-  ThenNow: "comparacion",
-  EvidenceCard: "acumulacion",
-};
-
-function valida(d) {
-  for (const [k, admitidos] of Object.entries(CAMPOS)) {
-    if (!(k in d)) throw new Error(`falta «${k}»`);
-    if (admitidos && !admitidos.includes(d[k])) {
-      throw new Error(`«${k}» = ${JSON.stringify(d[k])} no es de la lista`);
-    }
-  }
-  /**
-   * **Un componente sin `tablero` es una etapa que no va a cambiar nunca.**
-   *
-   * El contenido del tablero vivía en un literal por pieza y la descripción no
-   * lo tocaba: cuatro entregas idénticas, y Jaime contándolas una a una. Ahora
-   * el campo existe (`escena_desc.tablero`) y lo lee el render — pero si este
-   * paso no lo escribe, la etapa se queda con lo que hubiera, que es
-   * exactamente el mismo agujero por dentro.
-   *
-   * Así que se exige donde tiene sentido exigirlo: si la etapa declara un
-   * componente, tiene que traer su contenido.
-   */
-  if (d.componente && d.componente !== "ninguno") {
-    const t = d.tablero;
-    if (!t || typeof t !== "object" || !t.props) {
-      throw new Error(
-        `«tablero» falta y la etapa declara componente «${d.componente}»:` +
-        ` sin él, el tablero se queda con lo que ya hubiera y la descripción` +
-        ` no llega a la pantalla`);
-    }
-    if (!t.kind) t.kind = KIND_DE[d.componente] ?? "comparacion";
-  }
-  /**
-   * **Y la composición TIPOGRÁFICA es un tablero, aunque no lleve componente.**
-   *
-   * El gancho de reel-04 pide tipo —su `grafico` dice «una sola palabra, y es
-   * la que se oye: INMIGRANTE en Anton versales»— y `componente` es `ninguno`,
-   * así que la exigencia de arriba no le tocaba y la etapa salía sin copy. El
-   * render entonces rellenaba el bloque con `lineas[0]`, la primera línea del
-   * rótulo, y el segundo gancho visual **repetía el primero** encima de él, en
-   * el único segundo que compite contra el pulgar.
-   *
-   * No se arregla deduciendo la palabra de la prosa: eso sería código decidiendo
-   * el copy. Se arregla exigiéndolo aquí, que es donde el diseño entrega.
-   */
-  const ES_TIPO = /versales|el tipo es|la frase entera|solo texto|nada mas/i;
-  if (ES_TIPO.test(d.grafico ?? "")) {
-    const t = d.tablero;
-    const txt = t?.props?.texto ?? t?.props?.titulo ?? t?.texto;
-    if (typeof txt !== "string" || !txt.trim()) {
-      throw new Error(
-        `«tablero» falta y el gráfico de esta etapa es tipográfico: di qué dice` +
-        ` en \`tablero.props.texto\`. Si no, el render no tiene copy y la capa` +
-        ` no entra — o peor, repite el rótulo`);
-    }
-  }
-  return d;
-}
-
-/**
- * Describe **la pieza entera de una vez**, no etapa a etapa.
- *
- * Jaime, corrigiendo la version anterior: *«el tablero no exige una lectura
- * plana, la tolera, la permite; es alternativa cuando no hay una opcion mejor.
- * La decision se da en funcion de dos variables, complejidad y necesidad del
- * video, y por eso la debe tomar un LLM, porque el contexto es el video en
- * general; la idea es que el LLM construya un video coherente con lo que hay»*.
- *
- * La segunda variable —lo que la pieza necesita— **no existe a nivel de etapa**.
- * Preguntando de una en una, el modelo no puede saber que ya hay dos tableros
- * cerca ni que lleva seis planos hablados seguidos, asi que no puede alternar.
- * Por eso la unidad de esta llamada es la pieza.
- *
- * Y sale mas barato: seis llamadas en vez de cincuenta y cuatro.
- */
-/**
- * **El barrido caro es la ENTRADA de este paso, no un acabado posterior.**
- *
- * Jaime: *«la idea del barrido caro es que el agente de IA tenga el CC correcto,
- * y pueda tomar decisiones sobre el, eliminar redundancia y componer las
- * escenas»*.
- *
- * Sin esa comprobacion, este paso compone sobre el texto del barrido barato
- * —que sirve para localizar donde se dice algo y no para saber que se dijo— y
- * decide con palabras que nadie pronuncio. Medido: cuatro de las seis piezas
- * llegaron a montarse con el 0% del montaje afinado.
- *
- * No se avisa: se para. Un aviso en un lote de 16-50 se ignora.
- */
-const AFINADO_MINIMO = 0.95;
-
-function sinAfinar(slug) {
-  const cob = JSON.parse(sql("cc_afinado", [slug]));
-  return Object.entries(cob)
-    .filter(([, v]) => v < AFINADO_MINIMO)
-    .map(([b, v]) => `e${b} ${Math.round(v * 100)}%`);
-}
-
 function describePieza(slug, filas) {
-  // Cual es la portada ya esta decidido —es la etapa que abre— y no se
-  // renegocia aqui: se le dice, para que la describa como gancho.
-  let portada = null;
-  try {
-    const edl = JSON.parse(
-      fs.readFileSync(`ads/${slug}/edl-sell.json`, "utf8"),
-    );
-    portada = edl.detalle?.find((d) => d.trato === "portada")?.beat ?? null;
-  } catch {
-    // Sin EDL todavia no hay portada marcada, y no pasa nada: el paso de
-    // seleccion la marcara y `trato.py` la impone despues.
-  }
-
-  const entrada = [
-    `Reel: ${slug} — ${filas.length} etapas, en orden.`,
-    portada === null ? "" : `La etapa ${portada} es la PORTADA (el gancho).`,
-    "",
-    ...filas.map((f) =>
-      [
-        `## Etapa ${f.orden} de «${f.estructura}»: ${f.etapa}`,
-        `Funcion: ${f.mensaje ?? "(no declarada)"}`,
-        "Libreto:",
-        f.libreto,
-        // **Lo que dice el montaje, no lo que se eligio.** Son cosas
-        // distintas en cuanto un recorte posterior toca la etapa, y describir
-        // una mientras la puerta verifica la otra es como se llego a tener
-        // seis piezas descritas contra un texto que ya no existia.
-        "Lo que de verdad se dijo:",
-        f.montaje || f.dicho ||
-          "(esta etapa no tiene toma: va con tablero o tarjeta)",
-        "",
-      ].join("\n"),
-    ),
-  ].join("\n");
-
   // `quien` tiene que decir QUIEN contesto. Puso «gemini» cuando esa via ni
   // existia, y decir «cli» de lo que contesto la sesion es el mismo error con
   // otro nombre: el campo esta para poder auditar de donde salio una decision.
-  const falta = sinAfinar(slug);
-  if (falta.length) {
-    throw new Error(
-      `el CC no esta afinado (${falta.join(", ")}). El barrido caro va ANTES` +
-        ` de componer: node/python scripts/transcribir.py --elegidos ${
-          Number(slug.slice(-2))}`,
-    );
-  }
-  const ya = leeRespuesta(slug);
+  const entrada = pedidoDe(slug, filas);
+  const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
   // queda escrito es la pregunta entera —prompt incluido— y cualquiera puede
   // contestarla despues sin reconstruir nada.
-  dejaPedido(slug, entrada);
-  const arr = porCli(entrada);
+  dejaPedido(PASO, slug, PROMPT, entrada);
+  const arr = porCli(PROMPT, entrada);
   if (!arr) return null;
   /**
    * **Una respuesta a medias no se guarda como la respuesta.**
@@ -349,8 +122,18 @@ function describePieza(slug, filas) {
     );
     return null;
   }
-  fs.writeFileSync(rutaRespuesta(slug), JSON.stringify(arr, null, 1));
+  guardaRespuesta(PASO, slug, arr);
   return arr.map(valida).map((d) => ({ ...d, quien: "cli" }));
+}
+
+/** Lo que hay que describir, agrupado por pieza: la unidad de la llamada. */
+function porPiezas(filas) {
+  const m = new Map();
+  for (const f of filas) {
+    if (!m.has(f.slug)) m.set(f.slug, []);
+    m.get(f.slug).push(f);
+  }
+  return m;
 }
 
 const rehacer = process.argv.includes("--rehacer");
@@ -364,13 +147,7 @@ console.log(`${filas.length} escenas a describir`);
 
 let ok = 0;
 const esperan = [];
-// Agrupadas por pieza: la unidad de la llamada es el video, no la etapa.
-const porPieza = new Map();
-for (const f of filas) {
-  if (!porPieza.has(f.slug)) porPieza.set(f.slug, []);
-  porPieza.get(f.slug).push(f);
-}
-for (const [slug, suyas] of porPieza) {
+for (const [slug, suyas] of porPiezas(filas)) {
   try {
     const ds = describePieza(slug, suyas);
     if (!ds) {
@@ -412,6 +189,7 @@ if (esperan.length) {
   // La ULTIMA linea es la que el motor guarda como motivo en `video_fase`, asi
   // que tiene que decir que falta y donde se contesta.
   console.error(
-    `espera respuesta del servicio -> ${esperan.map(rutaPedido).join(" ")}`);
+    `espera respuesta del servicio -> ${
+      esperan.map((s) => rutaPedido(PASO, s)).join(" ")}`);
   process.exit(1);
 }

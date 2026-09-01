@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -60,7 +61,10 @@ def unidades(toma):
     Y no se descarta nada: lo que en su dia era motivo de exclusion —el aire, si
     abre en mayuscula, si cierra en punto— se guarda como columna.
     """
-    d = transcribir.exigir(toma)
+    # El peldano barato del embudo SI lee una cinta de una pasada: para eso
+    # existe —catalogar con `small` y afinar despues solo lo preseleccionado
+    # (C-59)—. Lo declara en vez de que la puerta se lo calle para todos.
+    d = transcribir.exigir(toma, varias=False)
     ws = d["segmentos"]
     runs = json.load(open(f"work/cuts/{toma}.json", encoding="utf-8"))["segmentos"]
 
@@ -99,7 +103,7 @@ def main():
                     help="medir la expresividad de cada unidad (lento)")
     a = ap.parse_args()
 
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.execute("PRAGMA foreign_keys = ON")
     reels = [a.toma] if a.toma else rutas.piezas()
     for n in reels:
@@ -119,7 +123,8 @@ def main():
         for u in us:
             voz = None
             if a.voz:
-                voz = round(beats.expresividad(toma, u["desde"], u["hasta"]), 2)
+                _v = beats.expresividad(toma, u["desde"], u["hasta"])
+                voz = None if _v is None else round(_v, 2)
             try:
                 con.execute(
                     "insert into unidad (toma_id, desde, hasta, texto, aire, abre,"

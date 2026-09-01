@@ -81,6 +81,47 @@ def _dir(paso):
     return d
 
 
+def _hoy():
+    """La fecha de hoy, para poder juzgar si una fecha ya paso."""
+    import datetime
+
+    return datetime.date.today().isoformat()
+
+
+def _respaldos(slug):
+    """Las cifras de la pieza con su fuente, su vigencia y sus condiciones.
+
+    Sale de `dato` —86 filas— con su `fuente`. Sin esto, quien contesta ve una
+    cifra en pantalla y no tiene contra que comprobarla, asi que la unica salida
+    honesta que le queda es subirla a Jaime. Con esto, sube **la que de verdad
+    no tiene respaldo**, que es una lista mucho mas corta y mucho mas util.
+
+    `condiciones` dice ademas cuando una cifra es un supuesto de la pieza y no
+    un dato medido, que es justo la distincion que hoy nadie podia hacer.
+    """
+    import sqlite3
+    import basedatos
+
+    ruta = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "ads", "decisiones.db")
+    if not slug or not os.path.exists(ruta):
+        return []
+    try:
+        cx = basedatos.abrir(ruta)
+        cx.row_factory = sqlite3.Row
+        filas = cx.execute(
+            "select d.etapa_orden etapa, d.cifra, d.afirmacion, d.condiciones,"
+            "       d.respalda, d.nota, f.rotulo, f.organismo, f.url,"
+            "       f.vigencia, f.cita"
+            "  from dato d join video v on v.id = d.video_id"
+            "  left join fuente f on f.id = d.fuente_id"
+            " where v.slug = ? order by d.etapa_orden", (slug,)).fetchall()
+        cx.close()
+    except sqlite3.Error:
+        return []
+    return [{k: r[k] for k in r.keys() if r[k] is not None} for r in filas]
+
+
 def ruta_pedido(paso, slug):
     return os.path.join(_dir(paso), f"{slug}.pedido.json")
 
@@ -114,8 +155,26 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # unico que mantiene un criterio siendo uno.
     if _piso():
         prompt = _piso() + SEPARA + prompt
+    # **Lo que exigen los CUATRO contratos va por un solo sitio**, igual que el
+    # piso. `contratos.py` lo lleva diciendo desde que existe: `hoy`, `evento` y
+    # `datos_respaldados` figuran como exigidos en los cuatro y **no se enviaban
+    # en ninguno**.
+    #
+    # Se paga en cada respuesta. Hoy los siete agentes tuvieron que deducir la
+    # fecha para juzgar si un evento habia caducado, y **los cinco que miraron
+    # cifras subieron «sin fuente»** — el 550 $ de reel-01, el 53,53 % de
+    # reel-03, el 33 % de reel-07, las dos del ministerio de comercio en
+    # reel-02. La tabla `dato` tiene 86 filas con su fuente, su vigencia y sus
+    # condiciones, y hasta dice cuando una cifra es un supuesto y no un dato
+    # medido. Nadie la estaba mirando porque no llegaba.
+    #
+    # Va al primer nivel del pedido y no dentro de `datos` a proposito: `datos`
+    # es una lista en unos pasos y un diccionario en otros, y lo que vale para
+    # todos no puede depender de esa forma.
+    comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug)}
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
-                        "datos": payload}, ensure_ascii=False, indent=1)
+                        **comun, "datos": payload},
+                       ensure_ascii=False, indent=1)
     # **Y hay campos que cambian sin que cambie la pregunta.** `vuelta` cuenta
     # cuantas veces ha pasado la pieza por aqui, asi que sube cada vez que se
     # archiva un par — y con eso el pedido nunca era identico a si mismo, su
@@ -127,7 +186,11 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # Se comparan las dos preguntas sin esos campos. Siguen viajando —quien
     # contesta necesita saber en que vuelta esta—, pero dejan de contar como
     # pregunta distinta.
-    VOLATILES = ("vuelta",)
+    # `hoy` viaja porque sin el no se puede juzgar si una fecha ya paso, pero
+    # no cuenta como pregunta distinta: si contara, toda respuesta escrita
+    # anoche seria «anterior a su pedido» esta manana, y volveria a preguntarse
+    # lo mismo. Es el mismo caso que `vuelta`.
+    VOLATILES = ("vuelta", "hoy")
 
     def _pregunta(txt):
         try:
@@ -137,6 +200,8 @@ def pedir(paso, slug, prompt, payload, cli=True):
         if isinstance(d.get("datos"), dict):
             d["datos"] = {k: v for k, v in d["datos"].items()
                           if k not in VOLATILES}
+        for k in VOLATILES:
+            d.pop(k, None)
         return json.dumps(d, ensure_ascii=False, sort_keys=True)
 
     try:
@@ -248,14 +313,31 @@ def _archivar(paso, slug, sufijo="", solo_respuesta=False):
 
 
 def recoger(paso, slug):
-    """La respuesta si existe, la escriba quien la escriba."""
+    """La respuesta si existe, la escriba quien la escriba.
+
+    **Y con envoltura o sin ella.** El contrato declara `("pieza",
+    "elementos")` con su `valida` en `pendiente`, y los consumidores iteran una
+    lista pelada. Los dos son defendibles; tener los dos a la vez no. Cada uno
+    de los siete agentes de hoy gasto una parte de su turno en descubrir cual
+    manda y en explicar por que eligio ese —«la envoltura esta declarada pero su
+    valida sigue pendiente, asi que manda el consumidor»— y ese trabajo no
+    produce ni un corte.
+
+    Se acepta la forma envuelta y se desenvuelve aqui, en la puerta: quien
+    contesta puede escribir cualquiera de las dos y ninguna se pierde. La
+    ambiguedad se paga una vez, en un sitio, y no en cada respuesta.
+    """
     p = ruta_respuesta(paso, slug)
     if not os.path.exists(p):
         return None
     try:
-        return json.load(open(p, encoding="utf-8"))
+        d = json.load(open(p, encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+    if (isinstance(d, dict) and isinstance(d.get("elementos"), list)
+            and set(d) <= {"pieza", "elementos"}):
+        return d["elementos"]
+    return d
 
 
 def _hay_cli():

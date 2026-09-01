@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sqlite3
+import basedatos
 import subprocess
 import sys
 import unicodedata
@@ -80,7 +81,7 @@ def main():
                     help="rehace tambien los que no cambiaron")
     a = ap.parse_args()
 
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.execute("PRAGMA foreign_keys = ON")
     fases = dict(con.execute("select nombre, id from fase").fetchall())
     ahora = datetime.datetime.now().isoformat(timespec="seconds")

@@ -118,7 +118,8 @@ def densidad(slug, orden, base="ads/decisiones.db"):
     aqui es volver al contador de digitos por la puerta de atras.
     """
     import sqlite3
-    con = sqlite3.connect(base)
+    import basedatos
+    con = basedatos.abrir(base)
     r = con.execute("select nivel, figura, por_que from densidad"
                     " where video_slug = ? and etapa_orden = ?",
                     (slug, orden)).fetchone()
@@ -149,8 +150,10 @@ def decidido(slug, orden, base="ads/decisiones.db"):
     Si nadie lo ha decidido devuelve `(None, None)` y manda la heuristica, que
     sigue sirviendo de red mientras el paso de descripcion no ha corrido.
     """
+    import basedatos
+
     import sqlite3
-    con = sqlite3.connect(base)
+    con = basedatos.abrir(base)
     try:
         r = con.execute("select trato, trato_porque from escena_desc"
                         " where video_slug = ? and etapa_orden = ?",

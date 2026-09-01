@@ -25,6 +25,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -165,7 +166,7 @@ def main():
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--ver", type=int)
     a = ap.parse_args()
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.execute("PRAGMA foreign_keys = ON")
     if a.ver:
         ver(con, f"reel-{a.ver:02d}")

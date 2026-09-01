@@ -29,6 +29,7 @@ import argparse
 import datetime
 import os
 import sqlite3
+import basedatos
 import sys
 
 BASE = os.path.join("ads", "decisiones.db")
@@ -48,7 +49,7 @@ CREATE INDEX IF NOT EXISTS incidencia_cuando ON incidencia (cuando);
 
 
 def _con():
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.executescript(ESQUEMA)
     return con
 

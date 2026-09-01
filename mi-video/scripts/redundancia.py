@@ -39,6 +39,7 @@ import json
 import os
 import re
 import sqlite3 as _sq3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -142,7 +143,7 @@ def material_para(slug, faltan, ventana=14, cuantas=6):
     """
     import rutas as _ru
 
-    con = _sq3.connect("ads/decisiones.db")
+    con = basedatos.abrir("ads/decisiones.db")
     con.row_factory = _sq3.Row
     libretos = {r["orden"]: r["texto"] for r in con.execute(
         "select l.orden, l.texto from libreto l join video v on v.id = l.video_id"
@@ -388,7 +389,7 @@ def dossier(slug, con_voz=True):
                 # verdad y tiene que llegar al log, no morir en un `pass`.
                 try:
                     fila["voz"] = round(
-                        float(beats.expresividad(toma, rango[0], rango[1])), 2)
+                        beats.expresividad(toma, rango[0], rango[1]) or 0.0, 2)
                     fila["tono"] = round(
                         beats.cambio_de_tono(toma, rango[0], rango[1]), 1)
                 except Exception as e:             # noqa: BLE001

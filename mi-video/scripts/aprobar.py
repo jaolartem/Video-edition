@@ -32,6 +32,7 @@ import argparse
 import datetime
 import os
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -41,7 +42,7 @@ BASE = "ads/decisiones.db"
 
 
 def _con():
-    c = sqlite3.connect(BASE)
+    c = basedatos.abrir(BASE)
     c.row_factory = sqlite3.Row
     return c
 

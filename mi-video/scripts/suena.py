@@ -40,6 +40,7 @@ import json
 import os
 import re
 import sqlite3
+import basedatos
 import subprocess
 import sys
 
@@ -126,8 +127,18 @@ def costuras(slug):
             continue
         tono = float(s.get("tono") or 0)
         ritmo = float(s.get("ritmo") or 0)
-        # **Se oye o no se oye**, y el umbral es el que ya usaba el proyecto.
-        if tono >= beats.SALTO_TONO or ritmo >= beats.SALTO_RITMO:
+        # **Se oye o no se oye, y la vara es UNA.** Esto usaba
+        # `beats.SALTO_TONO` (2,0) y `beats.SALTO_RITMO` (1,5) mientras el paso
+        # que cose usaba 2,5 y 3,0, así que el informe denunciaba uniones que el
+        # cosido daba por limpias — dos respuestas a la misma pregunta, que es
+        # la avería de esta semana en su forma más pura.
+        #
+        # Manda la del paso que **actúa**: sus umbrales están medidos contra las
+        # piezas reales, y una alarma que nadie va a atender es ruido que tapa
+        # las que sí. Ver `dominio/costura.py`.
+        from dominio.costura import RITMO_OK, TONO_OK
+
+        if tono > TONO_OK or ritmo > RITMO_OK:
             out.append({"en": round(sum(b - a for a, b in segs[:i + 1]), 1),
                         "beat": det[i].get("beat"),
                         "a_beat": det[i + 1].get("beat"),
@@ -160,7 +171,7 @@ def medir(n):
 
 def guardar(d):
     """Lo apunta en `medicion`, que existía con seis tipos y ninguna fila."""
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row
     tipos = {r["nombre"]: r["id"] for r in con.execute("select * from tipo_medicion")}
     # **La medida cuelga de la VERSION, no del video**, y es lo correcto: un
@@ -181,8 +192,21 @@ def guardar(d):
         if tipos.get(nombre) is None or d.get(clave) is None:
             continue
         con.execute(
+            # **Se sustituye, no se acumula.** La clave es
+            # `(version_id, tipo_id)`, asi que un `insert` a secas revienta la
+            # segunda vez que se mide la MISMA version — y medir dos veces la
+            # misma pieza no es un error del usuario: es lo que pasa cuando la
+            # linea vuelve atras y repite el paso, que es su forma normal de
+            # trabajar.
+            #
+            # Y sustituir es lo correcto ademas de lo comodo: la medida de una
+            # version es una, la del fichero que hay ahora. Guardar dos
+            # obligaria a decidir cual vale, y esa pregunta no deberia existir.
             "insert into medicion (version_id, tipo_id, valor, fecha)"
-            " values (?,?,?,?)", (ver["id"], tipos[nombre], d[clave], ahora))
+            " values (?,?,?,?)"
+            " on conflict(version_id, tipo_id) do update set"
+            " valor=excluded.valor, fecha=excluded.fecha",
+            (ver["id"], tipos[nombre], d[clave], ahora))
         n += 1
     con.commit()
     con.close()

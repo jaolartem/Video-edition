@@ -26,6 +26,7 @@ import json
 import os
 import re
 import sqlite3
+import basedatos
 import sys
 
 RUTA = os.path.join("ads", "decisiones.db")
@@ -34,7 +35,7 @@ ESQUEMA = os.path.join(os.path.dirname(__file__), "esquema.sql")
 
 def abrir():
     os.makedirs("ads", exist_ok=True)
-    cx = sqlite3.connect(RUTA)
+    cx = basedatos.abrir(RUTA)
     cx.row_factory = sqlite3.Row
     cx.execute("PRAGMA foreign_keys = ON")
     return cx

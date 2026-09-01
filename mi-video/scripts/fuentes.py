@@ -38,6 +38,7 @@ import json
 import os
 import re
 import sqlite3
+import basedatos
 import sys
 import rutas  # noqa: E402
 
@@ -80,7 +81,7 @@ def _normal(c):
 
 
 def _con():
-    c = sqlite3.connect(BASE)
+    c = basedatos.abrir(BASE)
     c.row_factory = sqlite3.Row
     return c
 

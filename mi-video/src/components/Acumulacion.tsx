@@ -1,18 +1,19 @@
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
+import { useEntrada } from "../brand/horario";
+import { cuerpoQueCabe } from "../brand/medida";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo, Panel } from "./Fondo";
-import {
-  color,
-  duration,
-  ease,
-  layout,
-  readingFrames,
-  size,
-  tracking,
-} from "../brand/tokens";
+import { Barra } from "./acumulacion/Barra";
+import { EJE, PANEL, SUELO, cruzaEn } from "./acumulacion/caja";
+import { horarioDe } from "./acumulacion/horario";
+import { color, layout, size, tracking } from "../brand/tokens";
+import type { AcumulacionProps } from "./acumulacion/tipos";
+
+export type { AcumulacionProps, Tramo } from "./acumulacion/tipos";
+export { duracionDe } from "./acumulacion/horario";
 
 /**
  * Una magnitud que se acumula, y la línea que no había que cruzar.
@@ -46,55 +47,19 @@ import {
  * - **Panel opaco y girado** sosteniendo el contenido, y **cintas** cruzándolo.
  * - **El oro es superficie**, no sólo tinta: paneles y bandas enteras en oro.
  *
- * **Cumplimiento por construcción:** `resultado` exige cifra y fuente juntas
- * —el tipo no admite una sin la otra— y `horizonte` y `condicion` son
- * obligatorias. Una cifra acumulada sin horizonte no significa nada, y sin
- * condición se lee como promesa de resultado, que el playbook prohíbe.
+ * ## Aquí sólo se dibuja y se ata
+ *
+ * Las otras tres cosas viven fuera, cada una en su fichero: el contrato de
+ * cumplimiento en [`acumulacion/tipos`](./acumulacion/tipos.ts), el calendario
+ * en [`acumulacion/horario`](./acumulacion/horario.ts), la geometría en
+ * [`acumulacion/caja`](./acumulacion/caja.ts) y el gráfico en
+ * [`acumulacion/Barra`](./acumulacion/Barra.tsx).
+ *
+ * Eran cuatrocientas líneas con todo mezclado, y el precio estaba a la vista:
+ * el horario estaba escrito **dos veces dentro del mismo fichero** —el del
+ * componente y el de `duracionDe`— así que el spec podía reservar un hueco de
+ * un largo y el tablero construirse en otro.
  */
-export type Tramo = {
-  /** Qué es este tramo. Versales condensadas, al lado de su bloque. */
-  etiqueta: string;
-  /** Cuánto ocupa, en fracción de la altura total del gráfico (0–1). */
-  alto: number;
-};
-
-export type AcumulacionProps = {
-  title: string;
-  /** Qué se acumula. Va en la cinta de arriba, con el horizonte. */
-  concepto: string;
-  /**
-   * El horizonte sobre el que se acumula. **Obligatorio**: «$300.000» no dice
-   * nada hasta que se sabe si son diez años o un trimestre.
-   */
-  horizonte: string;
-  /** Los tramos, de abajo arriba. Entran de uno en uno. */
-  tramos: Tramo[];
-  /**
-   * La raya. Opcional — no toda acumulación tiene umbral: la de diez años del
-   * R6 sólo crece.
-   */
-  umbral?: { etiqueta: string; en: number };
-  /** Lo que la acumulación produce. Cifra Y fuente, o ninguna de las dos. */
-  resultado?: { figure: string; source: string };
-  /** Qué cambiaría el cálculo. **Obligatorio.** */
-  condicion: string;
-  /**
-   * Placa de fondo, si el tablero la lleva. **El collage asoma por los bordes y
-   * el panel opaco sostiene las cifras** — que es como lo hace el canon: una
-   * tabla sobre un fotomontaje no se lee, pero una tabla flotando en negro deja
-   * medio cuadro muerto. Jaime: *«más color y movimiento»*.
-   */
-  placa?: string;
-  /** Requiere los ficheros de `public/sfx/`. */
-  sound?: boolean;
-};
-
-/** Caja del panel sobre el que se apoya todo. */
-const PANEL = { x: 46, y: 300, w: 988, h: 1090 } as const;
-/** Caja del gráfico, en coordenadas del panel. */
-const EJE = { x: 60, y: 230, alto: 640 } as const;
-const BARRA = 330;
-
 export const Acumulacion: React.FC<AcumulacionProps> = ({
   title,
   concepto,
@@ -106,7 +71,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
   placa,
   sound = false,
 }) => {
-  const frame = useCurrentFrame();
+  const entra = useEntrada();
 
   assertShort(title, "title", "Acumulacion.title");
   assertShort(concepto, "label", "Acumulacion.concepto");
@@ -116,47 +81,12 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
     assertShort(resultado.figure, "outcome", "Acumulacion.resultado.figure");
   }
 
-  /**
-   * Cuándo entra cada cosa, en cadena por tiempo de lectura.
-   *
-   * El componente lleva su propio horario, así que **la duración del hueco tiene
-   * que salir de aquí, no de un número redondo puesto desde fuera**: con 5,5 s
-   * el `TwoPaths` mostraba sólo la cabecera y parecía roto cuando estaba a medio
-   * construir. `duracionDe` lo publica para que el spec lo pregunte.
-   */
-  const raya = duration.entry * 2;
-  const entradas: number[] = [];
-  let reloj = raya + duration.entry;
-  for (const tr of tramos) {
-    entradas.push(reloj);
-    reloj += Math.max(duration.entry + 4, readingFrames(tr.etiqueta));
-  }
-  const finTramos = reloj;
-
-  const p = (desde: number, dura = duration.entry) =>
-    interpolate(frame, [desde, desde + dura], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: ease.out,
-    });
-
-  const bases: number[] = [];
-  let suma = 0;
-  for (const tr of tramos) {
-    bases.push(suma);
-    suma += tr.alto;
-  }
-
-  const aPx = (f: number) => Math.min(1, Math.max(0, f)) * EJE.alto;
-  const suelo = EJE.y + EJE.alto;
-  const yUmbral = umbral ? suelo - aPx(umbral.en) : null;
-  const cruce = umbral
-    ? tramos.findIndex((tr, i) => bases[i] + tr.alto > umbral.en)
-    : -1;
+  const t = horarioDe({ tramos, condicion });
+  const cruce = cruzaEn(tramos, umbral);
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
-      {placa ? <Fondo placa={placa} recorte="columna" fuerza={1} deriva={finTramos + 60} /> : null}
+      {placa ? <Fondo placa={placa} recorte="columna" fuerza={1} deriva={t.finTramos + 60} /> : null}
       {/**
        * **Tablero de datos: fondo PLANO.** No lleva fotomontaje.
        *
@@ -173,13 +103,13 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
 
       {sound ? (
         <>
-          <MotionSound motion="draw" at={raya} />
-          {entradas.map((f, i) => (
-            <MotionSound key={tramos[i].etiqueta} motion="mark" at={f} />
+          <MotionSound motion="draw" at={t.raya} />
+          {t.entradas.map((f, i) => (
+            <MotionSound key={tramos[i]?.etiqueta} motion="mark" at={f} />
           ))}
-          {resultado ? <MotionSound motion="land" at={finTramos + 6} /> : null}
+          {resultado ? <MotionSound motion="land" at={t.resultadoAt} /> : null}
           {umbral && cruce >= 0 && !resultado ? (
-            <MotionSound motion="land" at={entradas[cruce]} />
+            <MotionSound motion="land" at={t.entradas[cruce] ?? 0} />
           ) : null}
         </>
       ) : null}
@@ -212,7 +142,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
           right: layout.safe.right,
           display: "flex",
           justifyContent: "center",
-          opacity: p(0),
+          opacity: entra(0),
           fontFamily: fontFamily.bloque,
         }}
       >
@@ -234,8 +164,8 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
             El titulo se partia en «LA PLATA QUE SE QUEDO / QUIETA», con la
             segunda linea huerfana. **Donde respira una frase lo decide quien la
             escribe**, no el ancho que sobra — y el render es determinista, asi
-            que no hay layout al que preguntar: se estima. Anton gasta ~0,47 em
-            por caracter en versales, medido sobre render. */}
+            que no hay layout al que preguntar: se estima. El avance de la Anton
+            lo declara `brand/medida`, medido sobre render y en un solo sitio. */}
         <div
           style={{
             position: "absolute",
@@ -243,109 +173,30 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
             left: 56,
             right: 56,
             fontFamily: fontFamily.bloque,
-            fontSize: Math.min(96, (PANEL.w - 112) / (title.length * 0.47)),
+            fontSize: cuerpoQueCabe({
+              ancho: PANEL.w - 112,
+              largo: title.length,
+              registro: "anton",
+              tope: 96,
+            }),
             lineHeight: 0.94,
             letterSpacing: "0.004em",
             whiteSpace: "nowrap",
             textTransform: "uppercase",
             color: color.lightNeutral,
-            opacity: p(0),
+            opacity: entra(0),
           }}
         >
           {title}
         </div>
 
-        {/* La barra: cada tramo se parte en lo que queda debajo de la raya y lo
-            que asoma por encima. Ese corte ES el argumento. */}
-        {tramos.map((tr, i) => {
-          const crece = p(entradas[i]);
-          const base = bases[i];
-          const tope = base + tr.alto;
-          const corte = umbral ? Math.min(Math.max(umbral.en, base), tope) : tope;
-          const partes = [
-            { desde: base, hasta: corte, oro: false },
-            { desde: corte, hasta: tope, oro: true },
-          ].filter((q) => q.hasta > q.desde);
-          return (
-            <React.Fragment key={tr.etiqueta}>
-              {partes.map((q) => (
-                <div
-                  key={q.oro ? "oro" : "base"}
-                  style={{
-                    position: "absolute",
-                    left: EJE.x,
-                    width: BARRA,
-                    top: suelo - aPx(q.hasta),
-                    height: aPx(q.hasta) - aPx(q.desde),
-                    backgroundColor: q.oro
-                      ? color.gold
-                      : i % 2
-                        ? color.navyHi
-                        : color.navy,
-                    transformOrigin: "bottom",
-                    transform: `scaleY(${crece})`,
-                  }}
-                />
-              ))}
-              {/* Etiqueta centrada en su bloque y en UNA línea. Sin `nowrap`
-                  «Cruza el umbral» salía en tres renglones dentro de una
-                  columna estrecha y se leía como tres etiquetas distintas:
-                  dónde respira una frase lo decide quien la escribe, no el
-                  ancho que sobra. */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: EJE.x + BARRA + 34,
-                  top: suelo - aPx((base + tope) / 2) - 22,
-                  whiteSpace: "nowrap",
-                  fontFamily: fontFamily.bloque,
-                  fontSize: 40,
-                  letterSpacing: "0.01em",
-                  textTransform: "uppercase",
-                  color: q0Color(i, umbral, base, tope),
-                  opacity: crece,
-                }}
-              >
-                {assertShort(tr.etiqueta, "label", "Acumulacion.tramo")}
-              </div>
-            </React.Fragment>
-          );
-        })}
-
-        {/* La raya. Se traza ANTES de que la barra llegue: primero se ve el
-            límite, después se ve cruzarlo. Al revés no hay drama, hay un dato. */}
-        {umbral && yUmbral !== null ? (
-          <>
-            <div
-              style={{
-                position: "absolute",
-                left: EJE.x - 34,
-                top: yUmbral,
-                width: (PANEL.w - EJE.x - 20) * p(raya),
-                height: 4,
-                backgroundColor: color.gold,
-              }}
-            />
-            {/* Al final de la raya, no al principio: al principio cae debajo
-                de la barra y desaparece justo cuando la barra la cruza, que es
-                el unico momento en que hace falta leerla. */}
-            <div
-              style={{
-                position: "absolute",
-                right: 56,
-                top: yUmbral - 52,
-                fontFamily: fontFamily.bloque,
-                fontSize: 34,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: color.gold,
-                opacity: p(raya),
-              }}
-            >
-              {assertShort(umbral.etiqueta, "label", "Acumulacion.umbral")}
-            </div>
-          </>
-        ) : null}
+        <Barra
+          tramos={tramos}
+          umbral={umbral}
+          entradas={t.entradas}
+          raya={t.raya}
+          entra={entra}
+        />
 
         {resultado ? (
           <div
@@ -353,8 +204,8 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
               position: "absolute",
               left: EJE.x - 34,
               right: 56,
-              top: suelo + 62,
-              opacity: p(finTramos + 6),
+              top: SUELO + 62,
+              opacity: entra(t.resultadoAt),
             }}
           >
             <div
@@ -366,7 +217,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
                 textTransform: "uppercase",
                 color: color.gold,
                 whiteSpace: "nowrap",
-                transform: `translateY(${(1 - p(finTramos + 6)) * 22}px)`,
+                transform: `translateY(${(1 - entra(t.resultadoAt)) * 22}px)`,
               }}
             >
               {resultado.figure}
@@ -403,41 +254,11 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
           fontWeight: 700,
           lineHeight: 1.34,
           color: color.richBlack,
-          opacity: p(finTramos + 14),
+          opacity: entra(t.condicionAt),
         }}
       >
         {condicion}
       </div>
     </AbsoluteFill>
   );
-};
-
-/**
- * Color de la etiqueta de un tramo: oro si el tramo asoma por encima de la
- * raya, azul secundario si no. **El oro marca lo que hay que mirar**, así que
- * la etiqueta se pone de acuerdo con su bloque en vez de ir toda del mismo
- * color y dejar que el espectador empareje a mano.
- */
-const q0Color = (
-  _i: number,
-  umbral: { en: number } | undefined,
-  base: number,
-  tope: number,
-): string =>
-  umbral && tope > umbral.en && base < tope ? color.gold : color.secondaryBlue;
-
-/**
- * Cuánto dura el tablero completo, en frames.
- *
- * **Un componente con horario propio necesita su tiempo.** El spec pregunta en
- * vez de poner un número redondo: con 5,5 s el `TwoPaths` mostraba sólo la
- * cabecera y el pie, y en el render parecía un tablero vacío cuando lo que
- * estaba era a medio construir.
- */
-export const duracionDe = (props: AcumulacionProps): number => {
-  let reloj = duration.entry * 3;
-  for (const tr of props.tramos) {
-    reloj += Math.max(duration.entry + 4, readingFrames(tr.etiqueta));
-  }
-  return reloj + readingFrames(props.condicion) + 20;
 };

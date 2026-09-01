@@ -32,6 +32,7 @@ import os
 import re
 import shutil
 import sqlite3
+import basedatos
 import sys
 import unicodedata
 
@@ -160,7 +161,7 @@ def main():
     a = ap.parse_args()
     seco = a.ver or not (a.fragmentos or a.finales or a.revision)
 
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.execute("PRAGMA foreign_keys = ON")
 
     # **Aquí es donde el motivo pesa, y no antes.**

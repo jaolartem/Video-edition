@@ -28,343 +28,30 @@
  *   está escrita en un documento es una indicación que se incumple; una que
  *   devuelve una falta es una que no se puede incumplir sin enterarse.
  *
- * ## El gancho es distinto, y por eso va primero
+ * ## Dónde vive cada mitad
  *
- * Los otros cuatro caminos acompañan lo que Jaime dice. El gancho **compite
- * contra el pulgar**: no tiene que explicar, tiene que impedir que el vídeo se
- * vaya. Por eso es el único que apila capas sobre la cara, el único con más de
- * una entrada por segundo y el único donde el subtítulo va en su forma grande.
+ * Este fichero decidía el camino **y** leía la prosa de la escena **y** montaba
+ * el gancho, tres cosas de tamaños muy distintos en 503 líneas. Ahora:
+ *
+ *     scripts/escena.mjs   la prosa de la escena -> lo que existe (figura,
+ *                          efecto, copy, desaturación). Lo comparte `describir`
+ *     scripts/capa.mjs     el reloj de una capa: frames, reparto y sonido
+ *     scripts/gancho.mjs   la portada, que es la que es diferente
+ *     scripts/caminos.mjs  los cinco caminos, el despacho y lo de pieza entera
+ *
+ * La superficie pública no se movió: lo que `reels-spec.mjs` importaba de aquí
+ * se sigue importando de aquí.
  */
+import { FPS, sonar } from "./capa.mjs";
+import { desaturaDe, donde, figuraDe, sonidoDe } from "./escena.mjs";
+import { portada } from "./gancho.mjs";
 
-const FPS = 30;
-
-/** El gancho son 5 s y el primero es el que decide. Igual que en `trato.py`. */
-export const GANCHO_S = 5.0;
-export const GANCHO_CLAVE_S = 1.0;
-
-/**
- * La primera entrada, antes de esto. En frames.
- *
- * Doce frames son 0,4 s: lo que tarda el pulgar en decidir es ~1,3 s, así que
- * si la primera cosa que se mueve llega en el segundo 1, ya llegó tarde. El
- * plano puede estar quieto; la pantalla no.
- */
-const PRIMERA_ENTRADA = 12;
-
-/** Entradas mínimas dentro del gancho. Menos de esto no es maximalismo. */
-const ENTRADAS_MIN = 3;
-
-/**
- * De la prosa de `grafico` a la figura que existe.
- *
- * **Se detecta, no se interpreta.** La skill lo dice: el `grafico` es el
- * encargo y no hay que reinterpretarlo. Así que esto es un vocabulario corto y
- * literal; cuando no reconoce nada **no inventa una figura**, devuelve `null` y
- * el camino registra la falta. Un pictograma inventado es un pictograma que
- * nadie puede discutir.
- */
-const FIGURAS = [
-  // Dos cantidades enfrentadas. Es lo que mas piden las descripciones —«una
-  // barra llena y, debajo, la de lo que queda a un tercio»— y es geometria
-  // plana: rectangulos y un hueco. Va la primera porque «barra» tambien casa
-  // con verbos de movimiento y no queremos que la gane «flecha».
-  [/barra|dos cantidad|facturaci.n.*queda|lo que queda/i, "barras"],
-  // Tres marcas en fila, tachadas una tras otra. Lo piden tres escenas del
-  // lote con esas mismas palabras.
-  [/tres .*(en fila|una tras otra|tachad)|en fila|una tras otra/i, "serie"],
-  [/bifurcaci|dos camino|se divide|dos trayectoria|dos ruta/i, "bifurcacion"],
-  [/escalera|peldan|peldañ|escalon|escalón/i, "escalera"],
-  [/prohibi|alto\b|no se puede|puerta.*cerrad|cerrad[ao].*puerta/i, "alto"],
-  [/ceda|advertenc|riesgo/i, "ceda"],
-  [/desv[ií]o|rodeo|atajo/i, "desvio"],
-  [/dos persona|socio|empleado|equipo/i, "dos-personas"],
-  [/persona|dueñ|duen|empresari|sujeto/i, "persona"],
-  [/flecha|sube|crece|asciende|cae\b|baja\b/i, "flecha"],
-];
-
-/**
- * Hay escenas cuyo grafico **es la tipografia**: *«la pregunta en versales sobre
- * negro; nada mas»*, *«la frase entera en versales; el tipo es la composicion»*.
- *
- * Eso no es una figura que falte: es una figura que la escena no quiere. Forzar
- * un pictograma ahi seria justo lo que la skill prohibe —reinterpretar el
- * encargo— asi que el gancho usa un bloque de tipo como segundo gancho visual y
- * el resultado cumple sin inventarse nada.
- */
-const ES_TIPO = /versales|el tipo es|la frase entera|solo texto|nada mas/i;
-
-export const esTipografico = (grafico) => Boolean(grafico && ES_TIPO.test(grafico));
-
-export const figuraDe = (grafico) => {
-  if (!grafico) return null;
-  for (const [re, fig] of FIGURAS) if (re.test(grafico)) return fig;
-  return null;
-};
-
-/**
- * El copy que el gancho tipográfico pone en pantalla, **declarado, no deducido**.
- *
- * Regla de Jaime, y corrige lo que yo estaba haciendo: *«las escenas y tableros
- * las debe hacer un agente especializado en diseño; eso es editorial, no sale
- * con código»*. La primera versión de esto sacaba la palabra de la prosa de
- * `grafico` con una expresión regular — o sea código decidiendo qué dice el
- * plano que compite contra el pulgar. Eso es exactamente lo que no le toca.
- *
- * Lo que sí le toca es **leer lo que el diseño declaró** y negarse a inventar
- * cuando no hay nada. El copy vive en `escena_desc.tablero`, que es el mismo
- * sitio del que salen los tableros desde C-142: dato, no prosa, escrito por
- * quien compone y leído por quien monta.
- *
- * Qué arregla, y es el sitio más caro de la pieza: el bloque no traía texto
- * propio y `Reel.tsx` le pasaba `lineas[0]`, la primera línea del rótulo. El
- * segundo gancho visual **repetía el primero** — en reel-04 el rótulo decía
- * «NO ES POR / SER INMIGRANTE» y el bloque, encima y a la vez, «NO ES POR».
- */
-export const copyDeclarado = (desc) => {
-  const t = desc?.tablero;
-  if (!t) return null;
-  let d = t;
-  if (typeof d === "string") {
-    try {
-      d = JSON.parse(d);
-    } catch {
-      return null;
-    }
-  }
-  const txt = d?.props?.texto ?? d?.props?.titulo ?? d?.texto ?? null;
-  return typeof txt === "string" && txt.trim() ? txt.trim().slice(0, 26) : null;
-};
-
-/**
- * De la prosa de `sonido` al efecto que existe en `src/brand/sfx.ts`.
- *
- * Mismo criterio: la descripción dice *«el golpe seco cuando la segunda barra
- * se detiene antes»* y eso es `land`, no un whoosh elegido a gusto. Si no
- * reconoce el movimiento devuelve `null`, y entonces la capa **no suena** — que
- * es la regla del proyecto: prohibido el sonido sin movimiento que lo
- * justifique, y también al revés, prohibido inventarle un sonido a un
- * movimiento que la escena no describió.
- */
-const SONIDOS = [
-  [/golpe|seco|se detiene|aterriza|remate|impacto/i, "land"],
-  [/traz|dibuj|línea|linea|se escribe a mano/i, "draw"],
-  [/tecle|letra a letra|se escribe/i, "type"],
-  [/separa|bifurca|se abre|dos caminos/i, "fork"],
-  [/marca|sella|pegatina|subray/i, "mark"],
-  [/barrid|cruza|pasa de lado|entra de golpe/i, "whoosh"],
-  [/distorsi|glitch|corte sucio/i, "glitch"],
-];
-
-/**
- * Lo que se describió y no sonó. Se acumula y lo lee `reels-spec.mjs`, que es
- * quien puede decirlo con el reel y la etapa delante.
- */
-export const sonidosMudos = [];
-
-export const sonidoDe = (sonido, donde = "") => {
-  if (!sonido) return null;
-  for (const [re, m] of SONIDOS) if (re.test(sonido)) return m;
-  /**
-   * **Un sonido descrito que no suena tiene que decirlo.**
-   *
-   * Esto devolvía `null` en silencio, y el propio contrato lo llevaba escrito
-   * como deuda: *«texto libre: lo que `sonidoDe` no reconozca cae en silencio.
-   * O es lista cerrada, o `sonidoDe` avisa»*. Se pagó al oír el reel-01
-   * montado — Jaime: *«el tablero sin sonido»*, y después *«el sonido del
-   * tablero deben ser las acciones animadas del tablero»*.
-   *
-   * Quien compone escribe frases como «zumbido corto ascendente mientras la
-   * barra sube, un golpe metálico seco al cruzar el umbral». Si ninguna
-   * expresión de `SONIDOS` la reconoce, la capa se monta muda **y nadie se
-   * entera**: la descripción existe, está bien escrita, y no produce nada.
-   *
-   * No se inventa un sonido —eso rompería la regla de que el sonido sigue al
-   * movimiento— pero tampoco se calla: se anota con su sitio.
-   */
-  sonidosMudos.push({ donde, dice: String(sonido).slice(0, 90) });
-  return null;
-};
-
-/** `color` de la escena: `avivar`, `apagar` o `dejar`. Nunca por gusto. */
-const desaturaDe = (color) =>
-  color === "apagar" ? 0.55 : color === "avivar" ? 1.15 : 1;
-
-/**
- * Reparte n entradas dentro de una ventana, empezando pronto y espaciándolas.
- *
- * No es decorativo que empiece en `PRIMERA_ENTRADA`: el gancho se pierde en el
- * primer segundo, así que la primera cosa que se mueve no puede esperar a que
- * la anterior termine. A partir de ahí, aire igual entre entradas.
- */
-const reparte = (n, desde, hasta) => {
-  const paso = (hasta - desde) / Math.max(1, n);
-  return Array.from({ length: n }, (_, i) => Math.round(desde + paso * i));
-};
-
-const sonar = (motion, at) =>
-  motion ? [{ tipo: "sonido", at, props: { motion } }] : [];
+export { GANCHO_S, GANCHO_CLAVE_S } from "./gancho.mjs";
+export { copyDeclarado, esTipografico, figuraDe, sonidoDe, sonidosMudos }
+  from "./escena.mjs";
 
 export const CAMINOS = {
-  /**
-   * **portada — el gancho.** Los primeros 5 s, *«de los que el primero es
-   * clave»*.
-   *
-   * Indicaciones, y todas se comprueban abajo: cara y máxima expresividad, mucho
-   * movimiento dentro de la toma, ganchos visuales múltiples, sonidos que
-   * acompañan al título y a los subtítulos animados. *«Maximalismo coherente:
-   * romper el patrón y generar curiosidad.»*
-   *
-   * Coherente es la palabra que hace el trabajo: apila, pero apila con la
-   * paleta, la tipografía y las prohibiciones del canon. Nada de rebote ni
-   * confeti — el maximalismo aquí es **densidad de entradas**, no blandura.
-   */
-  portada: {
-    nombre: "gancho",
-    manda: "toma",
-    porque:
-      "compite contra el pulgar, no explica: la única que apila sobre la cara",
-    capas(ctx) {
-      const { at, duration, desc, det, lado } = ctx;
-      // **El gancho dura 5 s, no lo que dure el segmento.** Si la toma que abre
-      // dura 2 s, las capas siguen sobre la escena siguiente hasta cerrar los 5:
-      // el gancho es una ventana de la pieza, no una propiedad del corte.
-      const fin = at + Math.round(GANCHO_S * FPS);
-      void duration;
-      const clave = at + Math.round(GANCHO_CLAVE_S * FPS);
-      const tipo = esTipografico(desc?.grafico);
-      const fig = tipo ? null : figuraDe(desc?.grafico);
-      const motion = sonidoDe(desc?.sonido, `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`);
-      const out = [];
-
-      // 1 · El plano se mueve dentro de sí mismo. No es un plano fijo con cosas
-      //     encima: la toma empuja. Va primero porque no necesita entrada.
-      out.push({
-        tipo: "punch",
-        at,
-        duration: fin - at,
-        props: { desde: 1.0, hasta: 1.08 },
-      });
-
-      // 2 · El rótulo entra con movimiento —por bloques desde el lado libre—,
-      //     no con un fundido. Un fundido no rompe ningún patrón.
-      const tR = at + PRIMERA_ENTRADA;
-      out.push({
-        tipo: "rotulo",
-        at: tR,
-        duration: fin - tR,
-        props: { lado, entrada: "bloque" },
-      });
-      out.push(...sonar("whoosh", tR));
-
-      // 3 · La figura de la escena, entrando desde fuera del cuadro. Sólo si la
-      //     descripción la nombra: el catálogo de `FIGURAS` no adivina.
-      if (fig) {
-        const [t1, t2] = reparte(2, clave, fin - Math.round(0.6 * FPS));
-        out.push({
-          tipo: "figura",
-          at: t1,
-          duration: fin - t1,
-          props: { figura: fig, oro: true, lado, dura: fin - t1 },
-        });
-        out.push(...sonar("draw", t1));
-        // 4 · Y el elemento geométrico que entra y sale — el segundo gancho
-        //     visual, con el sonido que la escena describió para él.
-        out.push({
-          tipo: "remate",
-          at: t2,
-          duration: fin - t2,
-          props: { lado, tinte: "gold" },
-        });
-        out.push(...sonar(motion ?? "land", t2));
-      }
-
-      // 3bis · El gancho tipografico. Mismo trabajo que la figura —segundo y
-      //     tercer gancho visual dentro de los 5 s— pero con el material que la
-      //     escena pidio: tipo, en versales, entrando por bloques.
-      //     Y **con su propio texto**: el que la escena declaró en versales. Sin
-      //     él la capa no entra — repetir el rótulo es peor que una capa menos,
-      //     y `exige` lo cuenta para que lo resuelva quien describe.
-      const literal = tipo ? copyDeclarado(desc) : null;
-      if (tipo && literal) {
-        const [t1, t2] = reparte(2, clave, fin - Math.round(0.6 * FPS));
-        out.push({
-          tipo: "bloque",
-          at: t1,
-          duration: fin - t1,
-          props: { lado, tinte: "gold", entrada: "corte", texto: literal },
-        });
-        out.push(...sonar("mark", t1));
-        out.push({
-          tipo: "remate",
-          at: t2,
-          duration: fin - t2,
-          props: { lado, tinte: "navy", texto: literal },
-        });
-        out.push(...sonar(motion ?? "land", t2));
-      }
-
-      // 5 · El subtítulo, en su forma grande. En el gancho el subtítulo no
-      //     acompaña: es una de las capas que enganchan.
-      out.push({
-        tipo: "subtitulo",
-        at,
-        duration: fin - at,
-        props: { forma: "grande", suena: "type" },
-      });
-
-      return out.map((c) => ({ ...c, camino: "portada", beat: det.beat }));
-    },
-    exige(capas, ctx) {
-      const faltas = [];
-      const entradas = capas.filter(
-        (c) => c.tipo !== "sonido" && c.tipo !== "punch",
-      );
-      if (entradas.length < ENTRADAS_MIN)
-        faltas.push(
-          `el gancho lleva ${entradas.length} entradas y necesita ${ENTRADAS_MIN}:` +
-            " «ganchos visuales múltiples»",
-        );
-      const primera = Math.min(...entradas.map((c) => c.at - ctx.at));
-      if (!(primera <= PRIMERA_ENTRADA))
-        faltas.push(
-          `la primera entrada llega en el frame ${primera} y el primer segundo` +
-            " es el que decide",
-        );
-      if (!capas.some((c) => c.tipo === "punch"))
-        faltas.push("el gancho no se mueve dentro de la toma");
-      // **El gancho tipográfico sin copy declarado no entra, y se cuenta.**
-      // La escena pide tipo —su `grafico` habla de versales— y nadie escribió
-      // qué dice. Antes eso se rellenaba con la primera línea del rótulo y el
-      // gancho se repetía a sí mismo; ahora falta una capa y **se dice**, que
-      // es lo que lo manda a quien compone la escena. Es editorial: no sale de
-      // aquí.
-      if (esTipografico(ctx.desc?.grafico) && !copyDeclarado(ctx.desc))
-        faltas.push(
-          "el gancho pide tipo y la escena no declara qué dice:" +
-            " escríbelo en `escena_desc.tablero`, que es de donde lo lee el" +
-            " render. Deducirlo de la prosa seria codigo decidiendo el copy.",
-        );
-      if (
-        !capas.some((c) => c.tipo === "subtitulo" && c.props.forma === "grande")
-      )
-        faltas.push("el subtítulo del gancho no va en su forma grande");
-      // Cada movimiento suena. Se comprueba que no haya entrada muda salvo el
-      // subtítulo, que trae su sonido dentro.
-      for (const c of entradas) {
-        if (c.tipo === "subtitulo") continue;
-        if (
-          !capas.some((s) => s.tipo === "sonido" && Math.abs(s.at - c.at) <= 2)
-        )
-          faltas.push(`la capa «${c.tipo}» del gancho entra sin sonido`);
-      }
-      if (!figuraDe(ctx.desc?.grafico) && !esTipografico(ctx.desc?.grafico))
-        faltas.push(
-          "la escena del gancho no describe ni figura dibujable ni composición" +
-            ` de tipo: «${ctx.desc?.grafico ?? "sin descripción"}»`,
-        );
-      return faltas;
-    },
-  },
+  portada,
 
   /**
    * **tablero — el gráfico es el plano.** *«Los tableros son ideales para ideas
@@ -377,7 +64,7 @@ export const CAMINOS = {
     porque: "la idea es compleja y el espectador no puede rebobinar",
     capas(ctx) {
       const { at, duration, desc, det } = ctx;
-      const motion = sonidoDe(desc?.sonido, `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`);
+      const motion = sonidoDe(desc?.sonido, donde(desc));
       return [
         {
           tipo: "tablero",
@@ -429,7 +116,7 @@ export const CAMINOS = {
     manda: "toma",
     porque: "la cara es el argumento; la animación acompaña y no tapa",
     capas(ctx) {
-      const { at, duration, desc, det, lado } = ctx;
+      const { at, duration, det } = ctx;
       // **Sin figura.** Jaime: *«en todos los planos sobra si no tiene un
       // proposito»*, y aqui no lo tiene por definicion: el camino cercano
       // existe porque **la cara es el argumento**. Metia una figura cada vez
@@ -438,7 +125,9 @@ export const CAMINOS = {
       //
       // Si una etapa necesita figura, el paso de descripcion la manda a
       // `metafora`. Eso es una decision, no una coincidencia de vocabulario.
-      void desc;
+      //
+      // Por eso este camino no mira `desc` ni `lado`: no le hacen falta, y
+      // pedirlos era una invitacion a volver a usarlos.
       const out = [
         {
           tipo: "punch",
@@ -478,7 +167,7 @@ export const CAMINOS = {
     capas(ctx) {
       const { at, duration, desc, det, lado } = ctx;
       const fig = figuraDe(desc?.grafico) ?? det.figura ?? null;
-      const motion = sonidoDe(desc?.sonido, `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`);
+      const motion = sonidoDe(desc?.sonido, donde(desc));
       const t = at + Math.round(0.5 * FPS);
       const out = [];
       if (fig) {
@@ -532,7 +221,14 @@ export const CAMINOS = {
   },
 };
 
-/** Los cinco, por si alguien quiere recorrerlos sin conocer los nombres. */
+/**
+ * Los cinco, por si alguien quiere recorrerlos sin conocer los nombres.
+ *
+ * **Y es la lista cerrada de `trato`**, no una copia de ella: `describir.mjs`
+ * validaba la respuesta contra su propio array de cinco cadenas, así que un
+ * camino nuevo aquí quedaba fuera de la validación y un camino borrado seguía
+ * siendo admitido. Una lista escrita dos veces es dos listas.
+ */
 export const NOMBRES = Object.keys(CAMINOS);
 
 /**

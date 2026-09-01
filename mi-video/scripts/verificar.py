@@ -40,6 +40,7 @@ import json
 import os
 import re
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -56,7 +57,7 @@ def revisar(slug):
         return [f"{slug}: no hay EDL"]
     edl = json.load(open(ruta, encoding="utf-8"))
     mal = []
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row
 
     # 1 · **La descripción caduca cuando cambia EL TEXTO, no la fecha.**
@@ -151,7 +152,7 @@ def revisar(slug):
     # que hubo una decision — y una decision no es un agujero.
     quitadas = set()
     try:
-        _c = sqlite3.connect(BASE)
+        _c = basedatos.abrir(BASE)
         for (q,) in _c.execute(
                 "select que from revision where video_slug = ? and accion='cortar'"
                 " and estado='aplicada' and regla='seccion que sobra'", (slug,)):

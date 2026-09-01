@@ -35,10 +35,62 @@ REGISTRO: dict[str, Servicio] = {
 }
 
 
+class Recogido(Servicio):
+    """Un servicio con su fallo recogido. **Todos pasan por aquí.**
+
+    Regla de Jaime, y corrige el método antes que el código: *«todos los pasos
+    con código van con try / if not para el log de errores; no puedes estar
+    buscando a ojo»*.
+
+    Buscar a ojo significa leer una traza, arreglar esa línea, volver a correr y
+    encontrar la siguiente. Es lento y, peor, **sólo encuentra lo que revienta
+    delante de ti**: el fallo de `redundancia` con un `NoneType` llevaba horas en
+    el log de incidencias sin que nadie lo mirase, porque nadie se cayó por él.
+
+    Envolver aquí y no en cada clase es lo que hace que no se pueda olvidar: un
+    paso nuevo entra por `para()` y ya viene recogido, sin que su autor tenga que
+    acordarse. Un `try` que hay que recordar poner es un `try` que falta.
+
+    **Y no se traga el fallo.** Devuelve un `Resultado` que dice que no pudo, con
+    el tipo y el mensaje dentro, para que el motor lo anote y pare esa pieza — no
+    las otras seis.
+    """
+
+    def __init__(self, dentro: Servicio):
+        self.dentro = dentro
+        self.nombre = getattr(dentro, "nombre", "?")
+        self.escribe_cintas = getattr(dentro, "escribe_cintas", False)
+
+    def puede(self, pieza):
+        try:
+            return self.dentro.puede(pieza)
+        except Exception as e:                     # noqa: BLE001
+            return False, f"no se pudo preguntar: {type(e).__name__}: {e}"[:200]
+
+    def correr(self, pieza) -> Resultado:
+        import registro
+
+        try:
+            return self.dentro.correr(pieza)
+        except Exception as e:                     # noqa: BLE001
+            motivo = f"{self.nombre} revento: {type(e).__name__}: {e}"
+            registro.aviso("servicio", "el paso revento",
+                           detalle=f"{pieza.slug}: {motivo}"[:600], eco=True)
+            return Resultado(False, motivo=motivo[:300])
+
+    def __repr__(self):
+        return f"<Recogido {self.dentro!r}>"
+
+
 def para(fase_nombre: str, plantilla: str | None) -> Servicio | None:
-    """El servicio de una fase: el objeto si lo hay, si no el script envuelto."""
+    """El servicio de una fase, **ya con su fallo recogido**.
+
+    El objeto si lo hay, si no el script envuelto; y en los dos casos dentro de
+    `Recogido`, que es lo que garantiza que ningún paso pueda reventar la línea
+    sin dejar rastro en el log.
+    """
     if fase_nombre in REGISTRO:
-        return REGISTRO[fase_nombre]
+        return Recogido(REGISTRO[fase_nombre])
     if plantilla:
-        return ServicioScript(fase_nombre, plantilla)
+        return Recogido(ServicioScript(fase_nombre, plantilla))
     return None

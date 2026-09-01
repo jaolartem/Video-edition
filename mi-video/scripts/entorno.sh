@@ -52,8 +52,28 @@ mkdir -p "$LOCALAPPDATA" "$APPDATA"
 export PYTHONIOENCODING=utf-8
 mkdir -p "$_TMP_PROY"
 
-# Y se comprueba: si el temporal no está en el disco del proyecto, se para. Un
-# render que empieza mal tarda veinte minutos en fallar.
+# **Ninguna ruta del proyecto vive en C:, y se comprueba TODAS.**
+#
+# Jaime lo ha dicho treinta veces: *«todo debe guardar en F:, C: no se toca»*,
+# *«C no se debe utilizar, para eso está F»*. Esto comprobaba sólo `temporal`,
+# así que la regla se cumplía en una ruta de cinco y las otras cuatro pasaban
+# sin que nadie mirara. Media regla comprobada es media regla.
+#
+# Se para, no se avisa: un render que empieza mal tarda veinte minutos en
+# fallar, y el error que da habla de disco sin decir cuál.
+_EN_C=$(node -e "
+  const r = JSON.parse(require('fs').readFileSync('rutas.json','utf8'));
+  const mal = Object.entries(r)
+    .filter(([k, v]) => typeof v === 'string' && !k.startsWith('_'))
+    .filter(([, v]) => /^[Cc]:|^\/c\//.test(v))
+    .map(([k, v]) => k + '=' + v);
+  console.log(mal.join(' '));
+" 2>/dev/null)
+if [ -n "$_EN_C" ]; then
+  echo "entorno.sh: hay rutas en C: y aqui no se produce en C: -> $_EN_C" >&2
+  echo "  Se corrigen en rutas.json. Todo el proyecto vive en F:." >&2
+  return 1 2>/dev/null || exit 1
+fi
 case "$_TMP_PROY" in
   [Cc]:*|/c/*)
     echo "entorno.sh: el temporal apunta a C: ($_TMP_PROY) y todo se produce" \

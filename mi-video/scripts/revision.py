@@ -41,6 +41,7 @@ por eso `publicar.py` mira que no queden notas pendientes.
     python scripts/revision.py --aplicar 1           # los cortes al EDL
     python scripts/revision.py --anotar 1 cortar 20 47 "sólo es lectura"
 """
+import basedatos
 import argparse
 import datetime
 import json
@@ -64,7 +65,7 @@ VELOCIDAD = 1.0
 
 def _con():
     import sqlite3
-    c = sqlite3.connect(BASE)
+    c = basedatos.abrir(BASE)
     c.row_factory = sqlite3.Row
     return c
 
@@ -146,10 +147,9 @@ def _por_ancla(edl, ancla, slug="", cual=1):
     sys.path.insert(0, os.path.dirname(__file__))
     import transcribir as _tr, rutas as _ru
 
-    def limpio(t):
-        t = unicodedata.normalize("NFD", t.lower())
-        return "".join(c for c in t if unicodedata.category(c) != "Mn"
-                       and (c.isalnum() or c == " "))
+    from dominio import texto as _tx
+
+    limpio = _tx.comparable          # la vara con la que se busca un ancla
 
     # Un ancla puede ser una frase, o «desde ... hasta» separadas por «|»: para
     # un corte largo, la primera dice donde empieza y la segunda donde acaba.
@@ -158,14 +158,20 @@ def _por_ancla(edl, ancla, slug="", cual=1):
     fin_obj = partes[1] if len(partes) > 1 else None
     if not obj:
         return None
-    cache, linea, t = {}, [], 0.0
+    cache, linea, t, ilegible = {}, [], 0.0, set()
     for rango, det in zip(edl["segmentos"], edl["detalle"]):
         toma = det.get("toma") or _ru.TOMAS.get(slug or slug_de(edl))
         if toma not in cache:
             try:
                 cache[toma] = _tr.exigir(toma)["segmentos"]
-            except SystemExit:
+            except (SystemExit, _tr.Incompleta):
+                # **Una cinta que no se puede leer no es una cinta sin texto.**
+                # Con `[]` a secas el ancla no resolvia, y mas abajo eso se lee
+                # como «el texto ya no esta en la pieza»: la nota se marcaba
+                # `aplicada` y **el corte se perdia para siempre**, sin que
+                # nadie lo contara. Se distingue una cosa de la otra.
                 cache[toma] = []
+                ilegible.add(toma)
         for w in cache[toma]:
             # La vara de que palabra suena dentro del corte vive en
             # `transcribir.suena` (C-84). Este era el CUARTO sitio con su propia
@@ -192,8 +198,12 @@ def _por_ancla(edl, ancla, slug="", cual=1):
         for j in range(i + len(obj), len(pal) - len(fin_obj) + 1):
             if pal[j:j + len(fin_obj)] == fin_obj:
                 return desde, round(linea[j + len(fin_obj) - 1][2], 2)
-        return None
-    return None
+        return False if ilegible else None
+    # **`False` es «no pude mirar»; `None` es «mire y no esta».** Son cosas
+    # opuestas y las dos llegaban como `None`: quien llama lo leia como «el
+    # texto ya no esta en la pieza», marcaba la nota `aplicada` y el corte
+    # desaparecia sin que nadie lo contara.
+    return False if ilegible else None
 
 
 def _retirar_fijados(slug, edl, antes):
@@ -210,13 +220,13 @@ def _retirar_fijados(slug, edl, antes):
     Retirar la declaracion no es perder el registro: la nota de corte queda, con
     su porque y su ancla, y es la que explica por que esa etapa ya no esta.
     """
-    import sqlite3 as _sq
+
 
     vivos = {d.get("beat") for d in edl.get("detalle", [])}
     fuera = [b for b in antes if b is not None and b not in vivos]
     if not fuera:
         return 0
-    con = _sq.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.executemany(
         "delete from corte_fijo where papel='etapa' and orden = ?"
         " and video_id = (select id from video where slug = ?)",
@@ -302,6 +312,12 @@ def aplicar(slug, ver=False):
         except (IndexError, KeyError):
             _cual = 1
         rango = _por_ancla(edl, n["ancla"], slug, _cual) if n["ancla"] else None
+        # No se aplica **y no se da por hecha**: la cinta no se pudo leer, asi
+        # que de esta nota no sabemos nada. Callar aqui es perder el corte.
+        if rango is False:
+            print(f"  {slug}: nota {n['id']} sin mirar — la cinta no se pudo"
+                  f" leer entera. Ni se aplica ni se da por hecha.")
+            continue
         if rango is None and n["desde_s"] is None:
             # **Un ancla que ya no esta en la pieza es un corte ya hecho.**
             # Antes se saltaba y la nota se quedaba pendiente para siempre: la

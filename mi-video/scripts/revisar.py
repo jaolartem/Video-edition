@@ -26,6 +26,7 @@ import io
 import os
 import re
 import sqlite3
+import basedatos
 import subprocess
 import sys
 import unicodedata
@@ -59,7 +60,7 @@ def main():
     ap.add_argument("reels", nargs="*", type=int)
     a = ap.parse_args()
 
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     for n in (a.reels or rutas.piezas()):
         slug, pieza = f"reel-{n:02d}", f"reel-R{n}"
         fuente = os.path.join(rutas.DESTINO, "entrega", f"{pieza}.mp4")

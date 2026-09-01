@@ -37,6 +37,7 @@ import datetime
 import json
 import os
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -45,7 +46,7 @@ BASE = "ads/decisiones.db"
 
 
 def _con():
-    c = sqlite3.connect(BASE)
+    c = basedatos.abrir(BASE)
     c.row_factory = sqlite3.Row
     return c
 
@@ -57,11 +58,41 @@ def _vid(con, slug):
     return r["id"]
 
 
+def huella(toma, a, b):
+    """Que se oye dentro de ese tramo, reducido a doce caracteres.
+
+    Es la prueba contra la que se declaro. Se lee por `exigir()` —la puerta—,
+    no del fichero, para que sea el mismo texto que ve quien monta.
+
+    Se compara texto y no segundos a proposito: la linea reescribe los
+    transcripts en su paso `afinado` y los tiempos se mueven unas milesimas sin
+    que cambie una palabra. Lo que invalida una declaracion no es que el fichero
+    sea mas nuevo: es que **ahi ahora se dice otra cosa**.
+    """
+    import hashlib
+    import unicodedata
+
+    import transcribir as _tr
+
+    try:
+        pal = _tr.exigir(toma)["segmentos"]
+    except (SystemExit, Exception):                # noqa: BLE001
+        return None
+    dentro = [w["text"] for w in pal if _tr.suena(w, a, b)]
+    if not dentro:
+        return None
+    t = unicodedata.normalize("NFD", " ".join(dentro).lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn"
+                and (c.isalnum() or c == " "))
+    return hashlib.sha1(" ".join(t.split()).encode("utf-8")).hexdigest()[:12]
+
+
 def fijados(slug):
     """Los tramos declarados de una pieza, por beat."""
     con = _con()
     filas = con.execute(
-        "select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que"
+        "select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que,"
+        " cf.huella"
         "  from corte_fijo cf join video v on v.id = cf.video_id"
         " where v.slug = ? and cf.papel = 'etapa' order by cf.orden, cf.desde",
         (slug,)).fetchall()
@@ -331,8 +362,9 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
                 " and orden = ?", (vid, int(beat)))
     con.executemany(
         "insert into corte_fijo (video_id, papel, orden, desde, hasta, toma,"
-        " por_que, quien, fecha) values (?,'etapa',?,?,?,?,?,?,?)",
-        [(vid, int(beat), a, b, tk, por_que, quien, ahora) for a, b, tk in tramos])
+        " por_que, quien, fecha, huella) values (?,'etapa',?,?,?,?,?,?,?,?)",
+        [(vid, int(beat), a, b, tk, por_que, quien, ahora, huella(tk, a, b))
+         for a, b, tk in tramos])
     con.commit()
     con.close()
     return veredicto
@@ -401,6 +433,52 @@ def rehacer(slug, beats=None):
     return aplicar(slug)
 
 
+def _con_prueba_viva(slug, fjs):
+    """Deja fuera las declaraciones que hablan de un texto que ya no esta ahi.
+
+    **Por etapa entera y no por tramo**: `aplicar` rehace la etapa con los
+    tramos que le llegan, asi que colar la mitad de una declaracion vieja deja
+    la etapa peor que no tocarla.
+
+    Lo que NO hace es borrarlas. Una declaracion es una decision con autor y
+    porque; lo que caduca es su prueba, no la decision. Se queda en la tabla,
+    no se aplica, y se dice en voz alta — para que el paso que la puso la vuelva
+    a mirar con la cinta de hoy delante.
+
+    Las que no tienen huella son las de antes de que esto existiera: se estampan
+    con la de ahora y se aplican, pero se cuenta cuantas, porque adoptar una
+    prueba no es haberla comprobado.
+    """
+    vivas, viejas, adoptadas = [], {}, 0
+    con = _con()
+    for f in fjs:
+        if not f.get("toma"):
+            vivas.append(f)
+            continue
+        h = huella(f["toma"], f["desde"], f["hasta"])
+        if f.get("huella") and h and h != f["huella"]:
+            viejas.setdefault(f["beat"], 0)
+            viejas[f["beat"]] += 1
+            continue
+        if not f.get("huella") and h:
+            con.execute("update corte_fijo set huella = ? where id = ?",
+                        (h, f["id"]))
+            adoptadas += 1
+        vivas.append(f)
+    con.commit()
+    con.close()
+    if adoptadas:
+        print(f"  {slug}: {adoptadas} declaracion(es) sin prueba estampada —"
+              f" se adopta la de hoy; no es lo mismo que comprobada")
+    if viejas:
+        fuera = set(viejas)
+        vivas = [f for f in vivas if f["beat"] not in fuera]
+        print(f"  {slug}: etapa(s) {sorted(fuera)} declaradas contra un texto"
+              f" que ya no esta ahi — NO se aplican. Manda la seleccion de hoy"
+              f" hasta que el paso que las puso las vuelva a mirar.")
+    return vivas
+
+
 def aplicar(slug):
     """Mete los tramos fijados en el EDL, sustituyendo los de esa etapa.
 
@@ -411,6 +489,9 @@ def aplicar(slug):
     import transcribir
 
     fjs = fijados(slug)
+    if not fjs:
+        return 0, []
+    fjs = _con_prueba_viva(slug, fjs)
     if not fjs:
         return 0, []
     ruta = f"ads/{slug}/edl-sell.json"

@@ -107,9 +107,10 @@ def piezas():
     la base no contesta, se cae al lote historico para no dejar la linea muerta.
     """
     import sqlite3
+    import basedatos
 
     try:
-        con = sqlite3.connect("ads/decisiones.db")
+        con = basedatos.abrir("ads/decisiones.db")
         ns = [int(r[0][-2:]) for r in con.execute(
             "select slug from video where slug like 'reel-%' order by slug")]
         con.close()

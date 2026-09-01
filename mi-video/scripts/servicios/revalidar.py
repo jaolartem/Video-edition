@@ -109,8 +109,9 @@ def aplicar(pieza: Pieza, veredictos) -> str:
     """
     import datetime
     import sqlite3
+    import basedatos
 
-    con = sqlite3.connect("ads/decisiones.db")
+    con = basedatos.abrir("ads/decisiones.db")
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     falsos, cortados, componen, cambiados = 0, 0, 0, 0
     for v in veredictos:
@@ -129,7 +130,17 @@ def aplicar(pieza: Pieza, veredictos) -> str:
             cortados += 1
         # El corte nuevo: o los tramos que propone, o el rango de la
         # candidata que elige. Lo segundo solo si no dijo tramos.
-        nuevos = [t for t in (v.get("tramos") or []) if len(t) == 2]
+        # **Dos o tres: `[desde, hasta]` o `[desde, hasta, cinta]`.** Exigir
+        # exactamente dos tira en silencio justo el que trae un trozo de OTRA
+        # grabacion — y ahi vive el escalon del precio de reel-05 y reel-06,
+        # que es cumplimiento: sin el, la pieza no sale.
+        #
+        # Esto ya se arreglo en `repaso._mover_bordes` y se quedo sin arreglar
+        # aqui. Su propio comentario lo nombra: «las dos mitades de la misma
+        # decision, una hecha y otra olvidada». `fijar.declarar` sabe aplicar
+        # las tres desde el principio; eran los dos lados de la escritura los
+        # que no se pusieron de acuerdo.
+        nuevos = [t for t in (v.get("tramos") or []) if len(t) in (2, 3)]
         if not nuevos and int(v.get("elegida") or 1) != 1:
             r = con.execute(
                 "select f.desde, f.hasta, t.nombre from candidato c"

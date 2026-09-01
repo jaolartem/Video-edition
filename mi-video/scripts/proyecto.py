@@ -35,6 +35,7 @@ import io
 import os
 import shutil
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -77,7 +78,7 @@ def rehacer_esquema():
     nueva = "ads/decisiones.nueva.db"
     if os.path.exists(nueva):
         os.remove(nueva)
-    con = sqlite3.connect(nueva)
+    con = basedatos.abrir(nueva)
     con.executescript(io.open("scripts/esquema.sql", encoding="utf-8").read())
     con.execute("attach database ? as vieja", (viejo,))
     tablas = [r[0] for r in con.execute(
@@ -155,7 +156,7 @@ def main():
             os.remove(p)
     # La base se vuelve a crear vacia: el esquema es sistema, el contenido no.
     os.makedirs("ads", exist_ok=True)
-    con = sqlite3.connect("ads/decisiones.db")
+    con = basedatos.abrir("ads/decisiones.db")
     con.executescript(io.open("scripts/esquema.sql", encoding="utf-8").read())
     con.commit()
     con.close()

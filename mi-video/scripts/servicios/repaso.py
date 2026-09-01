@@ -62,6 +62,7 @@ class ServicioRepaso(Servicio):
         # perdido.
         try:
             import sqlite3 as _s3
+            import basedatos
 
             _c3 = _s3.connect("ads/decisiones.db")
             estructura_beats = [r[0] for r in _c3.execute(
@@ -122,7 +123,7 @@ class ServicioRepaso(Servicio):
         try:
             import sqlite3 as _sq
 
-            _c = _sq.connect("ads/decisiones.db")
+            _c = basedatos.abrir("ads/decisiones.db")
             _c.row_factory = _sq.Row
             ve = [dict(r) for r in _c.execute(
                 # **`grafico` es lo que se ve.** Sin el, `se_ve` no servia

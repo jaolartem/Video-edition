@@ -1,32 +1,12 @@
 import React from "react";
-import { Easing, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import { layout, videoText, color, type ModeTokens } from "../brand/tokens";
+import { Compuesta } from "./captionBand/Compuesta";
+import { Corregida } from "./captionBand/Corregida";
+import { Plana } from "./captionBand/Plana";
+import { layout, videoText, type ModeTokens } from "../brand/tokens";
+import type { Compuesto } from "./captionBand/Compuesta";
 
-/**
- * El subtítulo compuesto: **dos renglones, dos fuentes, dos superficies.**
- *
- * Petición de Jaime: *«el cc también puede ser grande, o compuesto —una frase
- * luego otra abajo— con dos fuentes y con más colores. De esa manera los
- * animamos»*.
- *
- * Es el canon aplicado a la capa portante. Los ejemplos no tienen texto
- * flotante con contorno: tienen **bloques planos de color con el tipo dentro**,
- * y lo grande va en condensada pesada y versales. Así que el renglón de arriba
- * lleva el contexto en Montserrat sobre negro, y el de abajo **el golpe** en
- * Anton versales sobre color.
- *
- * - `arriba` — lo que sitúa. Caja mixta, cuerpo de subtítulo.
- * - `abajo` — lo que remata. Versales, cuerpo derivado de su largo.
- * - `tinte` — **oro sólo cuando hay una cifra o una fecha**, que es lo que el
- *   espectador debe mirar. El resto va en navy. El oro decorativo está
- *   prohibido por nombre, y un remate en oro cada tres segundos lo sería.
- */
-export type Compuesto = {
-  arriba: string;
-  abajo: string;
-  tinte: "gold" | "navy";
-};
+export type { Compuesto } from "./captionBand/Compuesta";
 
 /**
  * La franja de subtítulos, encima de la interfaz de la plataforma.
@@ -55,6 +35,14 @@ export type Compuesto = {
  * es el que no se mueve** y el bloque crece hacia arriba: el ojo tiene un
  * punto fijo al que volver, y lo que crece lo hace hacia la barbilla y no
  * hacia la interfaz de la plataforma.
+ *
+ * ## Aquí sólo se elige la forma
+ *
+ * Las tres formas viven aparte, cada una con su regla: la
+ * [plana](./captionBand/Plana.tsx), la
+ * [compuesta](./captionBand/Compuesta.tsx) —que es la única que mide texto— y
+ * la [corregida](./captionBand/Corregida.tsx), que sirve igual a la corrección
+ * y a la idea fuerza.
  */
 export const CaptionBand: React.FC<{
   text: string;
@@ -151,239 +139,3 @@ export const CaptionBand: React.FC<{
     )}
   </div>
 );
-
-/**
- * La forma plana, **con entrada**.
- *
- * Jaime cuenta los subtitulos animados entre los tratamientos validos: *«si no
- * hay tablero hay animaciones detras mio o los subtitulos animados; las dos son
- * validas»*. Sin entrada, la banda cambia de texto por sustitucion y el ojo lo
- * lee como un fallo de sincronia; con cuatro frames de subida, cada frase
- * **llega**.
- *
- * Cuatro frames, no doce: es la capa permanente y aparece cuarenta veces por
- * pieza. Lo que se puede permitir un rotulo que sale dos veces, esta no.
- * Y sin rebote — prohibido por nombre.
- */
-const Plana: React.FC<{ desde: number; children: React.ReactNode }> = ({
-  desde,
-  children,
-}) => {
-  const frame = useCurrentFrame();
-  const p = interpolate(frame, [desde, desde + 4], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  return (
-    <span
-      style={{
-        /**
-         * **Bloque, no contorno flotante.** El contorno aguantaba sobre el
-         * plano, pero sobre un tablero el subtitulo era lo unico sin fondo:
-         * flotaba encima de la composicion y se leia como pegado de otra
-         * pieza. El canon no tiene texto flotante en ninguna lamina — tiene
-         * bloques planos con el tipo dentro, que es lo que ya hace la forma
-         * compuesta.
-         *
-         * El contorno se queda debajo del bloque: sobre pared clara o camisa
-         * azul sigue haciendo su trabajo en los bordes de las letras.
-         */
-        backgroundColor: color.richBlack,
-        padding: "0.06em 0.22em",
-        boxDecorationBreak: "clone",
-        WebkitBoxDecorationBreak: "clone",
-        WebkitTextStroke: `4px ${color.richBlack}`,
-        paintOrder: "stroke fill",
-        opacity: p,
-        transform: `translateY(${((1 - p) * 14).toFixed(1)}px)`,
-      }}
-    >
-      {children}
-    </span>
-  );
-};
-
-/** Ancho util de la banda, ya descontadas las zonas seguras. */
-const ANCHO = layout.width - layout.safe.left - layout.safe.right;
-/** El tracking, en em, para poder sumarlo al avance. */
-const PISTA = Number.parseFloat(videoText.tracking);
-
-/**
- * Avance medio de la Anton en versales. Es condensada de verdad, asi que ocupa
- * mucho menos que la Montserrat 900 (0,70 em) del rotulo.
- *
- * **El interletrado y el relleno cuentan, y esa es la parte que se olvida.** El
- * aprendizaje 40 lo dice con estas palabras y `SidePanel` ya lo aplica; aqui
- * faltaba. El ancho real de un bloque no es `cuerpo * n * avance`: es
- *
- *     cuerpo * (n * (avance + tracking) + relleno)
- *
- * Con el relleno horizontal del bloque (0,32 em) y el tracking (0,01 em),
- * despejar el cuerpo sin esos dos terminos daba **siempre** un bloque mas ancho
- * que la banda: medido sobre el lote, ocho de trece se salian entre 39 y 58 px,
- * y con `nowrap` no envuelven — se salen y punto.
- *
- * El margen se paga en cuerpo, que es barato, no en texto cortado, que no lo
- * es. Y el numero final **se comprueba sobre un still**, no se razona.
- */
-const AVANCE_ANTON = 0.46;
-/** Relleno horizontal del bloque, en em. Va aqui porque entra en la cuenta. */
-const RELLENO_EM = 0.32;
-
-/**
- * Los dos renglones. El de arriba entra por la izquierda, el de abajo por la
- * derecha cuatro frames despues.
- *
- * **La contradiagonal es el motivo del canon**, no un adorno: el
- * constructivismo evita la simetria porque la diagonal es la que sugiere
- * movimiento. Dos bloques entrando por el mismo lado serian una lista; entrando
- * por lados opuestos, la pila se construye.
- *
- * Sin rebote y sin fundido: `Easing.out(cubic)` y peso. El rebote esta
- * prohibido por nombre.
- */
-const Compuesta: React.FC<{ c: Compuesto; desde: number }> = ({ c, desde }) => {
-  const frame = useCurrentFrame();
-  const cuerpo = Math.round(
-    Math.min(
-      videoText.titleBig,
-      Math.max(
-        videoText.caption,
-        ANCHO /
-          (c.abajo.length * (AVANCE_ANTON + PISTA) + RELLENO_EM),
-      ),
-    ),
-  );
-  const entra = (retardo: number) =>
-    interpolate(frame, [desde + retardo, desde + retardo + 6], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    });
-  const p1 = entra(0);
-  const p2 = entra(4);
-  const oro = c.tinte === "gold";
-  return (
-    <>
-      {/* La forma grande no lleva renglon de arriba: sin esto pintaba un
-          bloque negro vacio encima del remate. */}
-      {c.arriba ? (
-      <span
-        style={{
-          alignSelf: "flex-start",
-          maxWidth: ANCHO,
-          backgroundColor: color.richBlack,
-          color: color.lightNeutral,
-          padding: "0.06em 0.24em",
-          marginBottom: 8,
-          opacity: p1,
-          transform: `translateX(${(-(1 - p1) * layout.width * 0.35).toFixed(1)}px)`,
-        }}
-      >
-        {c.arriba}
-      </span>
-      ) : null}
-      <span
-        style={{
-          alignSelf: "flex-start",
-          maxWidth: ANCHO,
-          // Cinta del canon: **texto negro sobre el color**, nunca al reves.
-          backgroundColor: oro ? color.gold : color.navy,
-          color: oro ? color.richBlack : color.lightNeutral,
-          fontFamily: fontFamily.bloque,
-          fontSize: cuerpo,
-          fontWeight: 400,
-          lineHeight: 1.04,
-          letterSpacing: videoText.tracking,
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-          padding: "0.04em 0.16em",
-          opacity: p2,
-          transform: `translateX(${((1 - p2) * layout.width * 0.35).toFixed(1)}px)`,
-        }}
-      >
-        {c.abajo}
-      </span>
-    </>
-  );
-};
-
-/**
- * Parte el subtitulo y **pone la palabra correcta donde suena la equivocada**.
- *
- * Crece y se queda ahi: encogerla despues seria un efecto de vuelta atras, y lo
- * que tiene que quedarse es la contradiccion.
- *
- * ## Crece por cuerpo, no por `scale`
- *
- * `transform: scale()` **no reflowea**: la caja escalada se sale y se pinta
- * encima del texto que tiene al lado. En el reel 1 la idea fuerza «lo que
- * deberia» quedo escrita sobre el «le queda» que la precede, ilegibles las dos.
- * Con `fontSize` en `em` el renglon se recompone y las palabras se apartan.
- *
- * El factor cambia segun lo que crece: **una palabra suelta aguanta 1,45**
- * —es la correccion, y tiene que dar un golpe— pero una frase entera a 1,45
- * ocupa dos renglones ella sola, asi que la idea fuerza se queda en 1,22.
- */
-const Corregida: React.FC<{
-  texto: string;
-  corrige: { dice: string; es: string };
-  desde: number;
-  factor?: number;
-  /**
-   * Que la correccion **palpite**, y no siempre.
-   *
-   * Jaime, sobre un dato que el atribuye mal y el libreto tiene bien: *«el
-   * libreto dice la verdad, esta es una oportunidad para que el error se
-   * manifieste: el subtitulo, cuando digo ministerio de comercio, dice la
-   * informacion real palpitando o haciendola notar mas»*.
-   *
-   * Y **puede ser una broma** — él lo dijo al momento: *«sí puede ser una
-   * broma»*. Así que esto no separa dos registros, un serio y uno ligero. Lo
-   * que no se negocia es que la corrección **aparezca**, porque el dato tiene
-   * fuente; el tono es libre, y reírse del propio desliz es la misma marca de
-   * humanidad que la pieza ya usa. El palpiteo está disponible para las dos.
-   *
-   * Palpita **a pasos duros**, no en seno: un latido suave es decoracion y el
-   * canon la prohibe. Tres golpes y se queda — como una luz de aviso que se
-   * enciende, no como algo que respira.
-   */
-  palpita?: boolean;
-}> = ({ texto, corrige, desde, factor = 1.45, palpita }) => {
-  const { dice: palabra, es } = corrige;
-  const frame = useCurrentFrame();
-  const p = interpolate(frame, [desde + 2, desde + 12], [1, factor], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    // Sin `back`: sobrepasa y vuelve, y eso es rebote —prohibido por nombre en
-    // el canon—. La palabra crece y se queda; no hace una gracia al llegar.
-    easing: Easing.out(Easing.cubic),
-  });
-  // Tres golpes de seis frames a partir de que la palabra ya crecio, y luego
-  // se queda encendida. Escalon entero, sin rampa.
-  const t = frame - desde - 12;
-  const late = palpita && t >= 0 && t < 36 && Math.floor(t / 6) % 2 === 1;
-  const partes = texto.split(new RegExp(`(${palabra})`, "i"));
-  return (
-    <span>
-      {partes.map((t, i) =>
-        t.toLowerCase() === palabra.toLowerCase() ? (
-          <span
-            key={i}
-            style={{
-              fontSize: `${p}em`,
-              color: late ? color.richBlack : color.gold,
-              background: late ? color.gold : "transparent",
-              padding: palpita ? "0 0.12em" : undefined,
-            }}
-          >
-            {es}
-          </span>
-        ) : (
-          <React.Fragment key={i}>{t}</React.Fragment>
-        ),
-      )}
-    </span>
-  );
-};

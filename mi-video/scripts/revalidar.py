@@ -44,6 +44,7 @@ import argparse
 import json
 import os
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -80,6 +81,19 @@ INTENTOS = 3
 SUELO = {"intensidad": 1.2, "ritmo": 0.30, "continuidad": 0.5}
 
 
+def _mide(v, dec):
+    """Redondea una medida, y deja `None` cuando no la hubo.
+
+    `expresividad`, `cambio_de_tono` y `ritmo` devuelven `None` para decir
+    **no medido**. Antes devolvian `0.0`, que es indistinguible de «medido
+    y plano» — y eso estaba en 18 sitios, cuatro de ellos comparaciones.
+
+    Aqui no se convierte a cero: se guarda el `None`. Quien lo lea vera que
+    no hay medida, que es la verdad, en vez de un cero que miente.
+    """
+    return None if v is None else round(float(v), dec)
+
+
 def medir(toma, palabras, tramos):
     """Las cuatro medidas sobre los tramos ya afinados de una etapa."""
     a = min(x for x, _ in tramos)
@@ -93,9 +107,12 @@ def medir(toma, palabras, tramos):
         "desde": round(a, 2),
         "hasta": round(b, 2),
         "intensidad": ent["intensidad"],
-        "voz": round(float(beats.expresividad(toma, a, b)), 2),
-        "tono": round(beats.cambio_de_tono(toma, a, b), 1),
-        "ritmo": round(beats.ritmo(palabras, a, b), 2),
+        # **`None` es «no medido» y se guarda como tal.** Redondearlo
+        # reventaba el paso entero; convertirlo en 0,0 seria peor, porque
+        # «no lo oyo nadie» pasaria por «lo oi y esta plano».
+        "voz": _mide(beats.expresividad(toma, a, b), 2),
+        "tono": _mide(beats.cambio_de_tono(toma, a, b), 1),
+        "ritmo": _mide(beats.ritmo(palabras, a, b), 2),
         "continuidad": (round(1 - rotas / costuras, 2) if costuras else 1.0),
         "trozos": len(tramos),
         "esquirlas": esquirlas,
@@ -253,7 +270,7 @@ def evaluar(slug, beat, tramos, toma=None, excluir=None, contra=None):
     # esto es la otra mitad del mismo dato, que se habia quedado atras.
     toma = toma or _toma_montada(slug, beat)
     if not toma:
-        con = sqlite3.connect("ads/decisiones.db")
+        con = basedatos.abrir("ads/decisiones.db")
         con.row_factory = sqlite3.Row
         r = con.execute(
             "select t.nombre from etapa e join video v on v.id = e.video_id"
@@ -314,8 +331,19 @@ def evaluar(slug, beat, tramos, toma=None, excluir=None, contra=None):
 
 
 def flojo(m):
-    """Qué medidas quedan por debajo de su suelo. Informa, no descalifica."""
-    return [k for k, v in SUELO.items() if m.get(k, 0) < v]
+    """Qué medidas quedan por debajo de su suelo. Informa, no descalifica.
+
+    **Lo que no se midió no está flojo: está sin medir.** El `m.get(k, 0)` daba
+    por floja cualquier medida ausente, y desde que «no medido» es `None` en vez
+    de `0.0` ni siquiera comparaba: reventaba el paso entero. Las dos formas del
+    mismo error — tratar la falta de dato como un dato malo.
+
+    Quien no se midió no aparece en la lista, y eso es lo honesto: decir que una
+    etapa va floja de tono cuando nadie le midió el tono es inventarse un
+    diagnóstico.
+    """
+    return [k for k, v in SUELO.items()
+            if m.get(k) is not None and m[k] < v]
 
 
 def candidatas(slug, beat, cuantas=3):
@@ -330,7 +358,7 @@ def candidatas(slug, beat, cuantas=3):
     Tres, que es el tope del embudo: *«si ninguna de las tres candidatas es, pues
     la que mejor puntaje tenga»*.
     """
-    con = sqlite3.connect("ads/decisiones.db")
+    con = basedatos.abrir("ads/decisiones.db")
     con.row_factory = sqlite3.Row
     filas = con.execute(
         "select c.puesto, c.puntuacion, c.voz_st, f.desde, f.hasta,"
@@ -440,7 +468,7 @@ def rondas(slug, beat, tramos=None, limite=INTENTOS, afinar_ok=True):
     for c in sorted(primera.get("frente_a") or [],
                     key=lambda x: -(x.get("marca") or 0))[:limite]:
         toma = None
-        con = sqlite3.connect("ads/decisiones.db")
+        con = basedatos.abrir("ads/decisiones.db")
         con.row_factory = sqlite3.Row
         r = con.execute(
             "select t.nombre from candidato c join etapa e on e.id = c.etapa_id"

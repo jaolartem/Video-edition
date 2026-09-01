@@ -39,6 +39,7 @@ import os
 import shlex
 import subprocess
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -68,119 +69,10 @@ class Resultado:
     volver_a: str = ""
 
 
-class Pieza:
-    """Una pieza del lote. Lo que sabe de sí misma, en un solo sitio.
-
-    Antes cada script reconstruía esto por su cuenta: componer el slug, abrir el
-    EDL, buscar la versión, mirar la fase. Ahora se pregunta.
-    """
-
-    def __init__(self, n: int):
-        self.n = int(n)
-        self.slug = f"reel-{self.n:02d}"
-
-    # ── lo que la pieza es ────────────────────────────────────────────────
-    @property
-    def ruta_edl(self) -> str:
-        return f"ads/{self.slug}/edl-sell.json"
-
-    @property
-    def edl(self) -> dict | None:
-        if not os.path.exists(self.ruta_edl):
-            return None
-        return json.load(open(self.ruta_edl, encoding="utf-8"))
-
-    @property
-    def existe(self) -> bool:
-        return self.edl is not None
-
-    # ── lo que la pieza DICE ─────────────────────────────────────────────
-    #
-    # **Vivia en `verificar.py` como funcion privada, y ese fue el hueco.** El
-    # paso que describe la escena leia otra cosa —la eleccion guardada en la
-    # base— y la puerta comprobaba esta. Dos fuentes para «lo que dice esta
-    # etapa» son dos verdades, y la descripcion acababa hablando de un texto
-    # que el montaje ya no tenia sin que nadie lo notara.
-    #
-    # El cache es de clase a proposito: son siete cintas para seis piezas, y
-    # releerlas por pieza multiplica por seis el trabajo para el mismo dato.
-    _CINTAS: dict = {}
-
-    @property
-    def texto(self) -> dict:
-        """Lo que dice cada etapa **en el montaje actual**, por beat."""
-        import transcribir
-
-        edl = self.edl
-        if not edl:
-            return {}
-        por: dict = {}
-        for rango, det in zip(edl["segmentos"], edl["detalle"]):
-            toma = det.get("toma")
-            if toma not in Pieza._CINTAS:
-                try:
-                    Pieza._CINTAS[toma] = transcribir.exigir(toma)["segmentos"]
-                except SystemExit:
-                    # Sin cinta no se inventa texto: se queda vacio y quien
-                    # pregunte lo vera vacio. Un texto por defecto aqui es una
-                    # descripcion que describe la nada y nadie se entera.
-                    Pieza._CINTAS[toma] = []
-            # La vara —que palabra suena dentro del corte— vive en
-            # `transcribir.suena`, que es donde viven las palabras (C-84).
-            ws = [w["text"] for w in Pieza._CINTAS[toma]
-                  if transcribir.suena(w, rango[0], rango[1])]
-            por.setdefault(det.get("beat"), []).extend(ws)
-        return {b: " ".join(v) for b, v in por.items()}
-
-    def _con(self):
-        c = sqlite3.connect(BASE)
-        c.row_factory = sqlite3.Row
-        return c
-
-    @property
-    def video_id(self):
-        con = self._con()
-        r = con.execute("select id from video where slug = ?",
-                        (self.slug,)).fetchone()
-        con.close()
-        return r["id"] if r else None
-
-    @property
-    def fase(self):
-        """En qué fase está ahora. `None` si nunca entró al ciclo."""
-        con = self._con()
-        r = con.execute(
-            "select f.id, f.nombre, f.orden, f.servicio from video_fase vf"
-            " join fase f on f.id = vf.fase_id"
-            " where vf.video_id = (select id from video where slug = ?)"
-            " order by vf.id desc limit 1", (self.slug,)).fetchone()
-        con.close()
-        return dict(r) if r else None
-
-    @property
-    def version(self):
-        con = self._con()
-        r = con.execute(
-            "select ve.* from version ve join video vi on vi.id = ve.video_id"
-            " where vi.slug = ? order by ve.n desc limit 1",
-            (self.slug,)).fetchone()
-        con.close()
-        return dict(r) if r else None
-
-    @property
-    def aprobada(self) -> bool:
-        v = self.version
-        if not v:
-            return False
-        con = self._con()
-        r = con.execute("select veredicto from aprobacion where version_id = ?",
-                        (v["id"],)).fetchone()
-        con.close()
-        return bool(r and r["veredicto"] == "aprobada")
-
-    def __repr__(self):
-        f = self.fase
-        return f"<Pieza {self.slug} fase={f['nombre'] if f else '—'}>"
+# **`Pieza` vive en el dominio.** Se importa aquí porque medio proyecto la
+# pide como `from servicios import Pieza`, y mover una clase no tiene por
+# qué romper a treinta llamadores. Ver `dominio/pieza.py`.
+from dominio.pieza import Pieza  # noqa: E402,F401
 
 
 class Servicio:
@@ -196,6 +88,16 @@ class Servicio:
     """
 
     nombre: str = ""
+
+    #: **Si este paso reescribe una cinta compartida.** Lo declara el paso, no
+    #: lo adivina el motor. Es lo único que impide correr dos piezas a la vez:
+    #: si las dos afinan `20260825_225808`, una se lleva por delante lo que la
+    #: otra acaba de escribir — y además la pregunta de la segunda cambia
+    #: debajo de quien la esté contestando, que es C-150.
+    #:
+    #: Todo lo demás —cortar, medir, coser, describir— trabaja sobre el EDL y
+    #: las filas de SU pieza, y con WAL eso ya puede pasar en paralelo.
+    escribe_cintas: bool = False
 
     def puede(self, pieza: Pieza) -> tuple[bool, str]:
         return True, ""
@@ -222,6 +124,12 @@ class ServicioScript(Servicio):
     def __init__(self, nombre: str, plantilla: str):
         self.nombre = nombre
         self.plantilla = plantilla
+        # **Se deduce del comando, y por una vez está bien deducirlo.** El
+        # script envuelto es el que se conoce a sí mismo, y `transcribir.py` es
+        # el único de los cuarenta que reescribe una cinta. Ponerlo a mano en
+        # `CICLO` sería una segunda declaración de lo mismo — la avería de
+        # siempre — y esto se lee del propio comando que se va a ejecutar.
+        self.escribe_cintas = "transcribir.py" in plantilla
 
     def correr(self, pieza: Pieza) -> Resultado:
         partes = shlex.split(self.plantilla.format(n=pieza.n, slug=pieza.slug))

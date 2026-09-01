@@ -88,8 +88,8 @@ VERDADES = (
     Verdad(
         decision="El contenido de un tablero",
         vive_en="`escena_desc.tablero`, escrito por quien compone",
-        lee=(Aguja("scripts/reels-spec.mjs", "const deLaBase = (() => {"),
-             Aguja("scripts/consulta.py", 'tablero=coalesce(excluded.tablero, escena_desc.tablero)'),),
+        lee=(Aguja("scripts/reels/base.mjs", "export function tablerosDe(slug) {"),
+             Aguja("scripts/dominio/escena.py", "NO_SE_BORRAN"),),
         prohibido=(Aguja("scripts/reels-spec.mjs",
                          "const tableros = (TABLEROS[slug] ?? [])\n"),),
         copia="`TABLEROS[slug]` queda SOLO como respaldo para una pieza sin"
@@ -115,7 +115,7 @@ VERDADES = (
         decision="Una cifra que sale en pantalla",
         vive_en="tabla `dato`, con su fuente y su condición",
         lee=(Aguja("scripts/verificar.py", "y ninguna fila de"),
-             Aguja("scripts/reels-spec.mjs", "select f.rotulo, d.condiciones from dato d"),),
+             Aguja("scripts/reels/base.mjs", "select f.rotulo, d.condiciones from dato d"),),
         copia="La descripción puede nombrarla en prosa, pero **no puede"
               " rotular un importe que `dato` no declare**: la puerta lo para.",
         costo="Jaime cerró $14.000 —«los 300 los quité porque complica las"
@@ -125,7 +125,7 @@ VERDADES = (
     Verdad(
         decision="Que una pieza esté montada",
         vive_en="el fichero en `out/reels/`, no la etiqueta de fase",
-        lee=(Aguja("scripts/avanzar.py", "def _render_caduco(pieza):"),
+        lee=(Aguja("scripts/dominio/fase.py", "def _render_caduco(pieza):"),
              Aguja("scripts/avanzar.py", "caduco = _render_caduco(pieza)"),),
         copia="`video_fase` sigue siendo el camino, pero la etiqueta se"
               " comprueba contra el artefacto y contra su fecha.",

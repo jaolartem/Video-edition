@@ -1,4 +1,5 @@
 import sqlite3
+import basedatos
 
 SQL = """
 drop view if exists v_verdad;
@@ -79,7 +80,7 @@ select 'grabacion', coalesce(
   from toma t;
 """
 
-con = sqlite3.connect("ads/decisiones.db")
+con = basedatos.abrir("ads/decisiones.db")
 con.executescript(SQL)
 con.commit()
 n = con.execute("select count(*) from v_verdad").fetchone()[0]

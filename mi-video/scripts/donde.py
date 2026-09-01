@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import sqlite3
+import basedatos
 import subprocess
 import sys
 
@@ -46,7 +47,7 @@ def _commit():
 
 
 def estado(slug):
-    con = sqlite3.connect(BASE)
+    con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row
     v = con.execute("select id from video where slug = ?", (slug,)).fetchone()
     if not v:

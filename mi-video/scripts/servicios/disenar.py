@@ -36,13 +36,26 @@ y se guarda donde el render la lee.
 import json
 import os
 import sqlite3
+import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
 
-RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# **Tres niveles, no dos.** Este fichero vive en `scripts/servicios/`, así que
+# subir dos veces deja `RAIZ` en `scripts/` y no en el proyecto. Con eso, las
+# tres rutas que salen de aquí apuntaban a sitios que no existen:
+# `scripts/scripts/disenar.prompt.md`, `scripts/src/brand/tokens.ts` y
+# `scripts/src/brand/copy.ts`.
+#
+# **Y ninguna de las tres fallaba.** El prompt se leía con un `if os.path.exists`
+# que devuelve cadena vacía, y el canon con un `try/except` que devuelve un
+# diccionario con `error` dentro. O sea que el paso del diseñador ha estado
+# corriendo **sin su encargo y sin la paleta**, contestando igual, sin que nadie
+# lo contara. Es el mismo fallo que C-146 —una ruta con un nivel de más— en el
+# sitio donde más caro sale.
+RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PROMPT = os.path.join(RAIZ, "scripts", "disenar.prompt.md")
 BASE = "ads/decisiones.db"
 
@@ -53,7 +66,7 @@ TIPO = ("versales", "el tipo es", "la frase entera", "solo texto", "nada mas")
 
 
 def _con():
-    c = sqlite3.connect(BASE)
+    c = basedatos.abrir(BASE)
     c.row_factory = sqlite3.Row
     return c
 
@@ -64,14 +77,31 @@ def _canon():
     Se leen los tokens de verdad: un canon citado de memoria es un canon que se
     desvía sin que nadie lo note, y aquí el color es lo que dice dónde mirar.
     """
-    ruta = os.path.join(RAIZ, "src", "brand", "tokens.ts")
-    try:
-        t = open(ruta, encoding="utf-8").read()
-    except OSError:
-        return {"error": "no se pudo leer src/brand/tokens.ts"}
+    # **Se leen todos los ficheros de marca, no uno.** Esto miraba sólo
+    # `tokens.ts`, y el día que la paleta se mudó a `paleta.ts` empezó a
+    # devolver **cero colores en silencio** — un `{}` que el prompt del
+    # diseñador recibe como «no hay canon» sin que nada falle. Es el fallo que
+    # el propio docstring de arriba dice que no puede pasar, cometido por una
+    # ruta escrita a mano.
+    #
+    # Leer la carpeta entera no es un parche más ancho: es que el canon **es**
+    # `src/brand/`, no un fichero concreto de dentro. Que mañana se parta otra
+    # vez no vuelve a romper esto.
+    import glob
     import re
 
+    t = ""
+    for f in sorted(glob.glob(os.path.join(RAIZ, "src", "brand", "*.ts"))):
+        try:
+            t += open(f, encoding="utf-8").read() + "\n"
+        except OSError:
+            continue
+    if not t:
+        return {"error": "no se pudo leer src/brand/"}
     colores = dict(re.findall(r"(\w+):\s*\"(#[0-9a-fA-F]{3,8})\"", t))
+    # Y si no sale ni un color, **se dice**: un canon vacío no es un canon.
+    if not colores:
+        return {"error": "src/brand/ no declara ningun color: el canon no llega"}
     return {
         "colores": colores,
         "tipografia": {
