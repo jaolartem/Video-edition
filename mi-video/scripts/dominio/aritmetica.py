@@ -23,6 +23,19 @@ from .tijera import Tijera
 from .tramo import Tramo
 
 
+#: Por debajo de esto un solape no se toca: son 50 ms, menos de dos fotogramas
+#: a 30 fps, y moverlo cuesta mas de lo que arregla.
+#:
+#: **Vive aqui y la puerta lo lee de aqui.** Estaba escrito solo en el `if` de
+#: `sin_solapes`, y `verificar` se quejaba a partir de 1 ms: o sea el que arregla
+#: ignoraba lo que el que vigila exigia. Un solape de 20 ms —reel-03 e5— quedaba
+#: senalado para siempre y sin arreglo posible, y el comando que la puerta
+#: recomendaba (`fijar --rehacer`) devolvia «0 etapas rehechas» porque esas
+#: etapas no tienen declaracion: el solape no lo hace una declaracion, lo hace el
+#: ajuste a frontera de palabra al mover dos bordes hacia el mismo sitio.
+SOLAPE_MIN = 0.05
+
+
 class Aritmetica:
     """Las garantías que el corte de `slug` tiene que cumplir, y se cumplen solas.
 
@@ -153,6 +166,62 @@ class Aritmetica:
         print(f"{self.slug}: {len(fuera)} trozo(s) mudos fuera")
         return len(fuera)
 
+    def sin_eco(self) -> int:
+        """La cola de un trozo no puede ser el arranque del siguiente.
+
+        Cuando el hablante rearranca, la toma dice la misma frase dos veces
+        seguidas y el corte se lleva las dos: reel-02 e2 acababa en «...Ontario
+        en la mansion» y el trozo siguiente empezaba en «Ontario en la mansion y
+        que tiene yate». El espectador lo oye repetido.
+
+        **Y se exige coincidencia literal en la costura, no parecido.** Es lo que
+        separa el rearranque del paralelismo, que es figura y se respeta: reel-04
+        dice «no lo persigue porque lo odio, lo persigue porque usted nunca
+        explico quien». Ahi «lo persigue porque» tambien sale dos veces y **no se
+        toca**, porque no es la cola de un trozo pegada al arranque del otro:
+        cae en mitad de la frase. Comparar por parecido borraria la figura.
+
+        Distinguirlo asi es lo que lo hace codigo y no criterio — que es la regla
+        de Jaime: el LLM decide lo que hay que entender, y esto no hay que
+        entenderlo, hay que medirlo.
+        """
+        if not self.existe:
+            return 0
+        tocados = 0
+        for i in range(len(self.tij) - 1):
+            a, b = self.tij.tramo(i), self.tij.tramo(i + 1)
+            if a.cinta != b.cinta and self.tij.beat(i) != self.tij.beat(i + 1):
+                continue
+            eco = self._eco(a, b)
+            if eco is None:
+                continue
+            self.tij.mover(i, Tramo(a.desde, eco, a.cinta))
+            tocados += 1
+            if self.ver:
+                print(f"  {self.slug} e{self.tij.beat(i)}: la cola repetia el"
+                      f" arranque del siguiente; acaba en {eco:.2f}")
+        if tocados:
+            self.tij.guardar()
+        return tocados
+
+    #: Cuantas palabras seguidas hacen un eco. Con una sola, «y» o «que» al
+    #: final de un trozo y al principio del siguiente pareceria repeticion.
+    ECO_MIN = 2
+
+    def _eco(self, a, b):
+        """Hasta donde recortar `a` si su cola repite el arranque de `b`."""
+        ha, hb = self.habla(a.cinta), self.habla(b.cinta)
+        cola = [p for p in ha.palabras if a.desde <= p.empieza < a.hasta]
+        cabeza = [p for p in hb.palabras if b.desde <= p.empieza < b.hasta]
+        if len(cola) < self.ECO_MIN or len(cabeza) < self.ECO_MIN:
+            return None
+        n = min(len(cola), len(cabeza))
+        for largo in range(n, self.ECO_MIN - 1, -1):
+            if ([p.comparable for p in cola[-largo:]]
+                    == [p.comparable for p in cabeza[:largo]]):
+                return round(cola[-largo].empieza, 3)
+        return None
+
     def sin_solapes(self) -> int:
         """Dos trozos de la misma cinta no pueden pisarse: es audio repetido.
 
@@ -172,7 +241,7 @@ class Aritmetica:
         for k in range(len(orden) - 1):
             i, j = orden[k], orden[k + 1]
             a, b = tij.tramo(i), tij.tramo(j)
-            if i in fuera or a.cinta != b.cinta or b.desde >= a.hasta - 0.05:
+            if i in fuera or a.cinta != b.cinta or b.desde >= a.hasta - SOLAPE_MIN:
                 continue
             tocados += 1
             # Recortarle la entrada al que cabía entero dentro del otro dejaría
@@ -240,6 +309,23 @@ class Aritmetica:
             if gb < bar:
                 nb, gb = t.hasta, 0.0
             if nb - na <= 0.25 or (na == t.desde and nb == t.hasta):
+                continue
+            # **Y no se mueve a donde crearia un eco.**
+            #
+            # Las dos reglas tenian razon y se deshacian la una a la otra: aqui
+            # el tramo 3 de reel-01 se alargaba de 126,141 a 126,591 buscando un
+            # punto 32 dB mas callado, y `sin_eco` lo devolvia porque asi su cola
+            # repetia el arranque del trozo siguiente. Cuatro vueltas del
+            # asentamiento sin converger, y la puerta contando un corte sucio que
+            # no habia forma de limpiar.
+            #
+            # Gana no repetir: un corte un poco mas sonoro se oye peor una vez;
+            # una frase dicha dos veces se oye mal siempre. Asi que el eco es un
+            # techo, igual que un borde declarado — con la diferencia de que este
+            # lo pone el propio material.
+            nuevo = Tramo(na, nb, t.cinta)
+            if (i + 1 < len(self.tij)
+                    and self._eco(nuevo, self.tij.tramo(i + 1)) is not None):
                 continue
             movidos += (na != t.desde) + (nb != t.hasta)
             ganado += [g for g in (ga, gb) if g > 0]

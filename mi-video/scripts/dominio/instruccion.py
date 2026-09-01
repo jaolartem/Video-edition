@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS instruccion (
 def _con():
     cx = basedatos.abrir()
     cx.row_factory = sqlite3.Row
-    cx.execute(ESQUEMA)
+    basedatos.esquema(cx, ESQUEMA)
     return cx
 
 

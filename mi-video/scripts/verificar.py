@@ -46,6 +46,8 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from servicios import Pieza  # noqa: E402
 import rutas  # noqa: E402
+from dominio.texto import dice_lo_mismo as _dice_lo_mismo  # noqa: E402
+from dominio.aritmetica import SOLAPE_MIN as _SOLAPE_MIN  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
@@ -83,12 +85,23 @@ def revisar(slug):
             b = f["etapa_orden"]
             ahora = " ".join((dice.get(b) or "").split())
             antes = " ".join((f["sobre_texto"] or "").split())
-            if b in dice and antes and antes != ahora:
+            # **Y «otro texto» quiere decir que dice otra cosa, no que se
+            # escriba distinto.** Comparando cadenas exactas, una muletilla que
+            # se mueve —un «su» al principio, una coma— marcaba la descripcion
+            # como caducada. Ahora que la caducidad no rehace nada sino que abre
+            # un ticket, eso seria peor que antes: un ticket por cada palabra de
+            # relleno, y entre ellos los tres que importan.
+            #
+            # `dice_lo_mismo` compara lo que decide el sentido —palabras de
+            # contenido, cifras y negaciones— y perdona el relleno. Asi lo que
+            # salta es puntual, que es la condicion que Jaime le puso a que algo
+            # vuelva: *«si vuelve, vuelve con cosas tremendamente puntuales»*.
+            if b in dice and antes and not _dice_lo_mismo(antes, ahora):
                 viejas.append(b)
         if viejas:
             mal.append(
                 f"{slug}: la descripción de las etapas {viejas} habla de otro"
-                f" texto — vuelve a describir ESAS, no la pieza entera.")
+                f" texto — mira ESAS contra el corte de hoy, no la pieza entera.")
 
     # 1b · **Una etapa no puede sonar dos veces.**
     #
@@ -118,12 +131,22 @@ def revisar(slug):
     for _b, _v in sorted(_por_beat.items(), key=lambda x: (x[0] is None, x[0])):
         _v = sorted(_v, key=lambda x: (str(x[0]), x[1][0]))
         for (_t1, _a), (_t2, _c) in zip(_v, _v[1:]):
-            if _t1 == _t2 and _c[0] < _a[1] - 1e-3:
+            # **El mismo umbral que usa quien lo arregla.** Estaba en 1 ms
+            # mientras `Aritmetica.sin_solapes` ignoraba todo lo menor de 50, o
+            # sea la puerta exigia lo que el arreglo no tocaba: un solape de
+            # 20 ms —reel-03 e5— quedaba senalado para siempre.
+            if _t1 == _t2 and _c[0] < _a[1] - _SOLAPE_MIN:
+                # **Y se dice el tamano, no «se va a oir dos veces».** Un solape
+                # de 80 ms no es la etapa repetida: es el empalme pisandose. La
+                # frase dramatica mandaba a buscar una reperticion que no
+                # existia.
+                _ms = (_a[1] - _c[0]) * 1000
                 mal.append(
-                    f"{slug} e{_b}: el montaje repite {_a[0]:.1f}-{_a[1]:.1f}s"
-                    f" y {_c[0]:.1f}-{_c[1]:.1f}s de la misma cinta — se va a"
-                    f" oir dos veces. Corre: python scripts/fijar.py"
-                    f" {int(slug[-2:])} --rehacer {_b}")
+                    f"{slug} e{_b}: dos trozos de la misma cinta se pisan"
+                    f" {_ms:.0f} ms ({_a[0]:.2f}-{_a[1]:.2f} y"
+                    f" {_c[0]:.2f}-{_c[1]:.2f}) — ese audio suena dos veces."
+                    f" Lo cierra el paso `cosido`:"
+                    f" python scripts/costuras.py {int(slug[-2:])}")
                 break
 
     # 2 · **Ninguna etapa se queda muda.** Ni sin material ni con dos palabras:
@@ -215,12 +238,27 @@ def revisar(slug):
     # (`repeticiones`) y decide con la frase delante. Parar por algo que el que
     # compone no ve es dejar la pieza sin nadie que pueda arreglarla — el mismo
     # atasco de C-116, que costo dos vueltas contando el mismo fallo.
+    # **Y lo que sobrevive al cosido no para la pieza: se anota.**
+    #
+    # El caso mecanico —la cola de un trozo repitiendo el arranque del
+    # siguiente— lo cierra `Aritmetica.sin_eco` sin preguntarle a nadie. Lo que
+    # llega hasta aqui es, por construccion, lo que ese corte NO es: o el
+    # hablante se repitio dentro de la misma tirada, o **es figura**.
+    #
+    # Y la figura hay que respetarla. reel-04 e6 dice «no lo persigue porque lo
+    # odio, lo persigue porque usted nunca explico quien»: «lo persigue porque»
+    # sale dos veces y las dos hacen falta. Bloquear ahi es pedir que se rompa
+    # una frase bien construida para poder renderizar.
+    #
+    # Distinguir figura de tropiezo es entender, no medir, asi que no lo decide
+    # esta puerta: se anota con su etapa y su frase, viaja con la pieza, y lo ve
+    # quien mira el montaje.
     for r in _cs.repetido(slug):
         if r["separadas_por"] <= 8 and not r["una_toma"]:
             mal.append(
                 f"{slug} e{r['etapa']}: dice «{r['dice']}» dos veces seguidas"
-                f" — es rearranque del hablante o repeticion del corte, no"
-                f" enfasis")
+                f" — el cosido ya descarto que sea eco de la costura, asi que o"
+                f" el hablante se repitio o es figura deliberada. Miralo.")
 
     # 6a · **Una cifra en la descripción tiene que estar declarada.**
     #

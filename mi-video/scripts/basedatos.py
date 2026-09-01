@@ -78,6 +78,23 @@ def abrir(ruta=None, **kw):
         return cx
     kw.setdefault("timeout", ESPERA)
     kw.setdefault("check_same_thread", False)
+    # **Cada sentencia commitea sola, y por eso no hay candado.**
+    #
+    # Por defecto, sqlite3 abre una transaccion implicita en el primer INSERT o
+    # UPDATE y **la deja abierta hasta que alguien llama a `commit()`**. Con la
+    # linea en cuatro hilos eso significa que un hilo que escribe y todavia no ha
+    # terminado su paso mantiene tomada la unica plaza de escritor que da WAL, y
+    # los otros tres esperan los 30 s enteros para acabar en «database is
+    # locked».
+    #
+    # Medido el 1 de septiembre: con `--hilos 1` la linea entera corre sin un
+    # solo candado; con `--hilos 4` revienta el enrutado de dos piezas y las
+    # descripciones ya contestadas de reel-06 no llegan a aplicarse. La
+    # concurrencia no era el problema: era cuanto duraba cada escritura.
+    #
+    # En autocommit la escritura dura lo que dura la sentencia. Los `commit()`
+    # que hay repartidos por el codigo siguen siendo validos: no hacen nada.
+    kw.setdefault("isolation_level", None)
     cx = sqlite3.connect(ruta, factory=_Conexion, **kw)
     # El `timeout` cubre la conexión; el `pragma` cubre cada sentencia, que es
     # donde de verdad se choca contra otro proceso. Cuestan una llamada.
@@ -114,3 +131,33 @@ def cerrar_todo():
         except sqlite3.Error:
             pass
     _VIVAS.clear()
+
+
+#: Los esquemas ya asegurados en este proceso, por (ruta, hilo, esquema).
+_YA = set()
+
+
+def esquema(cx, sql: str):
+    """Asegura una tabla **una vez por conexion**, no en cada consulta.
+
+    **Por que existe.** `ticket._con()` e `instruccion._con()` corrian su
+    `CREATE TABLE IF NOT EXISTS` en cada llamada. Parece gratis —la tabla ya
+    existe, no hace nada— y no lo es: **un CREATE es una escritura**, y abre una
+    transaccion de escritura aunque no cambie un byte. Con `servicio.pedir()`
+    pidiendo tickets e instrucciones en cada pedido y cuatro hilos a la vez, un
+    hilo que no commiteaba dejaba la escritura abierta y los otros tres esperaban
+    los 30 s enteros para acabar en «database is locked».
+
+    Costo real, medido el 1 de septiembre: el enrutado de reel-06 revento y sus
+    ocho descripciones —ya contestadas y correctas— no llegaron a aplicarse. El
+    parte decia «descripciones caducadas», que es verdad y no es la causa.
+
+    Se asegura una vez y se commitea en el sitio, que es lo unico que la hace
+    inofensiva.
+    """
+    clave = (id(cx), sql)
+    if clave in _YA:
+        return
+    cx.execute(sql)
+    cx.commit()
+    _YA.add(clave)

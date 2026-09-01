@@ -157,7 +157,8 @@ def encargos(slug):
     con = _con()
     filas = [dict(r) for r in con.execute(
         "select etapa_orden, que_pasa, emocion, componente, grafico, color,"
-        " sonido, plano, tablero from escena_desc where video_slug = ?"
+        " sonido, plano, tablero, tablero_propuesto from escena_desc"
+        " where video_slug = ?"
         " order by etapa_orden", (slug,))]
     con.close()
     return [f for f in filas if _pide_tablero(f) and not f["tablero"]]
@@ -258,6 +259,18 @@ class ServicioDisenar(Servicio):
 
         pendientes = encargos(pieza.slug)
         if not pendientes:
+            # **Y si habia un pedido abierto, se retira.**
+            #
+            # La puerta cuenta los pedidos sin contestar por el fichero que hay
+            # en disco, no por si queda trabajo. Cuando `describir` trae ya el
+            # tablero, este paso se queda sin nada que componer y el pedido de la
+            # vuelta anterior se quedaba ahi: la puerta paraba el render pidiendo
+            # una respuesta que nadie necesitaba y que nadie iba a escribir.
+            #
+            # Un paso que deja de necesitar su pregunta tiene que retirarla. Si
+            # no, la pregunta pasa a ser un bloqueo sin dueno — que es la forma
+            # que tiene un pedido de convertirse en deuda.
+            _retira_pedido(pieza.slug)
             return Resultado(True, salida="ningun tablero por montar")
 
         resumen = resumen_pieza(pieza.slug)
@@ -281,6 +294,15 @@ class ServicioDisenar(Servicio):
                 "sonido": f["sonido"],
                 "plano": f["plano"],
                 "componente_sugerido": f["componente"],
+                # **Lo que propuso quien describio, y es propuesta.** Sin esto
+                # el que compone empieza de cero y pierde lo que ya se penso;
+                # con esto, y sabiendo que puede cambiarlo entero, compone.
+                "propuesta": _propuesta(f["tablero_propuesto"]),
+                # **Donde cae la etapa en la pista.** Jaime: *«sobre todo que el
+                # tablero que quede sincronice con lo que la pista da»*. Un
+                # tablero se compone contra un tiempo real —cuando se dice y
+                # cuanto dura—, no contra una idea de cuanto deberia durar.
+                "en_la_pista": _en_la_pista(pieza.slug).get(f["etapa_orden"]),
             } for f in pendientes],
         }
         prompt = (open(PROMPT, encoding="utf-8").read()
@@ -341,3 +363,54 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
             motivo=f"etapa(s) {sin_copy} volvieron sin `kind` o sin `props`:"
                    f" un tablero sin copy no se puede montar")
     return Resultado(True, salida=f"{puestos} tablero(s) montado(s)")
+
+
+def _retira_pedido(slug: str) -> None:
+    """Archiva el pedido de diseno que ya no tiene trabajo detras."""
+    import shutil
+
+    import servicio as contrato
+
+    p = contrato.ruta_pedido("disenar", slug)
+    if not os.path.exists(p):
+        return
+    d = os.path.join(os.path.dirname(p), "usadas")
+    os.makedirs(d, exist_ok=True)
+    try:
+        shutil.move(p, os.path.join(
+            d, f"{slug}.sin-trabajo-detras.pedido.json"))
+    except OSError:
+        pass
+
+
+def _propuesta(crudo):
+    """Lo que dejo quien describio, ya como objeto. `None` si no dejo nada."""
+    if not crudo:
+        return None
+    try:
+        return json.loads(crudo)
+    except (TypeError, ValueError):
+        return None
+
+
+def _en_la_pista(slug: str) -> dict:
+    """Cuando suena cada etapa en la pieza montada: `{beat: [desde, hasta]}`.
+
+    Son segundos de la PIEZA, no de la cinta — que es lo que la pista de audio
+    sigue y lo que el espectador oye. Un tablero que se compone contra los
+    segundos de la cinta se coloca donde nadie lo esta mirando.
+    """
+    try:
+        from dominio.montaje import Montaje
+
+        m = Montaje(slug)
+        fuera, t = {}, 0.0
+        for tr, d in m.tramos():
+            b, dur = d.get("beat"), tr.dura
+            if b is not None:
+                a, z = fuera.get(b, (t, t))
+                fuera[b] = (min(a, t), max(z, t + dur))
+            t += dur
+        return {b: [round(a, 2), round(z, 2)] for b, (a, z) in fuera.items()}
+    except Exception:                              # noqa: BLE001
+        return {}

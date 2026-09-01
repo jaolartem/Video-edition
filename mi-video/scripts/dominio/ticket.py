@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS ticket (
 def _con():
     cx = basedatos.abrir()
     cx.row_factory = sqlite3.Row
-    cx.execute(ESQUEMA)
+    basedatos.esquema(cx, ESQUEMA)
     return cx
 
 

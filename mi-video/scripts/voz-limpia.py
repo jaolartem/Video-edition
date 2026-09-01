@@ -37,11 +37,23 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import registro  # noqa: E402
 
-# Donde Jaime deja los limpiados. La local es el respaldo por si Drive no esta
-# montado; se miran las dos y gana la mas reciente.
+# **F: es la memoria de trabajo; G: es donde queda lo terminado.**
+#
+# Jaime lo fijo el 1 de septiembre, y con su imagen: *«F es memoria de trabajo…
+# una RAM con superpoderes»*. Y la division entera: *«G solo para ediciones
+# finales o para recoger; las de trabajo en F; terminamos y borramos todo de F y
+# queda en G»*.
+#
+# La voz que el limpia es material de trabajo, asi que sale a F: y ahi se
+# recoge. Estuvo saliendo a G: y ese es el error que la regla corrige: llenar de
+# intermedios el sitio donde solo tiene que haber piezas terminadas.
+#
+# G: se sigue mirando al RECOGER —si el deja ahi el limpiado, vale igual—, pero
+# ya no es donde se deja.
+SALIDA = "out/audio-voz"
 CARPETAS = [
-    "G:/My Drive/Creación de videos/Audio para limpiar",
     "out/audio-puro",
+    "G:/My Drive/Creación de videos/Audio para limpiar",
 ]
 
 # Cuanto puede diferir la duracion antes de considerarlo otro audio. Cuarenta
@@ -178,6 +190,19 @@ def integrar(n, ver=False):
         print(f"R{n}: sin audio limpiado todavia")
         return False
     dv, da = duracion(video), duracion(wav)
+    # **Lo que sobra esta al final, y es silencio.** Jaime, sobre la herramienta
+    # con la que limpia: *«lo que le sobra a la pista del audio esta en la ultima
+    # parte, siempre agrega silencios al final»*.
+    #
+    # Sin esto, un limpiado correcto se rechazaba entero por una cola muda que no
+    # cambia una sola palabra — y el unico camino que quedaba era pedirle que lo
+    # limpiara otra vez, o sea tirar trabajo suyo por algo que la maquina puede
+    # quitar sola. Se recorta la cola y se vuelve a medir; si aun asi no cuadra,
+    # la diferencia esta dentro y ahi si hay que parar.
+    if da - dv > TOLERANCIA:
+        podado = _sin_cola_muda(wav, dv)
+        if podado:
+            wav, da = podado, duracion(podado)
     if abs(dv - da) > TOLERANCIA:
         print(f"R{n}: NO encaja — el video dura {dv:.2f}s y el audio {da:.2f}s"
               f" ({abs(dv - da):.2f}s de diferencia). No se sustituye:"
@@ -227,3 +252,40 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+#: Por debajo de esto no es silencio, es la respiracion del final de la frase.
+COLA_DB = "-45dB"
+
+
+def _sin_cola_muda(wav: str, objetivo: float):
+    """Quita la cola muda del final hasta dejarlo en `objetivo` segundos.
+
+    Se comprueba que lo que se quita **esta callado de verdad** antes de tocarlo:
+    recortar por duracion sin mirar la onda seria cortar voz para que cuadre un
+    numero, que es la peor manera de arreglar una desincronia.
+    """
+    fin = duracion(wav)
+    if fin is None or fin <= objetivo:
+        return None
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-v", "error", "-ss", str(objetivo), "-i", wav,
+             "-af", f"volumedetect", "-f", "null", "-"],
+            capture_output=True, text=True)
+        pico = [x for x in (r.stderr or "").splitlines() if "max_volume" in x]
+        if pico and float(pico[0].split(":")[-1].replace("dB", "").strip()) > -45.0:
+            registro.aviso("voz-limpia", "la cola de mas NO esta callada",
+                           detalle=f"{os.path.basename(wav)}: {pico[0].strip()}",
+                           eco=True)
+            return None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    salida = wav.rsplit(".", 1)[0] + "-sin-cola." + wav.rsplit(".", 1)[1]
+    try:
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", wav, "-t",
+                        str(objetivo), "-c", "copy", salida],
+                       capture_output=True, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return salida

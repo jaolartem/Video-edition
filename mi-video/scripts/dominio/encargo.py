@@ -167,15 +167,23 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
         d["bordes"] = p.bordes.get(orden) or []
         d["repetido"] = [r for r in p.repetido if r["etapa"] == orden]
         if not rehacer:
-            g = guardado.get((slug, orden))
-            # **Lo aprobado no se vuelve a discutir: se comprueba.** Jaime lo
-            # puso como norma el 1 de septiembre. Esto comparaba cadenas
-            # exactas, asi que un «su» de mas al principio tiraba la
-            # descripcion entera y se volvia a pedir — una llamada de IA por una
-            # muletilla. `dice_lo_mismo` perdona el relleno y **no perdona el
-            # sentido**: si cambian las palabras de contenido, las cifras o las
-            # negaciones, sigue caducada.
-            if g is not None and dice_lo_mismo(g, d["montaje"] or ""):
-                continue                 # descrita y sigue hablando de este texto
+            # **Se describe UNA vez.** Jaime, el 1 de septiembre: *«solo
+            # hacemos una descripcion y una sola composicion grafica; revisar es
+            # despues de eso»*, y *«no se devuelve a hacer un reproceso por lo
+            # mismo»*.
+            #
+            # Esto comparo primero cadenas exactas —una muletilla tiraba la
+            # descripcion entera— y luego, mejor, por sentido (`dice_lo_mismo`).
+            # Las dos versiones compartian el error de fondo: **volver a pedir**.
+            # Describir es criterio estetico, y la IA no es determinista: la
+            # segunda descripcion no es mejor que la primera, es otra. Con eso la
+            # pieza no cierra nunca.
+            #
+            # Que el texto se haya movido sigue siendo un dato, y no se pierde:
+            # `verificar` lo anota como ticket puntual con su etapa, y lo mira
+            # quien revisa la pieza montada. Lo que no hace es rehacer el
+            # trabajo. `--rehacer` sigue existiendo para pedirlo a mano.
+            if guardado.get((slug, orden)) is not None:
+                continue                 # ya descrita: no se vuelve a pedir
         fuera.append(d)
     return fuera

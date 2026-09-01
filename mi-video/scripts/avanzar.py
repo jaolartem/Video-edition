@@ -41,7 +41,8 @@ BASE = "ads/decisiones.db"
 # importan con su nombre de siempre porque `donde.py` y `aprobar.py` ya
 # los llaman así, y mover algo no tiene por qué romper a quien lo usa.
 from dominio.fase import (  # noqa: E402,F401
-    _con, _fallo_antes, _render_caduco, anotar, camino, fase_de)
+    _con, _fallo_antes, _render_caduco, VUELVE_SI_CADUCO, anotar, camino,
+    fase_de)
 
 
 def avanzar(n, ver=False, tope=None, permiso=None):

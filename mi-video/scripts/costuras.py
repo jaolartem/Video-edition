@@ -43,6 +43,11 @@ def sin_solapes(slug, ver=False):
     return Aritmetica(slug, ver).sin_solapes()
 
 
+def sin_eco(slug, ver=False):
+    """La cola de un trozo no puede ser el arranque del siguiente."""
+    return Aritmetica(slug, ver).sin_eco()
+
+
 def palabras_enteras(slug, ver=False):
     """Ningún corte de la pieza cae dentro de una palabra."""
     return Aritmetica(slug, ver).palabras_enteras()
@@ -223,7 +228,32 @@ def arreglar(slug, ver=False):
     # cae cada empalme. Y después, a lo callado — la voz y la palabra (C-135,
     # C-137) deciden QUÉ entra; eso, DÓNDE se pega la tijera.
     sin_aire(slug, ver=ver)
-    a_lo_callado(slug, ver=ver)
+    # **Los tres se asientan; encadenarlos no basta.**
+    #
+    # Cada uno crea trabajo para los otros: mover un borde al punto callado
+    # puede dejar dos trozos pisandose, y cerrar ese solape deja un corte en
+    # pleno sonido. Corriendolos una vez en fila, el ultimo de la fila deja
+    # siempre algo detras — y la puerta lo veia: reel-01 salia del cosido con
+    # tres cortes sucios que el propio cosido acababa de fabricar al cerrar un
+    # solape de 80 ms.
+    #
+    # Se repite hasta que nadie mueve nada, con tope: si en cuatro vueltas no
+    # converge, es que dos reglas se estan deshaciendo la una a la otra y eso hay
+    # que verlo, no esconderlo dando vueltas.
+    for _ in range(4):
+        movidos = a_lo_callado(slug, ver=ver) or 0
+        cerrados = sin_solapes(slug, ver=ver) or 0
+        # Y el eco del rearranque, que es de la misma familia que el solape: audio
+        # que suena dos veces. La diferencia es que el solape se pisa en el
+        # tiempo y el eco se repite en las palabras.
+        ecos = sin_eco(slug, ver=ver) or 0
+        if not movidos and not cerrados and not ecos:
+            break
+    else:
+        registro.aviso("costuras", "el cosido no se asienta",
+                       detalle=f"{slug}: cuatro vueltas y sigue moviendo — dos"
+                               f" reglas se estan deshaciendo la una a la otra",
+                       eco=True)
     tij = Tijera(slug)                   # el fichero cambió: se relee
     arit = Aritmetica(slug, ver)
     movidas, duras, total = 0, [], 0

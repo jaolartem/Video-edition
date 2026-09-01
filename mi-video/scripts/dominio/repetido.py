@@ -31,8 +31,33 @@ from . import vocabulario as _voc  # noqa: E402
 from .guion import Guion  # noqa: E402
 
 
+#: El tartamudeo pegado —«eso, eso»— es de dos palabras, y con tríos no se ve.
+#: Jaime lo cazó a ojo en el segundo 8 del reel-01 después de que la pieza pasara
+#: todas las puertas: *«segundo 8 otra vez repite eso, eso, inoficioso»*.
+#:
+#: Se busca aparte y sólo **pegado** (`separadas_por == 0`), que es lo que lo
+#: distingue de una palabra que vuelve más tarde por buenas razones. Con dos
+#: palabras y separación, casi cualquier pieza repetiría algo.
+PEGADO = 2
+
+
 def repetido(montaje, n: int = 3) -> list:
-    """Los n-gramas que la pieza dice más de una vez, con la prueba al lado."""
+    """Los n-gramas que la pieza dice más de una vez, con la prueba al lado.
+
+    **La regla de qué se perdona, y es de Jaime, literal:** *«para repeticiones
+    la regla establecida era cumplir dos de tres características; la primera
+    completamente obligatoria, que es que esté en la misma toma; la segunda que
+    esté en el libreto; y la tercera que aporte a la construcción de un
+    punchline — no sólo que no sea redundante, sino que la repetición sirva como
+    punchline»*.
+
+    De las tres, dos son hechos y una es criterio. `una_toma` y `en_libreto` se
+    miden aquí. El punchline no: eso hay que entenderlo, así que lo que sale de
+    aquí sin las dos primeras **se señala** y lo decide quien compone.
+
+    Y la primera siendo obligatoria quiere decir que una repetición que cruza dos
+    tomas se corta sin más pregunta: no la salva ni el libreto ni el remate.
+    """
     import beats
 
     pares = montaje.tramos()
@@ -103,6 +128,37 @@ def repetido(montaje, n: int = 3) -> list:
             "se_queda": (None if mejor is None else
                          {"empieza": mejor["empieza"], "acaba": mejor["acaba"],
                           "intensidad": mejor["intensidad"]})})
+    # **Y el tartamudeo pegado, que con trios no se ve.**
+    #
+    # «eso, eso» son dos palabras y `n` vale 3, asi que ninguna puerta lo miraba.
+    # Se busca sobre la misma secuencia ya construida, sin volver a leer nada, y
+    # solo cuando las dos apariciones son consecutivas: eso es un rearranque del
+    # hablante, no una palabra que vuelve.
+    if n > PEGADO:
+        for i in range(len(seq) - PEGADO * 2 + 1):
+            a = [x[0] for x in seq[i:i + PEGADO]]
+            b = [x[0] for x in seq[i + PEGADO:i + PEGADO * 2]]
+            if a != b:
+                continue
+            beat = seq[i][2]
+            trozos = {seq[k][1] for k in range(i, i + PEGADO * 2)}
+            g = " ".join(a)
+            en_libreto = " ".join(
+                _voc.palabras(guion.texto(beat))).count(g) >= 2
+            # La misma regla: la misma toma es obligatoria y no basta sola.
+            if len(trozos) == 1 and en_libreto:
+                continue
+            fuera.append({
+                "etapa": beat, "dice": g, "veces": 2, "separadas_por": 0,
+                "trozos": sorted(trozos),
+                "motivo": "lo dice dos veces pegado — rearranque del hablante,"
+                          " y no lo salva estar en la misma toma: esa es la"
+                          " condicion de entrada, no el permiso",
+                "en_libreto": en_libreto, "una_toma": len(trozos) == 1,
+                "tomas": [], "decide_quien_compone": True, "mejor": None,
+                "pegado": True,
+            })
+
     return fuera
 
 

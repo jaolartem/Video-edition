@@ -40,6 +40,8 @@ MANDA_QUIEN_COMPONE = (
     "que_pasa", "emocion", "grafico", "trato", "trato_porque", "prioridad",
     "integridad", "remedio", "corrige_dice", "corrige_es", "sobre_texto",
     "quien", "fecha",
+    # La propuesta de tablero: es suya, y por eso se pisa cuando redescribe.
+    "tablero_propuesto",
 )
 
 #: **Los campos que otro paso llena, y que el silencio no borra.** `tablero` lo
@@ -111,11 +113,27 @@ class Escena:
             # `quien` decía «gemini» y esa vía se descartó —*«no quiero a
             # Google»*—, así que el campo mentía sobre quién decidió.
             "quien": d.get("quien", "cli"), "fecha": _ahora(),
-            # **El tablero, como DATO y no como prosa.** Era un literal por pieza
-            # en `reels-spec.mjs`, así que re-describir una etapa no cambiaba su
-            # tablero: tres entregas iguales después de dos refactorizaciones.
-            "tablero": (json.dumps(tablero, ensure_ascii=False)
-                        if tablero not in (None, "", {}) else None),
+            # **El tablero NO lo escribe quien describe. Lo escribe quien
+            # compone, por `poner_tablero`.**
+            #
+            # `describir` dice QUÉ tiene que quedar dicho —eso es `grafico`, y es
+            # el encargo—; `disenar` decide CÓMO se dibuja y cómo conviven los
+            # de la pieza. La separación estaba escrita en el docstring de
+            # `disenar` desde el principio y el código la colapsaba aquí.
+            #
+            # El precio, medido el 1 de septiembre: **`disenar` no había corrido
+            # nunca**, cero respuestas en toda la historia del proyecto. Como
+            # sólo pide las etapas con el tablero vacío y esto se lo llenaba,
+            # quedaba desactivado para siempre. Lo que se veía en pantalla eran
+            # siete etapas declarando cada una su componente por su cuenta, sin
+            # nadie que mirase la pieza entera — Jaime, viendo el primer render:
+            # *«los tableros y paneles están sobrepuestos en todos lados»*, y
+            # después, más corto: *«no hay composición»*. Tenía razón literal.
+            #
+            # Lo que trae quien describe se guarda como **propuesta**, que es lo
+            # que es: una sugerencia para quien compone, no una entrega.
+            "tablero_propuesto": (json.dumps(tablero, ensure_ascii=False)
+                                  if tablero not in (None, "", {}) else None),
             "componente": (None if d.get("componente") in (None, "ninguno")
                            else d["componente"]),
             "color": d.get("color"), "sonido": d.get("sonido"),

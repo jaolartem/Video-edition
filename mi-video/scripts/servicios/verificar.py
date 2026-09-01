@@ -26,28 +26,59 @@ class ServicioVerificar(Servicio):
         mal = verificar.revisar(pieza.slug)
         if not mal:
             return Resultado(True, salida="pasa la puerta")
+        # **Lo que se anota y no para**, con el porque de cada uno:
+        #
+        # - la descripcion que habla de otro texto: rehacerla es rehacer criterio
+        #   estetico ya tomado, y la IA no es determinista (C-166);
+        # - la repeticion que sobrevive al cosido: el eco de la costura ya lo
+        #   cerro `sin_eco`, asi que lo que queda es tropiezo dentro de la toma o
+        #   **figura deliberada**, y distinguirlos es entender, no medir.
+        #
+        # Los dos comparten forma: la maquina los ve, no los sabe resolver sola,
+        # y pararse ahi deja la pieza sin nadie que pueda desatascarla. Se anotan
+        # con su etapa y viajan con la pieza hasta que alguien mire el montaje.
+        _DESCRIBIR = ("habla de otro texto", "sin contestar: ['describir']",
+                      "dos veces seguidas")
+        # **La caducidad se aparta ANTES de juzgar, no despues.**
+        #
+        # La primera version pedia que TODOS los motivos fueran de caducidad
+        # para dejar pasar la pieza, y con eso reel-02 seguia trabado: tenia una
+        # caducidad y dos motivos mas, asi que caia al bloqueo y el primer motivo
+        # que se imprimia era justo el que no debe bloquear nunca. Se aparta y se
+        # juzga lo que queda.
+        caducas = [m for m in mal if any(x in m for x in _DESCRIBIR)]
+        if caducas:
+            _apunta_caducadas(pieza, caducas)
+            mal = [m for m in mal if m not in caducas]
+        if not mal:
+            return Resultado(True, salida="descripciones de otro texto anotadas"
+                                          " como ticket; la pieza sigue")
         # Se devuelve el primero y se cuentan los demas: el motivo tiene que
         # caber en una linea del log y ser accionable. La lista entera esta en
         # `verificar.py --avisa`.
         resto = f" (+{len(mal) - 1} mas)" if len(mal) > 1 else ""
-        # **Y si la puerta sabe que paso lo arregla, manda la pieza ahi.**
-        #
-        # Una descripcion caducada no es un fallo que alguien tenga que ir a
-        # desatascar: es el paso `descrito` corriendo sobre un texto que ya
-        # cambio. La puerta lo diagnosticaba con nombre y numero de etapa —«la
-        # descripcion de las etapas [6, 7, 8] habla de otro texto»— y despues
-        # dejaba la pieza parada delante de ella misma, porque `descrito` ya
-        # estaba dado por hecho y nadie lo volvia a pedir. reel-01 dio dos
-        # vueltas asi, contando el mismo fallo cada vez.
-        #
-        # Es lo mismo que C-116 por otra puerta: el paso veia el defecto y no
-        # tenia con que arreglarlo. Aqui el arreglo existe y estaba a un salto.
-        # Las dos caras del mismo atasco: la descripcion caduco, y por eso hay
-        # un pedido de `describir` sin contestar. La segunda es consecuencia de
-        # la primera, asi que las dos juntas siguen siendo «vuelve a describir».
-        _DESCRIBIR = ("habla de otro texto", "sin contestar: ['describir']")
-        if all(any(x in m for x in _DESCRIBIR) for m in mal):
-            return Resultado(True, volver_a="descrito",
-                             salida="descripciones caducadas: "
-                                    + mal[0].split(": ", 1)[-1][:120])
         return Resultado(False, motivo=mal[0].split(": ", 1)[-1][:140] + resto)
+
+
+def _apunta_caducadas(pieza, motivos):
+    """Deja la caducidad como ticket, con su etapa. No para la pieza.
+
+    Puntual es la palabra: dice *que* etapa y *que* dice de mas o de menos, no
+    «vuelve a describir la pieza». Y no se repite — `ticket.abrir` es una fila
+    nueva, pero el motivo lleva la etapa dentro, asi que dos corridas iguales no
+    producen dos tickets distintos que haya que leer dos veces.
+    """
+    try:
+        from dominio import ticket as tk
+
+        for m in motivos:
+            texto = m.split(": ", 1)[-1][:400]
+            if any(t.get("dijo", "").startswith(texto[:60])
+                   for t in tk.abiertos(pieza.slug)):
+                continue          # ya esta dicho: repetirlo es ruido
+            tk.abrir(pieza.slug, texto, None, "objecion")
+    except Exception:                              # noqa: BLE001
+        import registro
+
+        registro.aviso("verificar", "no se pudo anotar la caducidad",
+                       detalle=pieza.slug, eco=False)
