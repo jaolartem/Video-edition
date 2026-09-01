@@ -25,4 +25,15 @@ const TOPE = 32 * 1024 * 1024;
 export const sql = (q, args = []) =>
   execFileSync("python", ["scripts/consulta.py", q, JSON.stringify(args)], {
     encoding: "utf8", maxBuffer: TOPE,
+    // **Y el hijo escribe en UTF-8, se lo diga Windows o no.** Node lee `utf8`
+    // y Python escribia en la consola del sistema —cp1252 aqui—, asi que
+    // cualquier caracter fuera de esa pagina reventaba la consulta entera con
+    // un `UnicodeEncodeError` y el paso se quedaba con el pedido de la vuelta
+    // anterior, que es peor que fallar: parece que corrio.
+    //
+    // Lo tiro un signo menos de verdad (U+2212) en una descripcion de escena.
+    // Un guion normal habria pasado. Eso es lo que lo hacia invisible: fallaba
+    // solo cuando el contenido lo pedia, y el contenido lo pide cada vez mas
+    // segun se afinan los textos.
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });

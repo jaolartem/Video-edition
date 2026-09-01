@@ -96,6 +96,34 @@ export function entradaDe(slug, filas) {
         "Lo que de verdad se dijo:",
         f.montaje || f.dicho ||
           "(esta etapa no tiene toma: va con tablero o tarjeta)",
+        // **Y la escena que YA se aprobo, si la hay.** Jaime: *«lo que ya se
+        // aprobo no se vuelve a discutir: se revisa que este como se dijo»*.
+        //
+        // El dato viajaba desde `encargo.por_describir` y aqui se tiraba: esta
+        // funcion arma la prosa y solo imprimia libreto y montaje. Asi que
+        // quien describe escribia **desde cero** cada vuelta aunque la escena
+        // estuviera decidida, y dos lecturas del mismo material daban dos
+        // escenas distintas sin que hubiera cambiado nada salvo el enfoque.
+        //
+        // Es la averia de siempre: el dato existe y el consumidor no lo lee.
+        ...(f.ya_dicho
+          ? [
+            "",
+            "YA APROBADA — esto no se rehace, se revisa. Se escribio sobre este texto:",
+            f.ya_dicho.sobre_texto || "(no consta)",
+            "Y dice:",
+            JSON.stringify(
+              Object.fromEntries(
+                Object.entries(f.ya_dicho).filter(([k]) => k !== "sobre_texto"),
+              ),
+              null,
+              1,
+            ),
+            "Compara ese texto con el de arriba: si lo que cambio no toca lo que",
+            "la escena ensena, devuelvela tal cual. Rehaz solo lo que el cambio",
+            "invalido.",
+          ]
+          : []),
         "",
       ].join("\n"),
     ),

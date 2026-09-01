@@ -99,6 +99,21 @@ def afinar(toma, tramos, pasadas=4):
             return None
         return min(x for x, _ in toca), max(y for _, y in toca)
 
+    # **Y se ordenan por la cinta antes de fundir.** El fundido de abajo compara
+    # cada tramo con el ULTIMO que entro, asi que da por supuesto que llegan en
+    # orden. Y no llegan: `elegidos` los saca del EDL, o sea **en orden de
+    # montaje**, que salta por la cinta. Dos tramos que se solapan pero llegan
+    # separados no se funden, y entonces el segundo se barre sobre un trozo que
+    # ya se toco — o no se barre.
+    #
+    # La huella estaba a la vista en la propia base: `20260825_225808` tiene
+    # 122,65-131,41 **y** 122,65-150,64 como dos rangos distintos. Un fundido que
+    # funciona no puede producir eso.
+    #
+    # Lo que costo: reel-04 e2 se quedo al 0% afinado con el barrido corrido tres
+    # veces. La puerta pedia el barrido, el barrido decia haberlo hecho, y no
+    # habia forma de salir mirando ninguno de los dos.
+    tramos = sorted(tramos, key=lambda x: (x[0], x[1]))
     redondeados = []
     for a, b in tramos:
         r = al_tramo(a, b)
