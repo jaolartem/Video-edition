@@ -159,7 +159,17 @@ export function armarPaneles(bs, reloj, tableros) {
       const tope = ADELANTO(b.bloques) + 3 * FPS;
       // Y si el diseno declaro cuando entra, manda eso: es la misma regla que
       // el tablero —arranca con la palabra— y el panel dice lo mismo antes.
-      const at = _anclaDeclarada(b, reloj) ?? inicio;
+      // **Y un panel no entra mientras un tablero sigue puesto.**
+      //
+      // `empujaTablero` desconflicta tableros contra tarjetas y nadie hacia lo
+      // mismo con los paneles: el de una etapa entraba 0,8 s antes de que el
+      // tablero de la anterior se retirase, y los dos se pintaban a la vez. Es
+      // la tercera causa de «estan sobrepuestos en todos lados», y como dijo
+      // quien compuso reel-02: *«no es colocacion, es que falta el empujon»*.
+      //
+      // Se empuja con la misma regla que ya existe, aplicada a los tableros que
+      // ya estan colocados en vez de a las tarjetas.
+      const at = empujaTablero(tableros)(_anclaDeclarada(b, reloj) ?? inicio);
       return dur
         ? { at, duration: Math.min(dur, tope), bloques: b.bloques }
         : null;
@@ -205,3 +215,16 @@ function _anclaDeclarada(b, reloj) {
   const inicio = reloj.anclaDe(b.beat);
   return at >= inicio ? at : null;
 }
+
+
+/**
+ * ¿Este trozo se pisa con alguno de los que ya ocupan el cuadro?
+ *
+ * El contraste es la tercera capa que toma el frame entero y la unica que no
+ * pasaba por ningun empujon: en reel-02 se pintaba sobre la cabecera del tablero
+ * que venia detras. Vive aqui, con las otras dos reglas de ocupacion, y no en el
+ * spec: el spec arma, esto decide quien cede.
+ */
+export const sePisa = (x, ocupantes = []) =>
+  !!x && ocupantes.some((o) => o.at < x.at + x.duration &&
+                               o.at + o.duration > x.at);

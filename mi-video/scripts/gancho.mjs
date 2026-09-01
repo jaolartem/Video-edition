@@ -62,7 +62,7 @@ export const portada = {
     const clave = at + frames(GANCHO_CLAVE_S);
     const tipo = esTipografico(desc?.grafico);
     const fig = tipo ? null : figuraDe(desc);
-    const motion = sonidoDe(desc?.sonido, donde(desc));
+    const motion = sonidoDe(desc?.sonido, donde(desc), desc);
     const out = [];
 
     // 1 · El plano se mueve dentro de sí mismo. No es un plano fijo con cosas

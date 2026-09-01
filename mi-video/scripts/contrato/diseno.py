@@ -206,7 +206,7 @@ DISENO = Contrato(
                    "                   `cc` es la opción por defecto del resto, no"
                    " un hueco: el subtítulo dinámico ya lleva la idea."),
         Clave("tablero.props",
-              dispara=(Aguja("scripts/reels-spec.mjs", "...pieDe(slug, b.beat)"),
+              dispara=(Aguja("scripts/reels-spec.mjs", "...pieDe(slug, b.beat, b.props)"),
                        Aguja("scripts/escena.mjs", "export const copyDeclarado = (desc) => {"),),
               efecto="el copy que sale en pantalla, incluido el del gancho"
                      " tipográfico",
@@ -250,7 +250,7 @@ DISENO = Contrato(
               nota="Es lo que decide si él sale en pantalla en ese beat, así que"
                    " manda sobre la regla de las tres apariciones."),
         Clave("tablero.fuente",
-              dispara=(Aguja("scripts/reels/base.mjs", "select f.rotulo, d.condiciones from dato d"),),
+              dispara=(Aguja("scripts/reels/base.mjs", "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d"),),
               efecto="el pie del tablero cuando rotula una cifra",
               sin_valor="sin cifra",
               nota="Cumplimiento: una cifra en pantalla sin fila en `dato` la para"

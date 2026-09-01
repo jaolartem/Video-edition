@@ -150,7 +150,47 @@ export const sonidosMudos = [];
 export const donde = (desc) =>
   `${desc?.video_slug ?? "?"} e${desc?.etapa_orden ?? "?"}`;
 
-export const sonidoDe = (sonido, donde = "") => {
+//: Los siete que existen en `public/sfx/`. Un nombre fuera de esta lista no
+//: tiene fichero, y `staticFile` **no comprueba que exista**: saldria mudo sin
+//: un solo aviso, que es la peor forma de fallar (C-06).
+const SUENAN = new Set(["mark", "draw", "fork", "land", "type", "whoosh",
+                        "glitch"]);
+
+
+/**
+ * El sonido de un movimiento: **declarado si se declara, deducido si no**.
+ *
+ * `desc.sonido` es prosa —«un roce grave y arrastrado cuando el bloque gris se
+ * mete debajo de la segunda barra»— y esto la pasaba por una tabla de
+ * expresiones regulares. Lo que la tabla no reconoce sale MUDO, y le paso a
+ * reel-02 e6 y a reel-05 e8 en la misma corrida: descripciones correctas, bien
+ * escritas, que no producen nada.
+ *
+ * Es la misma averia que tenia la figura y se arregla igual: **quien compone
+ * declara el sfx por su nombre** en `tablero.props.sfx`, y la prosa queda para
+ * lo que aun no lo declara. La regla de fondo la dio Jaime una vez para las dos:
+ * *«eso es editorial, no sale con codigo»*.
+ *
+ * Lo que NO cambia: no se inventa un sonido. Si no hay declarado y la prosa no
+ * casa, se anota en `sonidosMudos` y suena el silencio — porque el sonido sigue
+ * al movimiento, y un sfx puesto a dedo es ruido sin movimiento que lo
+ * justifique.
+ */
+export const sonidoDe = (sonido, donde = "", desc = null) => {
+  const puesto = desc?.tablero
+    ? (() => {
+        try {
+          const d = typeof desc.tablero === "string"
+            ? JSON.parse(desc.tablero)
+            : desc.tablero;
+          const s = d?.props?.sfx ?? d?.sfx;
+          return typeof s === "string" && SUENAN.has(s.trim()) ? s.trim() : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+  if (puesto) return puesto;
   if (!sonido) return null;
   for (const [re, m] of SONIDOS) if (re.test(sonido)) return m;
   /**

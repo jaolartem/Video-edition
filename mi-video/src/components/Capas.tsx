@@ -156,7 +156,16 @@ const CapaRemate: React.FC<{ props: Record<string, unknown>; dura: number }> = (
       <div
         style={{
           position: "absolute",
-          top: 900,
+          // **Dónde cruza el filete lo decide quien compone.**
+          //
+          // Estaba clavado en 900 y el gancho de reel-05 declara una escalera
+          // que ocupa 834-948: el filete la partía por la mitad. No es un fallo
+          // de la escalera ni del filete — es una coordenada fija en el sitio
+          // donde otro elemento se coloca por composición.
+          //
+          // 900 se queda como valor por defecto: las piezas que no lo declaran
+          // salen igual que hasta ahora.
+          top: typeof props.y === "number" ? props.y : 900,
           left: 0,
           height: 14,
           width: `${(p * 100).toFixed(1)}%`,

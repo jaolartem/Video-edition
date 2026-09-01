@@ -64,7 +64,7 @@ export const CAMINOS = {
     porque: "la idea es compleja y el espectador no puede rebobinar",
     capas(ctx) {
       const { at, duration, desc, det } = ctx;
-      const motion = sonidoDe(desc?.sonido, donde(desc));
+      const motion = sonidoDe(desc?.sonido, donde(desc), desc);
       return [
         {
           tipo: "tablero",
@@ -167,7 +167,7 @@ export const CAMINOS = {
     capas(ctx) {
       const { at, duration, desc, det, lado } = ctx;
       const fig = figuraDe(desc) ?? det.figura ?? null;
-      const motion = sonidoDe(desc?.sonido, donde(desc));
+      const motion = sonidoDe(desc?.sonido, donde(desc), desc);
       const t = at + Math.round(0.5 * FPS);
       const out = [];
       if (fig) {

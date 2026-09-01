@@ -93,17 +93,25 @@ RESPALDO = Contrato(
                    " del bucle y se pierde la carga entera porque el commit es al"
                    " final."),
         Clave("principal",
-              dispara=(Aguja("scripts/reels/base.mjs", "order by length(d.cifra) desc limit 1",
-                             pendiente="ordenar por `principal` y no por longitud"
-                                       " de la cadena"),),
-              efecto="cuál de las cifras de la etapa lleva el pie del tablero"),
+              dispara=(Aguja("scripts/reels/base.mjs",
+                             "const suya = filas.find((x) => {"),),
+              efecto="cuál de las cifras de la etapa lleva el pie del tablero",
+              nota="**La deuda que declaraba esta clave está pagada.** Decía"
+                   " «ordenar por `principal` y no por longitud de la cadena», y"
+                   " la longitud es lo que hacía: `order by length(d.cifra) desc`"
+                   " elegía la fila cuyo texto ocupara más caracteres. En"
+                   " reel-07 e3 eso saca «53.53% (corroboración independiente)»"
+                   " debajo de un tablero que rotula 32 %. Ahora se busca la fila"
+                   " cuya cifra APARECE en lo que el tablero pinta, y si no se"
+                   " puede saber manda la que más necesita el pie: una proyección"
+                   " (`respalda='parcial'`) tiene condiciones que hay que decir."),
         Clave("fuente",
-              dispara=(Aguja("scripts/reels/base.mjs", "const pieDe = (slug, beat) => {"),),
+              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {"),),
               efecto="el pie del tablero en pantalla, sólo si `respalda='si'`",
               nota="El upsert es por `rotulo` UNIQUE: dos fuentes distintas con el"
                    " mismo rótulo se funden en una fila."),
         Clave("condiciones",
-              dispara=(Aguja("scripts/reels/base.mjs", "const pieDe = (slug, beat) => {"),),
+              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {"),),
               efecto="`props.condicion` del tablero",
               nota="Prosa larga de comprobación entrando directa a un pie: en la"
                    " base hay `condiciones` de 400+ caracteres. O se corta aquí"
@@ -122,7 +130,7 @@ RESPALDO = Contrato(
                    " escrito a mano sin que nadie lo vea. Por eso `respalda`"
                    " exige `sube`."),
         Clave("marcar_como",
-              dispara=(Aguja("scripts/reels/base.mjs", "const pieDe = (slug, beat) => {",
+              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {",
                              pendiente="rotular HIPOTÉTICO / EJEMPLO en el tablero"
                                        " cuando el caso no está documentado"),),
               efecto="marca el caso en pantalla",
@@ -138,7 +146,7 @@ RESPALDO = Contrato(
                    " tarifa de gestión anual. La cifra se sostiene y el rótulo"
                    " miente, y no había clave para decirlo."),
         Clave("deriva_de",
-              dispara=(Aguja("scripts/reels/base.mjs", "const pieDe = (slug, beat) => {",
+              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {",
                              pendiente="una cifra derivada hereda el pie de la"
                                        " cifra de la que sale"),),
               efecto="la cifra derivada comparte el pie de su origen",

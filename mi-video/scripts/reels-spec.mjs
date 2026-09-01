@@ -41,7 +41,8 @@ import { CONTRASTE, LINEAS, SOSTIENE, entraRotulo, literalesDe }
 import { acotarAlCta, ctaDe } from "./reels/cta.mjs";
 import { caminosDe, contrasteDe, glitchesDe, repartirPorCubre, tarjetasDe }
   from "./reels/capas.mjs";
-import { armarPaneles, armarTableros, empujaTablero } from "./reels/tableros.mjs";
+import { armarPaneles, armarTableros, empujaTablero, sePisa }
+  from "./reels/tableros.mjs";
 import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad }
   from "./reels/subtitulos.mjs";
 import { porEscena, rellenar } from "./reels/escenas.mjs";
@@ -253,7 +254,10 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
    * *«manteniendo los subtítulos»*.
    */
   const contraste = contrasteDe(pieza.id, CONTRASTE[slug], pieza.captions);
-  if (contraste) {
+  if (sePisa(contraste, pieza.tableros ?? [])) {
+    faltas.push(`${slug}: el contraste se pisaba con un tablero y se retira`);
+    pieza.contraste = null;
+  } else if (contraste) {
     for (const c of pieza.captions) {
       if (c.compuesto && c.at < contraste.at + contraste.duration &&
           c.at + c.duration > contraste.at) {
