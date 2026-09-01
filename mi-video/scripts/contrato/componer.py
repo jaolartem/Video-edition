@@ -120,10 +120,20 @@ COMPONE = Contrato(
                    " y «no lo dijo» quedan indistinguibles en la base. `sin_valor`"
                    " tiene que guardarse como valor, no como ausencia."),
         Clave("grafico",
-              dispara=(Aguja("scripts/escena.mjs", "export const figuraDe = (grafico) => {"),),
-              efecto="la figura dibujable o la composición tipográfica; sin ella"
-                     " el gancho falla",
-              obligatoria=True),
+              dispara=(Aguja("scripts/servicios/disenar.py",
+                             '"encargo": f["grafico"],'),),
+              efecto="es EL ENCARGO: lo que tiene que quedar dicho en pantalla."
+                     " Viaja al paso de diseño, que decide cómo se dibuja",
+              obligatoria=True,
+              nota="**Disparaba `figuraDe(grafico)` y ya no.** Aquello sacaba una"
+                   " figura de esta prosa con una expresión regular, o sea código"
+                   " decidiendo qué se dibuja — la «Y» abstracta del segundo 42"
+                   " del reel-01 salió de la palabra «desvío» de una descripción."
+                   " Jaime: *«esa Y no es un panel; el panel es figurativo, no"
+                   " abstracto»*, y antes: *«las escenas y tableros los debe hacer"
+                   " un agente especializado en diseño; eso es editorial, no sale"
+                   " con código»*. Ahora esto es el encargo y la figura la declara"
+                   " quien compone."),
         Clave("color",
               dispara=(Aguja("scripts/escena.mjs", "const desaturaDe = (color) =>"),),
               efecto="desatura la escena del tablero",

@@ -34,8 +34,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class Falta:
     """Algo que no está como se dijo. Con su sitio, para poder ir a mirarlo."""
 
-    def __init__(self, que: str, etapa=None, segundo=None, para: bool = True):
+    def __init__(self, que: str, etapa=None, segundo=None, para: bool = True,
+                 devuelve_a: str | None = None):
         self.que, self.etapa, self.segundo, self.para = que, etapa, segundo, para
+        #: **A qué paso se devuelve, y sólo si ese paso lo evalúa.** Jaime:
+        #: *«un problema para devolver es respecto a lo que evalúa»*. Sin esto
+        #: una puerta paraba la pieza por algo que ningún paso sabía arreglar —
+        #: y entonces no hay salida ninguna: pasó hoy tres veces seguidas, con
+        #: un solape de 80 ms, con un corte sucio y con un pedido huérfano.
+        #:
+        #: `None` quiere decir que nadie lo arregla solo. Eso **no devuelve**:
+        #: se anota y viaja con la pieza, que es lo honesto.
+        self.devuelve_a = devuelve_a
 
     def __repr__(self):
         d = f" e{self.etapa}" if self.etapa is not None else ""
@@ -49,6 +59,9 @@ class Comprobacion:
     nombre = "comprobacion"
     #: Si para la pieza o sólo se anota.
     para = True
+    #: El paso que sabe arreglar lo que esta comprobación encuentra. Devolver la
+    #: pieza a cualquier otro sitio es mandarla a que no pase nada.
+    devuelve_a = None
     #: **Quién decide esto.** Jaime, el 1 de septiembre: *«descripciones y
     #: redundancias por LLM, que tienen criterio; lo demás por código»*.
     #:
@@ -63,69 +76,33 @@ class Comprobacion:
         raise NotImplementedError
 
 
-class ElCC(Comprobacion):
-    """El transcript de las cintas que usa la pieza: barrido y sin huecos."""
+class LosCortes(Comprobacion):
+    """Que ningún corte caiga dentro de una palabra.
 
-    nombre = "cc"
-
-    def mirar(self, pieza) -> list:
-        import consulta
-
-        fuera = []
-        try:
-            for beat, cob in (consulta.cc_afinado(pieza.slug) or {}).items():
-                if cob < 0.95:
-                    fuera.append(Falta(
-                        f"el CC de la etapa {beat} está al {cob:.0%}: el barrido"
-                        f" caro no lo cubre, así que lo que se lee ahí puede no"
-                        f" ser lo que se dijo", etapa=beat))
-        except Exception as e:                     # noqa: BLE001
-            fuera.append(Falta(f"no se pudo medir el CC: {type(e).__name__}"))
-        return fuera
-
-
-class LasDescripciones(Comprobacion):
-    """Que cada escena siga hablando del texto que hoy se oye.
-
-    **No pide redescribir.** Jaime: *«sólo hacemos una descripción y una sola
-    composición gráfica; no se devuelve a hacer un reproceso por lo mismo»*. Si
-    una descripción quedó hablando de otro texto, eso se anota y lo mira quien
-    ve la pieza — no se paga otra vuelta de IA por ello.
+    Es la primera de las cuatro que Jaime listó, y no es la misma que los
+    empalmes: el empalme es cómo suena la unión de dos trozos; el corte es dónde
+    cae la tijera. Un corte a media sílaba se oye aunque la costura sea limpia.
     """
 
-    nombre = "descripciones"
-    para = False
-    decide = "criterio"
+    nombre = "cortes"
+    devuelve_a = "cosido"
 
     def mirar(self, pieza) -> list:
-        import basedatos
+        import costuras
 
-        from .montaje import Montaje
-        from .texto import dice_lo_mismo
-
-        m = Montaje(pieza.slug)
-        dice = {}
-        for tr, d in m.tramos():
-            b = d.get("beat")
-            if b is not None:
-                dice[b] = (dice.get(b, "") + " " + (m.texto(tr) or "")).strip()
-        cx = basedatos.abrir()
-        fuera = []
-        for b, antes in cx.execute(
-                "select etapa_orden, sobre_texto from escena_desc"
-                " where video_slug = ? and sobre_texto is not null",
-                (pieza.slug,)):
-            if b in dice and not dice_lo_mismo(antes, dice[b]):
-                fuera.append(Falta(
-                    f"la escena de la etapa {b} se escribió sobre otro texto",
-                    etapa=b, para=False))
-        return fuera
+        try:
+            n = costuras.palabras_enteras(pieza.slug, ver=True)
+        except Exception as e:                     # noqa: BLE001
+            return [Falta(f"no se pudieron medir los cortes:"
+                          f" {type(e).__name__}")]
+        return [Falta(f"{n} corte(s) caen dentro de una palabra")] if n else []
 
 
 class LosEmpalmes(Comprobacion):
     """Que ningún corte parta una palabra ni caiga en pleno sonido."""
 
     nombre = "empalmes"
+    devuelve_a = "cosido"
 
     def mirar(self, pieza) -> list:
         import costuras
@@ -153,6 +130,8 @@ class SuenaLoQueDice(Comprobacion):
     """
 
     nombre = "suena"
+    #: Un hueco de voz dentro de un trozo lo cierra quien cose, partiéndolo.
+    devuelve_a = "cosido"
 
     #: Un trozo con más de esto callado dentro no es una pausa: es un hueco.
     MUDO_MAX = 1.2
@@ -225,8 +204,16 @@ class SinRepetir(Comprobacion):
 class Revisada:
     """La revisión entera de una pieza. Cinco comprobaciones, cero llamadas."""
 
-    COMPROBACIONES = (ElCC(), LasDescripciones(), LosEmpalmes(),
-                      SuenaLoQueDice(), SinRepetir())
+    #: **Las cuatro, y sólo las cuatro.** Jaime, precisando cuando yo había
+    #: puesto de más: *«no respecto a todo. Evalúa cortes, que haya audio,
+    #: empalmes y redundancia en CC»*.
+    #:
+    #: Fuera quedan la cobertura del CC —de eso sólo mira la redundancia— y las
+    #: descripciones, que ya se decidieron y no se vuelven a discutir. Un paso
+    #: que evalúa de más devuelve la pieza por cosas que no son suyas, y eso es
+    #: lo que la deja sin salida.
+    COMPROBACIONES = (LosCortes(), SuenaLoQueDice(), LosEmpalmes(),
+                      SinRepetir())
 
     def __init__(self, pieza):
         self.pieza = pieza
@@ -252,6 +239,7 @@ class Revisada:
             try:
                 for f in c.mirar(self.pieza):
                     f.para = f.para and c.para
+                    f.devuelve_a = f.devuelve_a or c.devuelve_a
                     fuera.append(f)
             except Exception as e:                 # noqa: BLE001
                 fuera.append(Falta(f"la comprobación «{c.nombre}» reventó:"

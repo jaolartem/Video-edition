@@ -45,6 +45,15 @@ import { limit } from "../brand/copy";
 
 /** Props que son estructura, no texto en pantalla. */
 const NO_ES_TEXTO = new Set([
+  // **`duracion` la mete el motor, no quien compone.** `armarTableros` la anade
+  // a los props para saber cuanto dura el tablero, y esto la trataba como una
+  // linea mas: el tablero del precio del reel-01 salia rotulando **«430»** en
+  // versales, junto a $576 y $20. Un numero que nadie escribio, en el sitio
+  // donde una cifra de mas es una cifra falsa.
+  //
+  // Lo encontro el paso de diseno la primera vez que corrio. Llevaba ahi desde
+  // que `armarTableros` empezo a pasar la duracion.
+  "duracion",
   "familia", "zona", "cubre", "oro", "sound", "fondo", "filete", "source",
   "paso", "entrada", "giro", "placa", "cede_el_cuadro", "sin_pie", "anclas",
   "ancla", "alinea", "a_la_vez", "no_rotular", "solo_si", "se_queda",

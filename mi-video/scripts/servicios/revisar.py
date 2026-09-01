@@ -65,12 +65,20 @@ class ServicioRevisar(Servicio):
         # **Primero lo que decide el código, y para si algo para.** Mandar a
         # leer una pieza con un hueco de dos segundos sin voz es pedir criterio
         # sobre material roto: lo que conteste va a hablar de otra cosa.
+        # **Y se devuelve al paso que lo evalúa, no a un alto genérico.**
+        # Jaime: *«un problema para devolver es respecto a lo que evalúa»*. Una
+        # falta con dueño vuelve a su dueño; una sin dueño no para la pieza —
+        # se anota y viaja, porque pararla sería dejarla sin salida.
         paran = [f for f in r.faltas() if f.para]
-        if paran:
-            uno = paran[0]
-            return Resultado(False, motivo=f"{uno.que}"[:140] +
-                             (f" (+{len(paran) - 1} mas)" if len(paran) > 1
-                              else ""))
+        con_dueno = [f for f in paran if f.devuelve_a]
+        if con_dueno:
+            uno = con_dueno[0]
+            resto = (f" (+{len(con_dueno) - 1} mas)" if len(con_dueno) > 1
+                     else "")
+            return Resultado(True, volver_a=uno.devuelve_a,
+                             salida=f"{uno.que}"[:140] + resto)
+        for f in paran:
+            _anota(pieza, f)
         casos = r.preguntas()
         if not casos:
             return Resultado(True, salida="revisada: nada que dictaminar")
@@ -155,3 +163,19 @@ def _aplicar(pieza: Pieza, veredictos) -> Resultado:
         # este paso pregunta una vez, como el repaso.
         return Resultado(True, volver_a="cosido", salida=parte)
     return Resultado(True, salida=parte)
+
+
+def _anota(pieza: Pieza, falta) -> None:
+    """Una falta que ningun paso sabe arreglar se anota, no para la pieza."""
+    from dominio import ticket as tk
+
+    try:
+        if any(t.get("dijo", "").startswith(falta.que[:60])
+               for t in tk.abiertos(pieza.slug)):
+            return                       # ya esta dicho: repetirlo es ruido
+        tk.abrir(pieza.slug, falta.que[:2000], falta.segundo, "objecion")
+    except Exception:                              # noqa: BLE001
+        import registro
+
+        registro.aviso("revisar", "no se pudo anotar la falta",
+                       detalle=f"{pieza.slug}: {falta.que[:120]}", eco=False)

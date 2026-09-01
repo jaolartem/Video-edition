@@ -45,7 +45,7 @@ from dominio.fase import (  # noqa: E402,F401
     fase_de)
 
 
-def avanzar(n, ver=False, tope=None, permiso=None):
+def avanzar(n, ver=False, tope=None, permiso=None, planta=True):
     """**La frontera del enrutador.** Nada de aquí dentro puede escapar sin log.
 
     Regla de Jaime: *«todos los pasos con código van con try / if not para el log
@@ -61,7 +61,8 @@ def avanzar(n, ver=False, tope=None, permiso=None):
     import registro as _reg
 
     try:
-        return _recorrer(n, ver=ver, tope=tope, permiso=permiso)
+        return _recorrer(n, ver=ver, tope=tope, permiso=permiso,
+                         planta=planta)
     except Exception as e:                         # noqa: BLE001
         slug = f"reel-{int(n):02d}"
         motivo = f"el enrutado revento: {type(e).__name__}: {e}"
@@ -70,7 +71,7 @@ def avanzar(n, ver=False, tope=None, permiso=None):
         return {"slug": slug, "fase": "?", "saltos": 0, "motivo": motivo[:300]}
 
 
-def _recorrer(n, ver=False, tope=None, permiso=None):
+def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
     """Recorre el camino con una pieza hasta donde pueda.
 
     Se para por tres motivos y **son distintos**: llegó al final, espera a
@@ -171,11 +172,25 @@ def _recorrer(n, ver=False, tope=None, permiso=None):
             # fallo**: ahi el paso no se rompio, esta pidiendo su turno.
             espera = "espera" in (r.motivo or "").lower()
             if not espera and _fallo_antes(pieza.video_id, actual["id"], motivo):
-                raise SystemExit(
-                    f"avanzar: {pieza.slug} lleva dos intentos fallando en"
-                    f" «{siguiente['nombre']}» por lo mismo — {r.motivo}."
-                    " Se para aqui a proposito: corrige y vuelve a correr,"
-                    " que el detalle esta en el log.")
+                atasco = (f"{pieza.slug} lleva dos intentos fallando en"
+                          f" «{siguiente['nombre']}» por lo mismo — {r.motivo}")
+                # **Y el despachador no se planta por esto.** Jaime: *«el
+                # despachador recibe varias piezas al tiempo, FIFO; si una no
+                # puede avanzar registra el log y queda con las etiquetas que
+                # tiene; tú revisas los logs y resuelves problemas»*.
+                #
+                # Plantarse esta bien en una corrida a mano —dice que hay algo
+                # que arreglar— y es justo lo contrario cuando hay seis piezas
+                # mas esperando turno: apagar el reparto por una es dejar de
+                # repartir. La pieza se queda donde esta, con su etiqueta y su
+                # log, y las demas siguen.
+                if planta:
+                    raise SystemExit(
+                        f"avanzar: {atasco}. Se para aqui a proposito: corrige"
+                        " y vuelve a correr, que el detalle esta en el log.")
+                registro.aviso("avanzar", "pieza atascada, se queda donde esta",
+                               detalle=atasco[:600], eco=False)
+                motivo = atasco
             break
 
         if r.volver_a:
@@ -241,6 +256,9 @@ def main():
                     help="como mucho N saltos por pieza")
     ap.add_argument("--volver", metavar="FASE",
                     help="devuelve la pieza a esa fase y la vuelve a recorrer")
+    ap.add_argument("--despachar", action="store_true",
+                    help="queda encendido repartiendo pedidos y recogiendo"
+                         " respuestas segun llegan")
     ap.add_argument("--por-que", default="", metavar="RAZON",
                     help="por que vuelve; queda en el log de la pieza")
     a = ap.parse_args()
@@ -325,6 +343,14 @@ def main():
     # ultima vuelta —en la que ya no se mueve nada— deja las preguntas escritas.
     # Un pedido abierto sobre un material que todavia puede cambiar es una
     # pregunta que no se puede contestar, y contestarla es trabajo tirado.
+    if a.despachar:
+        despachar(a)
+        return
+    _una_vuelta(a)
+
+
+def _una_vuelta(a) -> int:
+    """Un recorrido completo de todas las piezas. Devuelve cuanto se movio."""
     piezas = list(a.reels or rutas.piezas())
     # **Las piezas que no comparten cinta trabajan a la vez.** El bucle de una
     # en una hacía que el paso más lento parase a las siete, incluidas las que
@@ -336,7 +362,8 @@ def main():
     for vuelta in range(1, vueltas + 1):
         movidos = 0
         hechos = plan.correr(piezas, lambda n: avanzar(
-            n, ver=a.ver, tope=a.paso, permiso=plan.permiso))
+            n, ver=a.ver, tope=a.paso, permiso=plan.permiso,
+            planta=not getattr(a, "despachar", False)))
         for n in piezas:
             r = hechos.get(n)
             if not r:
@@ -357,6 +384,89 @@ def main():
         print(f"{r['slug']}: {r['fase']}"
               + (f"  (+{saltos})" if saltos else "")
               + (f"  — {r['motivo']}" if r["motivo"] else ""))
+    return sum(total.values())
+
+
+def despachar(a) -> None:
+    """Queda encendido: reparte pedidos y recoge respuestas segun llegan.
+
+    **Lo que es este programa.** Jaime, el 1 de septiembre: *«como el programa es
+    un despachador, debe permanecer encendido mientras trabajamos; las etiquetas
+    les asignan el pedido hasta que salen y se archivan; tus agentes reemplazan
+    el llamado por API, pero el programa funciona como tal»*.
+
+    Corriendolo a mano, cada respuesta esperaba a que a mi se me ocurriera
+    empujar la linea. Y esperar no es gratis: entre que una respuesta se escribe
+    y alguien la recoge, otra pieza puede mover la cinta que comparten y dejarla
+    desfasada — 20 analisis completos se perdieron asi. Un despachador encendido
+    la recoge cuando llega.
+
+    No adivina cuando hay trabajo: **mira los ficheros de respuesta**. Mientras
+    nadie conteste no hay nada que hacer y no se gasta nada en comprobarlo.
+    """
+    import time
+
+    huella, quieto, atascadas = None, 0, set()
+    print("despachador encendido — Ctrl-C para parar")
+    while True:
+        # **Una pieza atascada no apaga el despachador.**
+        #
+        # `avanzar` para en seco cuando una pieza falla dos veces por lo mismo, y
+        # eso esta bien para una corrida a mano: dice que hay algo que arreglar.
+        # Aqui es lo contrario de lo que hace falta — hay seis piezas mas
+        # esperando su turno, y apagar el reparto por una es dejar de repartir.
+        # Se dice una vez, se apunta, y se sigue con las demas.
+        movidos = _una_vuelta(a)
+        # **Lo que espera a un agente se dice, porque es la senal de lanzarlo.**
+        # Jaime: *«y lanzas el agente cuando el log sea por falta de agente»*.
+        # Un pedido abierto no es un fallo: es un turno pedido y sin servir, y
+        # mezclarlo con los atascos hace que no se distinga cual de los dos es.
+        for paso, slug in _sin_contestar():
+            clave = f"{paso}/{slug}"
+            if clave not in atascadas:
+                atascadas.add(clave)
+                print(f"  espera agente -> {clave}")
+        ahora = _respuestas()
+        if movidos or ahora != huella:
+            quieto = 0
+        else:
+            quieto += 1
+            if quieto == 1:
+                print("  (esperando respuestas)")
+        huella = ahora
+        try:
+            time.sleep(min(2 + quieto * 2, 20))
+        except KeyboardInterrupt:
+            print("\ndespachador apagado")
+            return
+
+
+def _sin_contestar() -> list:
+    """Los pedidos escritos que nadie ha contestado. `(paso, pieza)`."""
+    import glob
+
+    fuera = []
+    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
+                                           "*.pedido.json"))):
+        if os.path.exists(f.replace(".pedido.json", ".respuesta.json")):
+            continue
+        paso = os.path.basename(os.path.dirname(f))
+        fuera.append((paso, os.path.basename(f)[:-len(".pedido.json")]))
+    return fuera
+
+
+def _respuestas() -> tuple:
+    """La huella de lo contestado. Si no cambia, no hay nada nuevo que recoger."""
+    import glob
+
+    fuera = []
+    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
+                                           "*.respuesta.json"))):
+        try:
+            fuera.append((f, os.path.getmtime(f)))
+        except OSError:
+            continue
+    return tuple(fuera)
 
 
 if __name__ == "__main__":

@@ -138,6 +138,20 @@ def _topes():
     return {k: int(v) for k, v in re.findall(r"(\w+):\s*(\d{2,3})\b", t)}
 
 
+#: Lo que el gancho tiene que cumplir, y lo comprueba `gancho.mjs`.
+ENTRADA_GANCHO = {
+    "entradas_minimo": 3,
+    "por_que": "el primer segundo decide si alguien sigue mirando; el "
+               "maximalismo aqui es DENSIDAD DE ENTRADAS, no adorno",
+    "jaime": "el hook tiene que ser mucho mas movido",
+    "exige": "una figura dibujable declarada o una composicion tipografica; "
+             "no vale prosa, porque nadie la dibuja",
+    "prohibido": "rebote, confeti, wiggle y cualquier micro-animacion "
+                 "juguetona: esto es un asesor financiero hablando a duenos de "
+                 "negocio",
+}
+
+
 def _pide_tablero(fila):
     """¿Esta etapa lleva tablero? Lo dijo el paso que planea, no éste.
 
@@ -147,6 +161,19 @@ def _pide_tablero(fila):
     ninguna comprobación lo alcanzaba y la etapa salía sin copy.
     """
     if fila["componente"]:
+        return True
+    # **Y el gancho siempre lleva, lo diga o no.**
+    #
+    # Es la etapa 1 y es la unica que no puede quedarse sin composicion: los
+    # rotulos que salian en pantalla venian de un literal de `reels-spec.mjs`
+    # —o sea de codigo, no del disenador— y su figura la deducia una expresion
+    # regular de la prosa. Nadie lo habia disenado nunca, y por eso las seis
+    # piezas fallan la misma comprobacion: *«el gancho lleva 2 entradas y
+    # necesita 3»*.
+    #
+    # Jaime, sobre el primer render: *«el hook tiene que ser mucho mas movido»*.
+    # Eso no se arregla con un umbral: se arregla componiendolo.
+    if int(fila["etapa_orden"]) == 1:
         return True
     g = (fila["grafico"] or "").lower()
     return any(p in g for p in TIPO)
@@ -303,6 +330,10 @@ class ServicioDisenar(Servicio):
                 # tablero se compone contra un tiempo real —cuando se dice y
                 # cuanto dura—, no contra una idea de cuanto deberia durar.
                 "en_la_pista": _en_la_pista(pieza.slug).get(f["etapa_orden"]),
+                # Lo que el gancho exige y las demas no. Va en la etapa, no en
+                # una nota aparte, para que quien compone no tenga que acordarse.
+                **({"es_el_gancho": ENTRADA_GANCHO}
+                   if int(f["etapa_orden"]) == 1 else {}),
             } for f in pendientes],
         }
         prompt = (open(PROMPT, encoding="utf-8").read()

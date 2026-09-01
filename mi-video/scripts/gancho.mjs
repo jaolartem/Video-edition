@@ -61,7 +61,7 @@ export const portada = {
     void duration;
     const clave = at + frames(GANCHO_CLAVE_S);
     const tipo = esTipografico(desc?.grafico);
-    const fig = tipo ? null : figuraDe(desc?.grafico);
+    const fig = tipo ? null : figuraDe(desc);
     const motion = sonidoDe(desc?.sonido, donde(desc));
     const out = [];
 
@@ -186,7 +186,7 @@ export const portada = {
       )
         faltas.push(`la capa «${c.tipo}» del gancho entra sin sonido`);
     }
-    if (!figuraDe(ctx.desc?.grafico) && !esTipografico(ctx.desc?.grafico))
+    if (!figuraDe(ctx.desc) && !esTipografico(ctx.desc?.grafico))
       faltas.push(
         "la escena del gancho no describe ni figura dibujable ni composición" +
           ` de tipo: «${ctx.desc?.grafico ?? "sin descripción"}»`,

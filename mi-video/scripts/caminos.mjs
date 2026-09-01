@@ -166,7 +166,7 @@ export const CAMINOS = {
     porque: "la figura acompaña el plano, no lo sustituye",
     capas(ctx) {
       const { at, duration, desc, det, lado } = ctx;
-      const fig = figuraDe(desc?.grafico) ?? det.figura ?? null;
+      const fig = figuraDe(desc) ?? det.figura ?? null;
       const motion = sonidoDe(desc?.sonido, donde(desc));
       const t = at + Math.round(0.5 * FPS);
       const out = [];

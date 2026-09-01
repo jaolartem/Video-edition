@@ -26,24 +26,9 @@
 /**
  * De la prosa de `grafico` a la figura que existe.
  */
-const FIGURAS = [
-  // Dos cantidades enfrentadas. Es lo que mas piden las descripciones —«una
-  // barra llena y, debajo, la de lo que queda a un tercio»— y es geometria
-  // plana: rectangulos y un hueco. Va la primera porque «barra» tambien casa
-  // con verbos de movimiento y no queremos que la gane «flecha».
-  [/barra|dos cantidad|facturaci.n.*queda|lo que queda/i, "barras"],
-  // Tres marcas en fila, tachadas una tras otra. Lo piden tres escenas del
-  // lote con esas mismas palabras.
-  [/tres .*(en fila|una tras otra|tachad)|en fila|una tras otra/i, "serie"],
-  [/bifurcaci|dos camino|se divide|dos trayectoria|dos ruta/i, "bifurcacion"],
-  [/escalera|peldan|peldañ|escalon|escalón/i, "escalera"],
-  [/prohibi|alto\b|no se puede|puerta.*cerrad|cerrad[ao].*puerta/i, "alto"],
-  [/ceda|advertenc|riesgo/i, "ceda"],
-  [/desv[ií]o|rodeo|atajo/i, "desvio"],
-  [/dos persona|socio|empleado|equipo/i, "dos-personas"],
-  [/persona|dueñ|duen|empresari|sujeto/i, "persona"],
-  [/flecha|sube|crece|asciende|cae\b|baja\b/i, "flecha"],
-];
+//: `FIGURAS` se retiro el 1 de septiembre. Era la tabla de expresiones
+//: regulares que deducia la figura de la prosa; lo que dibuja la pieza lo
+//: declara el paso de diseno. Una regla nueva quita codigo, no lo anade.
 
 /**
  * Hay escenas cuyo grafico **es la tipografia**: *«la pregunta en versales sobre
@@ -62,10 +47,38 @@ const ES_TIPO = /versales|el tipo es|la frase entera|solo texto|nada mas/i;
 
 export const esTipografico = (grafico) => Boolean(grafico && ES_TIPO.test(grafico));
 
-export const figuraDe = (grafico) => {
-  if (!grafico) return null;
-  for (const [re, fig] of FIGURAS) if (re.test(grafico)) return fig;
-  return null;
+/**
+ * La figura que se dibuja, **declarada por quien compone y no deducida**.
+ *
+ * Es la misma regla que ya gobierna el copy dos funciones mas abajo, y que Jaime
+ * dio una vez para las dos: *«las escenas y tableros los debe hacer un agente
+ * especializado en diseno; eso es editorial, no sale con codigo»*. Se aplico al
+ * copy y no aqui, y la mitad que quedo suelta es la que se vio en pantalla.
+ *
+ * Lo que hacia: sacar una figura de la PROSA de `grafico` con una expresion
+ * regular, aunque la etapa declarara otra cosa. En el reel-01 la palabra
+ * «desvio» de la descripcion de la etapa 5 dibujo una bifurcacion abstracta
+ * sobre el plano — la «Y» flotando en el segundo 42 que Jaime senalo: *«esa Y no
+ * es un panel; el panel es figurativo, no abstracto»*. Nadie la habia decidido:
+ * la puso una regex leyendo prosa.
+ *
+ * Ahora se lee de `escena_desc.tablero`, que es donde el paso de diseno escribe
+ * lo que decidio, y **se devuelve `null` cuando no hay nada**. Un plano sin
+ * figura es una decision legitima; inventarle una no lo es.
+ */
+export const figuraDe = (desc) => {
+  const t = typeof desc === "string" ? null : desc?.tablero;
+  if (!t) return null;
+  let d = t;
+  if (typeof d === "string") {
+    try {
+      d = JSON.parse(d);
+    } catch {
+      return null;
+    }
+  }
+  const fig = d?.props?.figura ?? d?.figura ?? null;
+  return typeof fig === "string" && fig.trim() ? fig.trim() : null;
 };
 
 /**

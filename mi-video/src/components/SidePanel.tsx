@@ -109,7 +109,18 @@ export const SidePanel: React.FC<{
               position: "relative",
               overflow: "hidden",
               backgroundColor: b.fuerte ? color.gold : color.richBlack,
-              color: b.fuerte ? color.richBlack : color.gold,
+              // **El oro sale una vez por panel: en el bloque `fuerte`.**
+              //
+              // Esto pintaba en oro el texto de TODOS los bloques que no fueran
+              // `fuerte`, asi que un panel de tres bloques ponia tres cosas en
+              // oro. El canon dice lo contrario y dice por que: *«el oro dice
+              // "mira aqui"; si en un tablero hay tres cosas en oro, dos sobran,
+              // el ojo no sabe donde ir y el recurso deja de significar nada»*.
+              //
+              // Lo que no es el foco va en neutro claro, que es lo que el canon
+              // reserva para texto sobre oscuro. La jerarquia la marca el
+              // contraste —placa de oro contra negro—, no repetir el acento.
+              color: b.fuerte ? color.richBlack : color.lightNeutral,
               fontFamily: fontFamily.video,
               fontSize: cuerpo(!!b.fuerte),
               fontWeight: 900,
