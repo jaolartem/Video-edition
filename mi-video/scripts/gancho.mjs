@@ -102,7 +102,13 @@ export const portada = {
         tipo: "remate",
         at: t2,
         duration: fin - t2,
-        props: { lado, tinte: "gold" },
+        // **Y donde cruza lo dice el diseno.** `Capas.tsx` admite `props.y`
+        // desde que el gancho de reel-05 declaro una escalera que el filete
+        // partia por la mitad — y el camino nunca se lo pasaba, asi que la
+        // correccion estaba hecha y desconectada. Media correccion es ninguna:
+        // en reel-01 el filete cae en 900 y la barra de abajo ocupa 907-930,
+        // justo donde entra el oro.
+        props: { lado, tinte: "gold", ...(_filete(desc) ?? {}) },
       });
       out.push(...sonar(motion ?? "land", t2));
     }
@@ -194,3 +200,23 @@ export const portada = {
     return faltas;
   },
 };
+
+
+/**
+ * Donde cruza el filete del gancho, si el diseno lo declaro en `props.filete`.
+ *
+ * Se declara porque el filete y la figura comparten cuadro: el unico que sabe
+ * si se pisan es quien compuso los dos.
+ */
+function _filete(desc) {
+  try {
+    const d = typeof desc?.tablero === "string"
+      ? JSON.parse(desc.tablero)
+      : desc?.tablero;
+    const y = d?.props?.filete ?? d?.filete;
+    const n = Number(typeof y === "object" && y !== null ? y.y : y);
+    return Number.isFinite(n) && n > 0 ? { y: n } : null;
+  } catch {
+    return null;
+  }
+}

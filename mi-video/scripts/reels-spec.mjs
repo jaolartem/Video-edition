@@ -29,14 +29,14 @@
  *   node scripts/reels-spec.mjs
  */
 import fs from "fs";
-import { sonidosMudos } from "./caminos.mjs";
+import { rotuloDe, sonidosMudos } from "./caminos.mjs";
 import { FPS, Reloj } from "./reels/reloj.mjs";
 import { FRAMES } from "./reels/material.mjs";
 import { duracionDelCorte, edlDe, marcoDe, planDe, subsDe }
   from "./reels/material.mjs";
 import { aprobadas, correccionesDe, descDe, pieDe, tablerosDe }
   from "./reels/base.mjs";
-import { CONTRASTE, LINEAS, SOSTIENE, entraRotulo, literalesDe }
+import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe }
   from "./reels/copy.mjs";
 import { acotarAlCta, ctaDe } from "./reels/cta.mjs";
 import { caminosDe, contrasteDe, glitchesDe, repartirPorCubre, tarjetasDe }
@@ -55,13 +55,12 @@ import { revisar } from "./reels/puerta.mjs";
  */
 const faltas = [];
 
-// **Las piezas salen de lo declarado, no de un literal de copy.** Esto iteraba
-// `LINEAS` —los rotulos del gancho, escritos a mano— asi que una pieza que no
-// estuviera ahi no generaba spec ni existia para el render: reel-07 llevaba dias
-// en la linea, invisible aqui. Es el `if (slug === ...)` con otra cara.
+// **Las piezas salen de lo declarado, no de `LINEAS`.** Una que no estuviera en
+// ese literal no existia para el render: reel-07 llevaba dias invisible aqui.
 const spec = Object.keys(FRAMES.reels).map((slug) => {
-  // El rotulo: `LINEAS` solo mientras queden ganchos sin componer.
-  const lineas = LINEAS[slug] ?? [];
+  // **El rotulo lo declara el diseno; `LINEAS` es el respaldo.** Del literal
+  // salia «No es por / ser inmigrante», que refuta la creencia antes de plantarla.
+  const lineas = rotuloDe(descDe(slug)?.[1]) ?? LINEAS[slug] ?? [];
   const marco = marcoDe(slug);
   const edl = edlDe(slug);
   const plan = planDe(slug);
@@ -254,6 +253,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
    * *«manteniendo los subtítulos»*.
    */
   const contraste = contrasteDe(pieza.id, CONTRASTE[slug], pieza.captions);
+  faltas.push(...[precioSinEscala(slug, pieza.captions)].filter(Boolean));
   if (sePisa(contraste, pieza.tableros ?? [])) {
     faltas.push(`${slug}: el contraste se pisaba con un tablero y se retira`);
     pieza.contraste = null;
@@ -328,12 +328,9 @@ if (parados.length) {
  * rompería la ley de que el sonido sigue al movimiento— pero se dice qué etapa
  * lo describió y qué escribió, que es lo que permite arreglarlo donde vive.
  */
-for (const s of sonidosMudos) {
-  faltas.push(
-    `${s.donde}: describe un sonido que no suena — «${s.dice}». Ninguna ` +
-    `expresion de SONIDOS lo reconoce, asi que la capa se monta muda.`,
-  );
-}
+faltas.push(...sonidosMudos.map((s) =>
+  `${s.donde}: describe un sonido que no suena — «${s.dice}». Ninguna ` +
+  `expresion de SONIDOS lo reconoce, asi que la capa se monta muda.`));
 if (faltas.length) {
   console.log(`\nFALTAS DE CAMINO — ${faltas.length}:`);
   for (const f of faltas) console.log(`  · ${f}`);

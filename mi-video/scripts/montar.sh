@@ -37,7 +37,38 @@ source "$(dirname "$0")/entorno.sh"
 # una reescritura se lo llevó por delante, el montaje para aquí en vez de
 # reproducir el defecto en las seis piezas. Es barato —lee ficheros— y va
 # primero justo por eso.
-node scripts/guardas.mjs
+# **Y en la entrega para aprobacion NO paran: levantan ticket.**
+#
+# Jaime, el 1 de septiembre: *«en este paso no deben parar por guardas; la guarda
+# levanta tickets que se resuelven en el renderizado final»*.
+#
+# Y tiene razon en lo que separa: una aguja rota dice que un mecanismo cambio de
+# sitio, no que la pieza este mal. Parar la entrega por eso es no dejar ver el
+# video por un problema del codigo — hoy una sola aguja tuvo cinco piezas
+# paradas mientras dos ya habian renderizado.
+#
+# En el render FINAL siguen parando, y ahi es donde tienen que hacerlo: es lo
+# ultimo antes de publicar, y una correccion perdida ahi sale al mundo.
+_guardas() {
+  local salida
+  salida=$(node scripts/guardas.mjs 2>&1) || {
+    echo "$salida"
+    if [ "$FINAL" = "1" ]; then return 1; fi
+    PYTHONIOENCODING=utf-8 python - "$salida" <<'TICKET'
+import sys
+sys.path.insert(0, "scripts")
+from dominio import ticket as tk
+for n in (1, 2, 3, 4, 5, 6, 7):
+    tk.abrir(f"reel-{n:02d}",
+             "una guarda de codigo no se sostiene y la entrega salio igual: "
+             + " ".join(sys.argv[1].split())[:600],
+             None, "dato")
+TICKET
+    echo "montar.sh: guarda rota anotada como ticket; la entrega sigue."
+  }
+  return 0
+}
+_guardas || exit 1
 # **Y la fuente de verdad de cada decision, comprobada.** Jaime: *«deja clara
 # en codigo la fuente de verdad»*. Una correccion que se escribe en una copia y
 # un render que lee la otra no falla al corregir: falla al entregar, y calla.

@@ -129,13 +129,25 @@ class ServicioVisto(Servicio):
             return Resultado(False, motivo="no hay fichero entregado")
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
-        # Va por la carpeta de `disenar`, que es su contrato.
-        r = contrato.pedir("disenar", pieza.slug, prompt, d)
+        # **Y va por su propia carpeta, no por la de `disenar`.**
+        #
+        # Compartia el fichero de pedido con el paso de diseno «porque es su
+        # contrato», y un contrato compartido no es una carpeta compartida: los
+        # dos escriben `disenar/<slug>.pedido.json`, asi que **el ultimo que pasa
+        # borra la pregunta del otro**. Paso el 1 de septiembre: el pedido del
+        # gancho de reel-01 aparecio sin `tableros`, sin `arco`, sin `canon` y
+        # sin `topes` — lo habia sobrescrito esto — y quien componia tuvo que ir
+        # a buscar el bueno al archivo para poder trabajar.
+        #
+        # No se ve venir porque no falla: el fichero existe, es JSON valido y le
+        # faltan la mitad de los datos. Y la respuesta que vuelva se archiva
+        # contra el pedido equivocado.
+        r = contrato.pedir("visto", pieza.slug, prompt, d)
         if r is None:
             return Resultado(
                 False,
                 motivo="espera revision del render -> "
-                       + contrato.ruta_pedido("disenar", pieza.slug))
+                       + contrato.ruta_pedido("visto", pieza.slug))
         return aplicar(pieza, r)
 
 

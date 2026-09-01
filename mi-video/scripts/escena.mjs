@@ -217,3 +217,27 @@ export const sonidoDe = (sonido, donde = "", desc = null) => {
 /** `color` de la escena: `avivar`, `apagar` o `dejar`. Nunca por gusto. */
 export const desaturaDe = (color) =>
   color === "apagar" ? 0.55 : color === "avivar" ? 1.15 : 1;
+
+
+/**
+ * El rotulo del gancho, **declarado por quien compone**. `null` si no lo declara.
+ *
+ * Misma regla que la figura y que el sfx, y por el mismo motivo: el copy que
+ * sale en pantalla es editorial. Vuelve como lista de lineas, que es lo que el
+ * render espera.
+ */
+export const rotuloDe = (desc) => {
+  try {
+    const d = typeof desc?.tablero === "string"
+      ? JSON.parse(desc.tablero)
+      : desc?.tablero;
+    const r = d?.props?.rotulo ?? d?.rotulo;
+    const ls = Array.isArray(r)
+      ? r
+      : (typeof r === "string" ? r.split(String.fromCharCode(10)) : null);
+    const limpio = (ls ?? []).map((x) => String(x).trim()).filter(Boolean);
+    return limpio.length ? limpio : null;
+  } catch {
+    return null;
+  }
+};

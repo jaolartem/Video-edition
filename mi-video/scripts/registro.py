@@ -29,7 +29,30 @@ import argparse
 import datetime
 import os
 import sqlite3
+import sys
+
 import basedatos
+
+# **Lo que este proyecto escribe es UTF-8, lo diga Windows o no.**
+#
+# La consola de Windows es cp1252 y Python escribe en ella tal cual: **un solo
+# caracter fuera de esa pagina mata el paso entero**. Hoy paso tres veces, en
+# tres sitios distintos, y la tercera se llevo el despachador con las siete
+# piezas en marcha — por una flecha, «→», en una linea de log.
+#
+# No es un fallo del texto: es que el canal de diagnostico se rompe justo cuando
+# tiene algo que contar, y lo que se pierde es el motivo. Los textos de este
+# proyecto son espanoles y llevan tildes, comillas angulares y flechas; escribir
+# en cp1252 no era una opcion, era una bomba con retardo.
+#
+# Va aqui porque `registro` es quien manda lo que se escribe, y lo importa todo
+# el que escribe algo. `errors="replace"` porque perder un caracter de un mensaje
+# es barato; perder el mensaje —y con el, la corrida— no.
+for _canal in (sys.stdout, sys.stderr):
+    try:
+        _canal.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 import sys
 
 BASE = os.path.join("ads", "decisiones.db")

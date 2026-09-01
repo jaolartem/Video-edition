@@ -228,3 +228,28 @@ export const literalesDe = (slug) =>
     ["rotulo del gancho", (LINEAS[slug] ?? []).length ? 1 : 0],
     ["tarjetas", (TARJETAS[slug] ?? []).length],
   ].filter(([, n]) => n > 0);
+
+
+/**
+ * **Un precio dicho sin la escala en pantalla no sale.**
+ *
+ * Jaime: *«prefiero o dejarlo con el 20 o cambiarlo, pero dejar en pantalla la
+ * escala de precios»*. Con la escala puesta, que la voz diga «20 dolares» deja
+ * de caducar: la pantalla dice hasta cuando vale y a cuanto sube. Sin ella, la
+ * pieza miente sola el dia que el escalon cambia — y no avisa nadie, porque una
+ * frase correcta el lunes sigue siendo gramatical el viernes.
+ *
+ * Por eso se comprueba aqui y no se confia en que alguien se acuerde: es la
+ * unica forma de que no vuelva. Lo que se mira es lo que el espectador tiene
+ * delante — la voz por un lado, `PRECIO` o `CUENTA` por el otro.
+ */
+export const precioSinEscala = (slug, captions) => {
+  const dice = (captions ?? []).some(
+    (c) => /(20|30|40|veinte|treinta|cuarenta)\s+(d[oó]lares|dolares)/i
+      .test(String(c.text ?? "")),
+  );
+  if (!dice) return null;
+  if (PRECIO[slug] || CUENTA[slug]) return null;
+  return `${slug}: la voz dice un precio y la escala no sale en pantalla —` +
+    ` el dia que suba, la pieza miente sola`;
+};

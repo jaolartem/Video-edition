@@ -43,11 +43,11 @@
  * se sigue importando de aquí.
  */
 import { FPS, sonar } from "./capa.mjs";
-import { desaturaDe, donde, figuraDe, sonidoDe } from "./escena.mjs";
+import { desaturaDe, donde, figuraDe, rotuloDe, sonidoDe } from "./escena.mjs";
 import { portada } from "./gancho.mjs";
 
 export { GANCHO_S, GANCHO_CLAVE_S } from "./gancho.mjs";
-export { copyDeclarado, esTipografico, figuraDe, sonidoDe, sonidosMudos }
+export { copyDeclarado, esTipografico, figuraDe, rotuloDe, sonidoDe, sonidosMudos }
   from "./escena.mjs";
 
 export const CAMINOS = {
