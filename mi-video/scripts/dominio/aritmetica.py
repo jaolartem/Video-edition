@@ -210,6 +210,24 @@ class Aritmetica:
             return 0, 0.0
         movidos, ganado = 0, []
         for i in range(len(self.tij)):
+            # **Un tramo declarado no se mueve, ni por un punto mas callado.**
+            #
+            # Esto movia cada corte hasta 120 ms al silencio mas cercano sin
+            # preguntar si alguien lo habia declarado — y con seis vueltas, hasta
+            # 240. Medido en reel-07: de ocho bordes declarados, **cinco
+            # llegaron movidos** al montaje; el que se declaro en 433,47 aparecio
+            # en 433,35, exactamente menos 120 ms.
+            #
+            # Ese es el motivo de que los agentes lleven vueltas redeclarando los
+            # mismos bordes: declaran, el cosido lo mueve, y a la vuelta
+            # siguiente lo ven mal otra vez. Una decision que no sobrevive al
+            # paso siguiente no es una decision.
+            #
+            # La regla ya existia en `Costura.fijada` —«no se mueve aunque se
+            # oiga, porque moverla recorta una palabra a cada lado»— y aqui no
+            # se preguntaba. Las dos mitades de la misma decision, otra vez.
+            if self.tij.fijado(i):
+                continue
             t = self.tij.tramo(i)
             cinta = t.cinta or rutas.TOMAS.get(self.slug)
             if not cinta:

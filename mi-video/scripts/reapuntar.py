@@ -112,6 +112,13 @@ def _di(msg):
     print(msg.encode(cod, "replace").decode(cod))
 
 
+#: Por debajo de esto un literal no identifica un mecanismo: identifica un
+#: prefijo. `const PAR` casaba con `const PAREJA = 14;` en un fichero que no
+#: tenia nada que ver — y la herramienta lo movio tan contenta. Una aguja corta
+#: no se reapunta sola: se mira.
+MINIMO = 14
+
+
 def donde_vive(literal, cuerpos):
     return sorted(f for f, s in cuerpos.items() if literal in s)
 
@@ -132,6 +139,10 @@ def revisar(hazlo=False):
             continue
         corta = ruta[len("mi-video/"):]
         if corta in cuerpos and literal in cuerpos[corta]:
+            continue
+        if len(literal) < MINIMO:
+            _di(f"  CORTA  [{literal}]  ({corta}) - no se mueve sola, mirala")
+            copiadas += 1
             continue
         vive = donde_vive(literal, cuerpos)
         if len(vive) == 1:

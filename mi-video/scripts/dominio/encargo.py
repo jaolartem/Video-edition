@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import basedatos  # noqa: E402
 
 from .montaje import Montaje  # noqa: E402
+from .texto import dice_lo_mismo  # noqa: E402
 from .pieza import Pieza  # noqa: E402
 from .repetido import repetido  # noqa: E402
 
@@ -88,12 +89,41 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
         args = [f"reel-{int(r):02d}" for r in reels]
     con = basedatos.abrir()
     con.row_factory = sqlite3.Row
+    # **«Nada que describir» y «esta pieza no está declarada» no son lo mismo.**
+    #
+    # reel-07 pasó por aquí con **cero etapas** —estaba en `ads/frames.json` con
+    # sus ocho beats y la base no se había enterado— y esta consulta devolvió
+    # una lista vacía, que el paso leyó como «ya está todo descrito» y dio por
+    # bueno. La pieza siguió camino y sólo reventó tres fases más arriba, con un
+    # mensaje que apuntaba a este paso: «sin descripción de escena, corre el
+    # paso 4». Correrlo mil veces no habría arreglado nada.
+    #
+    # Una pieza sin etapas no es una pieza terminada: es una pieza sin declarar,
+    # y decir «nada que hacer» es mentir en el único sitio donde alguien mira.
+    for s in args:
+        n = con.execute("select count(*) from etapa e join video v"
+                        " on v.id = e.video_id where v.slug = ?", (s,)).fetchone()[0]
+        if not n:
+            con.close()
+            raise ValueError(
+                f"{s} no tiene ni una etapa declarada en la base. No es que no"
+                f" haya nada que describir: es que no hay pieza. Corre"
+                f" `python scripts/db.py migrar` para meter `ads/frames.json`.")
     filas = con.execute(ETAPAS.format(donde=donde), args).fetchall()
     # La caducidad se decide comparando textos, y en SQL no se puede porque el
     # montaje se calcula leyendo la cinta. Se trae lo escrito y se compara aquí.
+    # **Y viaja la descripcion aprobada, no solo su fecha.** Jaime: *«lo que ya
+    # se aprobo no se vuelve a discutir: se revisa que este como se dijo»*.
+    # Trayendo unicamente `sobre_texto` sabiamos que estaba caducada y quien
+    # contestaba la escribia **desde cero**, sin ver la que ya habia — asi que
+    # dos vueltas seguidas podian describir la misma etapa de dos maneras sin
+    # que nada hubiera cambiado salvo el enfoque de quien miraba.
+    filas_desc = list(con.execute(
+        "select video_slug, etapa_orden, sobre_texto, que_pasa, emocion,"
+        " componente, grafico, color, sonido, plano from escena_desc"))
     guardado = {(r["video_slug"], r["etapa_orden"]): (r["sobre_texto"] or "")
-                for r in con.execute("select video_slug, etapa_orden,"
-                                     " sobre_texto from escena_desc")}
+                for r in filas_desc}
+    aprobada = {(r["video_slug"], r["etapa_orden"]): dict(r) for r in filas_desc}
     con.close()
 
     fuera, piezas = [], {}
@@ -122,12 +152,23 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
             continue
         # Los bordes y lo repetido van **con la etapa**, para que quien compone
         # los resuelva con el texto delante en vez de dejárselos a un umbral.
+        # Lo aprobado y **sobre que texto se aprobo**, para poder comparar.
+        ya = aprobada.get((slug, orden))
+        if ya:
+            d["ya_dicho"] = {k: v for k, v in ya.items()
+                             if k not in ("video_slug", "etapa_orden")}
         d["bordes"] = p.bordes.get(orden) or []
         d["repetido"] = [r for r in p.repetido if r["etapa"] == orden]
         if not rehacer:
             g = guardado.get((slug, orden))
-            if g is not None and " ".join(g.split()) == " ".join(
-                    (d["montaje"] or "").split()):
+            # **Lo aprobado no se vuelve a discutir: se comprueba.** Jaime lo
+            # puso como norma el 1 de septiembre. Esto comparaba cadenas
+            # exactas, asi que un «su» de mas al principio tiraba la
+            # descripcion entera y se volvia a pedir — una llamada de IA por una
+            # muletilla. `dice_lo_mismo` perdona el relleno y **no perdona el
+            # sentido**: si cambian las palabras de contenido, las cifras o las
+            # negaciones, sigue caducada.
+            if g is not None and dice_lo_mismo(g, d["montaje"] or ""):
                 continue                 # descrita y sigue hablando de este texto
         fuera.append(d)
     return fuera

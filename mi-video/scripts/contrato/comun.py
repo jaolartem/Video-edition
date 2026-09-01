@@ -83,16 +83,20 @@ lo decide Jaime. Tu salida es la evidencia, y va en `sube`.
 """,
     campos=(
         Campo("precio_vigente",
-              manda=Aguja("scripts/servicios/repaso.py", "precio = _co.precio_vigente()"),
+              manda=Aguja("scripts/servicio.py", '"precio_vigente": _precio(),'),
               exige=(Prompt("scripts/repaso.prompt.md", "El precio en voz coincide con el escalón"),),
               condicional="`None` si no hay escalón abierto **y también si la"
                           " llamada revienta**: los dos casos son el mismo dato",
               si_falta=Prompt("scripts/repaso.prompt.md", "sin escalón, la pieza no sale"),
               nota="{importe, hasta, vale, luego}. Es el único «contra qué» que"
-                   " el paso tiene para comprobar el precio."),
+                   " el paso tiene para comprobar el precio, y por eso viaja en"
+                   " TODOS los pedidos y no sólo en `repaso`: llegando a uno"
+                   " solo, tres agentes dedujeron la ventana de las fechas de"
+                   " `datos_respaldados`, se quedaron con la fila del Early"
+                   " Bird y dieron por caducado un precio abierto (C-160)."),
         Campo("hoy",
               manda=Aguja("scripts/servicio.py",
-                          'comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug)}'),
+                          'comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),'),
               exige=(Prompt("scripts/fuentes.prompt.md", "no respalda una cifra de hoy"),),
               nota="La fecha del render. Sin ella, «hoy» es lo que el modelo"
                    " suponga, y una vigencia se juzga contra una fecha"

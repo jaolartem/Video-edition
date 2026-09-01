@@ -69,6 +69,7 @@ from contrato.comun import CUMPLIMIENTO, REDUNDANCIA, SUBE
 from contrato.componer import COMPONE
 from contrato.corte import CORTE
 from contrato.diseno import DISENO, MARCA
+from contrato.repaso import REPASO
 from contrato.respaldo import RESPALDO
 
 #: El registro vivo. Las tres primeras fases del `CICLO` son el mismo contrato
@@ -76,7 +77,7 @@ from contrato.respaldo import RESPALDO
 #: composición son dos —`descrito` define lo que va a haber y escribe el
 #: encargo, `disenado` lo monta—, porque son dos tareas. `visto` es el segundo
 #: momento del que monta: revisa lo que salió y lo lanza.
-REGISTRO = Registro((CORTE, COMPONE, DISENO, RESPALDO),
+REGISTRO = Registro((CORTE, COMPONE, DISENO, REPASO, RESPALDO),
                     (MARCA, REDUNDANCIA, CUMPLIMIENTO))
 
 CONTRATOS: dict[str, Contrato] = REGISTRO.contratos

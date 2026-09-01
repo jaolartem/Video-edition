@@ -87,43 +87,6 @@ CAMPOS = (
           en=("revalidado",),
           nota="INERTE: cero apariciones en el prompt de revalidar. `flojo` es"
                " el cálculo del suelo ya hecho y el prompt pide aplicarlo a mano."),
-    Campo("onda",
-          manda=Aguja("scripts/servicios/repaso.py", "curva = consulta.onda(pieza.slug)"),
-          exige=(Prompt("scripts/repaso.prompt.md", "arriba, luego abajo, luego arriba"),),
-          en=("repasado",),
-          condicional="si la llamada revienta se manda `[]` en silencio",
-          si_falta=Prompt("scripts/repaso.prompt.md", "si `onda` llega vacía"),
-          nota="Trae `tibio` ya calculado con el umbral 1,2 que el prompt pide"
-               " aplicar a mano, y no lo nombra."),
-    # ── lo que se ve ─────────────────────────────────────────────────────
-    Campo("se_ve",
-          manda=Aguja("scripts/servicios/repaso.py",
-                      "select etapa_orden, remedio, trato, componente, grafico,"),
-          exige=(Prompt("scripts/repaso.prompt.md", "lo que se oye contra lo que se ve"),),
-          en=("repasado",),
-          une_con="beat",
-          condicional="si la base falla se manda `[]` y el contrato sigue"
-                      " pidiendo juzgar lo que se ve",
-          si_falta=Prompt("scripts/repaso.prompt.md", "si `se_ve` llega vacía"),
-          nota="`etapa_orden` es la ÚNICA junta con `montaje[].beat` y ningún"
-               " prompt dice que se unen por ahí."),
-    Campo("se_ve[].dura_en_pantalla",
-          manda=None,
-          deuda="ver `nota`",
-          exige=(Prompt("scripts/repaso.prompt.md", "da tiempo a leerse"),),
-          en=("repasado",),
-          nota="EXIGIDO Y NO ENVIADO. `se_ve` no trae duración ni cantidad de"
-               " texto, y `montaje` da segundos de cinta, no de permanencia"
-               " del gráfico. El caso fundacional del paso —reel-01, segundo"
-               " 30— es exactamente éste."),
-    Campo("subtitulo",
-          manda=None,
-          deuda="ver `nota`",
-          exige=(Prompt("scripts/repaso.prompt.md", "voz, subtítulo y"),),
-          en=("repasado",),
-          nota="EXIGIDO Y NO ENVIADO. Se pide que las cifras no se contradigan"
-               " entre voz, subtítulo y tablero, y el subtítulo no viaja."),
-    # ── lo que la pieza quería decir ─────────────────────────────────────
     Campo("libreto",
           manda=None,
           deuda="ver `nota`",
@@ -133,9 +96,16 @@ CAMPOS = (
                " El EDL trae `de_jaime`, `dice`, `cobertura` y `literal`, y"
                " ninguno se reenvía. No hay contra qué comparar."),
     Campo("estructura",
-          manda=Aguja("scripts/servicios/repaso.py", '"estructura": (pieza.edl or {}).get("estructura")'),
+          manda=None,
+          deuda="lo mandaba `repaso`, que salio de este contrato el 1 de"
+                " septiembre al dejar de editar; `redundancia` lo exige en su"
+                " prompt y nunca lo mando",
           exige=(Prompt("scripts/redundancia.prompt.md", "PAS sin problema o sin activación"),),
-          nota="Valores reales: 'Polarizing Thesis', 'Belief Demolition',"
+          nota="EXIGIDO Y NO ENVIADO desde que `repasado` dejo este contrato."
+               " Que lo mandara el paso equivocado es justo lo que escondia la"
+               " deuda: `redundancia` razona sobre PAS sin recibir el arco, y"
+               " parecia cubierto porque OTRO momento del mismo contrato lo"
+               " traia. Valores reales: 'Polarizing Thesis', 'Belief Demolition',"
                " 'Two Paths / Default Loss'. El prompt de repaso afirma en"
                " duro «estas piezas son SELL» con una tabla de cuatro arcos"
                " donde ninguno de ésos aparece, y el de redundancia razona"
@@ -146,13 +116,6 @@ CAMPOS = (
           exige=(Prompt("scripts/revalidar.prompt.md", "El nombre de las cosas"),),
           nota="EXIGIDO Y NO ENVIADO. El EDL los tiene y `revalidar.dossier`"
                " los lee y los tira."),
-    Campo("cierres_en_corpus",
-          manda=Aguja("scripts/servicios/repaso.py", "cierres = redundancia.cierres_en_corpus()"),
-          exige=(Prompt("scripts/repaso.prompt.md", "elige uno de ahí"),),
-          en=("repasado",),
-          condicional="si falla se manda `[]` y el prompt sigue diciendo"
-                      " «elige uno de ahí»",
-          si_falta=Prompt("scripts/repaso.prompt.md", "si no llega ningún cierre")),
     Campo("candidatas",
           manda=Aguja("scripts/revalidar.py", '"candidatas": candidatas(slug, beat)'),
           exige=(Prompt("scripts/revalidar.prompt.md", "revisa los candidatos con sus puntuaciones"),),

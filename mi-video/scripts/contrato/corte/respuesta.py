@@ -9,8 +9,7 @@ from ..piezas import Clave
 
 CLAVES = (
     Clave("beat",
-          dispara=(Aguja("scripts/servicios/repaso.py", "beat = b.get(\"beat\")"),
-                   Aguja("scripts/servicios/revalidar.py", "beat = v.get(\"beat\")")),
+          dispara=(Aguja("scripts/servicios/revalidar.py", "beat = v.get(\"beat\")"),),
           efecto="enruta el elemento a su etapa",
           obligatoria=True,
           nota="Sin él la fila se descarta con `continue`, sin aviso."),
@@ -31,10 +30,8 @@ CLAVES = (
                " por segmento: contar apariciones globales es reconstrucción"
                " del lector, no un dato. Lo arregla `montaje[].en`, que ya viaja."),
     Clave("tramos",
-          dispara=(Aguja("scripts/servicios/repaso.py",
-                         "vd = fijar.declarar(pieza.slug, int(beat), toma, tramos,"),
-                   Aguja("scripts/servicios/revalidar.py",
-                         "vd = fijar.declarar(pieza.slug, beat, toma, nuevos,")),
+          dispara=(Aguja("scripts/servicios/revalidar.py",
+                         "vd = fijar.declarar(pieza.slug, beat, toma, nuevos,"),),
           efecto="declara el tramo por `fijar`, que lo mide y lo deja escrito"
                  " en `corte_fijo`; sobrevive a que la selección se rehaga",
           exige_ademas=("toma", "por_que"),
@@ -85,9 +82,7 @@ CLAVES = (
                " marca la costura para que costuras.py la mueva» y"
                " `costuras.py` no lee nada de este paso."),
     Clave("por_que",
-          dispara=(Aguja("scripts/redundancia.py", 'c.get("por_que")'),
-                   Aguja("scripts/servicios/repaso.py",
-                         'b.get("por_que") or "borde movido en el repaso"')),
+          dispara=(Aguja("scripts/redundancia.py", 'c.get("por_que")'),),
           efecto="se guarda con la nota o con la declaración",
           adjunta_a="ancla|tramos|falso_positivo",
           obligatoria=True,

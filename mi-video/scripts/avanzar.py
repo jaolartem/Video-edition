@@ -244,6 +244,35 @@ def main():
                     help="por que vuelve; queda en el log de la pieza")
     a = ap.parse_args()
 
+    # **Lo declarado entra en la base antes de recorrer nada.**
+    #
+    # reel-07 llevaba dias cortandose, cosiendose y repasandose con **cero
+    # etapas declaradas**: estaba en `ads/frames.json` con sus ocho beats, tenia
+    # libreto y tenia EDL, y nadie habia vuelto a correr la migracion desde que
+    # se anadio. La linea no lo vio hasta tres fases mas arriba, y lo dijo mal:
+    # «sin descripcion de escena — corre el paso 4», cuando lo que faltaba
+    # estaba dos niveles por debajo y ningun paso 4 lo habria arreglado.
+    #
+    # Es el agujero de siempre: **la decision existia y no estaba registrada**.
+    # Declarar una pieza en `frames.json` es declararla; que la base se entere
+    # dependia de que alguien se acordara de un comando.
+    #
+    # Se arregla haciendo imposible el desfase, no anadiendo un detector que
+    # avise: `migrar()` es idempotente por diseno —«se puede correr las veces
+    # que haga falta»— y tarda menos de un segundo. Corriendola aqui, la base
+    # nunca puede ir por detras de lo declarado.
+    try:
+        import db
+
+        db.migrar()
+    except Exception as e:                          # noqa: BLE001
+        # Y si la migracion revienta, se para: recorrer con la base a medias es
+        # exactamente como se perdio reel-07.
+        registro.aviso("avanzar", "lo declarado no entra en la base",
+                       detalle=f"{type(e).__name__}: {str(e)[:300]}", eco=True)
+        raise SystemExit("avanzar: `ads/frames.json` no entra en la base."
+                         " No se recorre nada con la base por detras.")
+
     # **Devolver una pieza a una fase es del motor, no de un apano.**
     #
     # Solo se podia volver desde dentro de un servicio (`Resultado.volver_a`) o

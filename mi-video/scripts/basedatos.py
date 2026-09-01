@@ -26,6 +26,7 @@ acaba eso.
 """
 import os
 import sqlite3
+import threading
 
 #: Dónde vive la base. Estaba escrito a mano en una docena de ficheros, que es
 #: la misma avería de siempre en su versión más tonta: mover el fichero exigía
@@ -60,7 +61,18 @@ class _Conexion(sqlite3.Connection):
 def abrir(ruta=None, **kw):
     """La conexión del proceso para esa base. Siempre la misma."""
     ruta = ruta or BASE
-    clave = os.path.abspath(ruta)
+    # **Una por hilo, no una por proceso.** La regla sigue siendo «siempre la
+    # misma conexion», y el hilo es parte de «la misma»: sqlite3 permite
+    # compartirla con `check_same_thread=False`, pero entonces los cuatro hilos
+    # escriben dentro de la MISMA transaccion. El commit de uno cierra el
+    # trabajo a medias de otro, y lo que se ve por fuera es «database is
+    # locked» — que fue exactamente lo que reventó el enrutado de reel-05 el 1
+    # de septiembre, con la base en WAL y 30 s de espera, o sea con las dos
+    # cosas que supuestamente lo impedian.
+    #
+    # No es un candado mas: es que dos escritores en una transaccion no son dos
+    # escritores. Con una por hilo, WAL hace lo que promete.
+    clave = (os.path.abspath(ruta), threading.get_ident())
     cx = _VIVAS.get(clave)
     if cx is not None:
         return cx

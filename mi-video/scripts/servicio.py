@@ -88,6 +88,37 @@ def _hoy():
     return datetime.date.today().isoformat()
 
 
+def _tickets(slug):
+    """Las objeciones abiertas de esa pieza, recolocadas en su etapa de hoy."""
+    try:
+        from dominio import ticket
+
+        ticket.recolocar(slug)
+        return ticket.abiertos(slug)
+    except Exception:                              # noqa: BLE001
+        return []
+
+
+def _precio():
+    """El escalon abierto hoy, ya redactado. Ver `consulta.precio_vigente`."""
+    try:
+        import consulta
+
+        return consulta.precio_vigente()
+    except Exception:                              # noqa: BLE001
+        return None
+
+
+def _instrucciones(paso, slug):
+    """Lo que Jaime dijo y sigue aplicando a este paso y esta pieza."""
+    try:
+        from dominio import instruccion
+
+        return instruccion.para(paso, slug)
+    except Exception:                              # noqa: BLE001
+        return []
+
+
 def _respaldos(slug):
     """Las cifras de la pieza con su fuente, su vigencia y sus condiciones.
 
@@ -171,7 +202,25 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # Va al primer nivel del pedido y no dentro de `datos` a proposito: `datos`
     # es una lista en unos pasos y un diccionario en otros, y lo que vale para
     # todos no puede depender de esa forma.
-    comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug)}
+    comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),
+             # **Lo que Jaime ya dijo, para que no tenga que decirlo otra vez.**
+             # Guardarlo y no llevarlo al paso que debe obedecerlo es
+             # archivarlo. Ver `dominio/instruccion.py`.
+             "instrucciones_de_jaime": _instrucciones(paso, slug),
+             # **El precio vigente, en TODOS los pasos.** Llegaba solo a
+             # `repaso`, y los que no lo tenian dedujeron la ventana de las
+             # fechas de `datos_respaldados` — y se quedaron con la fila del
+             # Early Bird, que vence el 28 de agosto. **Tres agentes distintos
+             # cometieron el mismo error**, asi que no eran ellos: era el dato.
+             #
+             # El precio es cumplimiento y no puede depender de que paso lo
+             # mire.
+             "precio_vigente": _precio(),
+             # **Lo que Jaime ha dicho de ESTA pieza, colocado en su etapa.**
+             # Una objecion suya —«en el segundo 30 el tablero se queda sin
+             # sonido»— no se puede atender si el paso no sabe que etapa cae en
+             # el segundo 30. Ver `dominio/ticket.py`.
+             "lo_que_dijo_jaime_de_la_pieza": _tickets(slug)}
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
                         **comun, "datos": payload},
                        ensure_ascii=False, indent=1)
@@ -186,11 +235,48 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # Se comparan las dos preguntas sin esos campos. Siguen viajando —quien
     # contesta necesita saber en que vuelta esta—, pero dejan de contar como
     # pregunta distinta.
+    # **Y con ellos el precio y las instrucciones, por la misma razon y con una
+    # diferencia que hay que decir.** Los tres son **contexto que acompana**, no
+    # el material que se juzga: el corte, el texto y las candidatas son la
+    # pregunta. Si cambia el contexto, la respuesta sobre los bordes sigue
+    # valiendo.
+    #
+    # Lo que se pierde al no contarlos: una instruccion nueva de Jaime no tumba
+    # las respuestas en vuelo. Se recoge en la ronda siguiente, que es cuando el
+    # paso vuelve a preguntar. La alternativa era tirar siete respuestas ya
+    # escritas cada vez que el dice algo, y eso convierte su criterio en un
+    # castigo — que es lo contrario de lo que la tabla viene a hacer.
     # `hoy` viaja porque sin el no se puede juzgar si una fecha ya paso, pero
     # no cuenta como pregunta distinta: si contara, toda respuesta escrita
     # anoche seria «anterior a su pedido» esta manana, y volveria a preguntarse
     # lo mismo. Es el mismo caso que `vuelta`.
-    VOLATILES = ("vuelta", "hoy")
+    VOLATILES = ("vuelta", "hoy", "precio_vigente", "instrucciones_de_jaime",
+                 "lo_que_dijo_jaime_de_la_pieza")
+
+    # **Y lo que es contexto tampoco cambia la pregunta.**
+    #
+    # Jaime: *«el analisis de cada video es caro, revisa que reprocesos hay y
+    # los eliminamos»*. Medido el 1 de septiembre: **20 respuestas terminadas y
+    # tiradas** por desfasadas —5 de repaso, 8 de redundancia, 7 de revalidar—,
+    # cada una un analisis completo de una pieza.
+    #
+    # Y no se tiraban porque la pregunta cambiara: se tiraban porque cambiaba
+    # **algo** del pedido. Las piezas comparten cintas, asi que cualquier paso
+    # determinista de otra pieza reescribia la onda o el corpus de esta, y una
+    # respuesta correcta sobre los cortes se iba a la basura porque el material
+    # de apoyo se habia movido.
+    #
+    # Un dato que se manda **para poder contestar** no es la pregunta. Si cambia
+    # la curva pero el corte es el mismo, la respuesta sobre ese corte sigue
+    # siendo verdad. Cada paso declara aqui lo suyo; el que no declara nada
+    # sigue comparandose entero, que es lo conservador.
+    CONTEXTO = {
+        # El repaso contesta sobre los cortes y el sonido, o sea sobre
+        # `montaje`. Lo demas va para que pueda juzgarlo, no es lo juzgado.
+        "repaso": ("onda", "se_ve", "etapas_sin_voz", "material_en_corpus",
+                   "libreto", "evento", "estructura", "cierres_en_corpus"),
+    }
+    APOYO = CONTEXTO.get(paso, ())
 
     def _pregunta(txt):
         try:
@@ -199,7 +285,7 @@ def pedir(paso, slug, prompt, payload, cli=True):
             return None
         if isinstance(d.get("datos"), dict):
             d["datos"] = {k: v for k, v in d["datos"].items()
-                          if k not in VOLATILES}
+                          if k not in VOLATILES and k not in APOYO}
         for k in VOLATILES:
             d.pop(k, None)
         return json.dumps(d, ensure_ascii=False, sort_keys=True)

@@ -81,3 +81,53 @@ def numerico(t: str) -> str:
     t = unicodedata.normalize("NFKD", str(t).lower())
     t = "".join(c for c in t if not unicodedata.combining(c))
     return re.sub(r"(?<=\d)[.,](?=\d)", "", t)
+
+
+#: Las que `VACIAS` se come y **cambian el sentido**. `contenido` las quita
+#: porque para comparar de qué habla una frase no aportan; para comparar si dice
+#: lo mismo, deciden. Un texto que pierde el «no» habla de lo mismo y afirma lo
+#: contrario.
+NIEGAN = ("no", "ni", "sin", "nunca", "nada", "tampoco", "jamas", "pero")
+
+
+def dice_lo_mismo(a: str, b: str) -> bool:
+    """¿Estos dos textos dicen lo mismo, aunque no sean iguales?
+
+    **Para qué existe.** Jaime: *«lo que ya se aprobó no se vuelve a discutir: se
+    revisa que esté como se dijo»*. Una descripción se estampa con el texto sobre
+    el que se escribió, y caducaba con una comparación exacta: si el corte movía
+    un «su» de más al principio, la descripción se tiraba y se volvía a pedir
+    entera. Eso es discutir de nuevo lo aprobado, y cuesta una llamada por etapa.
+
+    **Y no vale un parecido.** Un 95 % de coincidencia aprueba un texto que
+    perdió un «no», que es la mitad del sentido. Así que se compara lo que
+    decide: las palabras de contenido, las negaciones y los números. Si los tres
+    son idénticos, lo que cambió es relleno —conectores, muletillas, el arranque
+    de una frase— y lo que se dijo del texto sigue siendo verdad.
+
+    Lo que esto NO hace es decidir si la descripción es buena. Decide si sigue
+    hablando del mismo texto, que es una pregunta de código.
+    """
+    if " ".join((a or "").split()) == " ".join((b or "").split()):
+        return True
+    if contenido(a) != contenido(b):
+        return False
+    if _cifras(a) != _cifras(b):
+        return False
+    return _niegan(a) == _niegan(b)
+
+
+def _cifras(t: str):
+    """Las cifras que aparecen, en orden y ya normalizadas.
+
+    `numerico` normaliza el texto entero —«25 mil» y «25.000» acaban iguales—,
+    que es justo lo que hace falta antes de comparar; pero devuelve el texto, no
+    las cifras. Compararlo entero era comparar otra vez la frase completa, y
+    entonces la regla no perdonaba ni una coma.
+    """
+    return re.findall(r"\d+(?:[.,]\d+)?", numerico(t or ""))
+
+
+def _niegan(t: str):
+    """Cuántas veces niega, en orden. El orden importa: «no es X» y «es no X»."""
+    return [p for p in palabras(t) if p in NIEGAN]
