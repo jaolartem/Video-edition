@@ -101,7 +101,7 @@ def suyas(slug):
     return fuera
 
 
-def contestado(motivo: str, slug: str):
+def contestado(motivo: str, slug: str, salvo=None):
     """Qué decisión suya cubre este motivo, o `None`.
 
     Devuelve `(de_donde, sus_palabras)` para poder decirlo en pantalla. Esto no
@@ -109,7 +109,14 @@ def contestado(motivo: str, slug: str):
     """
     quiere = _palabras(motivo)
     etapa = _etapa(motivo)
+    # **Una nota no se contesta a si misma.** Sin esto, preguntarle a la #709 si
+    # ya estaba decidida devolvia «si, por la nota #709»: misma pieza, misma
+    # etapa, texto identico. Una comprobacion que se da la razon sola no
+    # comprueba nada — y esta existe para no volver a preguntarle lo mismo a
+    # Jaime, asi que equivocarse hacia callar es justo lo que no puede hacer.
     for de_donde, texto in suyas(slug):
+        if salvo is not None and de_donde == f"nota #{salvo}":
+            continue
         suya = _etapa(texto)
         # **La etapa ata mejor que las palabras, y por eso va primero.**
         #

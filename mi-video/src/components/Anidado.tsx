@@ -3,10 +3,11 @@ import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
-import { color, layout, readingFrames, size, tracking } from "../brand/tokens";
+import { color, layout, readingFrames } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
+import { PieTablero } from "./PieTablero";
 
 /**
  * **Un universo, y lo que cabe dentro de él.** La contención dicha con
@@ -154,8 +155,13 @@ export const Anidado: React.FC<AnidadoProps> = ({
                       : color.navy
                     : "transparent",
                   display: "flex",
-                  alignItems: i ? "center" : "flex-start",
-                  padding: i ? "0 40px" : "24px 30px",
+                  // **El rótulo de una capa que contiene a otra va ARRIBA.**
+                  // Centrado, el texto del 2,5% quedaba justo detrás de la
+                  // astilla de oro que encaja dentro: en el frame se leía «EL»
+                  // y un trozo. Sólo la de dentro se centra, porque no contiene
+                  // nada.
+                  alignItems: dentro ? "center" : "flex-start",
+                  padding: dentro ? "0 40px" : i ? "22px 40px" : "24px 30px",
                   // Encaja: entra estrechándose desde su borde izquierdo, que es
                   // el gesto de meterse dentro y no el de aparecer encima.
                   opacity: p,
@@ -190,48 +196,10 @@ export const Anidado: React.FC<AnidadoProps> = ({
           })}
         </div>
 
-        {condicion || source ? (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: color.lightNeutral,
-              transform: "rotate(0.8deg)",
-              padding: "18px 74px 22px",
-              opacity: entra(t),
-            }}
-          >
-            {source ? (
-              <div
-                style={{
-                  fontFamily: fontFamily.data,
-                  fontSize: size.source,
-                  letterSpacing: tracking.labelMono,
-                  textTransform: "uppercase",
-                  color: color.navy,
-                  marginBottom: 10,
-                }}
-              >
-                {source}
-              </div>
-            ) : null}
-            {condicion ? (
-              <div
-                style={{
-                  fontFamily: fontFamily.video,
-                  fontSize: 26,
-                  fontWeight: 700,
-                  lineHeight: 1.3,
-                  color: color.richBlack,
-                }}
-              >
-                {condicion}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        <PieTablero
+          lineas={[source, condicion].filter(Boolean) as string[]}
+          opacidad={entra(t)}
+        />
       </ZonaTablero>
     </AbsoluteFill>
   );

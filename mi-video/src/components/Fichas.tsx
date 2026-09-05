@@ -1,12 +1,12 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { franja } from "../brand/franja";
-import { color, layout, readingFrames, size, tracking } from "../brand/tokens";
+import { color, layout, readingFrames } from "../brand/tokens";
 import { Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
+import { PieTablero } from "./PieTablero";
 import { leerDeclarado } from "./declarado/lineas";
 import { Ficha, FileteFicha } from "./fichas/Ficha";
 
@@ -170,40 +170,8 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
           ))}
         </div>
 
-        {/* El pie: fuente y condición. Es cumplimiento, no adorno, y va sobre
-            banda clara para que la letra pequeña se lea. */}
-        {pie.length ? (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: color.lightNeutral,
-              transform: "rotate(0.7deg)",
-              padding: "18px 74px 22px",
-              opacity: entra(t),
-            }}
-          >
-            {pie.map((p, i) => (
-              <div
-                key={p}
-                style={{
-                  fontFamily: i ? fontFamily.video : fontFamily.data,
-                  fontSize: i ? 26 : size.source,
-                  fontWeight: i ? 700 : 400,
-                  letterSpacing: i ? 0 : tracking.labelMono,
-                  textTransform: i ? "none" : "uppercase",
-                  lineHeight: 1.3,
-                  color: i ? color.richBlack : color.navy,
-                  marginBottom: 8,
-                }}
-              >
-                {p}
-              </div>
-            ))}
-          </div>
-        ) : null}
+        {/* El pie: fuente y condición. Es cumplimiento, no adorno. */}
+        <PieTablero lineas={pie} opacidad={entra(t)} />
       </ZonaTablero>
     </AbsoluteFill>
   );

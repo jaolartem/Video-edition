@@ -49,15 +49,6 @@ export const CaptionBand: React.FC<{
   text: string;
   tokens: ModeTokens;
   /**
-   * Si hay un tablero en pantalla. Entonces el subtitulo **acompana**: mismo
-   * sitio, cuerpo mas pequeno. Ver `sobreTablero` en `Ad.tsx`.
-   *
-   * Jaime: *«los subtitulos de los tableros deben ser pequenos, que no compitan,
-   * que simplemente presenten info»*. No se calla —esa regla es suya tambien— y
-   * por eso lo que cambia es el peso visual, no la presencia.
-   */
-  sobreTablero?: boolean;
-  /**
    * Dónde cae su coronilla, en fracción del cuadro. Con esto el subtítulo se
    * coloca **en el hueco de encima de su cabeza** en vez de junto a la barbilla.
    *
@@ -124,7 +115,7 @@ export const CaptionBand: React.FC<{
   /** Frame en que empieza este subtitulo, para poder animar dentro de el. */
   desde?: number;
 }> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0,
-        sobreTablero, coronilla, lado }) => (
+        coronilla, lado }) => (
   <div
     style={{
       position: "absolute",
@@ -176,12 +167,11 @@ export const CaptionBand: React.FC<{
       justifyContent: "flex-end",
       alignItems: "flex-start",
       fontFamily: fontFamily.body,
-      // Sobre tablero baja a 0,68 del cuerpo: sigue legible a distancia de
-      // movil y deja de pelear con el copy del tablero, que es el que manda
-      // ese instante.
-      fontSize: sobreTablero
-        ? Math.round(videoText.caption * 0.68)
-        : videoText.caption,
+      // **Sobre un tablero esta banda ya no se dibuja.** Bajaba a 0,68 del
+      // cuerpo y se quedaba donde estaba —incluso encima de la coronilla, o sea
+      // encima del propio tablero—. Ahora ese caso lo lleva `CaptionDiscreta`,
+      // que es lo que la instruccion T-02 pedia y llevaba escrito sin usarse.
+      fontSize: videoText.caption,
       fontWeight: 800,
       lineHeight: 1.2,
       letterSpacing: videoText.tracking,

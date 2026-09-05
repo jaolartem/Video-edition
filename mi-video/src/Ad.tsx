@@ -16,6 +16,7 @@ import type { CompuertaProps } from "./components/Compuerta";
 import type { AcumulacionProps } from "./components/Acumulacion";
 import type { TwoPathsProps } from "./components/TwoPaths";
 import { CaptionBand, type Compuesto } from "./components/CaptionBand";
+import { CaptionDiscreta } from "./components/CaptionDiscreta";
 import { color } from "./brand/tokens";
 import { mode as modes, type Mode } from "./brand/tokens";
 
@@ -177,6 +178,14 @@ export const Ad: React.FC<AdProps> = ({
   );
 
   /**
+   * ¿Hay un tablero puesto en este frame? Decide **qué subtítulo se dibuja**,
+   * no sólo cómo de grande. Ver la instrucción T-02 abajo.
+   */
+  const bajoTablero = boards.some(
+    (b) => frame >= b.at && frame < b.at + b.duration,
+  );
+
+  /**
    * **El plano se filtra una sola vez, y por eso la cadena se arma aquí.**
    *
    * Estaban como dos objetos derramados dentro del `style`, y el segundo `filter`
@@ -259,34 +268,46 @@ export const Ad: React.FC<AdProps> = ({
         </AbsoluteFill>
       ) : null}
 
+      {/**
+       * **Bajo un tablero el subtitulo cambia de forma Y de sitio.**
+       *
+       * Instrucción de Jaime (T-02): *«durante los tableros el subtítulo pasa a
+       * estilo tradicional discreto: cuerpo pequeño, sin caja ni contorno,
+       * apoyado en el borde inferior de la zona segura —no del cuadro—»*.
+       *
+       * `CaptionDiscreta` llevaba escrito desde entonces y **no lo dibujaba
+       * nadie**: aquí sólo se le bajaba el cuerpo a la banda portante. Y el
+       * cuerpo no era el problema — la banda sube sobre la coronilla cuando hay
+       * hueco, así que en reel-04 el subtítulo se pintaba **encima del bloque de
+       * oro del tablero**, a 400 px de altura, texto sobre texto. Bajarle el
+       * cuerpo no arregla que esté en el sitio de otro.
+       *
+       * Con un tablero puesto no hay cara que acompañar, así que el sitio bueno
+       * es el que no roba composición: el suelo de la franja. El subtítulo no se
+       * calla —*«en los tableros también hay cc»*— pero deja de ser la capa que
+       * manda.
+       */}
       {caption ? (
-        <CaptionBand
-          text={caption.text}
-          tokens={t}
-          /**
-           * **Sobre un tablero, el subtitulo se hace pequeno.**
-           *
-           * Jaime: *«los subtitulos de los tableros deben ser pequenos, que no
-           * compitan, que simplemente presenten info»*.
-           *
-           * El subtitulo NO se calla ahi —*«en los tableros tambien hay cc»*, y
-           * esa regla sigue— pero deja de ser la capa que manda: mientras el
-           * tablero explica, el cc acompana. A cuerpo entero las dos capas
-           * pelean por el mismo instante, y en reel-06 el subtitulo acabo
-           * pisando la barra de «PERDIDA SILENCIOSA» del propio tablero,
-           * diciendo ademas las mismas palabras.
-           */
-          sobreTablero={boards.some(
-            (b) => frame >= b.at && frame < b.at + b.duration,
-          )}
-          coronilla={coronilla}
-          lado={lado}
-          corrige={caption.corrige}
-          palpita={caption.palpita}
-          realza={caption.realza}
-          compuesto={caption.compuesto}
-          desde={caption.at}
-        />
+        bajoTablero ? (
+          <CaptionDiscreta
+            text={caption.text}
+            tokens={t}
+            corrige={caption.corrige}
+            desde={caption.at}
+          />
+        ) : (
+          <CaptionBand
+            text={caption.text}
+            tokens={t}
+            coronilla={coronilla}
+            lado={lado}
+            corrige={caption.corrige}
+            palpita={caption.palpita}
+            realza={caption.realza}
+            compuesto={caption.compuesto}
+            desde={caption.at}
+          />
+        )
       ) : null}
     </AbsoluteFill>
   );

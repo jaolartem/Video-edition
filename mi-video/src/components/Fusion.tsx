@@ -7,6 +7,7 @@ import { color, layout, readingFrames, size, tracking } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
+import { PieTablero } from "./PieTablero";
 import { FileteFicha } from "./fichas/Ficha";
 
 /**
@@ -212,12 +213,17 @@ export const Fusion: React.FC<FusionProps> = ({
             style={{
               position: "absolute",
               left: layout.safe.left,
-              top: ETIQUETA.y - 42,
+              top: ETIQUETA.y - 46,
+              // Sobre la placa el azul pizarra a 26 px desaparece: se leía como
+              // una mancha. La etiqueta va sobre su propio bloque plano, que es
+              // como el canon sostiene la letra pequeña encima de un collage.
+              backgroundColor: color.navy,
+              padding: "6px 14px",
               fontFamily: fontFamily.data,
               fontSize: size.labelMono,
               letterSpacing: tracking.labelMono,
               textTransform: "uppercase",
-              color: color.secondaryBlue,
+              color: color.lightNeutral,
               opacity: pFusion,
             }}
           >
@@ -285,38 +291,8 @@ export const Fusion: React.FC<FusionProps> = ({
           </div>
         ) : null}
 
-        {pie.length ? (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: color.lightNeutral,
-              transform: "rotate(0.7deg)",
-              padding: "18px 74px 22px",
-              opacity: entra(tVeredicto + 10),
-            }}
-          >
-            {pie.map((p, i) => (
-              <div
-                key={p}
-                style={{
-                  fontFamily: i ? fontFamily.video : fontFamily.data,
-                  fontSize: i ? 26 : size.source,
-                  fontWeight: i ? 700 : 400,
-                  letterSpacing: i ? 0 : tracking.labelMono,
-                  textTransform: i ? "none" : "uppercase",
-                  lineHeight: 1.3,
-                  color: i ? color.richBlack : color.navy,
-                  marginBottom: 8,
-                }}
-              >
-                {p}
-              </div>
-            ))}
-          </div>
-        ) : null}
+        <PieTablero lineas={pie} opacidad={entra(tVeredicto + 10)} />
+
       </ZonaTablero>
     </AbsoluteFill>
   );

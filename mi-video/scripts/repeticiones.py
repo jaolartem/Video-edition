@@ -16,6 +16,18 @@ import re
 import sys
 import unicodedata
 
+# **La consola de Windows es cp1252 y esto imprime una flecha.**
+#
+# Es el gotcha 1 del proyecto por enesima vez: `UnicodeEncodeError` sobre «→» y
+# el paso muere DESPUES de medir, asi que el trabajo esta hecho y no se ve.
+# `registro` ya sabe arreglarlo y lo hace por todos: importarlo pone el canal en
+# UTF-8 en vez de repetir aqui la misma linea, que es como se acaba teniendo
+# ocho copias de la misma tirita.
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import registro  # noqa: E402,F401
+
 
 def pal(t):
     t = unicodedata.normalize("NFD", t.lower())

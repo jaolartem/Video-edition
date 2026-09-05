@@ -7,6 +7,7 @@ import { color, ease, layout, readingFrames } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
+import { PieTablero } from "./PieTablero";
 
 /**
  * **La vía de siempre choca; la otra rodea el bloque y sale.**
@@ -242,27 +243,7 @@ export const Desvio: React.FC<DesvioProps> = ({
           </div>
         ) : null}
 
-        {pie.length ? (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: color.lightNeutral,
-              transform: "rotate(0.7deg)",
-              padding: "18px 74px 22px",
-              opacity: entra(tRemate + 12),
-              fontFamily: fontFamily.video,
-              fontSize: 26,
-              fontWeight: 700,
-              lineHeight: 1.3,
-              color: color.richBlack,
-            }}
-          >
-            {pie.join(" · ")}
-          </div>
-        ) : null}
+        <PieTablero lineas={pie} opacidad={entra(tRemate + 12)} />
       </ZonaTablero>
     </AbsoluteFill>
   );
