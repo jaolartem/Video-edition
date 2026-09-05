@@ -36,6 +36,8 @@
  * una entrada por segundo y el único donde el subtítulo va en su forma grande.
  */
 
+import { faltasDeCobertura } from "./lectura.mjs";
+
 const FPS = 30;
 
 /** El gancho son 5 s y el primero es el que decide. Igual que en `trato.py`. */
@@ -499,7 +501,16 @@ export const construir = (ctx) => {
       ],
     };
   const capas = c.capas(ctx);
-  return { capas, faltas: c.exige(capas, ctx) };
+  /**
+   * **La cobertura de los tramos leídos es transversal a los cinco caminos**, y
+   * por eso se comprueba aquí y no dentro de cada uno. Instrucción T-01: si en
+   * el audio se está leyendo, ese tramo va cubierto con tablero. Ver
+   * `lectura.mjs`, que es donde vive el criterio.
+   */
+  return {
+    capas,
+    faltas: [...c.exige(capas, ctx), ...faltasDeCobertura(ctx.det.trato, ctx.det)],
+  };
 };
 
 /**

@@ -776,6 +776,26 @@ COMPONE = Contrato(
               si_falta=Prompt("scripts/describir.prompt.md", "sin portada marcada"),
               nota="Sin ella el modelo elige `trato:'portada'` a ciegas y `valida`"
                    " lo acepta en cualquier etapa o en ninguna."),
+        Campo("lectura",
+              manda=Aguja("scripts/describir.mjs", "`Lectura: se lee el libreto al ${"),
+              exige=(Prompt("scripts/describir.prompt.md",
+                            "Un tramo leído va cubierto con tablero"),),
+              condicional="sólo viaja en las etapas que superan el umbral de lectura",
+              si_falta=Prompt("scripts/describir.prompt.md",
+                              "Las etapas que se leen te llegan"),
+              nota="T-01. El disparador es el AUDIO: `detalle[].literal`, medido"
+                   " contra el libreto por secuencias de cuatro palabras. Sin"
+                   " este campo el que compone elige tratamiento sin saber que"
+                   " la etapa se lee, y así salieron cinco tramos leídos en"
+                   " cámara limpia. `valida()` rechaza la respuesta que ponga"
+                   " otro `trato`."),
+        Campo("franja",
+              manda=Aguja("scripts/describir.mjs", "criterioDeFranja()"),
+              exige=(Prompt("scripts/describir.prompt.md",
+                            "La franja reservada al subtítulo"),),
+              nota="T-02. El valor exacto lo pone `scripts/franja.mjs` desde"
+                   " `src/brand/franja.json`, que es donde vive: escribirlo en"
+                   " el prompt sería la segunda copia que se queda vieja."),
         Campo("libreto",
               manda=Aguja("scripts/describir.mjs", '"Libreto:",'),
               exige=(Prompt("scripts/describir.prompt.md", "la intención comunicativa"),),

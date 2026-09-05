@@ -4,6 +4,7 @@ import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo, Panel } from "./Fondo";
+import { ZonaTablero } from "./ZonaTablero";
 import {
   color,
   duration,
@@ -89,10 +90,20 @@ export type AcumulacionProps = {
   sound?: boolean;
 };
 
-/** Caja del panel sobre el que se apoya todo. */
-const PANEL = { x: 46, y: 300, w: 988, h: 1090 } as const;
+/**
+ * Caja del panel sobre el que se apoya todo, **dentro de la zona del tablero**.
+ *
+ * Iba de 300 a 1390 y la banda de condición al 1452: los dos por debajo del
+ * 65% de altura, o sea bajo la interfaz de la plataforma. Nadie los veía. Con
+ * T-02 el tablero acaba en el techo de la franja del subtítulo (1048), así que
+ * el panel se recoge y la banda se cuelga de ese techo.
+ *
+ * Lo que se paga es escala, no contenido: el eje y la cifra de remate bajan de
+ * tamaño y el tablero dice exactamente lo mismo — en el sitio donde se ve.
+ */
+const PANEL = { x: 46, y: 270, w: 988, h: 610 } as const;
 /** Caja del gráfico, en coordenadas del panel. */
-const EJE = { x: 60, y: 230, alto: 640 } as const;
+const EJE = { x: 60, y: 170, alto: 250 } as const;
 const BARRA = 330;
 
 export const Acumulacion: React.FC<AcumulacionProps> = ({
@@ -202,6 +213,10 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
        * respete su secuencia. Eso lo garantiza el montaje, no un rótulo.
        */}
 
+      {/* Todo lo que hay que LEER va dentro de la zona del tablero: del borde
+          de arriba al techo de la franja del subtítulo. El fondo se queda
+          fuera, que ocupa el cuadro entero. Ver `ZonaTablero`. */}
+      <ZonaTablero>
       {/* Cinta de encabezado: las condiciones de la comparación. Va arriba y en
           claro, como en el canon — es el marco del dato, no el dato. */}
       <div
@@ -353,14 +368,16 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
               position: "absolute",
               left: EJE.x - 34,
               right: 56,
-              top: suelo + 62,
+              top: suelo + 48,
               opacity: p(finTramos + 6),
             }}
           >
             <div
               style={{
                 fontFamily: fontFamily.bloque,
-                fontSize: 132,
+                // 96 y no 132: la cifra de remate cabe dentro de la zona del
+                // tablero. Ver `PANEL`.
+                fontSize: 96,
                 lineHeight: 0.9,
                 letterSpacing: "0.002em",
                 textTransform: "uppercase",
@@ -388,26 +405,28 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
       </Panel>
 
       {/* Banda inferior: la condición. Lleva banda propia y no vive de adorno
-          al pie — un límite que comparte pantalla con el argumento no se lee. */}
+          al pie — un límite que comparte pantalla con el argumento no se lee.
+          Colgada del TECHO de la franja: crece hacia arriba y no puede bajar. */}
       <div
         style={{
           position: "absolute",
           left: 0,
           right: 0,
-          top: 1452,
+          bottom: 0,
           backgroundColor: color.lightNeutral,
           transform: "rotate(0.9deg)",
-          padding: "22px 74px",
+          padding: "16px 64px",
           fontFamily: fontFamily.video,
-          fontSize: 26,
+          fontSize: 24,
           fontWeight: 700,
-          lineHeight: 1.34,
+          lineHeight: 1.26,
           color: color.richBlack,
           opacity: p(finTramos + 14),
         }}
       >
         {condicion}
       </div>
+      </ZonaTablero>
     </AbsoluteFill>
   );
 };

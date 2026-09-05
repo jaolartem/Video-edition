@@ -11,6 +11,7 @@ import { Comparacion, type ComparacionProps } from "./components/Comparacion";
 import { Acumulacion, type AcumulacionProps } from "./components/Acumulacion";
 import { TwoPaths, type TwoPathsProps } from "./components/TwoPaths";
 import { CaptionBand, type Compuesto } from "./components/CaptionBand";
+import { CaptionDiscreta } from "./components/CaptionDiscreta";
 import { color } from "./brand/tokens";
 import { mode as modes, type Mode } from "./brand/tokens";
 
@@ -116,6 +117,22 @@ export const Ad: React.FC<AdProps> = ({
     (c) => frame >= c.at && frame < c.at + c.duration,
   );
 
+  /**
+   * **La jerarquía entre el tablero y el subtítulo, decidida aquí.**
+   *
+   * Instrucción de Jaime (T-02): *«el tablero es la capa de información y el
+   * subtítulo sólo acompaña»*. Mientras hay tablero el subtítulo cambia de
+   * forma —discreto, apoyado en el suelo de la franja— en vez de seguir siendo
+   * la capa portante con su caja negra encima de la composición. En R-04 las
+   * dos capas se cruzaban: texto sobre texto, ilegibles las dos.
+   *
+   * Se decide en el frame, no en el spec: un tablero puede empezar a mitad de
+   * una cue y la cue tiene que cambiar con él.
+   */
+  const bajoTablero = boards.some(
+    (b) => frame >= b.at && frame < b.at + b.duration,
+  );
+
   return (
     <AbsoluteFill style={{ backgroundColor: t.ground }}>
       <OffthreadVideo
@@ -180,15 +197,24 @@ export const Ad: React.FC<AdProps> = ({
       ) : null}
 
       {caption ? (
-        <CaptionBand
-          text={caption.text}
-          tokens={t}
-          corrige={caption.corrige}
-          palpita={caption.palpita}
-          realza={caption.realza}
-          compuesto={caption.compuesto}
-          desde={caption.at}
-        />
+        bajoTablero ? (
+          <CaptionDiscreta
+            text={caption.text}
+            tokens={t}
+            corrige={caption.corrige}
+            desde={caption.at}
+          />
+        ) : (
+          <CaptionBand
+            text={caption.text}
+            tokens={t}
+            corrige={caption.corrige}
+            palpita={caption.palpita}
+            realza={caption.realza}
+            compuesto={caption.compuesto}
+            desde={caption.at}
+          />
+        )
       ) : null}
     </AbsoluteFill>
   );

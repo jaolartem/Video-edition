@@ -44,6 +44,14 @@ node scripts/guardas.mjs
 # Va aqui, al lado de las guardas, y por el mismo motivo — lee ficheros y es
 # barato, asi que se paga antes de gastar el peldano caro.
 python scripts/verdad.py
+# **Y las instrucciones, con su aguja.** Misma idea, aplicada a lo que dice
+# Jaime: una instruccion cuyo mecanismo se perdio en una reescritura vuelve a
+# incumplirse en las seis piezas y nadie se entera. `instruccion.py` comprueba
+# la aguja de cada una; `franja.mjs` comprueba que ningun tablero baje a la
+# franja del subtitulo, que es la unica de las dos que se puede ver mirando la
+# pieza — y para entonces ya esta renderizada.
+python scripts/instruccion.py
+node scripts/franja.mjs
 
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")

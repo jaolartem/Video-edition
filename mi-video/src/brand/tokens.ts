@@ -67,9 +67,12 @@ export const layout = {
   safeBottomExtremo: 672,
 } as const;
 
-/** Altura útil real de un tablero, ya descontada la banda de subtítulos. */
-export const boardHeight =
-  layout.height - layout.safe.top - layout.safe.bottom - layout.captionBand;
+/**
+ * El alto útil de un tablero **ya no se calcula aquí**: vive en
+ * `src/brand/franja.ts`, derivado de `franja.json`, que es el único sitio donde
+ * está declarada la franja del subtítulo. Esto era la quinta copia del mismo
+ * número —`layout.safe.bottom + layout.captionBand`— y encima no lo leía nadie.
+ */
 
 /** Paleta canónica de `tokens.css`. Los hex no se ajustan "a ojo" para video. */
 export const color = {

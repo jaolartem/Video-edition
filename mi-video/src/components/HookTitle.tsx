@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
+import { franja } from "../brand/franja";
 import {
   duration,
   ease,
@@ -75,7 +76,7 @@ export const HookTitle: React.FC<{
         paddingLeft: layout.safe.left,
         paddingRight: layout.safe.right,
         /** Por encima de la banda de subtítulos, nunca sobre la cara. */
-        paddingBottom: layout.safe.bottom + layout.captionBand,
+        paddingBottom: franja.reserva,
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",

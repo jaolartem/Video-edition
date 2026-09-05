@@ -4,6 +4,7 @@ import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo } from "./Fondo";
+import { ZonaTablero } from "./ZonaTablero";
 import {
   color,
   duration,
@@ -98,19 +99,23 @@ export type ComparacionProps = {
 // resto era negro apretado arriba y vacío abajo; ahora respiran de verdad y el
 // pie legal tiene su banda.
 /**
- * Caja de las columnas, **por encima de la banda de subtítulos**.
+ * Caja de las columnas, **dentro de la zona del tablero**.
  *
  * Jaime: *«en los tableros también hay cc»*. Y es distinto del panel: bajo un
  * panel la voz dice lo que el panel muestra, así que el subtítulo repetiría;
  * bajo un tablero la voz **sigue diciendo cosas que el tablero no enseña** —es
  * un L-cut— y el 85% mira sin sonido.
  *
- * La banda vive en 960–1160 (`captionBottom` 760 + `captionBand` 200), así que
- * las columnas acaban en 900 y el remate y el pie se van por debajo de ella.
+ * **Esto bajaba a 900 y mandaba el remate al 1390 y el pie al 1570**, o sea
+ * fuera de la zona segura: por debajo del 65% vive la interfaz de la
+ * plataforma, así que ese remate y ese pie no los veía nadie. La regla nueva de
+ * Jaime (T-02) los recoge: ningún tablero baja hasta la franja del subtítulo,
+ * y por tanto tampoco más abajo. Las columnas pierden 140 px de alto —el
+ * contenido cabía de sobra en 500— y el pie se cuelga del techo de la franja.
  */
-const COL = { y: 260, alto: 640 } as const;
-/** Donde empieza la banda de subtítulos. Nada del tablero la invade. */
-const CC = layout.height - layout.captionBottom;
+const COL = { y: 260, alto: 500 } as const;
+/** El remate, justo debajo de las columnas y dentro de la zona. */
+const REMATE_Y = COL.y + COL.alto + 20;
 
 export const Comparacion: React.FC<ComparacionProps> = ({
   premisa,
@@ -163,6 +168,16 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   const entraIzq = Math.round(total * 0.14);
   const entraDer = Math.round(total * 0.38);
   const finColumnas = Math.round(total * 0.62);
+  /**
+   * **El pie legal tiene beat propio, y por eso releva al remate.**
+   *
+   * Es la regla del canon —*«el texto legal lleva beat propio, no vive de
+   * adorno permanente al pie»*— más lo que impone T-02: el tablero acaba en el
+   * techo de la franja, así que abajo hay un solo hueco y no dos. El remate
+   * ocupa ese hueco desde que las columnas se comparan; cuando llega la
+   * condición, se va. Nunca se pisan porque nunca coinciden.
+   */
+  const entraPie = Math.round(total * 0.78);
 
   const util = layout.width - layout.safe.left * 2;
   const ancho = (util - 34) / 2;
@@ -262,6 +277,10 @@ export const Comparacion: React.FC<ComparacionProps> = ({
        * respete su secuencia. Eso lo garantiza el montaje, no un rótulo.
        */}
 
+      {/* Todo lo que hay que LEER va dentro de la zona del tablero: del borde
+          de arriba al techo de la franja del subtítulo. El fondo se queda
+          fuera, que ocupa el cuadro entero. Ver `ZonaTablero`. */}
+      <ZonaTablero>
       {/* Cinta de premisa: la condición común. Sin ella la comparación no es
           honesta — el playbook exige que el punto de partida sea el mismo. */}
       <div
@@ -288,12 +307,12 @@ export const Comparacion: React.FC<ComparacionProps> = ({
         <div
           style={{
             position: "absolute",
-            top: CC + layout.captionBand + 30,
+            top: REMATE_Y,
             left: layout.safe.left,
             right: layout.safe.right,
             display: "flex",
             justifyContent: "center",
-            opacity: p(finColumnas + 6),
+            opacity: p(finColumnas + 6) * (1 - p(entraPie, 8)),
             fontFamily: fontFamily.bloque,
           }}
         >
@@ -316,11 +335,13 @@ export const Comparacion: React.FC<ComparacionProps> = ({
           position: "absolute",
           left: 0,
           right: 0,
-          top: CC + layout.captionBand + 210,
+          // Colgado del TECHO de la franja: crece hacia arriba y no puede
+          // bajar. Estaba en `top` y por eso acababa a 1570, bajo la interfaz.
+          bottom: 0,
           backgroundColor: color.lightNeutral,
           transform: "rotate(0.8deg)",
-          padding: "20px 74px 24px",
-          opacity: p(Math.round(total * 0.78)),
+          padding: "16px 64px 18px",
+          opacity: p(entraPie),
         }}
       >
         <div
@@ -338,15 +359,16 @@ export const Comparacion: React.FC<ComparacionProps> = ({
         <div
           style={{
             fontFamily: fontFamily.video,
-            fontSize: 26,
+            fontSize: 24,
             fontWeight: 700,
-            lineHeight: 1.34,
+            lineHeight: 1.26,
             color: color.richBlack,
           }}
         >
           {condicion}
         </div>
       </div>
+      </ZonaTablero>
     </AbsoluteFill>
   );
 };

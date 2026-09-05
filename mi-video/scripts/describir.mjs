@@ -68,6 +68,8 @@
  */
 import { execFileSync } from "child_process";
 import fs from "fs";
+import { criterio as criterioDeFranja } from "./franja.mjs";
+import { esLectura, tratoSinCubrir } from "./lectura.mjs";
 
 const PROMPT = fs.readFileSync("scripts/describir.prompt.md", "utf8");
 
@@ -172,7 +174,11 @@ const KIND_DE = {
   EvidenceCard: "acumulacion",
 };
 
-function valida(d) {
+function valida(d, leidas = new Map()) {
+  // T-01: lo que no encaja se rechaza, y una etapa leida que vuelve con un
+  // trato en camara limpia no encaja. El criterio vive en `lectura.mjs`.
+  const mal = tratoSinCubrir(d, leidas);
+  if (mal) throw new Error(mal);
   for (const [k, admitidos] of Object.entries(CAMPOS)) {
     if (!(k in d)) throw new Error(`falta «${k}»`);
     if (admitidos && !admitidos.includes(d[k])) {
@@ -247,11 +253,27 @@ function describePieza(slug, filas) {
   // Cual es la portada ya esta decidido —es la etapa que abre— y no se
   // renegocia aqui: se le dice, para que la describa como gancho.
   let portada = null;
+  /**
+   * **Qué etapas se están leyendo, y con qué exactitud.**
+   *
+   * T-01: *«el disparador es el audio, no el frame, para que el compositor
+   * identifique los tramos sin juzgar la mirada plano a plano»*. El dato ya
+   * está medido en el EDL (`detalle[].literal`, secuencias de cuatro palabras
+   * contra el libreto) y sólo hacía falta ponerlo en el pedido: sin él, el que
+   * compone decide el tratamiento **sin saber que la etapa se lee**, que es
+   * exactamente lo que dejó seis tramos leídos en cámara limpia.
+   */
+  const leidas = new Map();
   try {
     const edl = JSON.parse(
       fs.readFileSync(`ads/${slug}/edl-sell.json`, "utf8"),
     );
     portada = edl.detalle?.find((d) => d.trato === "portada")?.beat ?? null;
+    for (const d of edl.detalle ?? []) {
+      if (esLectura(d)) {
+        leidas.set(Number(d.beat), Math.max(leidas.get(Number(d.beat)) ?? 0, d.literal));
+      }
+    }
   } catch {
     // Sin EDL todavia no hay portada marcada, y no pasa nada: el paso de
     // seleccion la marcara y `trato.py` la impone despues.
@@ -260,11 +282,18 @@ function describePieza(slug, filas) {
   const entrada = [
     `Reel: ${slug} — ${filas.length} etapas, en orden.`,
     portada === null ? "" : `La etapa ${portada} es la PORTADA (el gancho).`,
+    criterioDeFranja(),
     "",
     ...filas.map((f) =>
       [
         `## Etapa ${f.orden} de «${f.estructura}»: ${f.etapa}`,
         `Funcion: ${f.mensaje ?? "(no declarada)"}`,
+        leidas.has(Number(f.orden))
+          ? `Lectura: se lee el libreto al ${Math.round(leidas.get(Number(f.orden)) * 100)}%` +
+            (Number(f.orden) === Number(portada)
+              ? " — es la portada, asi que NO se cubre: el gancho nunca es un tablero."
+              : " — esta etapa va CUBIERTA con tablero, `trato` = tablero.")
+          : "",
         "Libreto:",
         f.libreto,
         // **Lo que dice el montaje, no lo que se eligio.** Son cosas
@@ -291,7 +320,7 @@ function describePieza(slug, filas) {
     );
   }
   const ya = leeRespuesta(slug);
-  if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
+  if (ya) return ya.map((d) => valida(d, leidas)).map((d) => ({ ...d, quien: "servicio" }));
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
   // queda escrito es la pregunta entera —prompt incluido— y cualquiera puede
   // contestarla despues sin reconstruir nada.
@@ -326,7 +355,7 @@ function describePieza(slug, filas) {
     return null;
   }
   fs.writeFileSync(rutaRespuesta(slug), JSON.stringify(arr, null, 1));
-  return arr.map(valida).map((d) => ({ ...d, quien: "cli" }));
+  return arr.map((d) => valida(d, leidas)).map((d) => ({ ...d, quien: "cli" }));
 }
 
 const rehacer = process.argv.includes("--rehacer");

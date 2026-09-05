@@ -123,6 +123,45 @@ VERDADES = (
               " re-describir la etapa volvió el $14.300.",
     ),
     Verdad(
+        decision="La franja reservada al subtítulo",
+        vive_en="`src/brand/franja.json`, derivada de la zona segura",
+        lee=(Aguja("src/brand/franja.ts", 'import franjaJson from "./franja.json"'),
+             Aguja("scripts/franja.mjs", 'leer("src/brand/franja.json")'),
+             Aguja("src/components/ZonaTablero.tsx", "bottom: franja.reserva"),
+             Aguja("src/components/CaptionDiscreta.tsx", "bottom: franja.desdeAbajo"),
+             Aguja("scripts/describir.mjs", "criterioDeFranja()"),),
+        prohibido=(Aguja("src/components/CausalChain.tsx",
+                         "paddingBottom: layout.safe.bottom + layout.captionBand"),
+                   Aguja("src/components/TwoPaths.tsx",
+                         "paddingBottom: layout.safe.bottom + layout.captionBand"),
+                   Aguja("src/components/HookTitle.tsx",
+                         "paddingBottom: layout.safe.bottom + layout.captionBand"),
+                   Aguja("src/components/Comparacion.tsx", "top: CC + layout.captionBand"),
+                   Aguja("src/components/Acumulacion.tsx", "top: 1452"),),
+        copia="Ninguna. `tokens.ts` sigue declarando la zona segura de Meta"
+              " (`bottom: 672`) y la banda (`captionBand: 200`), que es de donde"
+              " sale el 65% y el 10,4166%; la franja no se recalcula en cada"
+              " componente.",
+        costo="Los seis tableros del lote la invadían: `Comparacion` ponía el"
+              " remate en 1390 y el pie en 1570, `Acumulacion` un panel hasta"
+              " 1390 y su condición en 1452 — todo por debajo del 65%, o sea"
+              " bajo la interfaz de la plataforma. La regla estaba escrita en"
+              " dos componentes y los otros dos no la miraban.",
+    ),
+    Verdad(
+        decision="Cuándo un tramo es lectura",
+        vive_en="`scripts/trato.py`, con la medida de `seleccionar.py :: literal()`",
+        lee=(Aguja("scripts/trato.py", "LEIDA = 0.60"),
+             Aguja("scripts/lectura.mjs", "export const LEIDA = 0.60;"),
+             Aguja("scripts/seleccionar.py", "def literal(texto, parrafo, n=4):"),),
+        copia="`reading-detect.py` mide la altura de la cabeza y **no decide**:"
+              " la hipótesis no se sostuvo (rango intercuartílico 0,016) y el"
+              " disparador es el audio, no el frame.",
+        costo="El umbral vivía sólo en `trato.py` y el que compone no lo veía:"
+              " cinco tramos leídos salieron en cámara limpia, uno al 97% de"
+              " secuencia literal.",
+    ),
+    Verdad(
         decision="Que una pieza esté montada",
         vive_en="el fichero en `out/reels/`, no la etiqueta de fase",
         lee=(Aguja("scripts/avanzar.py", "def _render_caduco(pieza):"),

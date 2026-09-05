@@ -4,6 +4,7 @@ import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
 import { MotionSound } from "./MotionSound";
 import { CaptionBand } from "./CaptionBand";
+import { franja } from "../brand/franja";
 import {
   accentChoice,
   beat,
@@ -201,7 +202,7 @@ export const CausalChain: React.FC<CausalChainProps> = ({
           ),
           paddingTop: layout.safe.top,
           /** Se descuenta la banda de subtítulos: también se ven. */
-          paddingBottom: layout.safe.bottom + layout.captionBand,
+          paddingBottom: franja.reserva,
           paddingLeft: layout.safe.left,
           paddingRight: layout.safe.right,
           display: "flex",
@@ -471,7 +472,7 @@ const Limitation: React.FC<{
   <AbsoluteFill
     style={{
       paddingTop: layout.safe.top,
-      paddingBottom: layout.safe.bottom + layout.captionBand,
+      paddingBottom: franja.reserva,
       paddingLeft: layout.safe.left,
       paddingRight: layout.safe.right,
       display: "flex",
