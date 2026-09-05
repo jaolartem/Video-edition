@@ -196,7 +196,16 @@ class Montaje:
                      "acaba_en": " ".join(p.texto for p in dentro[-5:]),
                      "seguia": " ".join(p.texto for p in sigue)})
             if avisos:
-                por.setdefault(d.get("beat"), []).extend(avisos)
+                # **La clave es SIEMPRE texto, y se normaliza aqui.** Este
+                # diccionario viaja dentro del pedido, y JSON convierte las
+                # claves de un objeto en cadenas: leido en proceso llegaba con
+                # enteros y leido tras pasar por el fichero, con cadenas. El
+                # mismo dato con dos tipos de clave son dos datos, y quien lo
+                # indexaba con el tipo que no era veia **todas las etapas
+                # limpias**. Con eso se cerro en falso el ticket #17 de reel-01
+                # —el beat 3 tenia el borde de 262,47— y la pieza salio con el
+                # defecto y la lista diciendo que se habia atendido.
+                por.setdefault(str(d.get("beat")), []).extend(avisos)
         return por
 
     def __str__(self) -> str:

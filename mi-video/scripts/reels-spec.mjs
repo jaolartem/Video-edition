@@ -29,20 +29,24 @@
  *   node scripts/reels-spec.mjs
  */
 import fs from "fs";
-import { rotuloDe, sonidosMudos } from "./caminos.mjs";
+import { createHash } from "node:crypto";
+import { faltasDeclaradas, rotuloDe } from "./caminos.mjs";
+import { lecturaCorta } from "./reels/lectura.mjs";
 import { FPS, Reloj } from "./reels/reloj.mjs";
-import { FRAMES } from "./reels/material.mjs";
-import { duracionDelCorte, edlDe, marcoDe, planDe, subsDe }
+// Las tres importaciones de `material.mjs` que había aquí eran una.
+import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe }
   from "./reels/material.mjs";
-import { aprobadas, correccionesDe, descDe, pieDe, tablerosDe }
+import { correccionesDe, descDe, pieDe, tablerosDe }
   from "./reels/base.mjs";
 import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe }
   from "./reels/copy.mjs";
-import { acotarAlCta, ctaDe } from "./reels/cta.mjs";
-import { caminosDe, contrasteDe, glitchesDe, repartirPorCubre, tarjetasDe }
+import { acotarAlCta, ctaDe, faltasDelCierre } from "./reels/cta.mjs";
+import { caminosDe, contrasteDe, cortinillasDe, cortinillasSinSitio,
+  faltaMezcla, glitchesDe, repartirPorCubre, tarjetasDe }
   from "./reels/capas.mjs";
 import { armarPaneles, armarTableros, empujaTablero, sePisa }
   from "./reels/tableros.mjs";
+import { imagenDe } from "./reels/imagen.mjs";
 import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad }
   from "./reels/subtitulos.mjs";
 import { porEscena, rellenar } from "./reels/escenas.mjs";
@@ -60,7 +64,10 @@ const faltas = [];
 const spec = Object.keys(FRAMES.reels).map((slug) => {
   // **El rotulo lo declara el diseno; `LINEAS` es el respaldo.** Del literal
   // salia «No es por / ser inmigrante», que refuta la creencia antes de plantarla.
-  const lineas = rotuloDe(descDe(slug)?.[1]) ?? LINEAS[slug] ?? [];
+  // El DECLARADO y el que se usa son dos cosas: si se pasa el resuelto a
+  // `literalesDe`, una pieza que cae al literal parece haberlo declarado.
+  const rotuloDeclarado = rotuloDe(descDe(slug)?.[1]);
+  const lineas = rotuloDeclarado ?? LINEAS[slug] ?? [];
   const marco = marcoDe(slug);
   const edl = edlDe(slug);
   const plan = planDe(slug);
@@ -88,7 +95,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
    * declarado es deuda; un parche callado es la fuente de verdad de facto. Lo
    * que queda escrito a mano vive junto en `copy.mjs` y se cuenta aquí.
    */
-  const literales = literalesDe(slug);
+  const literales = literalesDe(slug, rotuloDeclarado);
   if (literales.length) {
     faltas.push(
       `${slug}: ${literales.map(([q, n]) => `${n} ${q}`).join(", ")} salen de ` +
@@ -111,12 +118,13 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     );
   }
 
+  faltas.push(...faltaMezcla(slug, deLaBase));
   const { pleno, panel } = repartirPorCubre(deLaBase);
   const tableros = armarTableros(
     // El pie sale de la fuente comprobada, no de una cadena a mano. Va antes
     // del horario porque la condición cuenta para el tiempo de lectura.
     pleno.map((b) => ({ ...b, props: { ...b.props, ...pieDe(slug, b.beat, b.props) } })),
-    { slug, reloj, duracion, empuja: empujaTablero(cartas) },
+    { slug, reloj, duracion, empuja: empujaTablero(cartas), captions },
   );
 
   // El CTA se calcula ahora y no antes porque su sitio sale de la duración del
@@ -134,17 +142,21 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   // Si el desliz cae dentro del CTA, lo señala la fila de precio de la tarjeta.
   // Y entonces el precio SÍ se imprime: no caduca, porque lo que se enseña es
   // el número que el propio libreto calcula, no la oferta vigente.
-  if (marca.enCta) cta.corrige = marca.enCta;
+  if (marca.enCta && cta) cta.corrige = marca.enCta;
 
   const { capas: caminos, faltas: fCaminos } =
     caminosDe({ slug, plan, edl, desc: descDe(slug) });
   faltas.push(...fCaminos);
 
+  // El virado del plano y la costura animada: lo que el diseñador pidió sobre
+  // la IMAGEN, con su horario. Ver `scripts/reels/imagen.mjs`.
+  const imagen = imagenDe(reloj);
+
   const pieza = {
     id: `Reel-R${slug.slice(-1)}`,
     video: `${slug}.mp4`,
-    // Sin aprobar, sin audio adicional: ver `aprobadas` en `base.mjs`.
-    sonido: aprobadas.has(slug),
+    // Los efectos suenan siempre: la puerta de aprobacion se quito.
+    sonido: true,
     // Las capas por camino: el gancho, los tableros, los cercanos y las
     // metáforas, cada uno con lo suyo. Ver `scripts/caminos.mjs`.
     caminos,
@@ -190,23 +202,38 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
      * dibujaba encima de su trabajo. Su contenido se migró a `escena_desc`, y
      * ahí ya lo mueve él.
      */
-    paneles: armarPaneles(panel, reloj, tableros),
-    /**
-     * **Sin cortinillas.** Se probaron y se quitaron. Jaime: *«en el segundo 7 se
-     * ve raro; esos cortes de escena no vale la pena dejarlos como cortes de
-     * escena»*. Partían el rótulo por la mitad y no valían el corte: un flash que
-     * aparece y se va no desarrolla nada, y para tapar un corte metía dos.
-     *
-     * Lo que cubre las costuras ahora es **el propio tablero**, que se estira
-     * `SOLAPE` frames por encima de la frontera: es un L-cut, y lo que la tapa
-     * además explica algo. El campo se queda porque `Reel.tsx` y el detector de
-     * mudos lo leen.
-     */
-    cortinillas: [],
-    glitch: glitchesDe(edl, reloj, [...tableros, ...cartas]),
+    paneles: armarPaneles(panel, reloj, tableros, captions),
+    // **Las que se piden, no todas.** Se probaron en TODAS las costuras y
+    // quedaron mal —Jaime: «en el segundo 7 se ve raro; esos cortes de escena
+    // no vale la pena dejarlos como cortes de escena»—: partian el rotulo por
+    // la mitad, y para tapar un corte metian dos.
+    //
+    // La conclusion que se aplico fue `cortinillas: []` fijo, y con eso se
+    // perdio la pieza entera: componente escrito, hueco aqui, `Reel.tsx`
+    // dibujandolo, y ninguna forma de pedir una. Ahora sale de
+    // `escena_desc.camara.transicion`, asi que sigue sin haber ninguna mientras
+    // nadie la pida — y quien compone puede pedirla en la costura que la
+    // necesita, que es lo que no existia.
+    //
+    // Lo que cubre las costuras por defecto sigue siendo el propio TABLERO, que
+    // se estira `SOLAPE` frames por encima de la frontera: un L-cut, y lo que
+    // la tapa ademas explica algo.
+    cortinillas: cortinillasDe(slug, reloj, marco),
+    // Y el virado y los filetes, que se piden por etapa y salen del plan.
+    ...imagen,
+    // Una costura con filete pedido ya está resuelta: el glitch encima serían
+    // dos efectos en el mismo frame, que es ruido y no transición.
+    glitch: glitchesDe(edl, reloj, [...tableros, ...cartas, ...imagen.filetes]),
     tarjetas: cartas,
     boards: tableros,
+    cara: caraDe(slug),
   };
+
+  // **Y se comprueba que cada tablero DE TIEMPO A LEERSE.** Jaime: *«todo
+  // tablero tiene que tener tiempo suficiente de lectura»*. La regla llevaba
+  // escrita en el contrato del disenador desde el principio —0,75 s por bloque
+  // mas medio segundo— y no la miraba nadie.
+  faltas.push(...lecturaCorta(tableros).map((f) => `${slug}: ${f}`));
 
   /**
    * **El subtítulo se compone al final**, cuando ya se sabe qué hay en pantalla.
@@ -237,7 +264,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     ...pieza.tarjetas,
     ...pieza.paneles,
     // El CTA se pinta encima: componer ahi seria trabajar para nadie.
-    { at: pieza.cta.at * FPS, duration: pieza.cta.dur * FPS },
+    ...(pieza.cta ? [{ at: pieza.cta.at * FPS, duration: pieza.cta.dur * FPS }] : []),
     { at: pieza.entra, duration: 9 + pieza.sostiene + 9 },
   ], ventanas);
   pieza.captions = comp.captions;
@@ -286,6 +313,25 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   pieza.compuestos = comp.n;
   return pieza;
 });
+// **Cada pieza lleva la huella de lo que se compuso.**
+//
+// Jaime, despues de tres dias viendo el mismo video: *«con una que no cuadre es
+// suficiente para saber que eso no es lo que se mando a render»*. Tiene razon, y
+// la consecuencia es que no hay que catalogar diferencias: hay que poder
+// comparar lo dibujado con lo compuesto, de una sola vez.
+//
+// Hasta ahora la frescura se DEDUCIA comparando fechas de ficheros y de filas: si
+// el EDL es mas nuevo que el mp4, si `escena_desc.fecha` cambio. Eso adivina, y
+// se equivoca en las dos direcciones — no vio el bundle cacheado, y rehizo
+// renders que estaban bien.
+//
+// La huella no adivina: es el sha1 de lo que el render va a dibujar. Si el
+// fichero renderizado no lleva esta misma huella, lo que hay en disco NO es lo
+// que se compuso. No hay tercera posibilidad.
+for (const p of spec) {
+  const {huella: _v, ...sinHuella} = p;
+  p.huella = createHash("sha1").update(JSON.stringify(sinHuella)).digest("hex").slice(0, 12);
+}
 
 fs.writeFileSync("src/reels.json", JSON.stringify(spec, null, 1) + "\n");
 // **Las comprobaciones van DESPUES de escribir el spec.** Estaban antes, asi
@@ -293,7 +339,7 @@ fs.writeFileSync("src/reels.json", JSON.stringify(spec, null, 1) + "\n");
 // anterior y no habia forma de mirar por que fallo: los numeros que uno lee no
 // son los que la hicieron saltar. Un artefacto que no existe cuando la
 // comprobacion falla es un artefacto que no sirve para diagnosticar.
-revisar(spec);
+revisar(spec); faltasDelCierre(spec, faltas); // el cierre que falta tambien bloquea
 
 /**
  * **El spec se reescribe al final, con lo que dijeron las comprobaciones.**
@@ -321,16 +367,17 @@ if (parados.length) {
  * pieza peor, no una pieza inválida, y pararlo todo por eso deja seis vídeos sin
  * hacer por una descripción corta. Lo que sí hace es dejar de ser invisible.
  *
- * **Un sonido descrito que no suena entra aquí, no se calla.** `sonidoDe`
- * reconoce la descripción de la escena por expresiones —«golpe seco», «se
- * traza», «barrido»—; lo que no encaja con ninguna se montaba mudo sin decir
- * nada, con la descripción escrita y correcta. No se inventa el sonido —eso
- * rompería la ley de que el sonido sigue al movimiento— pero se dice qué etapa
- * lo describió y qué escribió, que es lo que permite arreglarlo donde vive.
+ * Lo declarado que no llega a producirse —el sonido que no suena, la figura que
+ * no se traza— lo redacta `faltasDeclaradas()` en `escena.mjs`, que es donde se
+ * acumula. Estaba escrito aquí dos veces, una por accidente: dos redacciones
+ * del mismo aviso son dos sitios donde el día que cambie el formato queda uno
+ * mal, que es el error que este fichero ya cometió con `donde()`.
  */
-faltas.push(...sonidosMudos.map((s) =>
-  `${s.donde}: describe un sonido que no suena — «${s.dice}». Ninguna ` +
-  `expresion de SONIDOS lo reconoce, asi que la capa se monta muda.`));
+faltas.push(...faltasDeclaradas());
+// Y la cortinilla pedida que no se pudo poner. Sale como falta y no como
+// silencio por lo de siempre: una transicion que se declara y no aparece deja
+// a quien compuso creyendo que la costura esta tapada.
+faltas.push(...cortinillasSinSitio.map((c) => `cortinilla sin sitio — ${c}`));
 if (faltas.length) {
   console.log(`\nFALTAS DE CAMINO — ${faltas.length}:`);
   for (const f of faltas) console.log(`  · ${f}`);

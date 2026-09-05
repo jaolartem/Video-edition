@@ -41,7 +41,8 @@ import { limit } from "../brand/copy";
  *
  * Lo que **no** hace es rellenar huecos. Un tablero sin textos no dibuja nada y
  * eso se ve, que es mejor que dibujar una caja vacía con pinta de tablero.
- */
+  * @clase tablero
+*/
 
 /** Props que son estructura, no texto en pantalla. */
 const NO_ES_TEXTO = new Set([
@@ -54,8 +55,21 @@ const NO_ES_TEXTO = new Set([
   // Lo encontro el paso de diseno la primera vez que corrio. Llevaba ahi desde
   // que `armarTableros` empezo a pasar la duracion.
   "duracion",
+  // **Y las otras claves de motor, por la misma razon.** `duracion` la puso
+  // aqui el «430» que salio rotulado en reel-01; estas tres son sus hermanas y
+  // seguian fuera: `sfx`/`sound` los pone quien declara el movimiento que suena
+  // —`sfx: "land"` se imprimia en versales como una linea mas—, `rotulo` es el
+  // texto del gancho que lleva `BigTitle`, y `camara` la declaracion de plano.
+  // Ninguna es copy, y las cuatro llegan por el mismo camino: alguien las
+  // escribe para otro consumidor y esto las trata como si fueran una frase.
+  "sfx", "rotulo", "camara", "motion",
   "familia", "zona", "cubre", "oro", "sound", "fondo", "filete", "source",
   "paso", "entrada", "giro", "placa", "cede_el_cuadro", "sin_pie", "anclas",
+  // Los otros tres props de `Fondo`: `placa` ya estaba y sus companeras no,
+  // asi que declarar como se recorta la placa —lo que separa el collage del
+  // papel pintado— habria rotulado «cuna» en versales. Lo vio quien componia
+  // reel-02 y prefirio dejarlo en `por_que` antes que arriesgarse.
+  "recorte", "fuerza", "deriva",
   "ancla", "alinea", "a_la_vez", "no_rotular", "solo_si", "se_queda",
   "al_entrar_la_siguiente", "abajo_se_tacha", "sin_cifra_en_pantalla",
   "tachado", "corte", "eje", "saltos", "franja", "lastre", "suelo",

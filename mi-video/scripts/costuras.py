@@ -33,7 +33,7 @@ from dominio.aritmetica import Aritmetica  # noqa: E402
 from dominio.borde import BUSCA, COLA  # noqa: E402,F401
 from dominio.costura import MARGEN, RITMO_OK, TONO_OK, Costura  # noqa: E402,F401
 from dominio.habla import AIRE, ATAQUE, COLGANTES  # noqa: E402,F401
-from dominio.senal import GANA, PUERTA  # noqa: E402,F401
+from dominio.senal import ALARGA, GANA, PUERTA, SUENA  # noqa: E402,F401
 from dominio.tijera import Tijera  # noqa: E402
 from dominio.tramo import Tramo  # noqa: E402
 
@@ -114,6 +114,22 @@ def sin_aire(slug, ver=False):
     nuevos, quitado, cambia = [], 0.0, False
     for i in range(len(tij)):
         t, d = tij.tramo(i), tij.detalle(i)
+        # **Y lo declarado no pasa por aqui.**
+        #
+        # Este es el unico paso que reescribe la lista entera —`rehacer`— y por
+        # ahi se cuela la unica cosa que `Tijera` existe para impedir: `mover` y
+        # `quitar` preguntan quien puso el trozo ahi, y `rehacer` no puede
+        # porque un trozo puede salir partido en tres. Resultado medido en
+        # reel-03: **catorce tramos declarados retrocedieron 0,12 s cada uno** y
+        # la pieza engordo 1,72 s de aire de entrada, con `colas` sin poder
+        # devolverlos porque a el si le para la marca. Se pregunta aqui, igual
+        # que en `Aritmetica.pasada_callada`.
+        #
+        # Y no se pierde nada: `fijar.declarar` ya pasa cada tramo por
+        # `_a_la_voz` al declararlo, asi que un tramo declarado llega recortado.
+        if tij.fijado(i):
+            nuevos.append((t, d))
+            continue
         cinta = t.cinta or rutas.TOMAS.get(slug)
         trozos = fijar._a_la_voz(cinta, t.desde, t.hasta) if cinta else None
         if not trozos:
@@ -139,6 +155,130 @@ def sin_aire(slug, ver=False):
     registro.nota("costuras", "aire muerto fuera",
                   detalle=f"{slug}: {quitado:.1f}s")
     return quitado
+
+
+def cerrar_palabras(slug, ver=False):
+    """Alarga el corte de salida hasta que la palabra termina de sonar.
+
+    **Se llamaba `palabras_enteras` y tapaba a la garantia del mismo nombre.**
+    Dos funciones con un nombre en un fichero no dan error: la segunda gana y la
+    primera deja de existir. Asi que `Aritmetica.palabras_enteras` —«ningun corte
+    cae dentro de una palabra»— no corria en el paso **ni en la puerta**:
+    `revisada.LosCortes` la pide por este nombre y recibia esta otra, que solo
+    mira salidas y necesita un wav que en esta maquina no esta. De ahi la queja
+    de Jaime sobre `reel-03` y de ahi que `costuras.py 3 --ver` contestara cero
+    con tres entradas sucias delante. Son dos cosas distintas y ahora se llaman
+    distinto: **esto cierra la salida por sonido; aquello saca el corte de dentro
+    de la palabra por tiempo.**
+
+    **Es la queja que Jaime repitio toda la noche**: *«el corte se come el final
+    de las palabras»*, *«los remates estan cortados, no se deja terminar las
+    frases, y eso rompe todo el flow»*.
+
+    Y no lo cogia nadie. `a_lo_callado` busca el minimo de una ventana de ±120
+    ms y se conforma con el: cuando la silaba dura mas que la ventana, devuelve
+    el punto menos malo y da el corte por bueno. Medido sobre las siete piezas:
+    **30 de 132 salidas cortaban con la voz entre -7 y -14 dB**, o sea a pleno
+    volumen, y el paso decia que estaban limpias.
+
+    Aqui no se busca un minimo: se avanza hasta que deja de sonar, que es la
+    regla que el dio — *«no por whisper, por sonido»*. Cuesta 113 ms de media y
+    2,4 s en el lote entero.
+
+    Lo que NO hace: recortar. Solo alarga, y como mucho `ALARGA`. Un corte que
+    sigue sonando despues de medio segundo no es una palabra sin cerrar, es
+    otra cosa — se cuenta y se dice, no se adivina.
+    """
+    from dominio import senal as _se
+    from dominio.senal import Senal
+    tij = Tijera(slug)
+    if not tij.existe:
+        return 0
+    # **Y no se alarga sobre el trozo siguiente de la MISMA cinta.**
+    #
+    # Sin esta cota el paso fabricaba solapes: `sin_solapes` los cerraba
+    # dejando el corte en pleno sonido, `a_lo_callado` lo movia, y el cosido no
+    # asentaba — cuatro piezas de siete dieron el aviso. Alargar la palabra no
+    # puede costar el trozo de al lado.
+    topes = {}
+    for i in range(len(tij)):
+        t = tij.tramo(i)
+        sig = [tij.tramo(j).desde for j in range(len(tij))
+               if j != i and tij.tramo(j).cinta == t.cinta
+               and tij.tramo(j).desde >= t.hasta]
+        topes[i] = min(sig) - 0.02 if sig else None
+    ondas, nuevos, cerrados, sonando = {}, [], 0, 0
+    for i in range(len(tij)):
+        t, d = tij.tramo(i), tij.detalle(i)
+        cinta = t.cinta or rutas.TOMAS.get(slug)
+        if cinta and cinta not in ondas:
+            try:
+                ondas[cinta] = Senal(cinta)
+            except Exception:                      # noqa: BLE001
+                ondas[cinta] = None
+        onda = ondas.get(cinta)
+        tope = topes.get(i)
+        margen = ALARGA if tope is None else min(ALARGA, max(0.0, tope - t.hasta))
+        hasta = onda.donde_calla(t.hasta, maximo=margen) if (onda and margen > 0) else None
+        if hasta is None:
+            if onda and onda.suena(t.hasta) > SUENA:
+                sonando += 1
+            nuevos.append((t, d))
+            continue
+        cerrados += 1
+        nuevos.append((Tramo(t.desde, hasta, t.cinta), d))
+    if not cerrados:
+        return 0
+    if ver:
+        print(f"  {slug}: cerraria {cerrados} palabra(s) en los bordes")
+        return cerrados
+    tij.rehacer(nuevos)
+    tij.guardar()
+    registro.nota("costuras", "palabras cerradas en los bordes",
+                  detalle=f"{slug}: {cerrados} borde(s), {sonando} sin cerrar")
+    print(f"  {slug}: {cerrados} palabra(s) cerradas"
+          + (f", {sonando} siguen sonando" if sonando else ""))
+    return cerrados
+
+
+def bordes_en_sonido(slug):
+    """Las SALIDAS que cortan voz. **Umbral absoluto, no vecindad.**
+
+    La puerta preguntaba «¿hay algo mas callado a 120 ms?», y esa no es la
+    pregunta: un borde a -105 dBFS —silencio de sobra— la fallaba igual porque
+    veinte milisegundos mas alla habia -123. Reel-07 se quedo sin renderizar
+    por eso, con sus tres bordes en silencio.
+
+    Es C-171 otra vez: **optimizar dentro de una ventana no es cumplir un
+    umbral**. Aqui se pregunta lo unico que se oye — si al cortar queda voz
+    colgando.
+
+    **Solo salidas.** Entrar donde antes habia voz es lo que un montaje es: se
+    recoge la frase a mitad de cinta. Lo que suena partido es salir mientras la
+    palabra sigue — como Jaime lo nombro: *«el corte se come final de las
+    palabras»*. Contando entradas salian 36 de 36 y no media nada.
+    """
+    import json
+
+    from dominio.senal import SUENA, Senal
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return []
+    edl = json.load(open(ruta, encoding='utf-8'))
+    ondas, sucios = {}, []
+    for (_a, b), det in zip(edl['segmentos'], edl['detalle']):
+        cinta = det.get('toma')
+        if not cinta:
+            continue
+        if cinta not in ondas:
+            ondas[cinta] = Senal(cinta)
+        # **Sin `except` mudo.** Uno se trago un `NameError` aqui y la funcion
+        # devolvia «0 bordes sucios» — la respuesta que uno quiere oir, dada
+        # por un fallo de programacion. Si medir falla, que se vea.
+        if ondas[cinta].suena(b) > SUENA:
+            sucios.append((cinta, round(b, 3)))
+    return sucios
 
 
 def _pasada_callado(slug, ver, minimo):
@@ -240,6 +380,14 @@ def arreglar(slug, ver=False):
     # Se repite hasta que nadie mueve nada, con tope: si en cuatro vueltas no
     # converge, es que dos reglas se estan deshaciendo la una a la otra y eso hay
     # que verlo, no esconderlo dando vueltas.
+    # **Cerrar la palabra va ANTES del bucle, y no dentro.**
+    #
+    # `a_lo_callado` ancla su ventana al corte que trae el montaje, asi que si
+    # las dos corrieran juntas se desharian la una a la otra y el cosido no
+    # asentaria — que es justo lo que avisa el `else` de abajo. Corriendo antes,
+    # el borde queda a -22/-33 dB y ya no hay 3 dB que ganar: `a_lo_callado` lo
+    # deja donde esta y el bucle converge igual.
+    cerrar_palabras(slug, ver=ver)
     for _ in range(4):
         movidos = a_lo_callado(slug, ver=ver) or 0
         cerrados = sin_solapes(slug, ver=ver) or 0

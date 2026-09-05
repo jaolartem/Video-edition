@@ -40,7 +40,8 @@ import { color } from "../brand/tokens";
  * Lo que sí sobrevive de aquel intento es la regla que lo mató: **retícula
  * estricta, y lo torcido torcido con intención**. Vale para el panel y las
  * cintas de aquí abajo.
- */
+  * @clase superficie
+*/
 export type FondoProps = {
   /** Placa en `public/fondos/`, sin extensión. Ver `ads/fondos.json`. */
   placa: string;
@@ -72,6 +73,23 @@ export type FondoProps = {
    * recorte respeta la retícula aunque la rompa.
    */
   recorte?: Recorte;
+  /**
+   * **El hueco de la placa, puesto donde está la cara.**
+   *
+   * Dos fracciones del cuadro —de dónde a dónde—: la placa se parte en dos y
+   * deja libre esa franja. Manda sobre `recorte`.
+   *
+   * Jaime, viendo el tablero de reel-06: *«en la composición muestra el tablero
+   * y mis piernas; si mostrara mi cara tendría sentido»*, y después *«por ahora
+   * que salga mi cara en los huecos»*. Con el porqué: *«mis pies son la parte
+   * más quieta y la que menos comunica intencionalmente»*.
+   *
+   * Los recortes de abajo abren el hueco por GEOMETRÍA —una diagonal fija—, y
+   * lo que se ve por él depende de dónde cayera el encuadre: en la sesión de
+   * noche, las rodillas. Esto lo abre por CONTENIDO. El dato lo escribe
+   * `punch-ins.py` en cada escena (`cara`); sólo había que traerlo.
+   */
+  ventana?: [number, number];
 };
 
 /**
@@ -100,6 +118,7 @@ export const Fondo: React.FC<FondoProps> = ({
   fuerza = 1,
   deriva,
   recorte = "lleno",
+  ventana,
 }) => {
   const frame = useCurrentFrame();
   const escala = deriva
@@ -108,6 +127,46 @@ export const Fondo: React.FC<FondoProps> = ({
         extrapolateRight: "clamp",
       })
     : 1;
+  const lamina = (
+    <Img
+      src={staticFile(`fondos/${placa}.png`)}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        opacity: fuerza,
+        transform: `scale(${escala})`,
+      }}
+    />
+  );
+  // La placa partida en dos: encima y debajo de la franja de la cara. Ver
+  // `ventana` arriba.
+  if (ventana) {
+    const [a, b] = ventana;
+    // **Sin `suelo` detrás: la ventana tiene que dejar ver el PLANO.**
+    //
+    // Con el fondo opaco envolviendo las dos mitades, el hueco ensenaba negro en
+    // vez de su cara — o sea que la ventana no abria nada, solo cambiaba de
+    // color. Cada mitad pinta su propio suelo; la franja de en medio no pinta
+    // nada, que es justo lo que se pedia.
+    return (
+      <AbsoluteFill style={{ overflow: "hidden" }}>
+        <AbsoluteFill
+          style={{
+            backgroundColor: suelo,
+            clipPath: `inset(0 0 ${(1 - a) * 100}% 0)`,
+          }}
+        >
+          {lamina}
+        </AbsoluteFill>
+        <AbsoluteFill
+          style={{ backgroundColor: suelo, clipPath: `inset(${b * 100}% 0 0 0)` }}
+        >
+          {lamina}
+        </AbsoluteFill>
+      </AbsoluteFill>
+    );
+  }
   return (
     <AbsoluteFill
       style={{
@@ -116,16 +175,7 @@ export const Fondo: React.FC<FondoProps> = ({
         clipPath: RECORTE[recorte],
       }}
     >
-      <Img
-        src={staticFile(`fondos/${placa}.png`)}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          opacity: fuerza,
-          transform: `scale(${escala})`,
-        }}
-      />
+      {lamina}
     </AbsoluteFill>
   );
 };

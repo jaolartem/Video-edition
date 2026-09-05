@@ -33,6 +33,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { comprobar as comprobarCamara } from "./camara.mjs";
 
 const RAIZ = path.resolve(process.cwd(), "..");
 const LOG = path.join(RAIZ, "docs/correcciones.md");
@@ -191,6 +192,59 @@ for (const e of entradas) {
     }
   }
 }
+
+/**
+ * **Dos funciones con el mismo nombre en un fichero: la segunda tapa a la
+ * primera y Python no dice nada.**
+ *
+ * `costuras.py` definia `palabras_enteras` dos veces —una saca el corte de
+ * dentro de la palabra, la otra alarga la salida por sonido— y la segunda
+ * borraba a la primera. Asi que la garantia «ningun corte cae dentro de una
+ * palabra» **no corria ni en el paso ni en la puerta**: `revisada.LosCortes` la
+ * pide por ese nombre y recibia la otra. `reel-03` llego a Jaime con tres
+ * entradas cortadas a mitad de palabra y `costuras.py 3 --ver` contestaba cero.
+ *
+ * Es la averia de un fichero que crece: se anade al final y el nombre ya estaba
+ * arriba, a trescientas lineas de donde se lee. No da error en ninguna parte —
+ * solo deja de existir una de las dos.
+ */
+{
+  const anda = (d) => {
+    for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, f.name);
+      if (f.isDirectory()) {
+        if (f.name !== "__pycache__") anda(p);
+        continue;
+      }
+      if (!f.name.endsWith(".py")) continue;
+      const cuenta = new Map();
+      for (const [, n] of fs.readFileSync(p, "utf8").matchAll(/^(?:def|class)[ \t]+([A-Za-z_]\w*)/gm))
+        cuenta.set(n, (cuenta.get(n) ?? 0) + 1);
+      for (const [n, c] of cuenta)
+        if (c > 1)
+          fallos.push(
+            `${path.relative(RAIZ, p)} define «${n}» ${c} veces: la ultima ` +
+              `tapa a las demas y quien la llame por ese nombre recibe otra ` +
+              `cosa, sin error. Ponles nombres distintos.`,
+          );
+    }
+  };
+  anda(path.join(process.cwd(), "scripts"));
+}
+
+/**
+ * Y lo que se le OFRECE al diseñador también tiene que existir.
+ *
+ * Jaime: *« que no quede otra vez el mismo error de declarar sin implementar,
+ * que ha sido la constante en este proyecto»*. Una corrección sin aguja y un
+ * verbo ofrecido sin línea que lo consuma son la misma avería por dos puertas:
+ * algo escrito que nadie ejecuta. Se comprueban en el mismo sitio.
+ */
+for (const r of comprobarCamara())
+  fallos.push(
+    `camara.mjs ofrece «${r.verbo}» y ${r.fichero} ya no tiene ` +
+      `«${r.aguja}»: el diseñador lo verá en su menú y no hará nada.`,
+  );
 
 console.log(
   `guardas: ${entradas.length} correcciones · ${comprobadas} agujas · ` +

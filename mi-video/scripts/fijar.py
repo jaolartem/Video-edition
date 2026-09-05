@@ -100,6 +100,34 @@ def fijados(slug):
     return [dict(f) for f in filas]
 
 
+def huerfanas(slug):
+    """Las marcas `fijado` del EDL que ya **no tienen declaracion** en la tabla.
+
+    Es la misma pregunta que `fijados`, hecha en la otra direccion, y hace falta
+    justo por eso: preguntando «¿esta en el corte lo que la tabla declara?» una
+    tabla vacia no acusa a nadie —recorre cero filas y da luz verde—, que es
+    como `verificar.py 5` respondia «reel-05: OK» con sus 27 declaraciones
+    destruidas y sus 27 marcas huerfanas en el propio EDL.
+
+    La marca la escribe `aplicar` con el id de la declaracion de la que sale, o
+    sea que **es un recibo**: si esta en el EDL, alguien declaro. Que la fila ya
+    no exista solo puede significar que se borro.
+
+    Devuelve `(id, beat, desde, hasta, toma, por_que)`, que es lo que hace falta
+    para reponerla — la lee `db.recuperar`.
+    """
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return []
+    edl = json.load(open(ruta, encoding="utf-8"))
+    hay = {f["id"] for f in fijados(slug)}
+    return [(d["fijado"], d["beat"], round(float(a), 3), round(float(b), 3),
+             d.get("toma") or "", d.get("por_que") or "")
+            for (a, b), d in zip(edl["segmentos"], edl["detalle"])
+            if d.get("fijado") and d["fijado"] not in hay
+            and d.get("beat") is not None]
+
+
 # Cuanto se puede retroceder para no entrar a mitad de frase. Mas que esto y
 # lo que se recupera ya no es la cabeza de lo que se dice: es lo anterior.
 RETROCESO = 1.5
@@ -230,6 +258,24 @@ def _a_la_voz(toma, a, b, margen=0.12):
     for x, y in voz:
         if x < a < y and a - x <= RETROCESO:
             ini = min(ini, max(0.0, x - margen))
+            break
+        # **Y lo que queda fuera del techo se dice, no se acepta callando.**
+        #
+        # El tope existe para no arrastrar la frase anterior, y esta bien que
+        # exista; lo que estaba mal es que por encima de el este paso no
+        # distinguia «el borde se puso ahi a proposito» de «el borde cayo a
+        # mitad de frase y nadie lo vio». Los dos salian iguales: en silencio.
+        #
+        # reel-05 e2 entraba 3,12 s dentro de un bloque de voz de 5,755 s
+        # —cinco veces RETROCESO— y por eso la pieza empezaba el caso en «...
+        # tres casas en un mismo trimestre», sin nombrar al realtor que su
+        # propio tablero rotula. Jaime lo pidio dos veces. No se mueve el borde
+        # —eso seria decidir por quien lo puso— pero se cuenta cuanta frase se
+        # queda fuera, que es lo unico que hacia falta para verlo antes de
+        # montar.
+        if x < a < y:
+            print(f"  aviso {toma} [{a:.3f}]: entra {a - x:.2f} s en el bloque"
+                  f" de voz de {x:.3f} y RETROCESO son {RETROCESO} s")
             break
     if fin - ini <= 0.2:
         return None
@@ -416,6 +462,19 @@ def rehacer(slug, beats=None):
     está, con nombre y con argumentos.
 
     Sin `beats`, rehace **todas** las etapas declaradas de la pieza.
+
+    **Y rehace ESAS y no las demás.** Decía «esas etapas» y hacía otra cosa:
+    quitaba la marca de las pedidas y luego llamaba a `aplicar` entero, así que
+    toda declaración pendiente de la pieza —una que nadie pidió tocar hoy— se
+    colaba en el mismo movimiento. Pedir el beat 7 del reel-01 rehacía también
+    el 3, que tenía una declaración sin aplicar de un ticket viejo: la etapa
+    pasaba de 20,2 s a 15,5 s y se llevaba «30 mil dólares, no de ventas — de
+    estructura», que es el remate de la comparación. Nada fallaba; la pieza
+    salía más corta y peor.
+
+    Es la regla del proyecto otra vez: **una corrección de una tuerca no
+    regenera la pieza entera.** El argumento acota lo que se rehace, no sólo lo
+    que se desmarca.
     """
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
@@ -430,7 +489,7 @@ def rehacer(slug, beats=None):
             d.pop("fijado", None)
     json.dump(edl, open(ruta, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
-    return aplicar(slug)
+    return aplicar(slug, solo=quiere)
 
 
 def _con_prueba_viva(slug, fjs):
@@ -479,16 +538,22 @@ def _con_prueba_viva(slug, fjs):
     return vivas
 
 
-def aplicar(slug):
+def aplicar(slug, solo=None):
     """Mete los tramos fijados en el EDL, sustituyendo los de esa etapa.
 
     **Se rehace el detalle de la etapa entera**, no se añade un trozo: un fijado
     dice cuál es el tramo de esa etapa, así que los que hubiera se van. Lo demás
     del EDL —las otras etapas, la oferta, la estructura— no se toca.
+
+    `solo` acota a esos beats. Sin él entran todas las declaraciones vivas de la
+    pieza, que es lo que quiere una corrida de línea; con él, lo que quiere una
+    corrección concreta — ver `rehacer`.
     """
     import transcribir
 
     fjs = fijados(slug)
+    if solo is not None:
+        fjs = [f for f in fjs if f["beat"] in solo]
     if not fjs:
         return 0, []
     fjs = _con_prueba_viva(slug, fjs)
@@ -612,9 +677,28 @@ def aplicar(slug):
     edl["segmentos"] = [segs[i] for i in orden]
     edl["detalle"] = [det[i] for i in orden]
     edl["duracion_s"] = round(sum(b - a for a, b in edl["segmentos"]), 2)
+    # **Y el otro sitio donde vive la misma cifra.** El EDL lleva la duracion
+    # dos veces —`duracion_s` y `duracion_montada_s`— y este paso solo tocaba
+    # una: despues de fijar una etapa el fichero decia 93,92 y 93,36 a la vez.
+    # `depurar` y `revision` ya escriben las dos; aqui faltaba, y una cifra que
+    # solo se actualiza en dos de los tres caminos es una cifra en la que no se
+    # puede confiar (es lo que `registrar_version` guarda como duracion de la
+    # version).
+    edl["duracion_montada_s"] = edl["duracion_s"]
+    # Y la lista de cintas, que es paralela a `detalle` y aqui se quedaba con la
+    # longitud de antes: 24 entradas para 23 segmentos. Hoy no rompe porque la
+    # pieza sale de una sola cinta, pero una lista paralela descuadrada es la
+    # averia del indice re-usado esperando a que haya dos.
+    edl["fuentes"] = [d.get("toma") or "" for d in edl["detalle"]]
     json.dump(edl, open(ruta, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
     return len(hechos), sorted(set(hechos))
+
+
+def _trozo(txt):
+    """`desde:hasta` o `desde:hasta:toma`, tal como los toma `declarar`."""
+    desde, hasta, *toma = txt.split(":")
+    return [float(desde), float(hasta)] + toma
 
 
 def main():
@@ -630,6 +714,16 @@ def main():
                     help="reconstruye esas etapas desde su declaracion"
                          " (sin numeros, todas las declaradas)")
     ap.add_argument("--aplicar", action="store_true")
+    #: **Una etapa de dos trozos, desde la linea.** `declarar` sustituye la
+    #: lista entera —esa es su garantia, ver su docstring— y la linea solo sabia
+    #: pasarle UN tramo, asi que corregir el borde de un trozo de reel-05 e2
+    #: —«lo digo porque un realtor que vende…»— por la linea se llevaba por
+    #: delante el otro, el del retail. La unica salida era llamar a `declarar`
+    #: desde Python, o sea hacer a mano el trabajo de la maquina: una decision
+    #: que no se puede repetir desde la linea no es un paso del proceso.
+    ap.add_argument("--tramo", action="append", type=_trozo,
+                    help="trozo desde:hasta[:toma]; repetible, declara la etapa"
+                         " entera y sustituye a los posicionales")
     a = ap.parse_args()
     slug = f"reel-{a.reel:02d}" if a.reel else None
     if a.ver:
@@ -648,7 +742,8 @@ def main():
         n, cuales = aplicar(slug)
         print(f"{slug}: {n} etapa(s) fijadas en el EDL {cuales}")
         return
-    v = fijar(slug, a.beat, a.toma, a.desde, a.hasta, a.por_que)
+    v = (declarar(slug, a.beat, a.toma, a.tramo, a.por_que) if a.tramo
+         else fijar(slug, a.beat, a.toma, a.desde, a.hasta, a.por_que))
     print(f"{slug} e{a.beat}: fijado. marca {v.get('marca')}"
           f" · {v.get('veredicto')} · margen {v.get('margen')}")
     print(f"    {(v.get('texto') or '')[:120]}")

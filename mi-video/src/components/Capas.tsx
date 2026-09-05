@@ -23,7 +23,8 @@ import type { Motion } from "../brand/sfx";
  * La separación importa porque antes no existía: los tableros y los paneles
  * salían de dos literales escritos a mano por pieza, así que cada reel tenía sus
  * propias reglas y ninguna se podía comprobar.
- */
+  * @clase capa
+*/
 
 export type Capa = {
   tipo: "punch" | "rotulo" | "figura" | "remate" | "bloque" | "subtitulo" | "sonido";

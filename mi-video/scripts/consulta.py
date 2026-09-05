@@ -36,6 +36,7 @@ from dominio.guion import Guion  # noqa: E402
 from dominio.material import abanico as _abanico  # noqa: E402
 from dominio.material import brolls as _brolls  # noqa: E402
 from dominio.montaje import Montaje  # noqa: E402
+from dominio.precio import evento as _evento  # noqa: E402
 from dominio.precio import vigente as _vigente  # noqa: E402
 from dominio.repetido import repetido as _repetido  # noqa: E402
 
@@ -111,6 +112,11 @@ def precio_vigente(fecha=None):
     return _vigente(fecha)
 
 
+def evento(fecha=None):
+    """Cuándo es el evento, derivado del último escalón de la escalera."""
+    return _evento(fecha)
+
+
 # ── lo que se escribe ───────────────────────────────────────────────────────
 #
 # **Un error de contenido tiene que salir por la consola como error.** El dominio
@@ -134,7 +140,23 @@ def guardar_tablero(slug, orden, tablero):
         raise SystemExit(str(e)) from e
 
 
+def repeticion(toma, primera, segunda):
+    """Cuanto sube la segunda entrega de una frase respecto a la primera.
+
+    Un microscopio: se pide para UNA repeticion concreta, no barre la pieza.
+    Devuelve dB, semitonos y duraciones — **no un veredicto**: la vara es
+    editorial y la pone quien compone.
+
+        python scripts/consulta.py repeticion
+            '["20260825_135637", [93.30, 95.09], [95.09, 95.92]]'
+    """
+    from dominio.repeticion import medir
+
+    return medir(toma, tuple(primera), tuple(segunda))
+
+
 VERBOS = {"escenas_por_describir": escenas_por_describir,
+          "repeticion": repeticion,
           "cc_afinado": cc_afinado,
           "bordes_sucios": bordes_sucios,
           "cruces": cruces,
@@ -144,6 +166,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "brolls": brolls,
           "pausas": pausas,
           "precio_vigente": precio_vigente,
+          "evento": evento,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
 
@@ -170,5 +193,22 @@ def _argumentos(argv):
 
 
 if __name__ == "__main__":
+    # **La consola escribe UTF-8, lo diga Windows o no.**
+    #
+    # La entrada ya estaba resuelta —`@fichero`, ahí arriba— y la salida no. En
+    # Windows el `stdout` de Python es el de la consola, cp1252 aquí, así que el
+    # «·» del precio salía como un solo byte 0xB7; node lo lee como UTF-8, ese
+    # byte suelto no es UTF-8 válido y llegaba convertido en «�». Se veía en la
+    # tarjeta de cierre de las siete piezas.
+    #
+    # Quien llama no puede arreglarlo: para cuando el texto sale del proceso ya
+    # está roto. Por eso va aquí y no en cada `execFileSync` con su
+    # `PYTHONIOENCODING` — la decisión «este CLI habla UTF-8» es de este CLI.
+    #
+    # Y va dentro del `__main__`, no arriba con los imports, porque `consulta`
+    # lo importan siete scripts: un módulo que reconfigura el `stdout` de quien
+    # lo importa decide por él. Esto es el borde de la consola; el borde es suyo.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     print(json.dumps(VERBOS[sys.argv[1]](*_argumentos(sys.argv)),
                      ensure_ascii=False))

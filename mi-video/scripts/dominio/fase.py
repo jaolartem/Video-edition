@@ -226,6 +226,57 @@ def _render_caduco(pieza):
     video = rutas.salida("reels", f"reel-R{n}.mp4")
     if not os.path.exists(video):
         return f"no hay render de {pieza.slug}: la fase dice montado y el fichero no esta"
+    # **Y montada quiere decir con SU audio, no con cualquiera.**
+    #
+    # Jaime, en una frase que corrige como estaba declarado esto: *«si el audio
+    # no esta bien el video no esta bien»*. Yo habia contado la entrega de R1
+    # como buena separando las dos cosas —«el video esta bien, el problema era
+    # solo el audio»— y esa separacion no existe: una pieza con la voz de otro
+    # montaje encima no esta a medias, esta mal.
+    #
+    # Lo que la dejo pasar fue mirar solo la duracion. La pista de reel-01 duraba
+    # 102,92 s contra 96,34 del corte, se recorto a la duracion justa y entro con
+    # contenido de una edicion anterior: desfasada de principio a fin.
+    entrega = rutas.salida("entrega", f"reel-R{n}.mp4")
+    if os.path.exists(entrega):
+        try:
+            import sys as _s
+            _s.path.insert(0, os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__))))
+            import importlib
+            _vl = importlib.import_module("voz-limpia".replace("-", "_"))
+        except Exception:                          # noqa: BLE001
+            _vl = None
+        if _vl and hasattr(_vl, "_corresponde"):
+            cerca = _vl._corresponde(entrega, video)
+            if cerca is not None and cerca < 0.35:
+                return (f"la entrega de {pieza.slug} lleva audio que no es el de"
+                        f" su corte (parecido {cerca:.2f}): montada con la voz de"
+                        f" otra edicion")
+    # **La huella manda: dice lo que el fichero DIBUJO, no cuando se escribio.**
+    #
+    # Jaime, tras tres dias con el mismo video: *«con una que no cuadre es
+    # suficiente para saber que eso no es lo que se mando a render»*. Todo lo de
+    # abajo —comparar la fecha del mp4 con la del EDL, con la de `escena_desc`—
+    # es deduccion, y se equivoco en las dos direcciones: no vio que el bundle
+    # servia un spec cacheado de hacia dias, y rehizo renders que estaban bien.
+    #
+    # `reel-RN.mp4.huella` lleva el sha1 del spec que ese fichero dibujo. Si no
+    # coincide con el spec de ahora, lo que hay en disco no es lo que se compuso.
+    # Sin adivinar y sin mirar un frame.
+    _h = _huella_del_spec(pieza.slug)
+    if _h:
+        _puesta = None
+        try:
+            with open(video + ".huella", encoding="utf-8") as f:
+                _puesta = f.read().strip()
+        except OSError:
+            _puesta = None
+        if _puesta != _h:
+            return (f"el render de {pieza.slug} dibujo otra cosa"
+                    f" ({_puesta or 'sin huella'} != {_h}): no es lo que se"
+                    f" compuso")
+        return None
     if os.path.getmtime(video) < os.path.getmtime(edl):
         return (f"el render de {pieza.slug} es anterior a su corte"
                 f" — se rehace, la etiqueta no basta")
@@ -245,4 +296,24 @@ def _render_caduco(pieza):
         if os.path.getmtime(video) < descrito:
             return (f"el render de {pieza.slug} es anterior a su descripcion"
                     f" — los tableros y los subtitulos salen de ahi")
+    return None
+
+
+def _huella_del_spec(slug: str):
+    """La huella que el spec de AHORA declara para esa pieza. `None` si no hay.
+
+    Se lee de `src/reels.json`, que es lo que el render dibuja. Si no existe o no
+    trae huella, se cae al metodo viejo de fechas: una pieza sin spec no puede
+    quedarse sin comprobar.
+    """
+    import json
+
+    try:
+        n = int(slug[-2:])
+        with open("src/reels.json", encoding="utf-8") as f:
+            for p in json.load(f):
+                if p.get("id") == f"Reel-R{n}":
+                    return p.get("huella")
+    except (OSError, ValueError, TypeError):
+        return None
     return None

@@ -45,7 +45,8 @@ export { duracionDe } from "./comparacion/horario";
  * [`comparacion/tipos`](./comparacion/tipos.ts), el reparto del horario sobre
  * la escena en [`comparacion/horario`](./comparacion/horario.ts) y la columna
  * en [`comparacion/Columna`](./comparacion/Columna.tsx).
- */
+  * @clase tablero
+*/
 export const Comparacion: React.FC<ComparacionProps> = ({
   premisa,
   izquierda,
@@ -53,7 +54,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   remate,
   fuente,
   condicion,
-  placa,
+  placa, recorte = "esquina",
   duracion,
   sound = false,
 }) => {
@@ -81,7 +82,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
-      {placa ? <Fondo placa={placa} recorte="esquina" fuerza={1} deriva={t.finColumnas + 60} /> : null}
+      {placa ? <Fondo placa={placa} recorte={recorte} fuerza={1} deriva={t.finColumnas + 60} /> : null}
       {sound ? (
         <>
           <MotionSound motion="mark" at={t.entraIzq} />

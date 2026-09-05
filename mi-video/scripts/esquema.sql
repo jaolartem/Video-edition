@@ -795,7 +795,7 @@ CREATE TABLE IF NOT EXISTS revision (
   que         TEXT NOT NULL,
   regla       TEXT,
   estado      TEXT NOT NULL DEFAULT 'pendiente'
-                CHECK (estado IN ('pendiente','aplicada','automatizada','sube')),
+                CHECK (estado IN ('pendiente','aplicada','automatizada','sube','huerfana')),
   fecha       TEXT
 );
 

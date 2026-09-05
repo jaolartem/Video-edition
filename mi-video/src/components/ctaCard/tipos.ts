@@ -1,3 +1,4 @@
+import type { Recorte } from "../Fondo";
 import type { Accent, Mode, Tone } from "../../brand/tokens";
 
 /**
@@ -5,6 +6,17 @@ import type { Accent, Mode, Tone } from "../../brand/tokens";
  * oferta necesita para ser cierta va en el tipo y no en una revisión.
  */
 export type CtaCardProps = {
+  /**
+   * El hueco de la placa, puesto donde esta su cara. Ver `ventana` en `Fondo`.
+   *
+   * El recorte va escrito a fuego en el componente, y con eso lo que se ve por
+   * el hueco depende de donde cayera el encuadre: en la sesion de noche, las
+   * rodillas. Jaime: *«mis pies son la parte mas quieta y la que menos comunica
+   * intencionalmente»*, *«por ahora que salga mi cara en los huecos»*.
+   *
+   * Declarada, manda sobre `recorte`. Sin declarar, todo sigue igual.
+   */
+  recorte?: Recorte;
   /** La promesa, en corto. No el guion entero. */
   promesa: string;
   /** Los datos duros de la oferta. Un CTA incompleto no sirve. */

@@ -88,11 +88,39 @@ export const placaDe = (slug, beat) =>
  * `null` cuando ya cerro la inscripcion, y entonces **no se imprime precio**:
  * una tarifa cerrada en pantalla es peor que ninguna.
  */
+/**
+ * **Cuando es el evento, preguntado a quien lo sabe.**
+ *
+ * Jaime: *«simplifica las fuentes, solo queremos una fuente de verdad»*. El dia
+ * estaba escrito a mano en `cta.mjs` y ademas era un hecho de la tabla `precio`
+ * —el `hasta` del ultimo escalon, con la nota «cierra con el evento»—. Dos
+ * copias del mismo dia, y la escalera se movio dos veces en una tarde.
+ *
+ * Devuelve `dice` («21 de septiembre», que es lo que la voz dice) y `con_ano`
+ * («21 SEP 2026»), para lo que se queda colgado y hay que fechar.
+ */
+export const evento = () => {
+  try {
+    return JSON.parse(
+      execFileSync("python", ["scripts/consulta.py", "evento", "[]"],
+                   { encoding: "utf8" }),
+    );
+  } catch {
+    return null;
+  }
+};
+
 export const precioVigente = () => {
   try {
     return JSON.parse(
+      // **`PYTHONIOENCODING` no es opcional.** Sin el, Python en Windows escribe
+      // en la codificacion de la consola —cp1252— y aqui se lee como UTF-8: el
+      // «·» del precio salia como «?» EN PANTALLA, en las siete piezas y en la
+      // tarjeta de cierre. Se veia en la entrega y no en ninguna prueba, porque
+      // todas las corridas a mano llevaban la variable puesta.
       execFileSync("python", ["scripts/consulta.py", "precio_vigente", "[]"],
-                   { encoding: "utf8" }),
+                   { encoding: "utf8",
+                     env: { ...process.env, PYTHONIOENCODING: "utf-8" } }),
     );
   } catch {
     return null;
@@ -132,4 +160,37 @@ export const delPaso2 = (slug, estructura, beats) => {
         pie: t.pie,
       },
     }));
+};
+
+/**
+ * **El hueco libre encima de su cabeza, y donde cae su cara.**
+ *
+ * Jaime: *«hay mucho espacio arriba de mi cabeza en esas tomas para poner cc y
+ * letreros»*, y al confirmarlo: *«si, aprovechemos el espacio de la toma, que
+ * para eso es; ademas es una toma muy bonita»*.
+ *
+ * Medido en las siete: la coronilla cae en 0,317-0,320 del cuadro y la zona
+ * segura de Meta empieza en 0,14, asi que quedan **340-345 px sin usar** —un 18%
+ * del cuadro— encima de el, dentro de zona legal. Debajo, en cambio, la banda de
+ * subtitulos se toca con su menton.
+ *
+ * **Y sale de MEDIRLO, no de predecirlo.** La primera version lo derivaba del
+ * ancla de `punch-ins.py`, que localiza al sujeto por el centroide del
+ * movimiento. En el sofa tambien se mueven la cortina y la lampara, asi que el
+ * ancla sube: declaraba 0,317-0,320 en las SIETE —o sea, devolvia la constante
+ * `HEAD_POS`— cuando lo medido va de 0,149 a 0,447.
+ *
+ *     declaraba   0,317  0,320  0,320  0,320  0,320  0,318  0,320
+ *     medido      0,235  0,168  0,227  0,433  0,149  0,447  0,240
+ *
+ * Se veia sin mirar el render: una medida de verdad varia entre piezas grabadas
+ * en sesiones distintas, y aquella no variaba. Ahora lo mide `sujeto.py` sobre
+ * el corte ya hecho —con MediaPipe, que sabe distinguir una persona de una
+ * cortina— y lo deja en `work/scenes/<slug>/cara.json`.
+ */
+export const caraDe = (slug) => {
+  const f = `work/scenes/${slug}/cara.json`;
+  if (!fs.existsSync(f)) return null;
+  const m = JSON.parse(fs.readFileSync(f, "utf8"));
+  return {coronilla: m.coronilla, pies: m.pies, visto: m.visto};
 };

@@ -8,6 +8,8 @@ import {
 } from "remotion";
 import { CausalChain, type CausalChainProps } from "./components/CausalChain";
 import { Comparacion, type ComparacionProps } from "./components/Comparacion";
+import { BeliefSwap, type BeliefSwapProps } from "./components/BeliefSwap";
+import { Compuerta, type CompuertaProps } from "./components/Compuerta";
 import { Acumulacion, type AcumulacionProps } from "./components/Acumulacion";
 import { TwoPaths, type TwoPathsProps } from "./components/TwoPaths";
 import { TableroDeclarado } from "./components/TableroDeclarado";
@@ -27,6 +29,8 @@ export type BoardCue =
   | { at: number; duration: number; kind: "causal"; props: CausalChainProps }
   | { at: number; duration: number; kind: "twopaths"; props: TwoPathsProps }
   | { at: number; duration: number; kind: "comparacion"; props: ComparacionProps }
+  | { at: number; duration: number; kind: "BeliefSwap"; props: BeliefSwapProps }
+  | { at: number; duration: number; kind: "Compuerta"; props: CompuertaProps }
   | { at: number; duration: number; kind: "acumulacion"; props: AcumulacionProps }
   /**
    * **Cualquier otra forma que el diseñador declare.**
@@ -89,6 +93,26 @@ export type Desatura = { at: number; duration: number };
  */
 export type Glitch = { at: number; duration: number };
 
+/**
+ * **El virado del plano.**
+ *
+ * Jaime: *«que me ponga en sepia… ya tiene más herramientas de diseño, está muy
+ * mediocre el diseñador»*. Lo declara quien compone, por etapa, en
+ * `escena_desc.camara.virado`, y llega hasta aquí con el filtro **ya resuelto**:
+ * el catálogo de virados que el canon admite y su traducción a CSS viven juntos
+ * en `scripts/imagen.mjs`, que es la única forma de que las dos mitades no se
+ * separen. Aquí no se decide nada, se aplica.
+ *
+ * No es una capa encima: cambia la propia imagen, así que el subtítulo, el
+ * tablero y el rótulo van por delante sin enterarse.
+ */
+export type Virado = {
+  at: number;
+  duration: number;
+  virado: string;
+  css: string;
+};
+
 export type AdProps = {
   /**
    * Proxy del vídeo ya cortado, en `public/`. Se trabaja con proxy y no con el
@@ -97,20 +121,38 @@ export type AdProps = {
    * es 1080×1920 igualmente.
    */
   video: string;
+  /**
+   * Volumen del plano. **Existe para poder sacar los efectos solos.**
+   *
+   * `voz-limpia` sustituye la pista entera por la voz de Adobe (`-map 1:a`), y
+   * con ella se iban los sfx, que vivian dentro del render. Con `volumen: 0` la
+   * misma composicion se renderiza como pista de SOLO efectos, y esa se mezcla
+   * con la voz limpia en vez de tirarla.
+   */
+  volumen?: number;
   mode?: Mode;
   boards?: BoardCue[];
+  /** Donde cae su coronilla. Ver `coronilla` en `CaptionBand`. */
+  coronilla?: number;
+  /** Lado libre. Ver `lado` en `CaptionBand`. */
+  lado?: "izq" | "der";
   captions?: CaptionCue[];
   desatura?: Desatura[];
   glitch?: Glitch[];
+  virados?: Virado[];
 };
 
 export const Ad: React.FC<AdProps> = ({
   video,
+  volumen = 1,
   mode = "evidence",
   boards = [],
+  coronilla,
+  lado,
   captions = [],
   desatura = [],
   glitch = [],
+  virados = [],
 }) => {
   const frame = useCurrentFrame();
   const t = modes[mode];
@@ -132,22 +174,48 @@ export const Ad: React.FC<AdProps> = ({
     (c) => frame >= c.at && frame < c.at + c.duration,
   );
 
+  /**
+   * **El plano se filtra una sola vez, y por eso la cadena se arma aquí.**
+   *
+   * Estaban como dos objetos derramados dentro del `style`, y el segundo `filter`
+   * pisaba al primero: durante un glitch dentro de un tramo en blanco y negro, el
+   * blanco y negro desaparecía. Con un virado en juego serían tres y el último
+   * ganaría siempre — la avería de este proyecto en su forma más pequeña, una
+   * decisión declarada que otra descarta aguas abajo sin decir nada.
+   *
+   * **Y el blanco y negro gana al virado.** No se suman: `grayscale` seguido de
+   * un sepia vuelve a teñir lo que se acababa de vaciar de color. La marca de
+   * humanidad es un comentario sobre un desliz y manda sobre el tratamiento de
+   * la etapa, que es decoración al lado de eso.
+   */
+  const bn = desatura.some((d) => frame >= d.at && frame < d.at + d.duration);
+  const virado = virados.find(
+    (v) => frame >= v.at && frame < v.at + v.duration,
+  );
+  const filtro = [
+    bn ? "grayscale(1) contrast(1.15)" : virado?.css,
+    g > 0
+      ? `saturate(${(1 + g * 1.8).toFixed(2)}) contrast(${(1 + g * 0.5).toFixed(2)})`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <AbsoluteFill style={{ backgroundColor: t.ground }}>
       <OffthreadVideo
         src={staticFile(video)}
+        volume={volumen}
         style={{
-          ...(desatura.some((d) => frame >= d.at && frame < d.at + d.duration)
-            ? // Sin transición: el corte a blanco y negro tiene que notarse.
-              // Un fundido lo convertiría en un efecto y aquí es un comentario.
-              { filter: "grayscale(1) contrast(1.15)" }
-            : {}),
+          // Sin transición en el virado ni en el blanco y negro: el cambio de
+          // tratamiento tiene que notarse. Un fundido lo convertiría en un
+          // efecto, y aquí es un comentario sobre lo que se está diciendo.
+          ...(filtro ? { filter: filtro } : {}),
           ...(g > 0
             ? {
                 // Desplazamiento horizontal y salto de color: la señal que se
                 // rompe un instante. La escala evita que asome el borde negro.
                 transform: `translateX(${(g * 26).toFixed(2)}px) scale(${(1 + g * 0.04).toFixed(4)})`,
-                filter: `saturate(${(1 + g * 1.8).toFixed(2)}) contrast(${(1 + g * 0.5).toFixed(2)})`,
               }
             : {}),
         }}
@@ -170,6 +238,10 @@ export const Ad: React.FC<AdProps> = ({
             <Acumulacion {...(cue.props as AcumulacionProps)} />
           ) : cue.kind === "twopaths" ? (
             <TwoPaths {...(cue.props as TwoPathsProps)} mode={mode} />
+          ) : cue.kind === "BeliefSwap" ? (
+            <BeliefSwap {...(cue.props as BeliefSwapProps)} />
+          ) : cue.kind === "Compuerta" ? (
+            <Compuerta {...(cue.props as CompuertaProps)} />
           ) : (
             /* **Y lo demás también se dibuja.** Aquí caían diecinueve formas
                declaradas por el diseñador y no salía nada — ni en pantalla ni
@@ -209,6 +281,24 @@ export const Ad: React.FC<AdProps> = ({
         <CaptionBand
           text={caption.text}
           tokens={t}
+          /**
+           * **Sobre un tablero, el subtitulo se hace pequeno.**
+           *
+           * Jaime: *«los subtitulos de los tableros deben ser pequenos, que no
+           * compitan, que simplemente presenten info»*.
+           *
+           * El subtitulo NO se calla ahi —*«en los tableros tambien hay cc»*, y
+           * esa regla sigue— pero deja de ser la capa que manda: mientras el
+           * tablero explica, el cc acompana. A cuerpo entero las dos capas
+           * pelean por el mismo instante, y en reel-06 el subtitulo acabo
+           * pisando la barra de «PERDIDA SILENCIOSA» del propio tablero,
+           * diciendo ademas las mismas palabras.
+           */
+          sobreTablero={boards.some(
+            (b) => frame >= b.at && frame < b.at + b.duration,
+          )}
+          coronilla={coronilla}
+          lado={lado}
           corrige={caption.corrige}
           palpita={caption.palpita}
           realza={caption.realza}

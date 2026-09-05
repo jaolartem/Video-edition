@@ -59,7 +59,8 @@ export { duracionDe } from "./acumulacion/horario";
  * el horario estaba escrito **dos veces dentro del mismo fichero** —el del
  * componente y el de `duracionDe`— así que el spec podía reservar un hueco de
  * un largo y el tablero construirse en otro.
- */
+  * @clase tablero
+*/
 export const Acumulacion: React.FC<AcumulacionProps> = ({
   title,
   concepto,
@@ -68,7 +69,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
   umbral,
   resultado,
   condicion,
-  placa,
+  placa, recorte = "columna",
   sound = false,
 }) => {
   const entra = useEntrada();
@@ -86,7 +87,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
-      {placa ? <Fondo placa={placa} recorte="columna" fuerza={1} deriva={t.finTramos + 60} /> : null}
+      {placa ? <Fondo placa={placa} recorte={recorte} fuerza={1} deriva={t.finTramos + 60} /> : null}
       {/**
        * **Tablero de datos: fondo PLANO.** No lleva fotomontaje.
        *

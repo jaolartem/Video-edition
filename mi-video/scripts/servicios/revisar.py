@@ -141,9 +141,13 @@ def _aplicar(pieza: Pieza, veredictos) -> Resultado:
                 # el veredicto existiria y no habria pasado nada — que es la
                 # forma exacta en que este proyecto pierde decisiones.
                 fallidos.append(ancla[:60])
+                # Vuelve al que coso: el ancla no resolvio contra ESTE montaje,
+                # asi que quien lo rehace es quien lo hizo. Y lo cierra la
+                # medida del texto —si la frase ya no esta, esta resuelto—.
                 tk.abrir(pieza.slug,
                          f"la revision mando cortar «{ancla[:120]}» y no se pudo"
-                         f" anclar en el montaje de hoy", None, "objecion")
+                         f" anclar en el montaje de hoy", None, "objecion",
+                         vuelve_a="cosido", cierra_con="texto")
                 abiertos += 1
             continue
         grande = (v.get("ticket") or "").strip()

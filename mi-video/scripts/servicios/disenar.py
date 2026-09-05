@@ -41,7 +41,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dominio import remate as _remate  # noqa: E402
+
 from .base import Pieza, Resultado, Servicio  # noqa: E402
+from .marca import _canon, _laminas, _sonidos, _topes  # noqa: E402
+from .caja import (COMO_COMBINAR, CORRECCION, VERSE, catalogo_de_piezas,  # noqa: E402
+                   placas_que_existen, tres_dimensiones,
+                   figuras_que_se_trazan, mando_de_camara,
+                   que_leer_para_componer, voz_en_el_remate, ya_en_pantalla)
 
 # **Tres niveles, no dos.** Este fichero vive en `scripts/servicios/`, así que
 # subir dos veces deja `RAIZ` en `scripts/` y no en el proyecto. Con eso, las
@@ -71,84 +78,76 @@ def _con():
     return c
 
 
-def _canon():
-    """La paleta y las prohibiciones, del repositorio y no de memoria.
+#: El encargo de estilo. **No es una lista de prohibiciones**: eso es lo que
+#: habia y produjo minimalismo corporativo, porque lo unico que no estaba
+#: prohibido era no hacer nada.
+ESTILO = {
+    "que_es": "Neoconstructivista: el nieto millennial o alfa del constructivismo ruso. Emparentado con lo corporativo, pero lejos de el.",
+    "jaime": "Respeto por la cuadricula si, pero tambien irrespeto con criterio. Manejo de la forma si, pero tambien encuadres caoticos. Mucho color: NO HAY PROHIBICIONES DE COLOR, hay prohibiciones de coherencia y composicion.",
+    "la_vara": "Queremos dejar la sensacion de wow, y eso se consigue haciendonos entender. Un tablero que solo se lee no cumple; uno que se entiende de un vistazo, si.",
+    "el_tablero_es": "Fundamentalmente IMAGEN, no texto. Es un elemento didactico, igual que el panel. Si lo que compones se puede leer en voz alta y no se pierde nada, no es un tablero: es un rotulo.",
+}
 
-    Se leen los tokens de verdad: un canon citado de memoria es un canon que se
-    desvía sin que nadie lo note, y aquí el color es lo que dice dónde mirar.
-    """
-    # **Se leen todos los ficheros de marca, no uno.** Esto miraba sólo
-    # `tokens.ts`, y el día que la paleta se mudó a `paleta.ts` empezó a
-    # devolver **cero colores en silencio** — un `{}` que el prompt del
-    # diseñador recibe como «no hay canon» sin que nada falle. Es el fallo que
-    # el propio docstring de arriba dice que no puede pasar, cometido por una
-    # ruta escrita a mano.
-    #
-    # Leer la carpeta entera no es un parche más ancho: es que el canon **es**
-    # `src/brand/`, no un fichero concreto de dentro. Que mañana se parta otra
-    # vez no vuelve a romper esto.
-    import glob
-    import re
+#: Cuando dos criterios chocan, gana el de mas arriba. Palabras de Jaime.
+PRIORIDAD = {
+    "1_carga_cognitiva": "Reducir lo que el espectador tiene que procesar. Si el tablero propuesto obliga a leer tres cosas para entender una, se cambia.",
+    "2_coherencia_visual": "Que la pieza se vea de una sola mano y del canon de las 26 laminas.",
+    "3_objetivo_emocional": "Que la etapa deje la emocion que le toca.",
+    "jaime": "El disenador puede respetar el tablero o no; debe primar la reduccion de la carga cognitiva para el espectador, la coherencia visual y el objetivo emocional, en ese orden. MUCHO MOVIMIENTO, MUCHA DOPAMINA.",
+    "y_si_lo_cambias": "Dilo en `por_que`: que proponia el encargo, que compusiste y por cual de los tres criterios.",
+}
 
-    t = ""
-    for f in sorted(glob.glob(os.path.join(RAIZ, "src", "brand", "*.ts"))):
-        try:
-            t += open(f, encoding="utf-8").read() + "\n"
-        except OSError:
-            continue
-    if not t:
-        return {"error": "no se pudo leer src/brand/"}
-    colores = dict(re.findall(r"(\w+):\s*\"(#[0-9a-fA-F]{3,8})\"", t))
-    # Y si no sale ni un color, **se dice**: un canon vacío no es un canon.
-    if not colores:
-        return {"error": "src/brand/ no declara ningun color: el canon no llega"}
-    return {
-        "colores": colores,
-        "tipografia": {
-            "titulares y cifras": "Anton, versales",
-            "texto sobre video": "Montserrat 700-900",
-            "datos y cabeceras": "JetBrains Mono, versales, tracking amplio",
-            "prohibida": "cualquier serif: se emborrona con la compresion",
-        },
-        "prohibido": [
-            "sombras, degradados suaves, backdrop-filter, esquinas Material",
-            "rebote, confeti, wiggle, Easing.back",
-            "ilustracion amable: blobs, dibujitos, iconografia redondeada",
-            "fotografia de familia sonriente de stock",
-            "el oro decorando: si hay tres cosas en oro, dos sobran",
-        ],
-        "familias": {
-            "cargada": "fotomontaje a sangre, punto de fuga, geometria rota;"
-                       " para el golpe y el concepto",
-            "tranquila": "negro o navy liso, geometria plana a escuadra;"
-                         " para las cifras que hay que leer",
-        },
-    }
+#: El oficio del reel comercial, y el filtro de marca que lo acota.
+#:
+#: Jaime: *«el contrato del disenador tiene que conocer los efectos y las
+#: practicas mas comunes en reels comerciales, pero los efectos deben ser
+#: coherentes con la marca»*. Sin la primera mitad se compone como un carrusel
+#: quieto; sin la segunda se acaba en la plantilla que hace todo el mundo.
+OFICIO_REEL = {
+    "lo_que_funciona": [
+        "El primer segundo decide: algo se mueve antes del frame 12.",
+        "Tipografia cinetica: el texto ENTRA, no aparece. Y entra con ritmo, palabra a palabra o bloque a bloque, siguiendo la voz.",
+        "Capas sobre el plano: el rotulo puede nacer detras de la cara y acomodarse delante. Da profundidad y es lo que separa un reel de un video.",
+        "Punch-in: el encuadre se acerca en el remate. Corta el aburrimiento sin cortar la frase.",
+        "Pattern interrupt cada 3-5 s: algo cambia —encuadre, color, capa— antes de que el pulgar decida.",
+        "El subtitulo es capa portante y elemento de diseno, no un pie: se compone, se mueve y pesa en el cuadro.",
+        "El sonido marca el movimiento: cada entrada fuerte tiene su acento.",
+        "Freeze o corte seco para sostener una cifra: se para el mundo un instante y se lee.",
+    ],
+    "lo_que_NO_es_esta_marca": [
+        "Figuras redondeadas en pastel, iconografia amable, blobs.",
+        "El minimalismo simplon que todo el mundo hace para lucir caro: mucho aire, una linea fina y una palabra en el centro.",
+        "Plantillas de moda ajenas al proyecto: si se reconoce la plantilla antes que el mensaje, esta mal.",
+        "Adorno sin funcion: rebote, confeti, wiggle, particulas.",
+    ],
+    "el_filtro": "Todo lo de la primera lista vale SI pasa por el canon neoconstructivista de las 26 laminas. La tecnica es de reel; la forma es de esta marca. Jaime: «no es una figura redondeada color pastel… ni un estilo minimalista simplon o el que todo el mundo hace para lucir caro».",
+}
 
-
-def _topes():
-    """Los topes de texto, que **fallan el render** en vez de avisar."""
-    ruta = os.path.join(RAIZ, "src", "brand", "copy.ts")
-    try:
-        t = open(ruta, encoding="utf-8").read()
-    except OSError:
-        return {"error": "no se pudo leer src/brand/copy.ts"}
-    import re
-
-    return {k: int(v) for k, v in re.findall(r"(\w+):\s*(\d{2,3})\b", t)}
+#: El paso que faltaba: entender antes de dibujar.
+ANTES_DE_DIBUJAR = {
+    "1_que_quiere_decir": "Escribe en una linea que entiende el espectador DESPUES de esta etapa y no antes. Esa es la funcion del tablero.",
+    "2_no_lo_ilustres_literal": "Si el hablante usa un simil —«el contador es como un medico que firma una incapacidad»— la figura NO dibuja al medico. Dibuja lo que el simil viene a explicar: que se actua tarde y sobre el sintoma.",
+    "3_ejemplo_de_jaime": "Sobre un panel de palitos y bolitas: «pueden ser signos de dolares, o una grafica bajando, o algo que represente tributacion subiendo, o filas de monedas que crecen: algo que realmente tenga que ver con lo que se dice FIGURATIVAMENTE. Se trata de entender la intencion narrativa, no de repetir literalmente lo que se dice.»",
+    "4_complemento_no_eco": "El tablero complementa lo que se oye. Si repite la frase con otras letras, sobra.",
+}
 
 
 #: Lo que el gancho tiene que cumplir, y lo comprueba `gancho.mjs`.
 ENTRADA_GANCHO = {
-    "entradas_minimo": 3,
-    "por_que": "el primer segundo decide si alguien sigue mirando; el "
-               "maximalismo aqui es DENSIDAD DE ENTRADAS, no adorno",
-    "jaime": "el hook tiene que ser mucho mas movido",
-    "exige": "una figura dibujable declarada o una composicion tipografica; "
-             "no vale prosa, porque nadie la dibuja",
-    "prohibido": "rebote, confeti, wiggle y cualquier micro-animacion "
-                 "juguetona: esto es un asesor financiero hablando a duenos de "
-                 "negocio",
+    "entradas_minimo": 6,
+    "por_que": "el primer segundo decide si alguien sigue mirando; el maximalismo aqui es DENSIDAD DE ENTRADAS, no adorno",
+    "jaime": "espero animaciones mucho MAS FUERTES en todos los hooks: letras que entran DETRAS de mi cara y se acomodan, movimientos de subtitulos, cosas llamativas, con muchos efectos",
+    # **Esto TODAVIA NO SE PUEDE.** Se ofrecia como si estuviera hecho y no
+    # lo esta: `scripts/text-behind.py` saca el recorte del sujeto y
+    # funciona, pero ningun paso del render lo consume. Es la avería que
+    # Jaime nombro —*«que no quede otra vez el mismo error de declarar sin
+    # implementar»*— en el mismo bloque donde la nombro. Vive en
+    # `camara.por_construir`, que es donde se piden las cosas que cuestan
+    # codigo, y aqui se dice lo que hay.
+    "letras_detras": "POR CONSTRUIR, no lo compongas como si estuviera: el rotulo naciendo detras de la cara es lo que mas subiria el gancho y hoy no hay capa que lo dibuje. Si tu gancho lo pide, pidelo en `por_que` y se agenda. Ver `camara.por_construir`.",
+    "el_subtitulo_se_mueve": "En el gancho el subtitulo no solo aparece: entra, se asienta, acompana. Fuera del gancho se queda quieto.",
+    "exige": "una figura dibujable declarada o una composicion tipografica; no vale prosa, porque nadie la dibuja",
+    "prohibido": "rebote, confeti, wiggle y cualquier micro-animacion juguetona: esto es un asesor financiero hablando a duenos de negocio. Fuerte no es gracioso.",
 }
 
 
@@ -301,6 +300,11 @@ class ServicioDisenar(Servicio):
             return Resultado(True, salida="ningun tablero por montar")
 
         resumen = resumen_pieza(pieza.slug)
+        # **Lo que ya se ve en cada etapa.** Jaime: *«ya las escenas estan
+        # escogidas, asi que... pues que agregue lo B que falta»*. Sin esto el
+        # pedido describe cada etapa como si la pieza estuviera en blanco, y no
+        # lo esta: lo que se pide es el material B sobre una linea A cerrada.
+        hay = ya_en_pantalla(pieza.slug)
         payload = {
             "pieza": pieza.slug,
             # **El arco, que es lo que deja hacer un gancho de verdad.** Sin el,
@@ -308,11 +312,36 @@ class ServicioDisenar(Servicio):
             "arco": arco(pieza.slug),
             "otras_etapas": resumen,
             "canon": _canon(),
+            "laminas": _laminas(),
+            "placas": placas_que_existen(),
+            "estilo": ESTILO,
+            "antes_de_dibujar": ANTES_DE_DIBUJAR,
+            "sonidos": _sonidos(),
+            "oficio_reel": OFICIO_REEL,
+            "prioridad": PRIORIDAD,
+            "piezas": catalogo_de_piezas(),
+            "como_combinar": COMO_COMBINAR,
+            "figuras": figuras_que_se_trazan(),
+            "correccion": CORRECCION,
+            "verse": VERSE,
+            "tres_d": tres_dimensiones(),
+            "camara": mando_de_camara(),
+            # **Y cómo suena él en el remate**, que es la otra mitad de mandar
+            # sobre el material. Jaime: *«que cambie mi voz en los punchlines»*.
+            # Va en el pedido porque una herramienta que no está en el pedido no
+            # existe para quien compone: es lo que pasó con los cinco encuadres
+            # y con las catorce placas.
+            "voz": voz_en_el_remate(),
+            "composicion": que_leer_para_componer(),
             "topes": _topes(),
             "tableros": [{
                 "etapa_orden": f["etapa_orden"],
-                # El encargo es lo que escribio quien planea. **No se
-                # reinterpreta**: dice que tiene que quedar dicho, y este paso
+                # Lo que escribio quien planea: dice que tiene que quedar
+                # dicho. **Es una propuesta, no un encargo cerrado.** Jaime:
+                # *«el disenador puede respetar el tablero o no»*. Si cumplirlo
+                # al pie carga al espectador, se cambia — y se dice por que.
+                # Antes decia aqui que no se reinterpretaba, y eso es lo que
+                # producia ilustraciones literales del simil. Este paso
                 # decide como se dibuja.
                 "encargo": f["grafico"],
                 "que_pasa": f["que_pasa"],
@@ -332,6 +361,8 @@ class ServicioDisenar(Servicio):
                 "en_la_pista": _en_la_pista(pieza.slug).get(f["etapa_orden"]),
                 # Lo que el gancho exige y las demas no. Va en la etapa, no en
                 # una nota aparte, para que quien compone no tenga que acordarse.
+                "ya_en_pantalla": hay.get(int(f["etapa_orden"]),
+                                          ["NADA: cara y subtitulo, nada mas"]),
                 **({"es_el_gancho": ENTRADA_GANCHO}
                    if int(f["etapa_orden"]) == 1 else {}),
             } for f in pendientes],
@@ -369,12 +400,107 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
 
     con = _con()
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
-    puestos, sin_copy = 0, []
+    puestos, encuadrados, corregidos = 0, 0, 0
+    retirados, componentes, sin_copy = 0, 0, []
+    tratadas, destratadas, voz_mal = 0, 0, []
     for t in tableros:
         beat = t.get("etapa_orden")
         if beat is None:
             continue
+        # **La camara va primero y va sola.** Una etapa puede pedir encuadre y
+        # transicion sin llevar tablero —de hecho la mayoria son asi: cara y
+        # subtitulo—, asi que guardarla dentro del `if` del tablero la habria
+        # dejado inalcanzable justo para las etapas donde mas manda.
+        if isinstance(t.get("camara"), dict) and t["camara"]:
+            con.execute(
+                "update escena_desc set camara = ?, fecha = ?"
+                " where video_slug = ? and etapa_orden = ?",
+                (json.dumps(t["camara"], ensure_ascii=False), ahora,
+                 pieza.slug, int(beat)))
+            encuadrados += 1
+        # **Y la correccion de lo dicho, que tampoco tenia por donde pedirse.**
+        #
+        # `corrige_dice` / `corrige_es` existian en `escena_desc`, los dibuja
+        # `Corregida` y los declaraba el contrato del COMPOSITOR — no el de
+        # quien compone el grafico, que es justo el que tiene delante la cifra
+        # de la voz y la cifra respaldada.
+        #
+        # Jaime, al ver el caso: *«si se puede corregir en pantalla si queda
+        # explicito el error»*, *«pero explicito no es»* —de una nota al pie— y
+        # la forma exacta: *«no decir "aca hay un error", sino que el error se
+        # enfatice en el numero bueno, o el nombre bueno»*. Que es literalmente
+        # lo que hace `Corregida`: la palabra mala se SUSTITUYE por la buena, y
+        # la buena crece, se pone en oro y late.
+        # **`componente` tambien se aplica.** El contrato lo declara como clave
+        # del disenador —`Clave("componente")` en `contrato/diseno.py`, con su
+        # aguja en `caminos.mjs`— y `aplicar()` no lo escribia: sale de
+        # `escena_desc.componente`, no del tablero, asi que quien lo declaraba
+        # veia su decision desaparecer sin aviso. Es la misma forma de siempre:
+        # una clave con contrato, con lector, y sin nadie que la guarde.
+        comp = t.get("componente")
+        if isinstance(comp, str) and comp.strip():
+            con.execute(
+                "update escena_desc set componente = ?, fecha = ?"
+                " where video_slug = ? and etapa_orden = ?",
+                (comp.strip(), ahora, pieza.slug, int(beat)))
+            componentes += 1
+        # **Y cómo suena él en el remate de esa etapa.** Jaime: *«que cambie mi
+        # voz en los punchlines»*.
+        #
+        # Se guarda con `"voz" in t` y no con `t.get("voz")` porque las dos
+        # respuestas son distintas y las dos son suyas: no decir nada es dejarlo
+        # como está, y decir `null` es **retirarlo**. Sin esa diferencia el
+        # tratamiento se podría poner y no quitar, que es la mitad de una
+        # herramienta y la mitad que convierte una decisión en permanente.
+        #
+        # Y se valida ANTES de escribir: un trato que no existe guardado en la
+        # base sale como falta en cada corrida del paso de audio para siempre.
+        # Lo mismo que hace `figuras_que_se_trazan` por el lado visual.
+        if "voz" in t:
+            v, mal = t["voz"], ""
+            if isinstance(v, dict) and v:
+                r = _remate.Remate.de_declaracion(beat, v)
+                mal = r.falta() if r else "no dice `trato`"
+            if mal:
+                voz_mal.append(f"e{beat}: {mal}")
+            else:
+                con.execute(
+                    "update escena_desc set voz = ?, fecha = ?"
+                    " where video_slug = ? and etapa_orden = ?",
+                    (json.dumps(v, ensure_ascii=False) if v else None,
+                     ahora, pieza.slug, int(beat)))
+                if v:
+                    tratadas += 1
+                else:
+                    destratadas += 1
+        corr = t.get("corrige")
+        if isinstance(corr, dict) and corr.get("dice") and corr.get("es"):
+            con.execute(
+                "update escena_desc set corrige_dice = ?, corrige_es = ?,"
+                " fecha = ? where video_slug = ? and etapa_orden = ?",
+                (corr["dice"], corr["es"], ahora, pieza.slug, int(beat)))
+            corregidos += 1
+        # **Y un tablero se puede RETIRAR, no solo escribir.**
+        #
+        # `aplicar` solo sabia poner. Un disenador que decide que una etapa esta
+        # mejor sin tablero —reel-06 e7: 5,13 s de negro rotulando «21 DE
+        # SEPTIEMBRE» mientras el subtitulo decia lo mismo tres renglones arriba,
+        # con la fecha ya derivada en la tarjeta once segundos despues— no tenia
+        # forma de decirlo: escribia su decision en `por_que` y el tablero seguia
+        # saliendo. Es declarar sin poder aplicar, otra vez.
+        #
+        # `retirar: true` lo borra de `escena_desc`, que es su unica fuente.
+        if t.get("retirar"):
+            con.execute(
+                "update escena_desc set tablero = null, fecha = ?"
+                " where video_slug = ? and etapa_orden = ?",
+                (ahora, pieza.slug, int(beat)))
+            retirados += 1
+            continue
         kind, props = t.get("kind"), t.get("props")
+        if not kind and not props and (t.get("camara") or corr or comp
+                                       or "voz" in t):
+            continue          # etapa que solo pide camara: es una entrega valida
         if not kind or not isinstance(props, dict) or not props:
             sin_copy.append(beat)
             continue
@@ -393,7 +519,51 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
             False,
             motivo=f"etapa(s) {sin_copy} volvieron sin `kind` o sin `props`:"
                    f" un tablero sin copy no se puede montar")
-    return Resultado(True, salida=f"{puestos} tablero(s) montado(s)")
+    hecho = f"{puestos} tablero(s) montado(s)"
+    if encuadrados:
+        hecho += f" · {encuadrados} etapa(s) con camara declarada"
+    if corregidos:
+        hecho += f" · {corregidos} correccion(es) de lo dicho"
+    if retirados:
+        hecho += f" · {retirados} tablero(s) retirado(s)"
+    if componentes:
+        hecho += f" · {componentes} componente(s)"
+    if tratadas:
+        hecho += f" · {tratadas} remate(s) con tratamiento de voz"
+    if destratadas:
+        hecho += f" · {destratadas} remate(s) devuelto(s) a la voz de siempre"
+    if voz_mal:
+        hecho += " · voz NO declarada en " + "; ".join(voz_mal)
+    _archiva_respuesta(pieza.slug)
+    return Resultado(True, salida=hecho)
+
+
+def _archiva_respuesta(slug: str) -> None:
+    """Retira la respuesta ya consumida: existir tiene que significar pendiente.
+
+    `verificar.py` para la linea cuando encuentra `<slug>.respuesta.json`, y con
+    razon —*«una composicion escrita y sin aplicar es otro diseno compitiendo»*—,
+    pero nadie la retiraba al aplicarla, asi que el aviso salta **para siempre**
+    despues de un exito. Hoy paro el montaje de reel-02, reel-04 y reel-07 con
+    los tres disenos ya dentro de la base, comprobado etapa por etapa.
+
+    Es la averia del proyecto por el otro lado: alli el dato no llegaba, aqui la
+    senal no se apaga. Acaban igual — una comprobacion que grita donde no hay
+    problema se deja de mirar, y entonces no comprueba nada.
+    """
+    import shutil
+
+    import servicio as contrato
+
+    r = contrato.ruta_respuesta("disenar", slug)
+    if not os.path.exists(r):
+        return
+    d = os.path.join(os.path.dirname(r), "usadas")
+    os.makedirs(d, exist_ok=True)
+    try:
+        shutil.move(r, os.path.join(d, f"{slug}.aplicada.respuesta.json"))
+    except OSError:
+        pass
 
 
 def _retira_pedido(slug: str) -> None:
@@ -430,18 +600,16 @@ def _en_la_pista(slug: str) -> dict:
     Son segundos de la PIEZA, no de la cinta — que es lo que la pista de audio
     sigue y lo que el espectador oye. Un tablero que se compone contra los
     segundos de la cinta se coloca donde nadie lo esta mirando.
-    """
-    try:
-        from dominio.montaje import Montaje
 
-        m = Montaje(slug)
-        fuera, t = {}, 0.0
-        for tr, d in m.tramos():
-            b, dur = d.get("beat"), tr.dura
-            if b is not None:
-                a, z = fuera.get(b, (t, t))
-                fuera[b] = (min(a, t), max(z, t + dur))
-            t += dur
-        return {b: [round(a, 2), round(z, 2)] for b, (a, z) in fuera.items()}
-    except Exception:                              # noqa: BLE001
-        return {}
+    **Y se lo pregunta a `remate.ventanas`, que ya contestaba esto.** Aqui habia
+    una segunda respuesta a la misma pregunta, sumando `tr.dura` sobre los tramos
+    del EDL — y el EDL no es el reloj de la pieza: `plan-reel` le quita el aire a
+    cada corte antes de repartirlo en escenas, y `reels/reloj.mjs` lo tiene
+    medido, **6,83 s en reel-01 y creciendo hacia el final**. O sea que el
+    diseñador componia contra un reloj que se iba, y justo en el cierre.
+
+    `src/reels.json` es lo que el render dibujo, asi que sus segundos son los que
+    el espectador oye. Dos listas describiendo la misma pieza es el aprendizaje
+    33: manda la que se renderiza.
+    """
+    return {b: [a, z] for b, (a, z) in _remate.ventanas(slug).items()}

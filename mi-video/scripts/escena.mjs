@@ -66,6 +66,31 @@ export const esTipografico = (grafico) => Boolean(grafico && ES_TIPO.test(grafic
  * lo que decidio, y **se devuelve `null` cuando no hay nada**. Un plano sin
  * figura es una decision legitima; inventarle una no lo es.
  */
+//: Las diez que `Pictograma` sabe trazar. Un nombre fuera de esta lista **no
+//: deja de dibujarse: dibuja otra cosa**, porque el `switch` tenia un `default`
+//: con una flecha y la flecha es lo que salia. Es peor que el caso mudo de
+//: `SUENAN` — alli faltaba el fichero y se oia el silencio; aqui la pieza
+//: afirma en pantalla algo que nadie compuso (C-168).
+export const DIBUJAN = new Set(["persona", "dos-personas", "alto", "ceda", "desvio",
+                         "bifurcacion", "escalera", "flecha", "barras",
+                         "serie"]);
+
+/**
+ * Lo que se declaro y no se puede trazar. Mismo trato que `sonidosMudos`: se
+ * acumula y lo imprime `reels-spec.mjs`, que es quien tiene delante el reel y
+ * la etapa para poder ir a arreglarlo donde vive.
+ */
+export const figurasSinDibujo = [];
+
+/** ¿Es un nombre que `Pictograma` traza, o es prosa que caeria en la flecha? */
+export const dibujable = (fig, desc) => {
+  if (typeof fig !== "string" || !fig.trim()) return null;
+  const f = fig.trim();
+  if (DIBUJAN.has(f)) return f;
+  figurasSinDibujo.push({ donde: donde(desc), dice: f.slice(0, 90) });
+  return null;
+};
+
 export const figuraDe = (desc) => {
   const t = typeof desc === "string" ? null : desc?.tablero;
   if (!t) return null;
@@ -77,8 +102,7 @@ export const figuraDe = (desc) => {
       return null;
     }
   }
-  const fig = d?.props?.figura ?? d?.figura ?? null;
-  return typeof fig === "string" && fig.trim() ? fig.trim() : null;
+  return dibujable(d?.props?.figura ?? d?.figura ?? null, desc);
 };
 
 /**
@@ -153,7 +177,7 @@ export const donde = (desc) =>
 //: Los siete que existen en `public/sfx/`. Un nombre fuera de esta lista no
 //: tiene fichero, y `staticFile` **no comprueba que exista**: saldria mudo sin
 //: un solo aviso, que es la peor forma de fallar (C-06).
-const SUENAN = new Set(["mark", "draw", "fork", "land", "type", "whoosh",
+export const SUENAN = new Set(["mark", "draw", "fork", "land", "type", "whoosh",
                         "glitch"]);
 
 
@@ -241,3 +265,27 @@ export const rotuloDe = (desc) => {
     return null;
   }
 };
+
+/**
+ * **Lo que se declaro y no llega a producirse, redactado en un solo sitio.**
+ *
+ * Dos accidentes con la misma forma: una descripcion correcta, bien escrita,
+ * que no produce nada. El sonido que ninguna expresion de `SONIDOS` reconoce se
+ * monta mudo; la figura que no esta en `DIBUJAN` se montaba **como una flecha**,
+ * que es peor —el silencio se nota y una figura equivocada se aprueba (C-168)—.
+ *
+ * Se redacta aqui y no en `reels-spec.mjs` porque aqui es donde se acumula, y
+ * porque estaba escrito alli dos veces: dos redacciones del mismo aviso son dos
+ * sitios donde el dia que cambie el formato queda uno mal.
+ *
+ * No para el lote. Dice **que reel y que etapa**, que es lo que permite ir a
+ * declararlo donde vive, en `escena_desc.tablero`.
+ */
+export const faltasDeclaradas = () => [
+  ...figurasSinDibujo.map((f) =>
+    `${f.donde}: declara una figura que no se traza — «${f.dice}». No es un ` +
+    `nombre del catalogo de \`Pictograma\`, asi que la escena se monta sin figura.`),
+  ...sonidosMudos.map((s) =>
+    `${s.donde}: describe un sonido que no suena — «${s.dice}». Ninguna ` +
+    `expresion de SONIDOS lo reconoce, asi que la capa se monta muda.`),
+];

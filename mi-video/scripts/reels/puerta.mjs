@@ -203,7 +203,7 @@ function informe(r, m) {
     `${r.id}  ${r.duracion.toFixed(1)}s  ${m.visibles}/${r.captions.length} cc (${r.compuestos} compuestos)  mudo max ${(m.dur / FPS).toFixed(1)}s  ` +
     `rotulo entra en ${(r.entra / FPS).toFixed(1)}s  ` +
     `${r.paneles.length} panel(es) · ${r.boards.length} tablero(s)${r.boards.length ? " en " + r.boards.map((b) => (b.at / FPS).toFixed(1) + "s").join(",") : ""}  ` +
-    `CTA en ${r.cta.at.toFixed(1)}s`,
+    `CTA ${r.cta ? "en " + r.cta.at.toFixed(1) + "s" : "NO HAY (falta el copy del cierre)"}`,
   );
   /**
    * **La cifra es secundaria respecto al segmento.** Jaime: *«no creo que las

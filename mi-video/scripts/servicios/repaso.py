@@ -41,6 +41,41 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
+from .instrumentos import (INSTRUMENTOS, YA_MEDIDO,  # noqa: E402
+                           lo_que_hizo_la_maquina)
+
+
+def _contexto_del_corte(slug):
+    """Lo que el prompt pide y el pedido no mandaba. **Estaba en el EDL.**
+
+    Cinco campos llevaban meses marcados EXIGIDO Y NO ENVIADO en el contrato, y
+    cuatro de ellos estaban ahi mismo, en `edl-sell.json`: la estructura que
+    ejecuta la pieza, su pilar, su CTA y los enunciados. El quinto —donde estan
+    hoy las costuras— es la lista de segmentos, que tambien.
+
+    No habia que calcular nada. Habia que leerlo y mandarlo.
+    """
+    import json
+    import os
+
+    ruta = f"ads/{slug}/edl-sell.json"
+    if not os.path.exists(ruta):
+        return {}
+    with open(ruta, encoding="utf-8") as f:
+        e = json.load(f)
+    return {
+        "estructura": e.get("estructura"),
+        "pilar": e.get("pilar"),
+        "cta": e.get("cta"),
+        "enunciados": e.get("enunciados"),
+        # Donde estan HOY las costuras, no solo el span: se pide mover una y del
+        # montaje solo llegaba el minimo y el maximo.
+        "tramos_actuales": [
+            {"i": i, "desde": round(a, 3), "hasta": round(b, 3),
+             "toma": (e["detalle"][i] or {}).get("toma"),
+             "beat": (e["detalle"][i] or {}).get("beat")}
+            for i, (a, b) in enumerate(e["segmentos"])],
+    }
 
 
 class ServicioRepaso(Servicio):
@@ -115,8 +150,20 @@ class ServicioRepaso(Servicio):
         #
         # Se queda el montaje —lo que se juzga—, la onda —la otra mitad de
         # «suena»— y lo que cambio desde la vuelta anterior.
+        # **Los microscopios, declarados y no ejecutados.** Jaime: *«todo lo
+        # que se pueda medir en codigo que se mida en codigo; no quiero al LLM
+        # revisando script por script en cada viaje»* — y a la vez *«que las
+        # pueda utilizar con criterio editorial en los bordes que necesita
+        # ver… siempre que sean necesarias, para ahorrar tokens»*.
+        #
+        # Asi que lo barato ya viaja medido en `montaje`, y lo caro se declara:
+        # que contesta, que cuesta y como se invoca. Se pide para el sitio
+        # concreto, no se barre la pieza.
         datos = {"montaje": filas, "onda": curva,
-                 "lo_que_cambio": cambio}
+                 "instrumentos": INSTRUMENTOS, "ya_medido": YA_MEDIDO,
+                 "lo_que_hizo_la_maquina": lo_que_hizo_la_maquina(pieza.slug),
+                 "lo_que_cambio": cambio,
+                 **_contexto_del_corte(pieza.slug)}
         # **Tiene su propio contrato, y no es el de redundancia.** Jaime:
         # *«la revision de redundancia es revision de composicion, logica,
         # libreto, tono: es tu revision final»*. Reusar el prompt de la fase 5
@@ -167,9 +214,15 @@ class ServicioRepaso(Servicio):
                 seg = float(seg) if seg is not None else None
             except (TypeError, ValueError):
                 seg = None
+            # **Se declara aqui a quien le toca y que medida lo cierra.** Un
+            # ticket de corte o de sonido vuelve al paso que coso y lo cierra
+            # `bordes_sucios`, que es el detector que lo veria. Uno de `dato`
+            # no vuelve a ningun paso: es para Jaime, y ninguna medida lo cierra.
             tk.abrir(pieza.slug, (dijo + (f" — {porque}" if porque else ""))[:2000],
                      seg, "suena" if tipo == "suena" else
-                          ("dato" if tipo == "dato" else "objecion"))
+                          ("dato" if tipo == "dato" else "objecion"),
+                     vuelve_a="" if tipo == "dato" else "cosido",
+                     cierra_con="" if tipo == "dato" else "bordes")
             if tipo == "dato":
                 para_jaime += 1
             else:
@@ -204,6 +257,17 @@ def _cerrar_tickets(pieza) -> "Resultado":
     Lo que no se puede medir no se cierra solo — se queda abierto y viaja con la
     pieza hasta Jaime, que es donde tenia que estar desde el principio. Cerrar
     por silencio seria justo lo que este paso existe para impedir.
+
+    **Y solo cierra los suyos.** El barrido iba sobre `tk.abiertos(pieza.slug)`
+    —TODOS los tickets de la pieza, incluidos los que Jaime abrio por CLI— y
+    ademas leia el diccionario de bordes con la clave en texto teniendola en
+    numero, asi que **toda etapa parecia limpia**. Las dos cosas juntas cerraban
+    el ticket #17 de reel-01 —«la Y que aparece sobre el plano no es un panel»,
+    una queja grafica— con «la etapa ya no tiene ningun borde sucio», que ni era
+    su medida ni era cierto: el beat 3 tenia el borde de 262,47.
+
+    Ahora se cierra solo lo que declaro `cierra_con="bordes"` al abrirse, y
+    `contestar` revienta si alguien lo intenta con otra medida.
     """
     from dominio import ticket as tk
 
@@ -216,10 +280,11 @@ def _cerrar_tickets(pieza) -> "Resultado":
     cerrados, quedan = 0, 0
     for t in tk.abiertos(pieza.slug):
         b = t.get("beat")
-        if t.get("tipo") == "objecion" and b is not None and not sucios.get(str(b)):
+        if t.get("cierra_con") == "bordes" and b is not None and not sucios.get(str(b)):
             tk.contestar(t["id"], "el paso que cose volvio a pasar y la etapa ya"
                                   " no tiene ningun borde sucio: medido, no"
-                                  " opinado", estado="arreglado", quien="la linea")
+                                  " opinado", estado="arreglado",
+                         quien="la linea", medida="bordes")
             cerrados += 1
         else:
             quedan += 1

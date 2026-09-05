@@ -26,12 +26,21 @@ Cada vez que una instrucción se repite, sube el contador. No es estadística: e
 cuatro turnos de criterio de Jaime gastados en decir lo mismo, y el número lo
 dice sin discusión.
 
-## Los tres estados, y la diferencia importa
+## Los cuatro estados, y la diferencia importa
 
 - `pendiente` — dicha y no hecha. Es lo que hay que mirar antes que nada.
 - `aplicada` — hecha en esta pieza. Puede volver a hacer falta en la siguiente.
 - `en la maquina` — ya no depende de que nadie se acuerde: hay un mecanismo. Es
   el único estado que cierra de verdad, y la columna `aguja` dice dónde.
+- `descartada` — la miró y dijo que no. **Faltaba**, y la falta tenía coste: sin
+  este estado, una propuesta que Jaime rechaza se queda en `pendiente` y
+  `servicio.pedir()` la sigue metiendo en todos los pedidos **como si fuera
+  regla**. La alternativa era marcarla `aplicada`, que es mentir en la tabla.
+
+  Pasó el 4 de septiembre con T-03, la compuerta de cifras: su documento decía
+  *«Estado: propuesta»* y yo la mandé a implementar. Jaime: *«la regla propuesta
+  no»*. Un registro que sólo sabe decir «hecha» o «por hacer» no puede guardar un
+  «no», y entonces el «no» se pierde y la propuesta vuelve sola.
 """
 from __future__ import annotations
 
@@ -54,7 +63,8 @@ CREATE TABLE IF NOT EXISTS instruccion (
   pieza    TEXT,                     -- slug, si es de una
   paso     TEXT,                     -- fase, si es de uno
   estado   TEXT NOT NULL DEFAULT 'pendiente'
-           CHECK (estado IN ('pendiente','aplicada','en la maquina')),
+           CHECK (estado IN ('pendiente','aplicada','en la maquina',
+                             'descartada')),
   veces    INTEGER NOT NULL DEFAULT 1,
   aguja    TEXT,                     -- donde quedo imposible de olvidar
   nota     TEXT
@@ -66,7 +76,33 @@ def _con():
     cx = basedatos.abrir()
     cx.row_factory = sqlite3.Row
     basedatos.esquema(cx, ESQUEMA)
+    _al_dia(cx)
     return cx
+
+
+def _al_dia(cx):
+    """Añade `descartada` a una tabla que se creó sin ese estado.
+
+    `CREATE TABLE IF NOT EXISTS` no toca una tabla que ya existe, así que ampliar
+    un `CHECK` en `ESQUEMA` no cambia nada en la base que ya está escrita: el
+    estado nuevo se declara y sigue sin poder guardarse. Es la avería de este
+    proyecto en su forma más pequeña — declarar sin implementar.
+
+    Se rehace la tabla, que es lo único que SQLite permite para cambiar un
+    `CHECK`, y se copia fila por fila dentro de una transacción. Corre una vez:
+    la segunda encuentra el estado ya declarado y se va.
+    """
+    fila = cx.execute("select sql from sqlite_master where type = 'table'"
+                      " and name = 'instruccion'").fetchone()
+    if not fila or "descartada" in (fila[0] or ""):
+        return
+    cx.executescript(
+        "begin;"
+        " alter table instruccion rename to instruccion_vieja;"
+        + ESQUEMA.replace("IF NOT EXISTS ", "") + ";"
+        " insert into instruccion select * from instruccion_vieja;"
+        " drop table instruccion_vieja;"
+        "commit;")
 
 
 def guardar(dijo, ambito="lote", pieza=None, paso=None, nota=None):

@@ -87,6 +87,9 @@ export const PROMESA = {
   "reel-04": "Por qué el banco dice no, y qué cambiar.",
   "reel-05": "Qué activa el castigo y cómo evitarlo.",
   "reel-06": "Dónde está su brecha y qué hacer con ella.",
+  // Condensada de su propio cierre en el libreto —«para que más plata le
+  // llegue al bolsillo, de manera legal»—, no escrita aquí de cero.
+  "reel-07": "Que más plata le llegue al bolsillo.",
 };
 for (const [k, v] of Object.entries(PROMESA)) {
   if (v.length > 42) throw new Error(`promesa de ${k}: ${v.length} car (max 42)`);
@@ -119,7 +122,11 @@ export const CUENTA = {
   "reel-01": {
     cuesta: "$576 cada semana",
     vale: PRECIO_HOY?.vale ?? null,
-    nota: "luego $30 y $40",
+    // **Sin `nota`.** Decia "luego $30 y $40" y `vale` ya lo trae: la tarjeta
+    // pegaba las dos y salia «HASTA EL 4 SEP · LUEGO $30 Y $40 · LUEGO $30 Y
+    // $40», en pantalla y en la entrega. `nota` se escribio cuando `vale` era
+    // solo «$20»; al derivarse de la escalera de precios crecio y se comio lo
+    // que decia la nota, que quedo como segunda copia del mismo dato.
   },
 };
 
@@ -223,11 +230,28 @@ export const TARJETAS = {
  * facto. Sólo se nombra lo que **de verdad llega a la pantalla desde aquí**:
  * contar literales que ya nadie lee convierte la falta en ruido.
  */
-export const literalesDe = (slug) =>
-  [
-    ["rotulo del gancho", (LINEAS[slug] ?? []).length ? 1 : 0],
+/**
+ * **Y se cuenta el que SE USA, no el que existe.**
+ *
+ * Esto miraba si el literal estaba escrito, no si alguien lo leia. Con cinco de
+ * las siete piezas declarando ya su rotulo en `escena_desc` —y `rotuloDe`
+ * ganandole al literal, como debe— el montaje seguia avisando de «1 rotulo del
+ * gancho sale de un literal» en las seis. Veintiuna faltas de treinta eran eso.
+ *
+ * Es la misma averia que este fichero documenta arriba para `TABLEROS` y
+ * `PANELES`, palabra por palabra: *«un aviso que senala un problema ya resuelto
+ * gasta la misma atencion que uno de verdad»*. Escrita en el docstring y no en
+ * la funcion.
+ */
+export const literalesDe = (slug, declarado) => {
+  // `declarado` lo pasa quien monta: alli ya se resolvio el rotulo y aqui no se
+  // puede preguntar sin un ciclo de imports —`escena.mjs` importa de este
+  // fichero—. Se recibe en vez de deducirse.
+  return [
+    ["rotulo del gancho", !declarado && (LINEAS[slug] ?? []).length ? 1 : 0],
     ["tarjetas", (TARJETAS[slug] ?? []).length],
   ].filter(([, n]) => n > 0);
+};
 
 
 /**

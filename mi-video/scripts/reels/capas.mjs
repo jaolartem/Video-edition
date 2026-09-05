@@ -18,7 +18,8 @@
  */
 import { FPS, enFrames } from "./reloj.mjs";
 import { duracionTarjeta } from "./lectura.mjs";
-import { delPaso2 } from "./material.mjs";
+import { delPaso2, placaDe } from "./material.mjs";
+import { TOPE } from "../formas.mjs";
 import { TARJETAS } from "./copy.mjs";
 import { DICE } from "./texto.mjs";
 import { construir, revisarPieza } from "../caminos.mjs";
@@ -44,6 +45,34 @@ import { construir, revisarPieza } from "../caminos.mjs";
  * `cc` no emite nada: esa etapa la lleva el subtítulo dinámico, que ya tiene la
  * idea. No es un hueco, es la opción por defecto del resto.
  */
+// **Y el reparto se MIDE, no se confia.** Jaime, viendo lo que volvio del paso
+// de diseno: *«el uso de tableros debe complementarse con los paneles, no todo
+// puede ser tablero»*.
+//
+// La regla de los tres ya estaba escrita —tablero para lo complejo o para tapar
+// un corte duro, panel para lo complejo con carga emocional o lo que no da para
+// tablero, cc para el resto— y aun asi volvieron 16 plenos contra 13 paneles, y
+// una pieza con CINCO plenos y CERO paneles. Una regla que solo esta escrita se
+// cumple de media y se incumple en la pieza concreta.
+//
+// No es un tope de porcentaje: es que la distincion se haya hecho. Una pieza
+// que manda todo a pleno no eligio entre las tres vias — uso una.
+export function faltaMezcla(slug, declarados) {
+  const con = declarados.filter(
+    (b) => String(b.props?.cubre ?? "pleno") !== "cc",
+  );
+  const plenos = con.filter(
+    (b) => String(b.props?.cubre ?? "pleno") === "pleno",
+  ).length;
+  if (con.length < 3 || plenos < con.length) return [];
+  return [
+    `${slug}: los ${plenos} graficos de la pieza van a pleno y ninguno` +
+      " acompana el plano. «No todo puede ser tablero»: un grafico que no lleva" +
+      " contenido complejo ni tapa un corte duro le esta quitando el sitio a la" +
+      " cara, y sin panel la pieza no tiene registro intermedio.",
+  ];
+}
+
 export function repartirPorCubre(declarados) {
   const pleno = [];
   const panel = [];
@@ -148,6 +177,76 @@ export function tarjetasDe(slug, { marco, edl, reloj }) {
  * de esconder el corte para pasar a ser el corte.
  */
 const DUR_GLITCH = 5;
+
+// Lo que dura la cortinilla: 21 frames, 0,7 s. Es lo que se desvanece dentro
+// del propio componente, asi que acortarla la corta a media salida.
+const DUR_CORTINILLA = 21;
+
+// Cortinillas pedidas y sin placa, o con la etapa demasiado larga.
+export const cortinillasSinSitio = [];
+
+// **Las cortinillas que pidio quien compuso.**
+//
+// El componente estaba escrito, el hueco estaba en el spec y `Reel.tsx` lo
+// dibujaba — y el spec ponia `cortinillas: []` fijo desde que se probaron en
+// todas las costuras y quedaron mal. Jaime entonces: «en el segundo 7 se ve
+// raro; esos cortes de escena no vale la pena dejarlos como cortes de escena».
+//
+// Y tenia razon SOBRE PONERLAS EN TODAS, que es lo que se hizo. La conclusion
+// que se saco fue otra —quitarlas del todo— y con ella se perdio la pieza
+// entera: una mascara que se pone siempre deja de ser mascara, pero una que no
+// se puede poner nunca no es una decision, es una ausencia.
+//
+// Ahora sale donde se pide y solo ahi: `escena_desc.camara.transicion`. Sin
+// nadie que la pida no hay ninguna, asi que el estado de hoy no se mueve.
+//
+// Dos cosas la dejan fuera y las dos se CUENTAN en vez de reventar el render:
+// una etapa sin placa en `ads/fondos.json` —la cortinilla ES la placa— y un
+// nombre de etapa por encima del tope, que `assertShort` aborta a mitad de
+// render diciendo poco.
+export function cortinillasDe(slug, reloj, marco) {
+  const out = [];
+  const total = marco?.beats?.length ?? 0;
+  const vistos = new Set();
+  for (const e of reloj.escenas ?? []) {
+    // **Y una peticion vieja no vuelve por la puerta de atras.** `cortinilla`
+    // esta RETIRADA en `camara.mjs`, pero lo que el disenador escribio hace
+    // dias sigue en `escena_desc.camara.transicion`: sin esto, quitarla del
+    // menu no quita la que ya esta pedida. Se cuenta para que se vea, no se
+    // calla — es la diferencia entre retirar un mecanismo y esconderlo.
+    if (e.transicion === "cortinilla") {
+      cortinillasSinSitio.push(
+        `${slug} e${e.beat}: pide «cortinilla», que esta retirada`
+        + " (Jaime: «eso ya lo habiamos depreciado… para eso esta el glitch»)."
+        + " La costura la tapa el glitch.");
+      continue;
+    }
+    if (e.transicion !== "cortinilla") continue;
+    const beat = Number(e.beat);
+    // Una por etapa: un beat partido en tres escenas se anuncia una vez.
+    if (vistos.has(beat)) continue;
+    vistos.add(beat);
+    const at = enFrames(e.montado_desde);
+    // Nunca en el frame 0: la pieza abre con el gancho, no con una placa.
+    if (at <= 0) continue;
+    const etapa = marco?.beats?.[beat - 1]?.etapa ?? "";
+    const placa = placaDe(slug, beat);
+    const por = !placa ? "no hay placa para esa etapa en ads/fondos.json"
+      : etapa.length > TOPE.label ? `«${etapa}» pasa de ${TOPE.label} caracteres`
+      : null;
+    if (por) {
+      cortinillasSinSitio.push(`${slug} e${beat}: ${por}`);
+      continue;
+    }
+    out.push({
+      at,
+      duration: DUR_CORTINILLA,
+      props: { placa, etapa, beat: [beat, total], framework: marco.estructura,
+               sound: true },
+    });
+  }
+  return out;
+}
 
 export function glitchesDe(edl, reloj, cubren) {
   const duras = new Set(edl.costuras_duras ?? []);

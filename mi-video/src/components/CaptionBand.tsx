@@ -43,10 +43,46 @@ export type { Compuesto } from "./captionBand/Compuesta";
  * [compuesta](./captionBand/Compuesta.tsx) —que es la única que mide texto— y
  * la [corregida](./captionBand/Corregida.tsx), que sirve igual a la corrección
  * y a la idea fuerza.
- */
+  * @clase sistema
+*/
 export const CaptionBand: React.FC<{
   text: string;
   tokens: ModeTokens;
+  /**
+   * Si hay un tablero en pantalla. Entonces el subtitulo **acompana**: mismo
+   * sitio, cuerpo mas pequeno. Ver `sobreTablero` en `Ad.tsx`.
+   *
+   * Jaime: *«los subtitulos de los tableros deben ser pequenos, que no compitan,
+   * que simplemente presenten info»*. No se calla —esa regla es suya tambien— y
+   * por eso lo que cambia es el peso visual, no la presencia.
+   */
+  sobreTablero?: boolean;
+  /**
+   * Dónde cae su coronilla, en fracción del cuadro. Con esto el subtítulo se
+   * coloca **en el hueco de encima de su cabeza** en vez de junto a la barbilla.
+   *
+   * Jaime: *«hay mucho espacio arriba de mi cabeza en esas tomas para poner cc
+   * y letreros»*, *«sí, aprovechemos el espacio de la toma, que para eso es;
+   * además es una toma muy bonita»*.
+   *
+   * Medido en las siete piezas: la coronilla cae en 0,317–0,320 y la zona segura
+   * de Meta empieza en 0,14 — **340–345 px sin usar**, el 18% del cuadro. Abajo,
+   * en cambio, la banda se toca con su mentón.
+   *
+   * Y no contradice el porqué de la posición anterior —*«los subtítulos van
+   * pegados a la barbilla»*, para que el ojo no viaje—: encima de la cabeza
+   * está igual de cerca de la cara, y además no tapa la toma.
+   */
+  coronilla?: number;
+  /**
+   * El lado libre del cuadro, donde vive el panel. Sólo importa cuando el
+   * subtítulo sube: arriba **comparten franja** y hay que repartirla.
+   *
+   * Sin esto el cc a todo lo ancho se comió el panel «EMPRESARIO / EN ONTARIO /
+   * AÑO TRAS AÑO» de reel-06: dos capas de texto en la misma esquina, las dos
+   * ilegibles. Abajo no pasaba porque el panel vive arriba.
+   */
+  lado?: "izq" | "der";
   /**
    * La correccion que se burla: se oye una cosa y se lee otra.
    *
@@ -87,7 +123,8 @@ export const CaptionBand: React.FC<{
   compuesto?: Compuesto;
   /** Frame en que empieza este subtitulo, para poder animar dentro de el. */
   desde?: number;
-}> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0 }) => (
+}> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0,
+        sobreTablero, coronilla, lado }) => (
   <div
     style={{
       position: "absolute",
@@ -103,7 +140,34 @@ export const CaptionBand: React.FC<{
        * Sigue muy por encima de la interfaz de la plataforma, que ocupa los
        * 400 px inferiores.
        */
-      bottom: layout.captionBottom,
+      /**
+       * Encima de la cabeza **sólo si de verdad cabe**; si no, junto a la
+       * barbilla, que es donde Jaime lo pidió en su día.
+       *
+       * El hueco no es igual en las siete: medido sobre los cortes, va de −7 px
+       * (reel-05, donde su cabeza entra POR ENCIMA de la zona segura) a 565 px
+       * (reel-06, sentado y reclinado). Sólo R4 y R6 tienen sitio para dos
+       * renglones; en las otras cinco subir el subtítulo lo metería sobre su
+       * frente.
+       *
+       * La primera versión lo subía en las siete porque el dato de la coronilla
+       * era falso —predicho desde el ancla de movimiento, que devolvía siempre
+       * 0,32— y con él todas parecían tener 340 px libres. Ahora se mide.
+       */
+      ...(coronilla && coronilla * layout.height - layout.safe.top - 24 >= 260
+        ? {
+            top: layout.safe.top,
+            // Arriba se comparte con el panel: el cc se queda con su mitad.
+            ...(lado === "der"
+              ? { right: layout.width * 0.44 }
+              : { left: layout.width * 0.44 }),
+            // Acaba un pelo antes de la coronilla, para no morderla. Sin
+            // `Math.max`: aquí ya se sabe que hay 260 px o más, y un suelo
+            // artificial era lo que la metía sobre su cara cuando no cabía.
+            maxHeight: coronilla * layout.height - layout.safe.top - 24,
+            justifyContent: "flex-end" as const,
+          }
+        : { bottom: layout.captionBottom }),
       minHeight: layout.captionBand,
       display: "flex",
       flexDirection: "column",
@@ -112,7 +176,12 @@ export const CaptionBand: React.FC<{
       justifyContent: "flex-end",
       alignItems: "flex-start",
       fontFamily: fontFamily.body,
-      fontSize: videoText.caption,
+      // Sobre tablero baja a 0,68 del cuerpo: sigue legible a distancia de
+      // movil y deja de pelear con el copy del tablero, que es el que manda
+      // ese instante.
+      fontSize: sobreTablero
+        ? Math.round(videoText.caption * 0.68)
+        : videoText.caption,
       fontWeight: 800,
       lineHeight: 1.2,
       letterSpacing: videoText.tracking,

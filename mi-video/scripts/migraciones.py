@@ -94,6 +94,51 @@ def esquema(con):
     con.executescript(open(ESQUEMA, encoding="utf-8").read())
 
 
+def _revision_estructurada(con):
+    """Una nota deja de ser prosa: dice de que PIEZA, que ETAPA y que TEMA habla.
+
+    Jaime, viendo 130 escaladas: *«casi todos los que me han presentado son
+    repeticiones de lo mismo»*, y despues: *«hazlo estructurado»*.
+
+    El problema no era el volumen: era que la misma observacion, remedida en cada
+    corrida, entraba como nota nueva porque la clave de deduplicacion miraba las
+    primeras catorce palabras del texto. «El gancho abre plano: la etapa 1 puntua
+    0,71» y «El gancho abre tibio: la etapa 1 puntua 0,71» son la misma nota y
+    ninguna clave de texto las une — cambia el adjetivo y cambia la medida.
+
+    Con `etapa` y `tema` en columnas, la clave es exacta: una pieza, una etapa, un
+    tema es UNA nota, y las vueltas siguientes suben `veces` en vez de apilar.
+    """
+    cols = {r[1] for r in con.execute("pragma table_info(revision)")}
+    for c, tipo in (("etapa", "integer"), ("tema", "text"), ("medida", "real")):
+        if c not in cols:
+            con.execute(f"alter table revision add column {c} {tipo}")
+    con.execute("create index if not exists idx_revision_tema"
+                " on revision (video_slug, tema, etapa)")
+
+
+def _escena_voz(con):
+    """`escena_desc` gana la columna donde se declara el tratamiento de voz.
+
+    Jaime: *«que cambie mi voz en los punchlines»*. Es una decision sobre el
+    material de esa etapa —como `camara`— y por eso vive en su propia columna y
+    no dentro del JSON de la camara: son dos cosas distintas, y una columna que
+    significa dos cosas es la averia que este proyecto paga mas cara.
+
+    La lee `dominio/remate.py` y la escribe `servicios/disenar.aplicar`. Sin la
+    columna el disenador declararia y el paso de audio no leeria nada, que es
+    declarar sin implementar otra vez.
+    """
+    cols = {r[1] for r in con.execute("pragma table_info(escena_desc)")}
+    # Sin tabla no hay columna que anadir: `db.py` la crea con `esquema.sql` y
+    # esto corre antes. Devolver `False` en vez de reventar es lo que mantiene
+    # la migracion idempotente en una base recien nacida.
+    if not cols or "voz" in cols:
+        return False
+    con.execute("ALTER TABLE escena_desc ADD COLUMN voz TEXT")
+    return True
+
+
 def _corte_fijo_etapa(con):
     """`corte_fijo` deja de servir solo para la apertura y el cierre.
 
@@ -228,6 +273,8 @@ def migrar():
     con = _con()
     _fase_servicio(con)
     esquema(con)
+    _revision_estructurada(con)
+    _escena_voz(con)
     _corte_fijo_etapa(con)
     _corte_fijo_huella(con)
     _escalera(con)

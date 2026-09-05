@@ -30,7 +30,8 @@ export type { ComparedPath, TwoPathsProps } from "./twoPaths/tipos";
  * dibujo —la bifurcación y cada columna— en sus ficheros. Eran quinientas
  * líneas con las tres cosas mezcladas, y ahí es donde un cambio de ritmo se
  * lleva por delante una regla del playbook sin que se note.
- */
+  * @clase tablero
+*/
 export const TwoPaths: React.FC<TwoPathsProps> = ({
   start,
   horizon,

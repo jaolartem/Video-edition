@@ -39,7 +39,8 @@ import {
  * La duración la decide la lectura, no un techo heredado de la web: el canon es una
  * referencia, no un mandato, y esto es vídeo. Lo que sí se mantiene del canon es el
  * registro — nada de rebote ni de micro-animación juguetona.
- */
+  * @clase capa
+*/
 export const BigTitle: React.FC<{
   lineas: string[];
   accent?: Accent;

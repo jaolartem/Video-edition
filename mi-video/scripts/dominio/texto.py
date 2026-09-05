@@ -46,7 +46,7 @@ def comparable(t: str) -> str:
     """Para **buscar un ancla** en la línea de montaje.
 
     Deja letras, dígitos y espacios; todo lo demás fuera. Es la vara con la que
-    `revision._por_ancla` decide si el texto que la nota nombra sigue en la
+    `ancla.por_ancla` decide si el texto que la nota nombra sigue en la
     pieza, así que cambiarla mueve dónde caen los cortes.
     """
     return "".join(c for c in _sin_tildes(t) if c.isalnum() or c == " ")

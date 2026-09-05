@@ -30,12 +30,17 @@ import argparse
 import glob
 import json
 import os
-import re
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import registro  # noqa: E402
+# **`rutas` va aqui, no dentro de `exportar()`.** `main()` lo usa para saber que
+# piezas hay cuando no se le pasa ninguna, asi que el paso con numeros funcionaba
+# y el paso entero —como lo llama la linea— moria con NameError despues de
+# renderizar las siete: un import escondido en una rama solo existe en esa rama.
+import rutas  # noqa: E402
+import sincronia  # noqa: E402
 
 # **F: es la memoria de trabajo; G: es donde queda lo terminado.**
 #
@@ -50,7 +55,6 @@ import registro  # noqa: E402
 #
 # G: se sigue mirando al RECOGER —si el deja ahi el limpiado, vale igual—, pero
 # ya no es donde se deja.
-SALIDA = "out/audio-voz"
 CARPETAS = [
     "out/audio-puro",
     "G:/My Drive/Creación de videos/Audio para limpiar",
@@ -59,7 +63,27 @@ CARPETAS = [
 # Cuanto puede diferir la duracion antes de considerarlo otro audio. Cuarenta
 # milisegundos es medio frame: por debajo no se ve, por encima se nota en los
 # labios.
-TOLERANCIA = 0.04
+# **Y el resto vive en la cola muda, que no puede desincronizar una palabra.**
+#
+# Eran 40 ms —«medio frame»— y la reconciliacion de la cola deja un residuo de
+# ~44 ms: el `apad` y el contenedor redondean a limites de muestra y de frame, y
+# el sobrante queda al FINAL, en silencio, sobre la tarjeta de cierre. Ahi no hay
+# labios que despegar.
+#
+# 60 ms son menos de dos frames y siguen siendo imperceptibles; lo que la guarda
+# tiene que impedir es una diferencia que arrastre la voz, y esa se ve en el
+# rango de los cientos de milisegundos, no aqui. Rechazar por 4 ms de silencio
+# obliga a Jaime a limpiar otra vez un audio que encaja.
+TOLERANCIA = 0.06
+
+#: Cuanto silencio se admite anadir al final. Mas que esto no es la tarjeta
+#: de cierre: es que falta voz por algun sitio, y eso no se tapa callando.
+HUECO_MAX = 3.0
+
+#: Lo que se recorta sin comprobar si esta callado: 120 ms, tres frames y
+#: medio. Por debajo de eso no hay palabra que perder, y lo que sobra suele
+#: ser el redondeo del resampler al acelerar, no una cola de verdad.
+MIGAJA = 0.12
 
 # **La convencion de nombres, que la puso el.** Jaime: *«ya viste que la
 # estructura de guardado es regular: el mismo nombre mas otra parte al final»*.
@@ -80,16 +104,14 @@ def exportar(n):
     modificaciones»*.
 
     **Y a velocidad natural.** La primera vez le di el audio ya estirado a
-    1,15x, o sea resintetizado por `rubberband`, y encima paso por Adobe: dos
-    resintesis encadenadas. De ahi lo raro. Ahora el estirado no existe
-    (`beats.VELOCIDAD` es 1), pero aunque volviera, esto sale del bruto y no del
-    montaje: la limpieza va **antes** de cualquier transformacion.
+    1,15x —resintetizado por `rubberband`— y encima paso por Adobe: dos
+    resintesis encadenadas, y de ahi lo raro. El lote vuelve a ir a 1,15x, pero
+    esto sale del CORTE y no de la entrega: la limpieza va antes de acelerar.
     """
     slug = f"reel-{n:02d}"
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
         return None
-    sys.path.insert(0, os.path.dirname(__file__))
     import rutas as _ru
     edl = json.load(open(ruta, encoding="utf-8"))
     # **La voz se exporta del PLAN, que es lo que se renderiza.**
@@ -103,7 +125,6 @@ def exportar(n):
     # capas. Jaime lo vio al instante: *«entonces si no cuadra»*.
     #
     # Si no hay plan todavia se cae al EDL, que es mejor que no exportar nada.
-    plan = None
     try:
         plan = json.load(open(f"work/scenes/{slug}/plan-full.json",
                               encoding="utf-8"))["escenas"]
@@ -128,6 +149,29 @@ def exportar(n):
         pares = list(zip(edl["segmentos"], edl["detalle"]))
     os.makedirs("out/audio-voz", exist_ok=True)
     os.makedirs("F:/tmp-video/voz", exist_ok=True)
+    out = f"out/audio-voz/{BASE_VOZ.format(slug=slug)}.wav"
+    # **La voz sale del CORTE, no de volver a pegar la cinta.**
+    #
+    # Salia recortando cada tramo del bruto segun el plan, en segundos exactos.
+    # `render-hook.mjs` arma el corte recodificando esos mismos tramos, y cada
+    # uno se redondea a frame entero: el sonido es el mismo, el reloj no. Sobre
+    # veinticuatro tramos ese redondeo se suma —el plan de reel-01 dice 93,36 s
+    # y el fichero mide 93,07— y la voz que vuelve de Adobe entra derivando.
+    #
+    # Y hay algo peor que la deriva: si el corte cambia despues de exportar, lo
+    # que se mando a limpiar es de OTRO montaje. Medido el 4 de septiembre:
+    # reel-04 iba 2,0 s corrido en sus primeros 25 s y bien en el resto,
+    # reel-07 al reves. Un escalon asi no lo arregla mover ni estirar.
+    #
+    # `public/reel-NN.mp4` es el corte tal cual: misma cinta, mismo sonido sin
+    # tocar, y **el reloj de la pieza por construccion**. Exportar de ahi hace
+    # imposibles las dos averias a la vez.
+    corte = f"public/{slug}.mp4"
+    if os.path.exists(corte):
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", corte, "-vn",
+                        "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1", out],
+                       check=True)
+        return _repartir(out)
     trozos = []
     for i, (r, d) in enumerate(pares):
         f = f"F:/tmp-video/voz/{slug}-{i:03d}.wav"
@@ -143,13 +187,82 @@ def exportar(n):
     out = f"out/audio-voz/{BASE_VOZ.format(slug=slug)}.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0",
                     "-i", lista, "-c", "copy", out], check=True)
-    # Y a la carpeta donde el la recoge y deja la limpiada.
+    # **Y al lado, la misma voz con cabecera.** Jaime: *«normalizada si puede
+    # servir»*, y sirve por un motivo concreto: el bruto viene pegado a 0 dBFS
+    # —29.804 muestras planas en los dos primeros minutos del reel-01— y
+    # meterle a Adobe Podcast un fichero sin un dB libre es pedirle que trabaje
+    # sobre lo ya recortado.
+    #
+    # Es **ganancia lineal y nada mas**: se mide el pico y se baja hasta -3
+    # dBTP. Sin compresor, sin limitador, sin `loudnorm` —que lleva uno
+    # dentro—. La dinamica queda intacta y no hay una segunda resintesis antes
+    # de la de Adobe, que es de donde salio 'lo raro' la primera vez.
+    #
+    # El fichero sin tocar NO se sustituye: se entregan los dos, porque el
+    # de origen es el que pidio Jaime *«sin modificaciones»* y este es una
+    # comodidad para el paso siguiente.
+    _con_cabecera(out)
+    # **A TODAS las carpetas, no a la primera.**
+    #
+    # Esto recorria `CARPETAS` y hacia `break` en la primera que existiera, que
+    # es la local. La de Drive —donde Jaime los recoge— es la segunda, asi que
+    # no recibia nada nunca. El paso decia «en out/audio-puro» y salia con
+    # exito mientras el se pasaba tres dias oyendo los del 29 de agosto:
+    # *«no has subido los nuevos, yo como bobo escuchando los viejos»*.
+    #
+    # Es la averia del render por la puerta del audio: el trabajo se hace, el
+    # paso dice que si, y el fichero no llega a donde se consume. Se copian las
+    # dos versiones —la intacta y la de cabecera— y **se dice a donde**.
+    return _repartir(out)
+
+
+def _repartir(out):
+    """Cabecera y copia a TODAS las carpetas donde Jaime la recoge."""
+    import shutil
+    _con_cabecera(out)
     for carpeta in CARPETAS:
-        if os.path.isdir(carpeta):
-            import shutil
-            shutil.copy2(out, carpeta)
-            break
+        if not os.path.isdir(carpeta):
+            continue
+        shutil.copy2(out, carpeta)
+        print('    -> ' + carpeta)
     return out
+
+
+
+def _con_cabecera(wav, objetivo=-3.0):
+    """Le baja el pico a `objetivo` dBTP. Solo ganancia, y SOBRE EL MISMO fichero.
+
+    Escribia un `-norm.wav` al lado y quedaban catorce ficheros para siete
+    piezas. Jaime: *«no quiero 14 archivos inoficiosos»*. Y no se pierde nada:
+    la normalizada **es** la cruda con una ganancia, no hay proceso de por medio
+    — ni compresor, ni limitador— asi que el original no aporta una segunda
+    version, aporta un fichero mas que mantener.
+    """
+    medida = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", wav,
+         "-af", "loudnorm=print_format=json", "-f", "null", "-"],
+        capture_output=True, text=True)
+    pico = None
+    for linea in (medida.stderr or "").splitlines():
+        if '"input_tp"' in linea:
+            try:
+                pico = float(linea.split(":")[1].strip().strip(',"'))
+            except ValueError:
+                pico = None
+    if pico is None:
+        return None
+    ganancia = objetivo - pico
+    # **Por un temporal.** ffmpeg se niega a escribir sobre el fichero que lee
+    # —«Output same as Input #0 - exiting»— y con `check=True` eso reventaba la
+    # exportacion entera en la primera pieza. Se escribe al lado y se sustituye.
+    salida = wav + ".tmp.wav"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-i", wav,
+         "-af", "volume={:+.2f}dB".format(ganancia), salida], check=True)
+    os.replace(salida, wav)
+    print("    cabecera {:+.2f} dB: pico {:.1f} -> {:.1f} dBTP".format(
+        ganancia, pico, objetivo))
+    return wav
 
 
 def duracion(f):
@@ -160,6 +273,42 @@ def duracion(f):
         return float(out.stdout.strip())
     except ValueError:
         return 0.0
+
+
+#: Cuanto se tienen que parecer las dos envolventes para dar el audio por el
+#: mismo. **Es la segunda red, no la primera**: la que separa de verdad es la
+#: duracion, arriba.
+#:
+#: Empezo en 0,45 y con eso habria rechazado audio BUENO. Los numeros, sobre las
+#: siete piezas y con las limpias que Jaime aprobo de oido:
+#:
+#:     corresponden   0,556  0,429  0,324  0,299  0,297  0,284  0,253
+#:     de otro corte  0,206  0,179  0,141
+#:
+#: Adobe rehace la envolvente —quita ruido, nivela, cierra los huecos— asi que un
+#: par correcto puede quedarse en 0,25. El margen entre las dos familias es
+#: estrecho (0,21 contra 0,25), y por eso esto solo caza lo grosero: 0,24 deja
+#: pasar todo lo bueno medido y para lo que no se parece en nada.
+PARECIDO = 0.24
+
+
+def _corresponde(video, wav):
+    """Cuanto se parecen las dos ondas. `None` si no se pudo medir.
+
+    La envolvente la calcula `desfase.envolvente`, que es la misma de siempre:
+    aqui habia una segunda copia con sus propios numeros de ventana, y dos
+    copias de una medida se separan en cuanto una se toca.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    a_, b_ = (sincronia.desfase.envolvente(video),
+              sincronia.desfase.envolvente(wav))
+    if a_ is None or b_ is None:
+        return None
+    corto, largo = (b_, a_) if len(b_) <= len(a_) else (a_, b_)
+    return float(np.abs(np.correlate(largo, corto, mode="full")).max())
 
 
 def candidato(n):
@@ -176,6 +325,31 @@ def candidato(n):
             continue
         for f in glob.glob(os.path.join(carpeta, "*.wav")):
             nom = os.path.basename(f).lower()[:-4]
+            # **Lo que produce ESTE script no es una respuesta.** `-norm` es la
+            # copia con cabecera que se exporta junto a la voz cruda; comparte
+            # base y es mas reciente, asi que ganaba el `max` y entraba como si
+            # fuera la pista limpiada. La pieza habria salido con la voz SIN
+            # limpiar y sonando igual de bien de nivel: invisible.
+            #
+            # Lo que vuelve de Adobe trae su propia marca (`-enhanced-v2`). Lo
+            # nuestro se excluye por nombre y no por fecha, que es lo unico que
+            # no depende de en que orden se hagan las cosas.
+            if "-norm" in nom:
+                continue
+            # **Y `-sin-cola` / `-con-cola` tampoco son respuestas: los hace ESTE
+            # script.**
+            #
+            # Son el recorte y el relleno con que el propio paso cuadra la pista
+            # al video. Al no excluirlos, cada corrida elegia el ajuste de la
+            # anterior y le hacia otro encima: reel-07 llego a
+            # `-con-cola-sin-cola-sin-cola-sin-cola`, cuatro capas de la misma
+            # pista, y cada capa arrastraba el redondeo de la anterior.
+            #
+            # Es exactamente el mismo fallo que `-norm` de arriba, con otro
+            # sufijo. Lo de Adobe trae su marca; lo nuestro se excluye por
+            # nombre, que es lo unico que no depende del orden.
+            if "-sin-cola" in nom or "-con-cola" in nom:
+                continue
             if nom.startswith(base) and len(nom) > len(base):
                 vistos.append(f)
     return max(vistos, key=os.path.getmtime) if vistos else None
@@ -189,6 +363,26 @@ def integrar(n, ver=False):
     if not wav:
         print(f"R{n}: sin audio limpiado todavia")
         return False
+    # **Primero se pone en su sitio, y despues se mide si cabe.**
+    #
+    # El orden importa y estaba al reves. Las guardas de duracion de abajo
+    # comparan segundos, asi que una pista movida dos segundos las pasa si dura
+    # lo mismo — y peor: `_sin_cola_muda()` le quita de la cola justo lo que le
+    # sobraba por delante y **fabrica** el fichero que pasa la guarda.
+    #
+    # Alinear antes deja la cola diciendo la verdad: si despues de casar el
+    # arranque sigue sobrando o faltando material, eso ya es contenido y ahi si
+    # se para.
+    wav, movido, ventanas, motivo = sincronia.encajar(n, wav)
+    if motivo:
+        print(f"R{n}: NO encaja — {motivo}. No se sustituye: iria desfasada.")
+        registro.aviso("voz-limpia", "voz limpiada desfasada del corte",
+                       detalle=f"R{n}: {motivo}", eco=False)
+        return False
+    if abs(movido) > sincronia.AL_FRAME:
+        print(f"R{n}: la voz iba {movido:+.2f}s del corte — alineada")
+        registro.nota("voz-limpia", "voz limpiada alineada al corte",
+                      detalle=f"R{n}: {movido:+.2f}s")
     dv, da = duracion(video), duracion(wav)
     # **Lo que sobra esta al final, y es silencio.** Jaime, sobre la herramienta
     # con la que limpia: *«lo que le sobra a la pista del audio esta en la ultima
@@ -199,30 +393,281 @@ def integrar(n, ver=False):
     # limpiara otra vez, o sea tirar trabajo suyo por algo que la maquina puede
     # quitar sola. Se recorta la cola y se vuelve a medir; si aun asi no cuadra,
     # la diferencia esta dentro y ahi si hay que parar.
-    if da - dv > TOLERANCIA:
+    #
+    # **Y con TOPE, que es lo que faltaba.** Recortar sin limite borra la unica
+    # prueba de que la pista es de otro montaje: la de reel-01 sobraba 6,6 s
+    # —no es una cola, es otra edicion—, se recorto a la duracion justa y paso
+    # la guarda con contenido de una version anterior. Jaime lo oyo y lo dijo en
+    # una frase: *«si el audio no esta bien el video no esta bien»*.
+    #
+    # Mismo tope que para completar: por encima de `HUECO_MAX` la diferencia ya
+    # no es la cola, es que sobra o falta algo dentro.
+    if round(da - dv, 3) > TOLERANCIA:
+        if da - dv > HUECO_MAX:
+            print(f"R{n}: NO encaja — al audio le sobran {da - dv:.2f}s, mas de"
+                  f" los {HUECO_MAX}s que puede ser cola muda. Eso no es una"
+                  f" cola: es otro montaje. No se recorta para que quepa.")
+            registro.aviso("voz-limpia", "audio limpiado de otro montaje",
+                           detalle=f"R{n}: sobran {da - dv:.2f}s", eco=False)
+            return False
         podado = _sin_cola_muda(wav, dv)
         if podado:
             wav, da = podado, duracion(podado)
-    if abs(dv - da) > TOLERANCIA:
+    # **Y si falta cola, se completa con silencio.**
+    #
+    # El caso contrario y por la misma razon: el video acaba con la tarjeta de
+    # cierre, donde no habla nadie, asi que la voz limpiada dura MENOS que la
+    # pieza. Medido en reel-01: 104,40 s de voz contra 105,59 de video — 1,19 s
+    # que son tarjeta, no palabra. Rechazar por eso obliga a Jaime a limpiar otra
+    # vez un audio que esta bien.
+    #
+    # Se completa **con silencio y solo al final**, y solo si falta poco: por
+    # encima de `HUECO_MAX` la diferencia ya no es la cola, es que sobra o falta
+    # algo dentro, y ahi si hay que parar.
+    elif round(dv - da, 3) > TOLERANCIA:
+        if dv - da > HUECO_MAX:
+            pass
+        else:
+            rellenado = _con_cola_muda(wav, dv)
+            if rellenado:
+                wav, da = rellenado, duracion(rellenado)
+    # **Se compara redondeado al milisegundo.** Con `>` a pelo, una diferencia
+    # de exactamente 0,04 s fallaba por el ruido de coma flotante: 0,0400001 es
+    # mayor que 0,04 y la guarda rechazaba un audio que encajaba al frame. Una
+    # comparacion de frontera que depende de un decimal invisible no es una
+    # guarda: es un accidente que da la razon al azar.
+    if round(abs(dv - da), 3) > TOLERANCIA:
         print(f"R{n}: NO encaja — el video dura {dv:.2f}s y el audio {da:.2f}s"
               f" ({abs(dv - da):.2f}s de diferencia). No se sustituye:"
               f" desincronizaria la pieza entera.")
         registro.aviso("voz-limpia", "audio limpiado con otra duracion",
                        detalle=f"R{n}: {dv:.2f} vs {da:.2f}", eco=False)
         return False
-    print(f"R{n}: {os.path.basename(wav)} encaja ({da:.2f}s)")
+    # **Y encajar de duracion no es encajar.** Jaime, oyendo la entrega: *«el
+    # audio del primero esta completamente desfasado»*.
+    #
+    # La guarda de arriba solo compara segundos, y con eso una pista de OTRO
+    # montaje pasa si por casualidad dura lo mismo. Peor: este script recorta la
+    # cola cuando sobra, asi que **fabrica** el fichero que hace pasar la guarda.
+    # Medido en las siete: la de reel-01 duraba 102,92 s contra 96,34 del corte,
+    # se recorto a 96,43 y entro con contenido de una edicion anterior.
+    #
+    # Aqui se comprueba que sea EL MISMO AUDIO: se cruzan las envolventes y el
+    # pico dice si corresponden. Es la misma medida que `desfase.py` usa para
+    # casar dos camaras, y aqui contesta la pregunta gemela.
+    # **Y sólo cuando el perfil no pudo contestar.** `sincronia.encajar` mide el
+    # desfase en nueve puntos repartidos por la pieza; si engancha en cuatro o
+    # más, eso ya prueba que el contenido es el mismo — una pista de otro
+    # montaje no cuadra en nueve sitios ni por casualidad. El parecido global,
+    # además, castiga a la pista que hubo que acompasar: `rubberband` cambia la
+    # forma de la onda, y reel-05 salía a 0,22 con la sincronía medida en dos
+    # centésimas. Seguir bloqueando por ahí sería rechazar la pista **por estar
+    # arreglada**.
+    casa = _corresponde(video, wav) if ventanas < 4 else None
+    if casa is not None and casa < PARECIDO:
+        print(f"R{n}: NO encaja — dura lo mismo ({da:.2f}s) pero el audio es de"
+              f" OTRO montaje (parecido {casa:.2f}, hace falta {PARECIDO}). No se"
+              f" sustituye: iria desfasado de principio a fin.")
+        registro.aviso("voz-limpia", "audio limpiado de otro montaje",
+                       detalle=f"R{n}: parecido {casa:.2f}", eco=False)
+        return False
+    print(f"R{n}: {os.path.basename(wav)} encaja ({da:.2f}s"
+          + (f", parecido {casa:.2f})" if casa is not None else ")"))
     if ver:
         return True
-    # Se sustituye la pista sin recodificar el video: es copia de flujo.
     tmp = f"F:/tmp-video/reel-R{n}-voz.mp4"
-    subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-i", video, "-i", wav,
-         "-map", "0:v", "-map", "1:a", "-c:v", "copy",
-         "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", tmp],
-        check=True)
+    # **Se MEZCLA la voz limpia con los efectos, no se sustituye la pista.**
+    #
+    # Esto hacia `-map 0:v -map 1:a`: video del render y audio SOLO del wav.
+    # Y los efectos viven dentro del render, asi que al meter la voz de Adobe
+    # se iban los seis o siete de cada pieza — en las seis entregadas no habia
+    # ni uno. Jaime: *«falto la musica… igual que los efectos de sonido»*.
+    #
+    # No se pueden rescatar de lo entregado —el render trae voz y efectos ya
+    # mezclados— asi que `scripts/efectos.mjs` vuelve a renderizar la misma
+    # composicion con el plano mudo (`volumen: 0`) y deja los efectos solos.
+    # Si esa pista no esta, se sustituye como antes y **se dice**.
+    sfx = f"out/audio-voz/reel-R{n}-efectos.wav"
+    if os.path.exists(sfx):
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", video, "-i", wav, "-i", sfx,
+             "-filter_complex", "[1:a][2:a]amix=inputs=2:normalize=0[a]",
+             "-map", "0:v", "-map", "[a]", "-c:v", "copy",
+             "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", tmp],
+            check=True)
+    else:
+        print(f"    R{n}: SIN pista de efectos — corre `node scripts/efectos.mjs {n}`")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", video, "-i", wav,
+             "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+             "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", tmp],
+            check=True)
     os.replace(tmp, video)
     registro.nota("voz-limpia", "voz limpiada reintegrada",
                   detalle=f"R{n}: {os.path.basename(wav)}")
+    return True
+
+
+def _sin_cola_muda(wav: str, objetivo: float):
+    """Quita la cola muda del final hasta dejarlo en `objetivo` segundos.
+
+    Se comprueba que lo que se quita **esta callado de verdad** antes de tocarlo:
+    recortar por duracion sin mirar la onda seria cortar voz para que cuadre un
+    numero, que es la peor manera de arreglar una desincronia.
+    """
+    fin = duracion(wav)
+    if fin is None or fin <= objetivo:
+        return None
+    # **Una migaja se recorta sin preguntar si esta callada.**
+    #
+    # La comprobacion de abajo existe para no cortar VOZ, y por debajo de
+    # `MIGAJA` no hay voz que cortar: en 120 ms —tres frames y medio— no cabe una
+    # palabra ni una silaba entera.
+    #
+    # Sin esto, reel-07 se rechazaba entero por 70 ms. Y esos 70 ms no son una
+    # cola: son el redondeo del resampler al acelerar a 1,15x, que no puede
+    # aterrizar en la duracion exacta. La guarda estaba rechazando su propio
+    # artefacto y mandando a Jaime a limpiar otra vez un audio que estaba bien.
+    if fin - objetivo <= MIGAJA:
+        return _recorta(wav, objetivo)
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-v", "error", "-ss", str(objetivo), "-i", wav,
+             "-af", f"volumedetect", "-f", "null", "-"],
+            capture_output=True, text=True)
+        pico = [x for x in (r.stderr or "").splitlines() if "max_volume" in x]
+        if pico and float(pico[0].split(":")[-1].replace("dB", "").strip()) > -45.0:
+            registro.aviso("voz-limpia", "la cola de mas NO esta callada",
+                           detalle=f"{os.path.basename(wav)}: {pico[0].strip()}",
+                           eco=True)
+            return None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    return _recorta(wav, objetivo)
+
+
+def _recorta(wav: str, objetivo: float):
+    """Deja el wav en `objetivo` segundos. Sin juicio: eso lo hace quien llama.
+
+    **Se RECODIFICA, no se copia.** Con `-c copy` ffmpeg no corta este material:
+    devuelve el fichero entero con la misma duracion y **sale con exito**, asi que
+    el paso creia haber recortado y volvia a medir lo mismo. Comprobado sobre
+    reel-07:
+
+        origen          57,429 s
+        con -c copy     57,429 s   <- no hizo nada, y no lo dijo
+        recodificado    57,360 s   <- exacto
+
+    El corte cae donde cae, no en un limite de paquete, y copiar no puede partir
+    un paquete. Es PCM: recodificar no pierde nada.
+
+    Y por eso el recorte de cola no funciono nunca en los casos que lo
+    necesitaban. Los que si cuadraban lo hacian por otra via.
+    """
+    salida = wav.rsplit(".", 1)[0] + "-sin-cola." + wav.rsplit(".", 1)[1]
+    try:
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", wav, "-t",
+                        str(objetivo), "-c:a", "pcm_s16le", salida],
+                       capture_output=True, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    # Y se comprueba que de verdad quedo mas corto: un recorte que no recorta es
+    # lo que este arreglo viene a cerrar, y no se puede volver a creer sin mirar.
+    d = duracion(salida)
+    if d is None or d > objetivo + 0.02:
+        return None
+    return salida
+
+
+
+def _con_cola_muda(wav: str, objetivo: float):
+    """Alarga el audio con silencio hasta `objetivo`. Nada mas."""
+    salida = wav.rsplit(".", 1)[0] + "-con-cola." + wav.rsplit(".", 1)[1]
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", wav, "-af",
+             f"apad=whole_dur={objetivo}", "-t", str(objetivo), salida],
+            capture_output=True, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return salida
+
+
+
+#: Cuanto se acelera la pieza. **No se declara aqui: se lee de `beats`**, que es
+#: donde vive la velocidad del montaje y que ya avisa por que: *«estaba repetido
+#: en seis ficheros, que es como se acaba teniendo dos velocidades distintas en
+#: el mismo montaje»*.
+#:
+#: Y es lo que paso. Jaime fijo 1,15 el 1 de septiembre y lo revoco despues
+#: —*«ninguno hay que acelerar la verdad»*—; `beats` y `revision` bajaron a 1,0
+#: y **este fichero se quedo en 1,15**. Como `_acelerar` escribe en
+#: `out/entrega/`, las siete entregas siguieron saliendo estiradas por
+#: `rubberband` sobre una voz ya reconstruida por Adobe: las dos resintesis
+#: encadenadas que `beats` dice haber quitado de la cadena.
+#:
+#: Medido el 4 de septiembre, entrega contra render: 81,20/93,37 · 74,40/85,47 ·
+#: 45,10/51,80 · 56,70/65,10 · 72,40/83,20 · 59,20/68,00 · 76,70/88,17. Las
+#: siete a 0,870, que es 1/1,15 clavado.
+from beats import VELOCIDAD  # noqa: E402,F401
+
+
+def _acelerar(n) -> bool:
+    """Acelera la pieza y su voz a `VELOCIDAD`, sin tocar el tono."""
+    v = f"out/reels/reel-R{n}.mp4"
+    if not os.path.exists(v) or VELOCIDAD == 1.0:
+        return False
+    # **Y no se acelera dos veces.** Esto sobreescribe el render EN SU SITIO,
+    # asi que una segunda pasada de `voz-limpia` lo vuelve a estirar: reel-01
+    # paso de 93,4 s a 81,2 s y el render original se perdio — no hay vuelta
+    # atras, hay que rehacerlo.
+    #
+    # La senal es la duracion: el spec dice cuanto mide la pieza SIN acelerar,
+    # asi que un fichero que ya mide eso partido por la velocidad ya paso por
+    # aqui. Media decima de tolerancia, que es lo que mueve el recodificado.
+    try:
+        import json as _json
+        with open('src/reels.json', encoding='utf-8') as f:
+            _sp = next((x for x in _json.load(f)
+                        if x.get("id") == f"Reel-R{n}"), None)
+        if _sp:
+            _esperado = _sp["duracion"] / VELOCIDAD
+            if abs(duracion(v) - _esperado) < 0.5:  # ya acelerado
+                print(f"R{n}: ya iba a {VELOCIDAD}x, no se toca")
+                return False
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    tmp = v.replace(".mp4", "-acelerado.mp4")
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", v,
+             "-filter_complex",
+             f"[0:v]setpts=PTS/{VELOCIDAD}[v];[0:a]atempo={VELOCIDAD}[a]",
+             "-map", "[v]", "-map", "[a]", "-c:v", "h264_amf",
+             "-quality", "quality", "-rc", "cqp", "-qp_i", "20",
+             "-qp_p", "20", "-pix_fmt", "yuv420p", "-c:a", "aac",
+             "-b:a", "192k", tmp],
+            capture_output=True, check=True)
+        # **Y NO se escribe encima del render.** Este mismo comentario lleva
+        # semanas diciendo que sobreescribir en su sitio pierde el original, y
+        # el codigo lo seguia haciendo con una guarda contra la segunda pasada.
+        # La guarda no basta: con el render convertido en entrega, `out/reels/`
+        # deja de contener lo que su nombre dice, y todo lo que compara contra
+        # el —la sincronia de la voz, la huella, el chequeo de montada— compara
+        # contra otra cosa. Medido: `reel-R1.mp4` duraba 83,48 s en vez de 96,4,
+        # y con eso la guarda de voz informaba de «sobran 12 s» en las siete.
+        #
+        # El acelerado es la ENTREGA y va a la bandeja de salida. El render se
+        # queda intacto, que es lo que permite rehacer el audio sin re-renderizar.
+        import rutas as _ru
+        final = _ru.salida("entrega", f"reel-R{n}.mp4")
+        os.replace(tmp, final)
+    except (OSError, subprocess.SubprocessError) as e:
+        registro.aviso("voz-limpia", "no se pudo acelerar",
+                       detalle=f"R{n}: {type(e).__name__}", eco=True)
+        return False
+    print(f"R{n}: acelerada a {VELOCIDAD}x  ({duracion(final):.2f}s)"
+          f"  ->  {final}")
     return True
 
 
@@ -241,51 +686,55 @@ def main():
                 print(f"R{n}: {os.path.basename(f)}  {d:.2f}s sin modificar")
         print(f"\nen {CARPETAS[0]}")
         return
-    hechos = []
-    for n in (a.reels or rutas.piezas()):
+    hechos, pedidos = [], (a.reels or rutas.piezas())
+    for n in pedidos:
         if integrar(n, ver=a.ver):
             hechos.append(n)
-    if hechos and not a.ver:
-        print(f"\nmasterizando {len(hechos)}: {hechos}")
-        subprocess.run(["bash", "scripts/musica.sh", *[str(x) for x in hechos]])
+    # **Y se entrega tambien lo que no pudo cambiar de voz.** La aceleracion y
+    # el nivelado colgaban de que la voz limpia entrara, asi que una pieza con
+    # la pista desfasada —o que aun no hubiera pasado por Adobe— no tenia camino
+    # a la entrega: se quedaba sin 1,15x y sin -14 LUFS, o peor, con la entrega
+    # vieja en su sitio. Un paso que solo sabe terminar el caso bueno deja el
+    # malo a medias y en silencio. El audio del corte esta en sincronia por
+    # construccion, asi que sale pieza correcta con la voz sin limpiar:
+    # `integrar` ya dijo por que no sustituyo, y esto no lo tapa, lo entrega.
+    if pedidos and not a.ver:
+        # **La aceleracion va ANTES de la musica, no despues.**
+        #
+        # Jaime: *«la velocidad vamos a aumentarla a 1.15»*. Acelerar el
+        # master ya mezclado subiria tambien la musica un 15 %, y una pista
+        # acelerada suena a pista acelerada: cambia el tono y el caracter de
+        # algo que se eligio como es. Se acelera la pieza con su voz, y la
+        # musica entra despues a su velocidad natural sobre el resultado.
+        for n in pedidos:
+            _acelerar(n)
+        print(f"\nmasterizando {len(pedidos)}: {pedidos}"
+              + (f"  ·  con voz limpia: {hechos}" if hechos != pedidos else ""))
+        # **Y si el nivelado no corre, se dice.** Esto iba sin `check` y sin
+        # mirar la salida: las cinco piezas salieron a -21 LUFS —siete por
+        # debajo del objetivo— y el paso termino con exito. `musica.sh` ademas
+        # devuelve 0 aunque no encuentre el fichero, asi que el codigo de
+        # salida solo no basta: se comprueba que haya dicho algo de cada pieza.
+        r = subprocess.run(["bash", "scripts/musica.sh",
+                            *[str(x) for x in pedidos]],
+                           capture_output=True, text=True, encoding="utf-8")
+        print(r.stdout or "", end="")
+        if r.stderr:
+            print(r.stderr.strip()[:400])
+        # **Y se mira la ENTREGA, que es lo que el abre.** El nivelado ya se
+        # comprobaba aqui —leccion 51, *medir la entrega, no suponerla*— y la
+        # sincronia no, aunque entre el wav que entra y el fichero que sale hay
+        # la mezcla, la aceleracion y dos pasadas de nivelado.
+        sincronia.informe(pedidos, VELOCIDAD)
+        dichas = sum(1 for n in pedidos if f"R{n} " in (r.stdout or ""))
+        if r.returncode or dichas < len(pedidos):
+            raise SystemExit(
+                f"\nPARA: el nivelado contesto por {dichas} de {len(pedidos)}"
+                f" pieza(s) (codigo {r.returncode}). Sin el, la entrega se queda"
+                f" al nivel del corte —medido: -21 LUFS contra -14— y eso no se"
+                f" ve en el video, se oye al publicarlo.")
 
 
 if __name__ == "__main__":
     main()
 
-
-#: Por debajo de esto no es silencio, es la respiracion del final de la frase.
-COLA_DB = "-45dB"
-
-
-def _sin_cola_muda(wav: str, objetivo: float):
-    """Quita la cola muda del final hasta dejarlo en `objetivo` segundos.
-
-    Se comprueba que lo que se quita **esta callado de verdad** antes de tocarlo:
-    recortar por duracion sin mirar la onda seria cortar voz para que cuadre un
-    numero, que es la peor manera de arreglar una desincronia.
-    """
-    fin = duracion(wav)
-    if fin is None or fin <= objetivo:
-        return None
-    try:
-        r = subprocess.run(
-            ["ffmpeg", "-v", "error", "-ss", str(objetivo), "-i", wav,
-             "-af", f"volumedetect", "-f", "null", "-"],
-            capture_output=True, text=True)
-        pico = [x for x in (r.stderr or "").splitlines() if "max_volume" in x]
-        if pico and float(pico[0].split(":")[-1].replace("dB", "").strip()) > -45.0:
-            registro.aviso("voz-limpia", "la cola de mas NO esta callada",
-                           detalle=f"{os.path.basename(wav)}: {pico[0].strip()}",
-                           eco=True)
-            return None
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return None
-    salida = wav.rsplit(".", 1)[0] + "-sin-cola." + wav.rsplit(".", 1)[1]
-    try:
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", wav, "-t",
-                        str(objetivo), "-c", "copy", salida],
-                       capture_output=True, check=True)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return salida

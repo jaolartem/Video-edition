@@ -24,8 +24,10 @@ rótulo encima del rótulo.
 fija del encargo del diseñador, no algo que vaya en los cuatro.
 """
 from .aguja import Aguja, Prompt
+from .material import CAMARA, CAMPOS, LO_DICHO, VOZ
 from .comun import CUMPLIMIENTO, REDUNDANCIA
-from .piezas import Bloque, Campo, Clave, Contrato, Momento
+from .marca import MARCA
+from .piezas import Campo, Clave, Contrato, Momento
 
 # ═════════════════════════════════════════════════════════════════════════════
 # La parte FIJA del contrato del diseñador: las reglas de la marca
@@ -44,47 +46,6 @@ from .piezas import Bloque, Campo, Clave, Contrato, Momento
 # repositorio en cada pedido (`_canon()`, `_topes()`), porque un hex citado de
 # memoria es un hex que se desvía. Aquí van las reglas, que son las que no
 # cambian aunque cambie un token.
-MARCA = Bloque(
-    "marca",
-    texto="""
-**Estas reglas son de la marca, no de la pieza. No se negocian por encargo.**
-
-La autoridad visual son las 26 láminas de `docs/ejemplos/`: nieto Gen Z del
-constructivismo ruso — huesos constructivistas, piel nativa digital.
-
-**El oro dice «mira aquí», y sólo eso.** Si en un tablero hay tres cosas en oro,
-dos sobran: el ojo no sabe dónde ir y el recurso deja de significar nada. La
-paleta es corta a propósito —oscura y desaturada, con el oro como único tono
-vivo—; un color nuevo entra con el valor y la saturación de esa familia, nunca
-como código de estado.
-
-**Dos familias, y se alternan.** *Cargada*: fotomontaje a sangre, punto de fuga,
-geometría rota — para el golpe y el concepto. *Tranquila*: negro o navy liso,
-geometría plana a escuadra — para las cifras que hay que leer. Una tabla sobre
-fotomontaje no se lee; una tesis sobre negro liso es una diapositiva.
-
-**Prohibido, y no es cuestión de gusto:** sombras, degradados suaves,
-`backdrop-filter`, esquinas redondeadas Material — los bloques se separan con
-filetes de un píxel. Rebote, confeti, wiggle, `Easing.back` o cualquier
-micro-animación juguetona: esto es un asesor financiero hablando a dueños de
-negocio. Ilustración amable, blobs, iconografía redondeada. Fotografía de familia
-sonriente de stock. Serif de cualquier clase: se emborrona con la compresión.
-
-**Una idea por tablero.** Si hacen falta dos, son dos tableros.
-
-**La duración la decide la lectura, no un número redondo.** 0,75 s por bloque más
-medio segundo de respiro. Un dato que no da tiempo a leer no está en la pieza
-aunque esté en el frame — la web es autopaso y el vídeo no.
-
-**El sonido va en el frame del movimiento.** No está prohibido el whoosh: está
-prohibido el sonido sin movimiento que lo justifique.
-
-**Y las formas no están limitadas al catálogo que hoy existe.** Si lo que el
-encargo pide se dibuja mejor con una forma que no está construida, nómbrala: sale
-como encargo de código, no como un tablero peor. Elegir entre ocho cajas cuando
-la idea pedía una novena es dejar que el catálogo mande sobre el diseño.
-""",
-)
 
 
 DISENO = Contrato(
@@ -102,7 +63,9 @@ DISENO = Contrato(
                            " monta"),
     momentos=(
         Momento("disenado", 7.5,
-                trae=("encargo", "canon", "otras_etapas", "topes"),
+                trae=("encargo", "canon", "otras_etapas", "topes", "camara",
+                      "composicion", "figuras", "ya_en_pantalla",
+                      "correccion", "placas", "voz"),
                 no_trae=(),
                 nota="Después de `descrito`, que es quien dice qué etapas llevan"
                      " tablero y qué tiene que quedar dicho en cada uno. Antes de"
@@ -120,7 +83,9 @@ DISENO = Contrato(
         Momento("visto", 11.6,
                 trae=("dura", "aire", "costuras", "repetido", "se_ve",
                       "motivos_abiertos"),
-                no_trae=("encargo", "canon", "otras_etapas", "topes"),
+                no_trae=("encargo", "canon", "otras_etapas", "topes", "camara",
+                         "composicion", "figuras", "ya_en_pantalla",
+                         "correccion", "placas", "voz"),
                 nota="Aquí no recibe encargos: recibe **el artefacto medido** —lo"
                      " que dura, dónde calla, qué costuras se oyen, qué dice dos"
                      " veces y qué hay en pantalla sobre qué texto— y contesta"
@@ -152,7 +117,7 @@ DISENO = Contrato(
                    " diseña tableros correctos que no saben dónde caen."),
         Campo("otras_etapas",
               manda=Aguja("scripts/servicios/disenar.py", '"otras_etapas": resumen,'),
-              exige=(Prompt("scripts/disenar.prompt.md", "las dos familias se alternan"),),
+              exige=(Prompt("scripts/disenar.prompt.md", "las dos familias se alternen"),),
               nota="El nivel de PIEZA del que monta. Sin esto no se puede alternar"
                    " cargada y tranquila, ni repartir el oro, ni evitar tres"
                    " tableros seguidos con la misma forma."),
@@ -162,9 +127,108 @@ DISENO = Contrato(
               nota="Los tokens y las prohibiciones, del repositorio y no de"
                    " memoria: nada de rebote, sombras, degradados ni ilustración"
                    " amable."),
+        Campo("laminas",
+              manda=Aguja("scripts/servicios/disenar.py", '"laminas": _laminas(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "la autoridad visual"),),
+              nota="Las 26 laminas de `docs/ejemplos/` con sus RUTAS y su"
+                   " anatomia. Jaime: «al contrato del disenador le falto el"
+                   " contexto de la imagen de marca; no vio los ejemplos». Sin"
+                   " esto quien compone trabaja con una paleta y una lista de"
+                   " prohibiciones, y sale minimalismo corporativo."),
+        Campo("estilo",
+              manda=Aguja("scripts/servicios/disenar.py", '"estilo": ESTILO,'),
+              exige=(Prompt("scripts/disenar.prompt.md", "neoconstructivista"),),
+              nota="El encargo, no la prohibicion. «Respeto por la cuadricula"
+                   " si, pero tambien irrespeto con criterio… mucho color: no hay"
+                   " prohibiciones de color, hay prohibiciones de coherencia y"
+                   " composicion.»"),
+        Campo("antes_de_dibujar",
+              manda=Aguja("scripts/servicios/disenar.py", '"antes_de_dibujar": ANTES_DE_DIBUJAR,'),
+              exige=(Prompt("scripts/disenar.prompt.md", "intención narrativa"),),
+              nota="El paso que faltaba: entender que deja entendido la etapa"
+                   " ANTES de dibujarla. Sin el salen ilustraciones literales del"
+                   " simil —palitos y bolitas para «es como un medico»— en vez de"
+                   " lo que el simil viene a explicar."),
+        Campo("piezas",
+              manda=Aguja("scripts/servicios/disenar.py", '"piezas": catalogo_de_piezas(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "no son efectos de catálogo"),),
+              nota="El catalogo indexado de `src/components/`, leido de los"
+                   " propios componentes: cada uno declara su clase con `@clase`"
+                   " y su primera linea dice que hace. Jaime: «es un catalogo"
+                   " indexado, o esa era mi intencion con esos elementos; no se"
+                   " por que nunca se utilizo». Nadie lo indexaba."),
+        Campo("prioridad",
+              manda=Aguja("scripts/servicios/disenar.py", '"prioridad": PRIORIDAD,'),
+              exige=(Prompt("scripts/disenar.prompt.md", "carga cognitiva"),),
+              nota="El orden cuando dos criterios chocan: carga cognitiva,"
+                   " coherencia visual, objetivo emocional. Y la licencia para"
+                   " no respetar el tablero propuesto, que antes el contrato"
+                   " prohibia expresamente."),
+        Campo("oficio_reel",
+              manda=Aguja("scripts/servicios/disenar.py", '"oficio_reel": OFICIO_REEL,'),
+              exige=(Prompt("scripts/disenar.prompt.md", "tipografía cinética"),),
+              nota="Las practicas del reel comercial y el filtro de marca:"
+                   " ni pastel redondeado ni el minimalismo que todo el mundo"
+                   " hace para lucir caro."),
+        Campo("sonidos",
+              manda=Aguja("scripts/servicios/disenar.py", '"sonidos": _sonidos(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "el nombre exacto de la lista"),),
+              nota="Los siete efectos que existen, con lo que hace cada uno."
+                   " Sin esto el disenador describia el sonido con sus palabras"
+                   " —«un roce grave y arrastrado»— y la capa se montaba muda."),
+        Campo("verse",
+              manda=Aguja("scripts/servicios/disenar.py", '"verse": VERSE,'),
+              exige=(Prompt("scripts/disenar.prompt.md", "míralo antes de contestar"),),
+              nota="**Cómo verse antes de entregar**, con el comando exacto:"
+                   " `npx remotion still`. Todo lo que salió mal en reel-06 —el"
+                   " subtítulo sobre la cara, el panel flotando contra una pared"
+                   " vacía, la placa enseñando las piernas, el copy del tablero"
+                   " pisado por el cc— se ve en un fotograma, y ninguna se ve"
+                   " leyendo el JSON de la respuesta, que es lo único que el"
+                   " diseñador miraba. Jaime tuvo que mirarlo por él."),
+        Campo("figuras",
+              manda=Aguja("scripts/servicios/disenar.py", '"figuras": figuras_que_se_trazan(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "descrita con tus palabras no se dibuja"),),
+              nota="Los diez nombres que `Pictograma` sabe trazar, leídos de"
+                   " `escena.mjs`. Sin esto el diseñador escribe la figura en"
+                   " prosa —«dos caminos: quien usa la estructura y quien no»— y"
+                   " la escena **se monta sin figura y sin aviso** hasta el final"
+                   " de la corrida. Pasó tres veces en la última pasada. La"
+                   " lista existía desde el principio y el pedido no la"
+                   " llevaba: no se elige de un catálogo que no se ve."),
+        Campo("ya_en_pantalla",
+              manda=Aguja("scripts/servicios/disenar.py", '"ya_en_pantalla": hay.get(int(f["etapa_orden"]),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "el material B sobre una línea A cerrada"),),
+              nota="Qué hay HOY encima del plano en cada etapa, leído de"
+                   " `src/reels.json` — o sea de lo que el render dibuja, no de"
+                   " lo que se decidió. Jaime, al mandar las siete: *«ya las"
+                   " escenas están escogidas, así que… pues que agregue lo B que"
+                   " falta»*. Para agregar lo que falta hay que saber lo que hay,"
+                   " y el pedido describía cada etapa como si la pieza estuviera"
+                   " en blanco."),
+        *CAMPOS,
+        Campo("camara",
+              manda=Aguja("scripts/servicios/disenar.py", '"camara": mando_de_camara(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "declarar es elegir, no rellenar"),),
+              nota="El mando de la cámara —encuadre, movimiento, transición— con"
+                   " sus valores LEÍDOS de quien los ejecuta, y con el aviso de"
+                   " los verbos que se ofrecen sin implementar. Es la respuesta"
+                   " a *«dale herramientas al diseñador para que pueda tocar"
+                   " todo eso»*: el documento nombraba los tipos de plano y no"
+                   " había por dónde pedirlos."),
+        Campo("composicion",
+              manda=Aguja("scripts/servicios/disenar.py", '"composicion": que_leer_para_componer(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "cómo se representa una idea"),),
+              nota="La ruta y el índice de `docs/composicion.md`: de qué habla"
+                   " cada tipo de plano, las cuatro familias de animación, para"
+                   " qué sirve una máscara, las zonas seguras del vertical y el"
+                   " paso previo a dibujar. Viaja la ruta y no el texto —son 180"
+                   " líneas y el pedido ya lleva catorce bloques—, pero saber"
+                   " que está y cuándo abrirlo es la diferencia entre un"
+                   " documento que existe y uno que se lee."),
         Campo("topes",
               manda=Aguja("scripts/servicios/disenar.py", '"topes": _topes(),'),
-              exige=(Prompt("scripts/disenar.prompt.md", "un copy que se pasa no sale feo, no sale"),),
+              exige=(Prompt("scripts/disenar.prompt.md", "Un copy que se pasa no sale feo: no sale"),),
               nota="Salen de `src/brand/copy.ts` y **fallan el render**, no avisan."
                    " Mandarlos es más barato que un render muerto."),
     ),
@@ -249,6 +313,9 @@ DISENO = Contrato(
               lista=("en cuadro", "cerrado", "fuera"),
               nota="Es lo que decide si él sale en pantalla en ese beat, así que"
                    " manda sobre la regla de las tres apariciones."),
+        *CAMARA,
+        *VOZ,
+        *LO_DICHO,
         Clave("tablero.fuente",
               dispara=(Aguja("scripts/reels/base.mjs", "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d"),),
               efecto="el pie del tablero cuando rotula una cifra",

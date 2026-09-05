@@ -271,11 +271,63 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # siendo verdad. Cada paso declara aqui lo suyo; el que no declara nada
     # sigue comparandose entero, que es lo conservador.
     CONTEXTO = {
+        # **El diseno contesta sobre los ENCARGOS.** Lo demas viaja para que
+        # pueda componer: donde cae la etapa en la pista, lo que propuso quien
+        # describio, el canon y los topes. Contarlo como parte de la pregunta
+        # costo **cinco composiciones enteras**: se anadio `en_la_pista` y el
+        # gancho al pedido despues de que los agentes contestaran, y las cinco
+        # respuestas se archivaron como «desfasadas» — pagadas y tiradas.
+        #
+        # Un dato que se manda para poder contestar no es la pregunta. Es la
+        # misma leccion que C-163 y la tercera vez que la cobro este mes.
+        "disenar": ("arco", "otras_etapas", "canon", "topes",
+                    # El encargo de estilo, las laminas, el catalogo de sonidos
+                    # y el paso de entender antes de dibujar: todo eso viaja
+                    # PARA PODER componer, no es lo que se juzga. Si contara
+                    # como pregunta, cada retoque del brief tiraria las
+                    # respuestas en vuelo — que es la leccion de C-163 y la que
+                    # ya costo cinco composiciones enteras.
+                    "laminas", "estilo", "antes_de_dibujar", "sonidos",
+                    # **Y el resto del taller, por la misma razon y por cuarta
+                    # vez.** Lo de arriba se declaro cuando la lista era otra;
+                    # desde entonces al pedido le han entrado `verse`, `tres_d`,
+                    # `camara`, `composicion`, `piezas`, `figuras`, `placas` y
+                    # las tres constantes de oficio — todo material **con el que
+                    # se compone**, ninguno la pregunta.
+                    #
+                    # El coste medido hoy: al arreglar un `NameError` que tumbaba
+                    # el paso, `verse` y `tres_d` entraron al pedido por primera
+                    # vez, la pregunta "cambio", y las dos composiciones que ya
+                    # estaban escritas se archivaron por desfasadas. Jaime, sobre
+                    # justo esto: *«otro reproceso, no me gusta nada»*.
+                    #
+                    # La pregunta del diseno es `tableros` —los encargos— y
+                    # `pieza`. Nada mas. Cualquier cosa que se anada al taller
+                    # tiene que caer aqui, o tirara el trabajo en vuelo.
+                    "verse", "tres_d", "camara", "composicion", "piezas",
+                    "figuras", "placas", "correccion", "como_combinar",
+                    "oficio_reel", "prioridad"),
         # El repaso contesta sobre los cortes y el sonido, o sea sobre
         # `montaje`. Lo demas va para que pueda juzgarlo, no es lo juzgado.
         "repaso": ("onda", "se_ve", "etapas_sin_voz", "material_en_corpus",
                    "libreto", "evento", "estructura", "cierres_en_corpus"),
     }
+    # **Y donde se sabe cual es la pregunta, se dice la pregunta — no el resto.**
+    #
+    # `CONTEXTO` lista lo que NO se juzga, y esa forma tiene un fallo que ya se
+    # ha cobrado tres composiciones enteras: **cada herramienta nueva que se le
+    # da al disenador entra al pedido como clave nueva**, no esta en la lista, y
+    # cuenta como pregunta distinta. Paso hoy tres veces seguidas — al meter
+    # `en_la_pista` y el gancho, al arreglar un `NameError` que metio `verse` y
+    # `tres_d`, y al anadir `voz`. Las tres veces la respuesta ya estaba escrita
+    # y se archivo por «anterior al pedido».
+    #
+    # Enumerar lo que hay que ignorar obliga a acordarse en el futuro. Enumerar
+    # **lo que se pregunta** no: lo que se anada despues es contexto por
+    # definicion, que es lo que de verdad es. Para el diseno la pregunta son los
+    # encargos y la pieza; lo demas viaja para poder componer.
+    PREGUNTA = {"disenar": ("tableros", "pieza")}
+    SOLO = PREGUNTA.get(paso)
     APOYO = CONTEXTO.get(paso, ())
 
     def _pregunta(txt):
@@ -284,8 +336,12 @@ def pedir(paso, slug, prompt, payload, cli=True):
         except (TypeError, json.JSONDecodeError):
             return None
         if isinstance(d.get("datos"), dict):
-            d["datos"] = {k: v for k, v in d["datos"].items()
-                          if k not in VOLATILES and k not in APOYO}
+            def _cuenta(k):
+                if SOLO is not None:
+                    return k in SOLO
+                return k not in VOLATILES and k not in APOYO
+
+            d["datos"] = {k: v for k, v in d["datos"].items() if _cuenta(k)}
         for k in VOLATILES:
             d.pop(k, None)
         return json.dumps(d, ensure_ascii=False, sort_keys=True)

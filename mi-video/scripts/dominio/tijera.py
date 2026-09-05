@@ -25,18 +25,48 @@ from .montaje import Montaje
 from .tramo import Tramo
 
 
+class DecisionMovida(Exception):
+    """Un paso quiso reescribir un trozo declarado. Se para el paso.
+
+    No es un aviso: es la única forma de que un paso NUEVO no repita el fallo
+    sin que nadie lo note. `mover` y `quitar` pueden negarse en silencio porque
+    negarse deja el corte como estaba; `rehacer` no, porque reescribe la lista
+    entera y ahí «no hacer nada» no existe.
+    """
+
+
 class Tijera:
     """El montaje de `slug`, abierto para cambiarlo.
 
     Nada se escribe hasta `guardar()`, y `guardar()` no hace nada si no se movió
     nada: un paso que corre en seco no puede tocar el fichero por descuido.
+
+    ## Y lo declarado no se mueve, lo pida quien lo pida
+
+    C-161 puso esa pregunta —`fijado(i)`— dentro de un paso, `pasada_callada`.
+    Duró lo que tardó en aparecer el siguiente paso que mueve algo: `colas`
+    devolvía un borde declarado **1,533 s** tarde en 60 tramos del lote, `mudos`
+    borraba dos tramos declarados enteros —uno de ellos la cola del CTA de
+    reel-05— y `sin_eco` recortaba colas declaradas incluso corriendo en seco.
+
+    Poner el `if` en los cinco sitios sólo aplaza el sexto. Se pone **aquí**,
+    que es por donde pasan todos: un montaje sólo cambia por `mover`, `ajustar`,
+    `quitar` y `rehacer`, y las cuatro preguntan quién puso ese trozo ahí. Un
+    paso que no se acuerde de preguntar tampoco puede saltárselo.
+
+    La única puerta que un trozo declarado deja abierta es `ajustar`, y no la
+    abre la confianza: la abre la huella. Ver ahí por qué.
     """
 
-    __slots__ = ("m", "_sucio")
+    __slots__ = ("m", "_sucio", "respetados")
 
     def __init__(self, slug):
         self.m = Montaje(slug)
         self._sucio = False
+        #: Los trozos declarados que algún paso quiso tocar y no pudo. Vacío es
+        #: lo normal; que no lo esté significa que un paso empujó contra una
+        #: decisión declarada, y eso se dice al guardar.
+        self.respetados = set()
 
     # ── lo que hay ──────────────────────────────────────────────────────────
     @property
@@ -65,7 +95,42 @@ class Tijera:
 
     # ── lo que se puede cambiar ─────────────────────────────────────────────
     def mover(self, i: int, nuevo: Tramo) -> bool:
-        """El trozo `i` pasa a ser `nuevo`. **Y su detalle se mueve con él.**"""
+        """El trozo `i` pasa a ser `nuevo`. **Y su detalle se mueve con él.**
+
+        Devuelve si de verdad se movió, y un trozo declarado devuelve `False`:
+        los pasos cuentan por el retorno, así que negarse no infla el contador
+        que decide si el cosido converge.
+        """
+        if self.fijado(i):
+            self.respetados.add(i)
+            return False
+        return self._escribir(i, nuevo)
+
+    def ajustar(self, i: int, nuevo: Tramo) -> bool:
+        """Cuadra el trozo `i` **sin cambiar lo que dice**. Vale en lo declarado.
+
+        Una declaración dice *qué trozo de qué cinta* entra en la etapa —«éste, y
+        no el que elija la selección»—; no dice en qué milésima de qué sílaba cae
+        la tijera. Sacar un corte de dentro de una palabra no cambia esa
+        decisión: la ejecuta bien. Sin este camino no había forma de hacerlo, y
+        por eso `reel-03` llegó a Jaime con tres entradas a mitad de palabra y
+        **catorce de sus dieciséis trozos** intocables — con las declaraciones ya
+        borradas de la tabla, además, así que la marca protegía a nadie.
+
+        **Y el permiso no se promete: se comprueba.** Vale mientras la huella del
+        texto —lo que suena dentro, C-149— sea la misma antes y después. Si el
+        ajuste añade o quita una palabra ya no es cuadrar el corte, es cambiar la
+        etapa, y ahí manda la declaración: se respeta y se cuenta.
+        """
+        if not self.fijado(i):
+            return self.mover(i, nuevo)
+        ws = self.m.palabras(self.tramo(i).cinta)
+        if not ws or self.tramo(i).huella_de(ws) != nuevo.huella_de(ws):
+            self.respetados.add(i)
+            return False
+        return self._escribir(i, nuevo)
+
+    def _escribir(self, i: int, nuevo: Tramo) -> bool:
         viejo = self.tramo(i)
         if abs(nuevo.desde - viejo.desde) < 1e-9 and abs(nuevo.hasta - viejo.hasta) < 1e-9:
             return False
@@ -115,6 +180,12 @@ class Tijera:
         No es un adorno del fichero. Es lo que lee quien pregunta cuánto dura
         una pieza sin abrirla, y dejarla al criterio de cada paso es cómo llegó
         a mentir en seis de las siete.
+
+        **Y son DOS cifras, no una.** Esto escribía `duracion_s` y dejaba
+        `duracion_montada_s` como estuviera, así que tras coser el reel-02 el
+        fichero decía 67,98 y 67,01 a la vez — y la que `dominio/version.py`
+        guarda como duración de la versión es justo la que no se tocaba. Es
+        C-192 por tercera puerta: la promesa del docstring era cierta a medias.
         """
         if not self._sucio:
             return False
@@ -122,6 +193,7 @@ class Tijera:
         edl["duracion_s"] = round(
             sum(float(b) - float(a) for a, b in
                 (s[:2] for s in edl.get("segmentos") or [])), 2)
+        edl["duracion_montada_s"] = edl["duracion_s"]
         with open(self.m.pieza.ruta_edl, "w", encoding="utf-8") as f:
             json.dump(edl, f, ensure_ascii=False, indent=1)
         self._sucio = False

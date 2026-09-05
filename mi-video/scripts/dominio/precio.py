@@ -22,6 +22,43 @@ import basedatos  # noqa: E402
 MESES = ("ene", "feb", "mar", "abr", "may", "jun",
          "jul", "ago", "sep", "oct", "nov", "dic")
 
+MESES_LARGO = ("enero", "febrero", "marzo", "abril", "mayo", "junio",
+               "julio", "agosto", "septiembre", "octubre", "noviembre",
+               "diciembre")
+
+
+def evento(fecha=None):
+    """**Cuando es el evento**, derivado de la escalera y no escrito.
+
+    Jaime: *«simplifica las fuentes, solo queremos una fuente de verdad»*.
+
+    La fecha vivia a mano en `scripts/reels/cta.mjs` —`fecha: "21 de
+    septiembre"`— y a la vez, como hecho, en el ultimo escalon de la tabla
+    `precio`, cuyo `hasta` es `2026-09-21T11:30` con la nota «cierra con el
+    evento». Dos copias del mismo dia: el que se mueva primero deja al otro
+    mintiendo, y la escalera se movio DOS VECES en un solo dia.
+
+    Y ademas cierra un encargo que pidio quien compuso reel-01: sin ano, la
+    pieza caduca el 22 de septiembre si se reutiliza. Aqui el ano esta porque la
+    tabla lo tiene.
+    """
+    con = basedatos.abrir()
+    con.row_factory = sqlite3.Row
+    fila = con.execute(
+        "select hasta from precio where ancla = 0 order by hasta desc limit 1"
+    ).fetchone()
+    con.close()
+    if not fila:
+        return None
+    a, m, d = fila["hasta"][:10].split("-")
+    return {
+        "iso": fila["hasta"],
+        # Como se dice: es lo que la voz dice y lo que el cierre rotula.
+        "dice": f"{int(d)} de {MESES_LARGO[int(m) - 1]}",
+        # Con ano, para lo que se queda colgado y hay que fechar.
+        "con_ano": f"{int(d)} {MESES[int(m) - 1].upper()} {a}",
+    }
+
 
 def _abierta(fila, hoy: str) -> bool:
     """**El último día cuenta entero.**

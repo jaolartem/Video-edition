@@ -503,6 +503,26 @@ def dossier(slug):
     for rango, det in zip(edl["segmentos"], edl["detalle"]):
         por_beat.setdefault(det["beat"], {"tramos": [], "det": det})
         por_beat[det["beat"]]["tramos"].append(tuple(rango))
+    # **Lo que la etapa TENIA que decir, al lado de lo que dice.**
+    #
+    # El contrato lo declaraba `EXIGIDO Y NO ENVIADO`: *«es la definicion misma
+    # de congruencia… no hay contra que comparar»*. Y el prompt de este paso
+    # promete comparar *«del libreto y del texto»*, o sea que pedia una
+    # congruencia sin darle uno de los dos lados.
+    #
+    # Jaime, sobre reel-03: *«parece que el libreto y la intencion comunicativa
+    # del libreto no se respeto; si el objetivo es comparar A con B, no puedes
+    # entregarme B roto o solo el final de A»*. No es que el paso ignorara el
+    # libreto: es que no lo veia.
+    #
+    # Va **la intencion de su beat y nada mas** —1,2-1,7 KB por pieza—, no el
+    # corpus: los 118 KB se quitaron de `repaso` a proposito, y devolverlos
+    # seria invitar a recomponer la pieza en vez de juzgar el corte.
+    try:
+        from dominio.libreto import Libreto
+        _lib = Libreto(int(slug[-2:])).beats
+    except Exception:                              # noqa: BLE001
+        _lib = []
     out = []
     ultimo = None
     for beat, d in sorted(por_beat.items()):
@@ -524,6 +544,8 @@ def dossier(slug):
         out.append({
             "beat": beat,
             "etapa": d["det"].get("etapa"),
+            #: Lo que el libreto pedia para esta etapa. `None` si no hay.
+            "libreto": _lib[beat - 1] if 1 <= beat <= len(_lib) else None,
             "trato": d["det"].get("trato"),
             **m,
             "intensidad": inten.get("intensidad"),

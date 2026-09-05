@@ -102,11 +102,62 @@ class Servicio:
     def puede(self, pieza: Pieza) -> tuple[bool, str]:
         return True, ""
 
+    @staticmethod
+    def _tomar(turno: str) -> bool:
+        """Toma el turno. `False` si lo tiene otro proceso que sigue vivo."""
+        for _ in range(2):
+            try:
+                fd = os.open(turno, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                return True
+            except FileExistsError:
+                try:
+                    duenyo = int(open(turno).read().strip() or 0)
+                except (OSError, ValueError):
+                    duenyo = 0
+                if _vive(duenyo):
+                    return False
+                try:
+                    os.remove(turno)
+                except OSError:
+                    return False
+        return False
+
     def correr(self, pieza: Pieza) -> Resultado:
         raise NotImplementedError
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.nombre}>"
+
+
+def _vive(pid: int) -> bool:
+    """Si ese proceso sigue corriendo. En Windows no vale `os.kill(pid, 0)`.
+
+    Ahi `os.kill` **mata** en vez de preguntar —solo entiende los dos eventos de
+    consola—, asi que la comprobacion inocente de POSIX seria aqui la forma mas
+    rapida de tirar el render que se queria respetar. Se pregunta por la API:
+    `OpenProcess` puede abrir un proceso ya terminado y todavia sin recoger, asi
+    que el que contesta de verdad es `GetExitCodeProcess` con `STILL_ACTIVE`.
+    """
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, pid)   # QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        codigo = ctypes.c_ulong()
+        ok = k.GetExitCodeProcess(h, ctypes.byref(codigo))
+        k.CloseHandle(h)
+        return bool(ok) and codigo.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
 
 
 class ServicioScript(Servicio):
@@ -132,6 +183,42 @@ class ServicioScript(Servicio):
         self.escribe_cintas = "transcribir.py" in plantilla
 
     def correr(self, pieza: Pieza) -> Resultado:
+        # **Un paso no corre dos veces sobre la misma pieza a la vez.**
+        #
+        # Paso el 1 de septiembre: con el despachador encendido corri
+        # `montar.sh 2` a mano y **los dos renderizaron reel-02**, once minutos
+        # de maquina para producir el mismo fichero dos veces. La culpa fue mia
+        # —Jaime: *«tu no toques el proceso, tu estas afuera del proceso»*— pero
+        # que se pueda hacer es del codigo: el mismo choque lo produce un segundo
+        # despachador, o una prueba lanzada mientras la linea trabaja.
+        #
+        # Un fichero de turno por paso y pieza. Si esta tomado, el paso no falla:
+        # dice que ya se esta haciendo, que es la verdad, y la pieza se queda
+        # donde esta hasta la vuelta siguiente.
+        turno = os.path.join("work", "turnos", f"{self.nombre}.{pieza.slug}")
+        os.makedirs(os.path.dirname(turno), exist_ok=True)
+        #
+        # **Y el turno caduca con su dueño.** Guardaba el PID y no lo miraba
+        # nunca, asi que un montaje que no llega al `finally` —lo mata el techo
+        # de tamaño, lo corta una guarda, se cierra la consola— deja la pieza
+        # bloqueada **para siempre**, y el mensaje que sale dice «ya se esta
+        # haciendo», que es exactamente lo contrario de lo que pasa. Hoy dejo
+        # reel-02 y reel-07 paradas con nadie trabajando en ellas.
+        #
+        # Se comprueba si el proceso vive. No se borra por antiguedad: un render
+        # legitimo tarda veinte minutos y un umbral de tiempo lo atropellaria.
+        if not self._tomar(turno):
+            return Resultado(False, motivo=f"«{self.nombre}» ya se esta"
+                                           f" haciendo sobre esta pieza")
+        try:
+            return self._correr(pieza)
+        finally:
+            try:
+                os.remove(turno)
+            except OSError:
+                pass
+
+    def _correr(self, pieza: Pieza) -> Resultado:
         partes = shlex.split(self.plantilla.format(n=pieza.n, slug=pieza.slug))
         if partes[0].endswith(".py"):
             partes = [sys.executable] + partes

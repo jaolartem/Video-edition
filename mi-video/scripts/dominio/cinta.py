@@ -20,6 +20,7 @@ import dataclasses
 import json
 import os
 
+from .habla import AIRE
 from .palabra import Palabra
 
 #: Habla medida sin una sola palabra por encima de esto: la cinta no sirve.
@@ -28,6 +29,23 @@ from .palabra import Palabra
 SIN_TEXTO_MAX = 20.0
 #: Por debajo de dos pasadas el transcript se come frases y se queda pegado.
 PASADAS_MIN = 2.0
+
+#: La pausa que `cut-silence.py` respeta, y el margen que deja a cada lado del
+#: corte para no comerse el ataque de la consonante.
+PAUSA = 0.45
+MARGEN = 0.06
+#: **El silencio que un tramo de `work/cuts` lleva pegado a cada extremo.**
+#:
+#: No es un detalle del fichero: es la diferencia entre lo que el tramo declara
+#: y lo que se oye. `build_segments` conserva `PAUSA/2 + MARGEN` de silencio por
+#: delante y por detrás, así que **un tramo empieza 0,285 s antes de que suene
+#: la voz** y acaba 0,285 s después de que calle. Medido sobre 39 tramos de tres
+#: cintas: mediana 0,28-0,29 s de desfase entre el arranque declarado y el real.
+#:
+#: Vive aquí, que es quien LEE los tramos, y `cut-silence.py` —quien los
+#: escribe— lo importa de aquí. Escrito en los dos sitios son dos reglas: basta
+#: que alguien corra el detector con otro `--keep` para que este fichero mienta.
+HOLGURA = PAUSA / 2 + MARGEN
 
 
 class CintaIncompleta(Exception):
@@ -70,6 +88,16 @@ class Cinta:
         except (OSError, ValueError, KeyError, TypeError):
             return []
 
+    def voz(self) -> list:
+        """Los mismos tramos **sin la holgura**: donde de verdad suena la voz.
+
+        `habla()` devuelve lo que el detector conservó, y eso lleva `HOLGURA` de
+        silencio a cada lado. Quien pregunta «¿estaba hablando en el segundo
+        384,695?» no quiere lo conservado: quiere lo que se oye.
+        """
+        return [(a + HOLGURA, b - HOLGURA) for a, b in self.habla()
+                if b - a > 2 * HOLGURA]
+
     # ── lo que dijo el modelo, ya sostenible ─────────────────────────────────
     def palabras(self) -> list:
         """Las palabras de la cinta, **pegadas al habla y con orden**.
@@ -78,7 +106,11 @@ class Cinta:
 
         1. **Ninguna palabra suena donde se midió silencio.** El modelo reparte
            los tiempos dentro de su ventana y cuando calla estira la última.
-        2. **Ninguna se queda sin tiempo.** Una palabra de ancho cero no se
+        2. **Ninguna empieza después de que la voz haya arrancado.** Es la misma
+           avería por el otro extremo, y es la que dejaba entrar el corte a
+           mitad de palabra: la primera palabra de un tramo empieza cuando el
+           tramo empieza a sonar, no cuando el modelo se dio cuenta.
+        3. **Ninguna se queda sin tiempo.** Una palabra de ancho cero no se
            puede ordenar contra sus vecinas: el subtítulo la repite, y un corte
            que empiece en su instante se la lleva sin que nadie lo cuente.
         """
@@ -91,13 +123,18 @@ class Cinta:
         if runs:
             ini = [a for a, _ in runs]
             fin = [b for _, b in runs]
-            pegadas = []
+            pegadas, primera = [], set()
             for p in ws:
                 i = bisect.bisect_right(ini, p.empieza) - 1
                 # La que empieza fuera de todo tramo no se toca: ahí tampoco
                 # sabemos dónde empieza, y moverla sería adivinar.
-                pegadas.append(p if i < 0 or p.empieza >= fin[i]
-                               else p.pegada_a(fin[i]))
+                if i < 0 or p.empieza >= fin[i]:
+                    pegadas.append(p)
+                    continue
+                if i not in primera:
+                    primera.add(i)
+                    p = p.desde_el_ataque(min(ini[i] + HOLGURA, fin[i]), AIRE)
+                pegadas.append(p.pegada_a(fin[i]))
             ws = pegadas
         return self._con_sitio(ws)
 

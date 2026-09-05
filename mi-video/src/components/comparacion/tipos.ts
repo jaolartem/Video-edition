@@ -1,3 +1,4 @@
+import type { Recorte } from "../Fondo";
 /**
  * **El contrato de cumplimiento de la comparación de dos columnas.**
  *
@@ -20,6 +21,17 @@ export type Columna = {
 };
 
 export type ComparacionProps = {
+  /**
+   * El hueco de la placa, puesto donde esta su cara. Ver `ventana` en `Fondo`.
+   *
+   * El recorte va escrito a fuego en el componente, y con eso lo que se ve por
+   * el hueco depende de donde cayera el encuadre: en la sesion de noche, las
+   * rodillas. Jaime: *«mis pies son la parte mas quieta y la que menos comunica
+   * intencionalmente»*, *«por ahora que salga mi cara en los huecos»*.
+   *
+   * Declarada, manda sobre `recorte`. Sin declarar, todo sigue igual.
+   */
+  recorte?: Recorte;
   /** Cinta superior: la condición común. «Misma facturación», «De cada $100». */
   premisa: string;
   /** La columna del estado por defecto. Va en navy: no es donde hay que mirar. */

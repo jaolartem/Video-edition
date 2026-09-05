@@ -101,3 +101,31 @@ export function porCli(prompt, entrada) {
   if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
   return arr;
 }
+
+
+/**
+ * **Archiva el par pedido/respuesta cuando la respuesta ya se aplico.**
+ *
+ * `servicio.pedir` (Python) archiva en cuanto consume; este lado no lo hacia, y
+ * el efecto tardo semanas en verse: las siete respuestas de `describir` seguian
+ * en su carpeta desde las 15:05, ya aplicadas, y **parecian sin contestar para
+ * siempre**. En cuanto el despachador aprendio a devolver una pieza al paso que
+ * espera su respuesta, eso habria mandado las siete de vuelta a describir — el
+ * reproceso completo, disparado por ficheros que sobraban.
+ *
+ * Una respuesta aplicada que se queda en la carpeta no es inofensiva: es una
+ * peticion abierta que miente. Se numera para no pisar el archivo anterior, que
+ * es lo que deja seguir la historia de una pieza vuelta a vuelta.
+ */
+export function archivaUsado(paso, slug) {
+  const dir = `${RAIZ}/${paso}/usadas`;
+  fs.mkdirSync(dir, { recursive: true });
+  let n = 1;
+  while (fs.existsSync(`${dir}/${slug}.${n}.respuesta.json`)) n += 1;
+  for (const [cual, ruta] of [["pedido", rutaPedido(paso, slug)],
+                              ["respuesta", rutaRespuesta(paso, slug)]]) {
+    if (fs.existsSync(ruta)) {
+      fs.renameSync(ruta, `${dir}/${slug}.${n}.${cual}.json`);
+    }
+  }
+}

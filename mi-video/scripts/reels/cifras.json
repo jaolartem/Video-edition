@@ -1,0 +1,35 @@
+{
+  "_": "Lo que cuenta como cifra en pantalla, en un solo sitio y en los dos idiomas. Lo leen scripts/reels/cifras.mjs (el que monta) y scripts/fuentes.py (el que pregunta el respaldo). Si esto se separa, el que pregunta y el que pinta dejan de hablar de las mismas cifras — que es como reel-06 e9 acabo rotulando $20, $30 y $40 con una sola fila en `dato`.",
+
+  "no_es_texto": [
+    "duracion",
+    "familia", "zona", "cubre", "oro", "sound", "fondo", "filete", "source",
+    "paso", "entrada", "giro", "placa", "cede_el_cuadro", "sin_pie", "anclas",
+    "ancla", "alinea", "a_la_vez", "no_rotular", "solo_si", "se_queda",
+    "al_entrar_la_siguiente", "abajo_se_tacha", "sin_cifra_en_pantalla",
+    "tachado", "corte", "eje", "saltos", "franja", "lastre", "suelo",
+    "fondo_filetes", "filetes", "flecha", "universo", "capas", "escalones",
+    "tramos", "marcas", "lineas", "palabras", "renglones", "condiciones_en_fila",
+    "etiquetas", "figura"
+  ],
+
+  "al_pie": ["source", "fuente", "condicion", "condition", "legal"],
+
+  "casos": {
+    "53.53%": "53,53%",
+    "53,53 %": "53,53%",
+    "53.53 %.": "53,53%",
+    "32%": "32%",
+    "11,2 %": "11,2%",
+    "0,1%": "0,1%",
+    "$180.000": "$180,000",
+    "$180,000": "$180,000",
+    "$253.414": "$253,414",
+    "$ 20": "$20",
+    "$20.": "$20",
+    "$189,000": "$189,000",
+    "300.000 MIL": "300,000 mil",
+    "20 DÓLARES": "20 dólares",
+    "5 anos": "5 anos"
+  }
+}

@@ -92,7 +92,14 @@ python scripts/contratos.py
 # que `contratos.py` tuvo hasta ayer. Ahora la deuda esta declarada en
 # `docs/tamano-deuda.txt`, **solo puede bajar**, y un fichero nuevo por encima
 # del techo no nace. Cuesta menos de un segundo: solo cuenta lineas.
-python scripts/tamano.py > /dev/null
+# **Y su mensaje NO va a /dev/null.** Con la salida silenciada, un fichero por
+# encima del techo mataba el montaje sin decir una palabra: `set -e` y a callar.
+# Se pierden dos corridas averiguando que fue eso. Se guarda y se enseña solo
+# cuando falla, que es cuando hace falta leerlo.
+if ! _TECHO=$(python scripts/tamano.py 2>&1); then
+  echo "$_TECHO" | tail -5
+  exit 1
+fi
 
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
@@ -168,6 +175,20 @@ for r in "${REELS[@]}"; do
   # Ahora la escena declara su `fuente`, el ancla se mide **por fuente** y cada
   # escena abre su propio bruto: no hay dos fuentes en un corte, hay dos cortes.
   echo "══ corte reel-$r ══"
+  # **El cosido, y va AQUI: antes del plan y despues del EDL.**
+  #
+  # `cadena.py` ya lo declaraba —el eslabon `edl` se despierta con «revision
+  # --aplicar · depurar · costuras» y el `plan` viene detras—, pero la linea no
+  # lo corria: estaba solo en la tabla `fase`, o sea en el camino de
+  # `avanzar.py`. Una pieza montada a mano con `montar.sh` se saltaba el paso
+  # entero, y `verificar.py` se limitaba a **recomendarlo en un mensaje**. Un
+  # paso que hay que acordarse de correr no es un paso del proceso: asi llego
+  # `reel-03` a Jaime con tres entradas cortadas a mitad de palabra.
+  #
+  # Va antes del `if` de abajo a proposito: edita el EDL, asi que al tocarlo deja
+  # el plan viejo y la propia comparacion de fechas lo regenera. Al reves se
+  # cortaria con el plan de antes del cosido.
+  PYTHONIOENCODING=utf-8 python scripts/costuras.py "$((10#$r))" 2>&1 | grep -vE ": 0 " || true
   # **Si el EDL cambio, el plan esta viejo.** El corte no lee el EDL: lee
   # `plan-full.json`, que `plan-reel.mjs` derivo de el en su dia. Asi que editar
   # el EDL —anadir un cierre, recortar una entrada— **no cambiaba nada y no lo
@@ -191,9 +212,43 @@ for r in "${REELS[@]}"; do
     --plan "work/scenes/reel-$r/plan-full.json" \
     --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
   python scripts/subtitular.py "$r"
+  # **Y el subtitulo, cruzado con el libreto. Aqui, no cuando alguien se acuerde.**
+  #
+  # Pregunta de Jaime sobre el cc de reel-05: *«"una futura situacion gratuita"
+  # dicen los subtitulos, composicion no los revisa de cara al libreto?»*. No los
+  # revisaba nadie: `subtitular.py` corrige contra la cinta —y no ve nada cuando
+  # las dos pasadas se equivocan igual— y aplica el glosario, que solo caza lo
+  # que alguien ya noto una vez y escribio. Una palabra nueva mal oida pasaba
+  # entera hasta que el la leia en pantalla.
+  #
+  # Va pegado a `subtitular.py` y no aparte por lo de siempre: un paso que hay
+  # que acordarse de correr no es un paso del proceso. `costuras.py` estuvo asi
+  # y costo tres entradas cortadas a mitad de palabra en reel-03 (C-197).
+  #
+  # **Avisa y no para.** Es una lista para mirar, no un corte: casi todo lo que
+  # sale son parafrasis del hablante, porque en este proyecto el libreto no se
+  # toma literal. Plantar el lote por una parafrasis seria cambiar un problema
+  # por otro, y una lista que bloquea deja de leerse.
+  PYTHONIOENCODING=utf-8 python scripts/oido.py "$((10#$r))" || true
 done
 
 REELS_PEDIDOS="${REELS[*]}" node scripts/reels-spec.mjs
+
+# ── ¿llega al render lo que se declaro? ──────────────────────────────────────
+#
+# Jaime, despues de un dia entero de correcciones que no aparecian: *«las
+# correcciones no estaban llegando a la renderizacion»*, *«eso es un problema que
+# me obliga a retrabajar, a hacer dobles y triples procesos»*.
+#
+# Va AQUI y no al final: el spec ya esta armado —o sea, ya se sabe que va a
+# dibujar el render— y todavia no se ha gastado un minuto de GPU. Una declaracion
+# que no viaja se ve ahora, con su pieza y su etapa, en vez de cuando el vinculo
+# llega a sus manos.
+#
+# Avisa y no para: hay faltas legitimas —una forma sin componente propio— y parar
+# el lote por ellas seria cambiar un problema por otro. Lo que no puede pasar es
+# que no se digan.
+if ! python scripts/llega.py 2>&1 | tail -20; then :; fi
 # El parte de trabajo se reescribe solo: los números de `docs/bitacora.md` salen
 # del spec recién generado. Un número copiado a mano se queda viejo en el primer
 # render, y entonces la bitácora miente justo cuando hace falta.
@@ -242,20 +297,33 @@ for r in "${REELS[@]}"; do
     echo "   $MOTIVOS"
     BLOQUEADAS+=("R$n: $MOTIVOS")
   fi
-  # **Si falla por carga, se repite con menos carga.** No es reintentar lo
-  # mismo esperando otra cosa: es cambiar la condicion que lo rompio.
+  # **El render va por `scripts/render.mjs`, no por el CLI.**
   #
-  # Con `--concurrency=16` el servidor de frames de Remotion devuelve «Failed to
-  # fetch … /proxy?src=…&time=71.266» a media pieza, y **no es el material**: el
-  # proxy decodifica entero y ese frame se extrae con ffmpeg sin una queja. Es
-  # la maquina: dieciseis pestanas pidiendole frames a un fichero de 481 MB.
+  # Es lo unico que estampa `reel-RN.mp4.huella` —el sha1 del spec que ese
+  # fichero dibujo— y `_render_caduco()` la exige para dar la pieza por montada.
+  # Con `npx remotion render` esa huella no se escribia nunca: **toda pieza
+  # salia caduca**, el despachador relanzaba el montaje, y el video entregado
+  # seguia siendo el de antes. El lector existia y el escritor no se ejecutaba.
   #
-  # La segunda pasada tarda mas y termina, que es el unico resultado que cuenta.
-  # Si tambien falla, entonces si hay algo que arreglar y el motor se planta.
-  if ! npx remotion render "Reel-R$n" "$DESTINO/reels/reel-R$n.mp4"        --gl=angle --concurrency=16 --offthread-video-threads=8 --log=error; then
-    echo "  (fallo con concurrencia 16 — se repite con 4, que es mas lento y aguanta)"
-    npx remotion render "Reel-R$n" "$DESTINO/reels/reel-R$n.mp4"       --gl=angle --concurrency=4 --offthread-video-threads=2 --log=error
-  fi
+  # Ahi dentro van tambien el bundle limpio —el CLI sirve un spec cacheado— y la
+  # concurrencia 4. El reintento a 16 se disparaba siempre, asi que 4 no era el
+  # plan B: era el valor bueno escrito en el sitio equivocado.
+  node scripts/render.mjs "$n"
+  # **Y se comprueba que el render dejo su huella.**
+  #
+  # Aqui es donde se cerro la averia: `_render_caduco()` lleva dias exigiendo
+  # `reel-RN.mp4.huella` y NADIE la escribia, porque el paso renderizaba por el
+  # CLI. Toda pieza salia caduca, el despachador relanzaba el montaje, y el
+  # video entregado seguia siendo el de antes. El lector existia y el escritor
+  # no se ejecutaba: eso no se ve en ningun sitio, se ve en que nada converge.
+  #
+  # Se mira el artefacto y no el codigo, asi que da igual quien renderice
+  # manana: si la huella no esta, la linea para aqui y no en la cuarta entrega.
+  [ -f "$DESTINO/reels/reel-R$n.mp4.huella" ] || {
+    echo "montar.sh: el render de R$n no dejo huella en"          "$DESTINO/reels/reel-R$n.mp4.huella."
+    echo "  Sin ella la pieza sale caduca siempre y el montaje no converge."
+    exit 1
+  }
   # **La entrega NO recorta.** Jaime: *«respeta el guion; si hay necesidad de
   # recortar lo definimos al final»* y *«el ajuste de tiempo lo hacemos al final
   # con el reel montado»*.
@@ -327,16 +395,19 @@ for r in "${REELS[@]}"; do
   # **Y la pregunta se hace en un solo sitio.** `Pieza.aprobada` es la
   # definicion; preguntarla aqui con otro SQL seria una segunda copia de la
   # regla, que es como se separan las dos en cuanto una cambie.
-  if [ "$(PYTHONIOENCODING=utf-8 python -c "import sys;sys.path.insert(0,'scripts');from servicios import Pieza;print(1 if Pieza($((10#$n))).aprobada else 0)" 2>/dev/null)" = "1" ]; then
-    bash scripts/musica.sh "$n"
-  else
-    # La entrega existe igual —el paso siguiente la mide— pero es el render tal
-    # cual: la voz sola, sin nada encima. Copia de flujo, sin recodificar.
-    mkdir -p "$DESTINO/entrega"
-    ffmpeg -v error -y -i "$DESTINO/reels/reel-R$n.mp4" -c copy \
-           "$DESTINO/entrega/reel-R$n.mp4"
-    echo "  R$n sin aprobar: entrega sin musica ni efectos, solo la voz."
-  fi
+  # **Y el audio SIEMPRE pasa por el paso 7, aprobada o no.**
+  #
+  # Aqui habia una rama que, sin aprobar, entregaba el render con `-c copy`.
+  # Sin musica, si — esa es la regla de Jaime. Pero tambien **sin nivelar**, y
+  # eso nadie lo pidio: la entrega de reel-01 salio a -9,88 LUFS con pico
+  # +0,19 dBTP, o sea 4 LU de mas y clipeando por encima de cero. Se juzga una
+  # pieza con el audio reventado y lo que se aprueba no es lo que se hizo.
+  #
+  # `musica.sh` ya distingue las dos cosas: pregunta si esta aprobada, quita la
+  # musica si no lo esta, y masteriza la voz igual —lo dice su propio
+  # comentario, *«sin musica tambien hay que masterizar»*—. La rama duplicaba
+  # la pregunta y se llevaba por delante la mitad que no duplicaba.
+  bash scripts/musica.sh "$n"
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done
 # **La verificacion va DESPUES de entregar, y la llama el runner.** No la

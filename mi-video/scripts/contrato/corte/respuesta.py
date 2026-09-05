@@ -15,7 +15,7 @@ CLAVES = (
           nota="Sin él la fila se descarta con `continue`, sin aviso."),
     Clave("ancla",
           dispara=(Aguja("scripts/redundancia.py", 'revision.anotar(slug, "cortar", None, None,'),
-                   Aguja("scripts/revision.py", "def _por_ancla(")),
+                   Aguja("scripts/dominio/ancla.py", "def por_ancla(")),
           efecto="nota `cortar` en `revision`, que `revision.aplicar` recorta"
                  " del EDL buscando ese texto sobre el montaje de hoy",
           exige_ademas=("por_que",),
@@ -23,7 +23,7 @@ CLAVES = (
                " desde=None y hasta=None: lo que no se pueda anclar en texto"
                " exacto no se puede cortar."),
     Clave("cual",
-          dispara=(Aguja("scripts/revision.py", "def _por_ancla("),),
+          dispara=(Aguja("scripts/dominio/ancla.py", "def por_ancla("),),
           efecto="salta apariciones hasta la enésima al aplicar",
           sin_valor="1",
           nota="Se cuenta sobre el montaje entero y el payload viene troceado"

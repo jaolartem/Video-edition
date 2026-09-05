@@ -23,7 +23,8 @@ export type CoverProps = {
    * El gancho del reel. Es la primera línea hablada, no un título inventado:
    * la portada y la voz tienen que decir lo mismo o el espectador siente el
    * cambiazo en el primer segundo.
-   */
+    * @clase tablero
+*/
   hook: string;
   /** Etiqueta de serie, en versales. */
   kicker?: string;

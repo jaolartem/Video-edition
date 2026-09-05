@@ -43,12 +43,13 @@
  * se sigue importando de aquí.
  */
 import { FPS, sonar } from "./capa.mjs";
-import { desaturaDe, donde, figuraDe, rotuloDe, sonidoDe } from "./escena.mjs";
+import { desaturaDe, dibujable, donde, figuraDe, rotuloDe, sonidoDe }
+  from "./escena.mjs";
 import { portada } from "./gancho.mjs";
 
 export { GANCHO_S, GANCHO_CLAVE_S } from "./gancho.mjs";
-export { copyDeclarado, esTipografico, figuraDe, rotuloDe, sonidoDe, sonidosMudos }
-  from "./escena.mjs";
+export { copyDeclarado, esTipografico, faltasDeclaradas, figuraDe, rotuloDe,
+  sonidoDe, sonidosMudos } from "./escena.mjs";
 
 export const CAMINOS = {
   portada,
@@ -166,7 +167,21 @@ export const CAMINOS = {
     porque: "la figura acompaña el plano, no lo sustituye",
     capas(ctx) {
       const { at, duration, desc, det, lado } = ctx;
-      const fig = figuraDe(desc) ?? det.figura ?? null;
+      // `det.figura` pasa por el mismo filtro que lo declarado: el EDL tambien
+      // guarda prosa ahi, y colarla por el `??` era la otra puerta a la flecha.
+      //
+      // **Y si el disenador ya compuso esa etapa, su decision manda.** El EDL
+      // guarda la prosa del ENCARGO —«dos siluetas geometricas planas sobre la
+      // misma linea de salida»— y eso dice que tiene que quedar dicho, no que
+      // haya una figura declarada. Comprobarla contra el catalogo levantaba una
+      // falta por cada etapa donde el disenador decidio, mirando el fotograma,
+      // que ahi no va figura: cuatro de las trece que quedaban.
+      //
+      // Sin tablero disenado la prosa se sigue comprobando: ahi es lo unico que
+      // hay y una figura mal escrita se montaria muda.
+      const compuesta = Boolean(desc?.tablero);
+      const fig = figuraDe(desc)
+        ?? (compuesta ? null : dibujable(det.figura, desc));
       const motion = sonidoDe(desc?.sonido, donde(desc), desc);
       const t = at + Math.round(0.5 * FPS);
       const out = [];
@@ -184,6 +199,25 @@ export const CAMINOS = {
     exige(capas, ctx) {
       // Una metáfora sin figura es una diapositiva con otro nombre. No para el
       // lote —la cinta manda— pero se dice, que es lo que no pasaba antes.
+      //
+      // **Salvo que la etapa lleve tablero a cuadro completo**, y ahí no falta
+      // nada: el tablero ES el tratamiento. Exigir además una figura pedía una
+      // capa que no se puede ver — `CapaFigura` pinta en coordenada fija (top
+      // 790, lado libre) y bajo un tablero a `pleno` sale partida o dentro de la
+      // columna de oro. El diseñador lo comprobó en cuatro etapas sacando el
+      // fotograma: el nombre era correcto en tres de ellas y aun así la figura
+      // no se veía.
+      //
+      // Es C-168 por la puerta contraria: allí una figura equivocada se aprobaba
+      // porque nadie la miraba; aquí se exigía una figura que nadie iba a ver.
+      const cubre = ctx.desc?.tablero
+        ? (JSON.parse(
+            typeof ctx.desc.tablero === "string"
+              ? ctx.desc.tablero
+              : JSON.stringify(ctx.desc.tablero),
+          )?.props?.cubre ?? "pleno")
+        : null;
+      if (cubre === "pleno") return [];
       return capas.some((c) => c.tipo === "figura")
         ? []
         : [

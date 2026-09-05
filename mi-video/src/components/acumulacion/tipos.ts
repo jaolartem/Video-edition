@@ -1,3 +1,4 @@
+import type { Recorte } from "../Fondo";
 export type Tramo = {
   /** Qué es este tramo. Versales condensadas, al lado de su bloque. */
   etiqueta: string;
@@ -14,6 +15,17 @@ export type Tramo = {
  * playbook prohíbe.
  */
 export type AcumulacionProps = {
+  /**
+   * El hueco de la placa, puesto donde esta su cara. Ver `ventana` en `Fondo`.
+   *
+   * El recorte va escrito a fuego en el componente, y con eso lo que se ve por
+   * el hueco depende de donde cayera el encuadre: en la sesion de noche, las
+   * rodillas. Jaime: *«mis pies son la parte mas quieta y la que menos comunica
+   * intencionalmente»*, *«por ahora que salga mi cara en los huecos»*.
+   *
+   * Declarada, manda sobre `recorte`. Sin declarar, todo sigue igual.
+   */
+  recorte?: Recorte;
   title: string;
   /** Qué se acumula. Va en la cinta de arriba, con el horizonte. */
   concepto: string;

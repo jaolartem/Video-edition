@@ -30,6 +30,21 @@ export TMPDIR="$_TMP_PROY"
 export TEMP="$_TMP_PROY"
 export TMP="$_TMP_PROY"
 
+# **Y el perfil de Chrome, que TEMP no mueve.**
+#
+# Chrome escribe su perfil y sus caches en `%LOCALAPPDATA%`, no en `TEMP`: por
+# eso mover lo temporal a F: no bastaba y el disco del sistema seguia siendo el
+# limite. Con C: al 97% —16 GB— el render muere con «Compositor exited with code
+# 3» y «Timed out while setting up the headless browser», un error que no habla
+# de disco en ninguna de sus dos lineas.
+#
+# Es una variable de entorno de ESTE proceso: no toca la instalacion de nadie ni
+# mueve un solo fichero del usuario. Cumple la regla de Jaime —*«todo debe
+# guardar en F:, C: no se toca»*— en el unico sitio donde faltaba.
+export LOCALAPPDATA="$_TMP_PROY/localappdata"
+export APPDATA="$_TMP_PROY/appdata"
+mkdir -p "$LOCALAPPDATA" "$APPDATA" 2>/dev/null || true
+
 # **Y el perfil de Chrome, que NO lo mueve `TEMP`.**
 #
 # Regla de Jaime, dicha treinta veces: *«todo debe guardar en F:, C: no se

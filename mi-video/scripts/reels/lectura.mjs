@@ -52,7 +52,52 @@ const RESPIRO = 20;
 /** Frames de entrada de un bloque de tablero. */
 const ENTRADA = 8;
 
-export const duracionTablero = (kind, p) => {
+/**
+ * **Lo que se entrega va a 1,15x, y hasta ahora nadie lo restaba.**
+ *
+ * Jaime, viendo reel-05: *«todo tablero tiene que tener tiempo suficiente de
+ * lectura»*. Todo este fichero calcula el tiempo del MONTAJE, y el montaje se
+ * acelera despues en `voz-limpia.py` (`VELOCIDAD = 1.15`). Un tablero medido
+ * para 8,0 s de lectura se entrega en 7,0: un 13% menos, en TODOS, siempre, sin
+ * que apareciera en ninguna cuenta.
+ *
+ * Medido sobre las siete: cuatro tableros por debajo de su tiempo, y el peor
+ * —reel-05 beat 6— con 6,00 s reales para 8,75 s de texto.
+ *
+ * Se compensa aqui y no en el paso de audio porque aqui es donde se decide
+ * cuanto dura: alargarlo despues movería el corte entero.
+ */
+const ENTREGA = 1.15;
+
+/** El texto de un tablero, venga en el prop que venga. */
+const textos = (p) => {
+  const fuera = [];
+  const mete = (v) => {
+    if (typeof v === "string" && v.trim()) fuera.push(v);
+    else if (Array.isArray(v)) v.forEach(mete);
+    else if (v && typeof v === "object") Object.values(v).forEach(mete);
+  };
+  for (const [k, v] of Object.entries(p ?? {})) {
+    // Lo que no se lee: la placa es una imagen, el sonido un nombre de fichero,
+    // y `cubre`/`familia`/`oro` son instrucciones de composicion.
+    // Lo que no se lee: la placa es una imagen, el sonido un nombre de
+    // fichero, y `cubre`/`familia`/`oro`/`recorte` son instrucciones de
+    // composicion. `condicion_completa` y `source` se escriben para el copy
+    // del post y **no se dibujan nunca**.
+    //
+    // `recorte` entro en la lista el mismo dia que `armarTableros` empezo a
+    // ponerlo en todo tablero a pleno: valia «lleno», se contaba como un
+    // bloque de texto, y con eso aparecieron dos faltas de lectura que nadie
+    // habia disenado y dos recortes buenos siguieron dando falta.
+    if (["placa", "sound", "sfx", "cubre", "familia", "oro", "figura",
+         "source", "anclas", "recorte", "ventana",
+         "condicion_completa"].includes(k)) continue;
+    mete(v);
+  }
+  return fuera;
+};
+
+const _tablero = (kind, p) => {
   if (kind === "acumulacion") {
     const tramos = p.tramos.reduce(
       (n, tr) => n + Math.max(ENTRADA + 4, lectura(tr.etiqueta)), 0);
@@ -64,8 +109,72 @@ export const duracionTablero = (kind, p) => {
       RESPIRO + 24;
   }
   // `TwoPaths` y `CausalChain` no publican su horario; 8,5 s es lo medido.
+  //
+  // Se probo medirlo por su texto y **infla**: como respaldo solo entra cuando
+  // el beat no dice cuanto dura, y ahi `Math.min(pedido, hueco)` deja que el
+  // tablero se coma el hueco entero — reel-07 beat 2 se fue de 9,3 a 53,9 s.
+  // Lo que el texto pide sirve para AVISAR (ver `lecturaCorta`), no para fijar
+  // la duracion: la duracion la manda el beat.
   return Math.round(8.5 * FPS);
 };
+
+/**
+ * Los tableros cuyo copy NO da tiempo a leerse. Avisa; no toca nada.
+ *
+ * Jaime: *«todo tablero tiene que tener tiempo suficiente de lectura»*. La regla
+ * estaba escrita en el contrato del disenador —0,75 s por bloque mas medio
+ * segundo de respiro— y **no la comprobaba nadie**, asi que cuatro de diecisiete
+ * salieron cortos sin que apareciera en ningun sitio.
+ *
+ * Y no se arregla estirando: un tablero no puede pasar de su beat sin comerse la
+ * etapa siguiente. Lo que sobra es el COPY. Por eso esto es una falta con su
+ * numero —cuanto pide y cuanto hay— y la decision es de quien compone.
+ */
+/**
+ * Lo que la REGLA de Jaime pide para un tablero, en frames de montaje.
+ *
+ * *«0,75 s por bloque mas medio segundo de respiro»*, contado sobre la ENTREGA
+ * —que va a 1,15x— y devuelto en frames del montaje, que es donde se decide.
+ *
+ * Existe para que no haya dos cuentas. `duracionTablero` calcula lo que tarda en
+ * CONSTRUIRSE cada forma —cuando entra cada bloque, cuanto se sostiene— y esa es
+ * otra pregunta. Cuando `armarTableros` quiso adelantar un tablero corto uso esa
+ * y no cambio nada, porque la que se queja es esta.
+ */
+/**
+ * Lo mas que un tablero puede entrar ANTES cuando el CTA le come el final.
+ *
+ * 24 frames, 0,8 s: lo mismo que `SOLAPE` estira por el otro lado y por la misma
+ * razon —es un L-cut—. Mas que eso y el grafico llega antes que la idea que
+ * ilustra.
+ */
+export const ANTES = 24;
+
+export const pideLeer = (props) => {
+  const n = textos(props).length;
+  return n ? Math.ceil((0.75 * n + 0.5) * ENTREGA * FPS) : 0;
+};
+
+export const lecturaCorta = (tableros) => {
+  const faltas = [];
+  for (const b of tableros) {
+    const n = textos(b.props).length;
+    if (!n) continue;
+    const pide = 0.75 * n + 0.5;
+    const hay = b.duration / FPS / ENTREGA;
+    if (hay < pide - 0.05) {
+      faltas.push(
+        `el tablero del beat ${b.beat} («${b.kind}») tiene ${n} bloques que piden`
+        + ` ${pide.toFixed(1)}s de lectura y solo se ven ${hay.toFixed(1)}s`
+        + ` (${(b.duration / FPS).toFixed(1)}s a 1,15x): sobra copy, no falta tiempo`);
+    }
+  }
+  return faltas;
+};
+
+/** Lo que hay que dejar en el MONTAJE para que se lea en la ENTREGA. */
+export const duracionTablero = (kind, p) =>
+  Math.ceil(_tablero(kind, p) * ENTREGA);
 
 /** `Tarjeta` encadena: un bloque cada 8 frames, luego el remate, luego el pie. */
 export const duracionTarjeta = (p) =>

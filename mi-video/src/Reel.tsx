@@ -8,6 +8,7 @@ import {
 import { Ad } from "./Ad";
 import { BigTitle } from "./components/BigTitle";
 import { BarWipe } from "./components/BarWipe";
+import { Filete } from "./components/Filete";
 import { SidePanel } from "./components/SidePanel";
 import { Tarjeta } from "./components/Tarjeta";
 import { Cortinilla } from "./components/Cortinilla";
@@ -68,11 +69,15 @@ export const Reel: React.FC<{ spec: ReelSpec }> = ({ spec: r }) => {
     <PunchIn capas={r.caminos.filter((c) => c.tipo === "punch")}>
       <Ad
         video={r.video}
+        volumen={r.volumen ?? 1}
+        coronilla={r.cara?.coronilla}
+        lado={r.lado}
         mode="evidence"
         captions={captions}
         boards={r.boards}
         desatura={r.desatura}
         glitch={r.glitch}
+        virados={r.virados}
       />
     </PunchIn>
     <BigTitle lineas={r.lineas} entraEn={r.entra} sostiene={r.sostiene} />
@@ -96,6 +101,23 @@ export const Reel: React.FC<{ spec: ReelSpec }> = ({ spec: r }) => {
      * Van DESPUÉS del vídeo y ANTES de todo lo demás: tapan la costura sin
      * tapar el subtítulo, que sigue siendo capa portante.
      */}
+    {/**
+     * La transición animada, en la costura donde se pidió.
+     *
+     * Va **encima del plano y de sus capas** —tiene que cruzar por delante de
+     * lo que haya— y **debajo de la tarjeta y del CTA**, que ocupan el cuadro
+     * entero: un filete cruzando por encima de una tarjeta no tapa ninguna
+     * costura, la raya.
+     */}
+    {(r.filetes ?? []).map((f) => (
+      <Filete
+        key={`f${f.at}`}
+        en={f.at}
+        dura={f.duration}
+        grosor={f.grosor}
+        segundo={f.segundo}
+      />
+    ))}
     {r.cortinillas.map((c) => (
       <Sequence key={`c${c.at}`} from={c.at} durationInFrames={c.duration}>
         <Cortinilla {...c.props} />

@@ -32,6 +32,8 @@ import type { TarjetaProps } from "../components/Tarjeta";
 export type ReelSpec = {
   id: string;
   video: string;
+  /** Volumen del plano. `0` renderiza la pieza como pista de solo efectos. */
+  volumen?: number;
   /**
    * Las capas que decidio el camino de cada segmento. Ver `scripts/caminos.mjs`
    * y `components/Capas.tsx`: aqui solo se dibujan.
@@ -75,8 +77,30 @@ export type ReelSpec = {
    * otra cosa. Aquí esa otra cosa además explica.
    */
   boards: BoardCue[];
+  /**
+   * Donde cae su cara en el cuadro, en fracciones. Lo mide `punch-ins.py` y lo
+   * trae `reels-spec`. Con esto el subtitulo se coloca **encima de su cabeza**,
+   * que es el 18% del cuadro que estaba sin usar.
+   */
+  cara?: { coronilla: number; menton: number } | null;
   /** Tramos en blanco y negro. Ver `Desatura` en `Ad`. */
   desatura: { at: number; duration: number }[];
+  /**
+   * Tramos virados —sepia, navy, duro—, con su filtro ya resuelto.
+   *
+   * Los pide el diseñador por etapa en `escena_desc.camara.virado` y el horario
+   * sale del plan, no del EDL (`scripts/reels/imagen.mjs`). Vacío es lo normal:
+   * una pieza que nadie ha virado sale como se grabó.
+   */
+  virados: { at: number; duration: number; virado: string; css: string }[];
+  /**
+   * Costuras cruzadas por la transición animada. Ver `Filete`.
+   *
+   * Jaime: *«que haga una animación en esa transición»*. Es la tercera vía —el
+   * glitch distorsiona la imagen, la cortinilla interrumpía con una placa y
+   * quedó retirada— y sólo sale donde alguien la pide.
+   */
+  filetes: { at: number; duration: number; grosor: number; segundo: number }[];
   /**
    * Costuras tapadas con distorsión. Ver `Glitch` en `Ad`.
    *

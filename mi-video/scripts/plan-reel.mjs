@@ -20,7 +20,9 @@
  *   node scripts/plan-reel.mjs --reel 3
  */
 import fs from "fs";
+import { DatabaseSync } from "node:sqlite";
 import { bruto } from "./rutas.mjs";
+import { camaraDe, movimientoDe } from "./camara.mjs";
 
 /**
  * Silencio interno que se quita. Por debajo de esto es respiración y se queda:
@@ -96,6 +98,35 @@ const runs = JSON.parse(
   fs.readFileSync(`work/cuts/${edl.toma ?? tomaDe(slug)}.json`, "utf8"),
 ).segmentos;
 
+/**
+ * **Lo que el diseñador pidió de cámara, etapa por etapa.**
+ *
+ * `escena_desc.camara` es la fuente única — la misma columna donde vive el
+ * tablero y por la misma razón. Vacía significa lo de siempre: encuadre por
+ * rueda, acercamiento lento, corte seco, así que una pieza que nadie ha
+ * compuesto sale exactamente igual que ayer.
+ *
+ * Los cinco encuadres llevaban desde el principio en `punch-ins.py` repartidos
+ * con `ENCUADRES[idx % len]`. Construidos y no elegibles: aquí es donde la
+ * elección entra en el plan.
+ */
+const camaraPorBeat = () => {
+  const m = new Map();
+  try {
+    const db = new DatabaseSync("ads/decisiones.db", { readOnly: true });
+    for (const f of db
+      .prepare("select etapa_orden, camara from escena_desc where video_slug = ?")
+      .all(slug))
+      m.set(Number(f.etapa_orden), camaraDe(f.camara));
+    db.close();
+  } catch {
+    // Sin base no hay composición declarada, que es el estado de una pieza
+    // recién cortada: se sigue con los valores de siempre.
+  }
+  return m;
+};
+const CAMARA = camaraPorBeat();
+
 const escenas = [];
 let montado = 0;
 let aireQuitado = 0;
@@ -142,16 +173,18 @@ const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
   const d0 = (edl.detalle || [])[iSeg] || {};
   // Etapa con pausa declarada: entra tal cual, con su silencio.
   if (PAUSAS[String(d0.beat)]) {
-    return [[a, b, d0.beat ?? iSeg + 1, d0.etapa || "", d0.texto || ""]];
+    return [[a, b, d0.beat ?? iSeg + 1, d0.etapa || "", d0.texto || "", d0.toma]];
   }
   const t = conHabla(a, b, runs);
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
   const d = (edl.detalle || [])[iSeg] || {};
-  return t.map(([x, y]) => [x, y, d.beat ?? iSeg + 1, d.etapa || "", d.texto || ""]);
+  return t.map(([x, y]) => [x, y, d.beat ?? iSeg + 1, d.etapa || "", d.texto || "", d.toma]);
 });
 
-for (const [a, b, beat, etapa, dicho] of conVoz) {
+for (const [a, b, beat, etapa, dicho, toma] of conVoz) {
   const dur = b - a;
+  /** Lo declarado para esta etapa; si no hay nada, los valores de siempre. */
+  const cam = CAMARA.get(Number(beat)) ?? camaraDe(null);
   // Cuantas escenas caben; el resto se reparte para que ninguna quede corta.
   const n = Math.max(1, Math.round(dur / CADA));
   const paso = dur / n;
@@ -161,7 +194,7 @@ for (const [a, b, beat, etapa, dicho] of conVoz) {
     if (fin - ini < MINIMO && escenas.length) {
       // Se funde con la anterior en vez de crear un plano de parpadeo.
       const prev = escenas[escenas.length - 1];
-      if (Math.abs(prev.origen_hasta - ini) < 1e-6) {
+      if (Math.abs(prev.origen_hasta - ini) < 1e-6 && prev.fuente === toma) {
         prev.origen_hasta = fin;
         prev.duracion = Number((fin - prev.origen_desde).toFixed(3));
         montado += fin - ini;
@@ -174,6 +207,18 @@ for (const [a, b, beat, etapa, dicho] of conVoz) {
       // escena es un rango anónimo y no hay forma de decir «esta parte no
       // sirve» sin contar cortes con el dedo.
       beat,
+      /**
+       * **De que cinta sale esta escena.** `render-hook.mjs` lo lee
+       * (`fuenteDe`) y abre un `-i` por escena: el consumidor lo soportaba y
+       * este productor no lo emitia nunca, asi que las 23 escenas de reel-07
+       * se cortaron de la cinta que pasa `montar.sh` —una sola— incluidas las
+       * que el EDL declara de otra. Resultado: 26 s perdidos y audio de la
+       * cinta equivocada sonando dos veces.
+       *
+       * Es la averia de la noche por cuarta puerta: el lector existia y el
+       * escritor no se ejecutaba.
+       */
+      fuente: toma,
       etapa,
       dicho: dicho.slice(0, 160),
       montado_desde: Number(montado.toFixed(3)),
@@ -183,15 +228,39 @@ for (const [a, b, beat, etapa, dicho] of conVoz) {
       modo: k === 0 ? "cut" : "chain",
       hereda_encuadre: false,
       /**
+       * **El encuadre que pidió quien compuso**, o `null` para que
+       * `punch-ins.py` siga repartiendo por rueda.
+       *
+       * Va en TODAS las escenas del beat, no sólo en la primera: si un beat se
+       * parte en tres y las tres piden lo mismo, las fronteras entre ellas
+       * dejan de verse — que es lo que se quiere dentro de una etapa. La
+       * variedad es entre etapas.
+       *
+       * `punch-ins.py` puede abrirlo si el sujeto no cabe. Ahí manda él: antes
+       * un plano más abierto que una cara que se sale.
+       */
+      encuadre: cam.encuadre,
+      /** La costura de ENTRADA del beat. Sólo la primera escena la tiene. */
+      transicion: k === 0 ? cam.transicion : "corte",
+      // **El virado va en TODAS las escenas del beat**, igual que el encuadre:
+      // el tratamiento es de la etapa, no del trozo. Si sólo lo llevara la
+      // primera, el plano volvería a su color a mitad de la etapa y eso no lo
+      // pidió nadie. `null` = el plano sale como se grabó.
+      virado: cam.virado,
+      /**
        * **El movimiento dentro de la escena.** `punch-ins.py` calcula el
        * recorte final con los OJOS como punto fijo (aprendizaje 27), así que
        * el acercamiento no deriva en diagonal aunque el recorte toque un borde.
        *
-       * 0,88 son doce puntos de recorrido repartidos por toda la escena. En un
-       * beat de 15 s eso es 0,8 %/s: **no se nota mientras pasa, se nota al
-       * comparar el principio con el final**, que es la calibración correcta.
+       * **Y cuánto lo elige quien compone.** Estaba clavado en 0,88 para las
+       * escenas de las siete piezas: doce puntos de recorrido, la calibración
+       * correcta para que no se note mientras pasa y sí al comparar principio
+       * con final — pero la misma en el gancho, en la explicación y en el
+       * cierre. Un movimiento único no es tener movimiento.
+       *
+       * `acercar` sigue siendo esos 0,88, así que lo no declarado sale igual.
        */
-      zoom: { hasta: 0.88, desde_s: 0.3 },
+      zoom: movimientoDe(cam.movimiento),
     });
     montado += fin - ini;
   }

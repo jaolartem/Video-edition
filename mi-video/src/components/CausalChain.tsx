@@ -32,7 +32,8 @@ export type { CausalNode, CausalChainProps } from "./causalChain/tipos";
  * El componente **dibuja y ata**. El contrato de cumplimiento vive en
  * `causalChain/tipos` —una cifra sin fuente no compila—, el calendario en
  * `causalChain/horario`, y el eslabón y el límite legal en sus ficheros.
- */
+  * @clase tablero
+*/
 export const CausalChain: React.FC<CausalChainProps> = ({
   nodes,
   mode = "evidence",

@@ -35,7 +35,8 @@ import { color, duration, ease, layout } from "../brand/tokens";
  *
  * El audio **no se interrumpe** — la voz sigue corriendo por debajo, así que es
  * un L-cut y la costura tampoco se oye.
- */
+  * @clase transicion
+*/
 export type CortinillaProps = {
   /** Placa de `public/fondos/`, sin extensión. La que dice lo que dice el beat. */
   placa: string;

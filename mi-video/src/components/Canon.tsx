@@ -15,7 +15,8 @@ import { layout, size, tracking, weight } from "../brand/tokens";
  * Ninguna decide nada — el color lo pone quien la usa, porque el tinte depende
  * del modo, del tono y de si el bloque es el que hay que mirar. Lo que fijan es
  * la familia, el cuerpo y el interletrado, que son del sistema y no de la pieza.
- */
+  * @clase sistema
+*/
 
 /**
  * El marco de un tablero: la zona segura de Reels, **con la banda de subtítulos

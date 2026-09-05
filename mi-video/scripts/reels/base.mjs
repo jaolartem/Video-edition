@@ -14,7 +14,7 @@
  * veces por corrida, una para las aprobaciones y otra para el resto.
  */
 import { DatabaseSync } from "node:sqlite";
-import { revisarTablero } from "../formas.mjs";
+import { CONSTRUIDAS, revisarTablero } from "../formas.mjs";
 import { enPantalla } from "./lectura.mjs";
 
 const db = new DatabaseSync("ads/decisiones.db");
@@ -95,9 +95,18 @@ export const pieDe = (slug, beat, props) => {
       " where v.slug = ? and d.etapa_orden = ?" +
       "   and d.respalda in ('si','parcial')",
     ).all(slug, beat);
+    // **Y se comparan NORMALIZADAS.** La fila dice `53.53%` y el tablero puede
+    // pintar «53,53 %» —coma decimal y espacio antes del signo, que es como se
+    // escribe en español—: sin normalizar no casan, la busqueda falla en
+    // silencio y el pie cae al `?? filas[0]`, o sea **el pie de OTRA cifra
+    // debajo de esta**. Es peor que no poner pie: parece respaldar lo que no
+    // respalda, que es justo lo que el comentario de arriba vino a arreglar por
+    // la puerta de la longitud.
+    const igual = (s) => s.replace(/\s+/g, "").replace(/,(\d)/g, ".$1");
+    const plano_ = igual(pintado);
     const suya = filas.find((x) => {
       const n = String(x.cifra ?? "").match(/[\d.,]+\s*%?|\$[\d.,]+/);
-      return n && pintado.includes(n[0].trim());
+      return n && plano_.includes(igual(n[0]));
     });
     const r = suya
       ?? filas.find((x) => x.respalda === "parcial")
@@ -121,7 +130,12 @@ export const pieDe = (slug, beat, props) => {
  * Sólo pasan los `kind` que `Ad.tsx` sabe dibujar con componente propio. El
  * resto sale con `TableroDeclarado`, que es una mejora pendiente y no un fallo.
  */
-const DIBUJA = new Set(["causal", "comparacion", "acumulacion", "twopaths"]);
+// **No es una lista suya: es la de quien despacha.** Habia aqui una copia
+// escrita a mano y se quedo vieja el dia que se construyeron dos formas — el
+// parte seguia diciendo «sale con TableroDeclarado» de dos tableros que ya se
+// dibujaban con su componente. La segunda copia no dio error: dio un informe
+// que mandaba a construir lo que ya estaba hecho.
+const DIBUJA = CONSTRUIDAS;
 
 /**
  * **El tablero sale de la DESCRIPCIÓN, no de un literal por pieza.**

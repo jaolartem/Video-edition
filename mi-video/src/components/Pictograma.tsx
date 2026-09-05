@@ -1,6 +1,7 @@
 import React from "react";
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 import { color } from "../brand/tokens";
+import registro from "../brand/figuras.json";
 
 /**
  * **Pictogramas geométricos**: señales de tránsito y figuras de palitos.
@@ -28,18 +29,19 @@ import { color } from "../brand/tokens";
  *   su forma.
  * - **Entra dibujándose, no apareciendo.** El movimiento es el trazo, que es lo
  *   que el sonido puede seguir.
+  * @clase capa
+*/
+/**
+ * **El catalogo sale del registro, no de aqui.**
+ *
+ * Esta union estaba escrita a mano y `DIBUJAN` en `scripts/escena.mjs` la
+ * repetia: dos listas de las mismas diez, y una figura nueva habia que
+ * acordarse de ponerla en las dos. Ahora las dos leen
+ * `src/brand/figuras.json`, que es la biblioteca — lo que esta se usa, lo que
+ * no esta lo construye el paso de diseno con la skill `tableros-jaime` y queda
+ * ahi para las piezas siguientes.
  */
-export type Figura =
-  | "persona"
-  | "dos-personas"
-  | "alto"
-  | "ceda"
-  | "desvio"
-  | "bifurcacion"
-  | "escalera"
-  | "flecha"
-  | "barras"
-  | "serie";
+export type Figura = keyof typeof registro.figuras;
 
 /** Un trazo que se dibuja: se revela por longitud, no por opacidad. */
 const Traza: React.FC<{
@@ -244,7 +246,12 @@ export const Pictograma: React.FC<{
             })}
           </>
         );
-      default:
+      case "flecha":
+        /**
+         * **La flecha, ahora con su nombre.** Estaba viviendo en el `default`,
+         * y por eso el `default` no se podia vaciar sin perderla: era a la vez
+         * una figura del catalogo y el comodin de todo lo demas.
+         */
         return (
           <>
             <Traza d="M 20 90 L 160 90" p={p} largo={140} tinte={tinte} grosor={9} />
@@ -252,6 +259,38 @@ export const Pictograma: React.FC<{
             <Traza d="M 160 90 L 128 122" p={p} largo={45} tinte={tinte} grosor={9} />
           </>
         );
+      default:
+        /**
+         * **Lo que no se sabe trazar no se traza.**
+         *
+         * Aqui habia una flecha, y no como figura: como comodin. Ocho de las
+         * catorce figuras del lote traian prosa en vez de un nombre del
+         * catalogo —«compuerta de canal vista de lado», «tres oficios: realtor,
+         * medico, retail»— y las ocho salieron flecha, sobre el plano, sin que
+         * nada lo dijera. Una de ellas llevaba escrito literalmente *«objeto
+         * reconocible, no un trazo geometrico suelto»*.
+         *
+         * Es el fallo mas caro del proyecto en su peor forma: no es que falte
+         * algo, es que **la pieza afirma en pantalla una figura que nadie
+         * compuso**. Dibujar nada se ve y se arregla; dibujar otra cosa se
+         * aprueba por error.
+         *
+         * Quien lo dice en voz alta es `dibujable()` en `scripts/escena.mjs`:
+         * la figura no llega hasta aqui, y la etapa sale nombrada en las faltas
+         * de camino de `reels-spec.mjs`.
+         */
+        //
+        // **Y registrar una figura sin trazarla falla `tsc`.** El registro dice
+        // que existe y el `switch` decide si se dibuja: sin esto, anadir el
+        // nombre a `figuras.json` y olvidar el `case` devolveria `null` en
+        // silencio, que es el caso mudo que C-168 vino a quitar — la escena se
+        // monta sin su figura y nadie lo echa de menos.
+        {
+          const sinTrazar: never = figura;
+          void sinTrazar;
+        }
+        //: el catalogo se agota diciendo que se agoto (C-168)
+        return null;
     }
   };
 

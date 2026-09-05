@@ -63,7 +63,7 @@ const mudo = (r) => {
 
 const filas = spec.map((r) => {
   const m = mudo(r);
-  return `| **${r.id}** | ${r.duracion.toFixed(1)} s | ${m.vis}/${r.captions.length} | ${r.compuestos} | ${s(m.peor)} s | ${r.paneles.length} | ${r.boards.length} | ${r.tarjetas.length} | ${r.cta.at.toFixed(1)} s |`;
+  return `| **${r.id}** | ${r.duracion.toFixed(1)} s | ${m.vis}/${r.captions.length} | ${r.compuestos} | ${s(m.peor)} s | ${r.paneles.length} | ${r.boards.length} | ${r.tarjetas.length} | ${r.cta ? r.cta.at.toFixed(1) + " s" : "—"} |`;
 });
 
 const hoy = new Date().toISOString().slice(0, 10);

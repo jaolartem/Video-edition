@@ -11,6 +11,10 @@ import {
   type Mode,
 } from "../brand/tokens";
 
+/**
+ * Rótulo sobre el vídeo, para sostener la atención en el gancho.
+ * @clase capa
+ */
 export type TitleCue = {
   /** Frame en que entra. Anclado a la palabra que subraya. */
   at: number;

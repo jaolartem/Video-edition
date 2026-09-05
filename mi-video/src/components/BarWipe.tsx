@@ -20,7 +20,8 @@ import { color, layout } from "../brand/tokens";
  *
  * Diagonal y asimétrica a propósito: el constructivismo evita la simetría
  * porque la diagonal es la que sugiere movimiento.
- */
+  * @clase transicion
+*/
 export const BarWipe: React.FC<{
   /** Frame del corte. La barra lo cruza centrada en él. */
   en: number;

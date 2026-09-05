@@ -10,7 +10,8 @@ import { sfxSrc, sfxVolume, type Motion } from "../brand/sfx";
  * tiempos de este proyecto se derivan del tiempo de lectura y del anclaje al
  * transcript, así que cambian. Una pista aparte se desincroniza en el primer
  * ajuste de copy; esto no puede desincronizarse porque lee el mismo número.
- */
+  * @clase sistema
+*/
 export const MotionSound: React.FC<{
   motion: Motion;
   /** El frame en que arranca el movimiento. */

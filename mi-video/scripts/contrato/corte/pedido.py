@@ -88,18 +88,19 @@ CAMPOS = (
           nota="INERTE: cero apariciones en el prompt de revalidar. `flojo` es"
                " el cálculo del suelo ya hecho y el prompt pide aplicarlo a mano."),
     Campo("libreto",
-          manda=None,
-          deuda="ver `nota`",
+          manda=Aguja("scripts/revalidar.py",
+                      '"libreto": _lib[beat - 1] if 1 <= beat <= len(_lib) else None,'),
           exige=(Prompt("scripts/repaso.prompt.md", "el libreto quería decir"),
                  Prompt("scripts/revalidar.prompt.md", "del libreto y del texto")),
-          nota="EXIGIDO Y NO ENVIADO, y es la definición misma de congruencia."
-               " El EDL trae `de_jaime`, `dice`, `cobertura` y `literal`, y"
-               " ninguno se reenvía. No hay contra qué comparar."),
+          nota="La intencion de SU beat al lado de lo que la etapa dice, en el"
+               " dossier de `revalidar` — que es el paso cuyo prompt promete"
+               " comparar «del libreto y del texto». Estuvo EXIGIDO Y NO ENVIADO,"
+               " y esa es la averia que Jaime nombro: «si el objetivo es comparar"
+               " A con B, no puedes entregarme B roto o solo el final de A»."
+               " Viaja la intencion por beat (1,2-1,7 KB), no el corpus: los 118"
+               " KB salieron de `repaso` a proposito y no vuelven."),
     Campo("estructura",
-          manda=None,
-          deuda="lo mandaba `repaso`, que salio de este contrato el 1 de"
-                " septiembre al dejar de editar; `redundancia` lo exige en su"
-                " prompt y nunca lo mando",
+          manda=Aguja("scripts/servicios/repaso.py", '**_contexto_del_corte(pieza.slug)}'),
           exige=(Prompt("scripts/redundancia.prompt.md", "PAS sin problema o sin activación"),),
           nota="EXIGIDO Y NO ENVIADO desde que `repasado` dejo este contrato."
                " Que lo mandara el paso equivocado es justo lo que escondia la"
@@ -125,17 +126,29 @@ CAMPOS = (
                " larga el final se corta antes de llegar. `puntuacion` puede"
                " ser `null` a propósito y el prompt la asume presente."),
     Campo("abanico",
-          manda=None,
-          deuda="ver `nota`",
+          manda=Aguja("scripts/servicios/repaso.py",
+                      '"instrumentos": INSTRUMENTOS, "ya_medido": YA_MEDIDO,'),
           exige=(Prompt("scripts/revalidar.prompt.md", "no se salta un peldaño"),),
           en=("revalidado", "repasado"),
-          nota="EXIGIDO Y NO ENVIADO. El peldaño 2 ordena buscar en las siete"
-               " cintas con `consulta.py abanico`. Quien contesta por fichero"
-               " no puede ejecutar un comando: o viaja el resultado, o el"
-               " peldaño 2 no existe."),
+          nota="EL ACCESO AL CORPUS, y viaja como INSTRUMENTO, no como dato."
+               " El peldano 2 ordena buscar en las siete cintas y el corpus"
+               " nunca viajaba: se le pedia elegir sin darle entre que. Mandarlo"
+               " entero son megabytes por pieza, asi que se declara como se pide"
+               " —`consulta.py abanico` con una frase— y quien compone lo invoca"
+               " para el sitio que necesita. Jaime: «siempre que sean necesarias,"
+               " para ahorrar tokens»."),
+    Campo("lo_que_hizo_la_maquina",
+          manda=Aguja("scripts/servicios/repaso.py",
+                      '"lo_que_hizo_la_maquina": lo_que_hizo_la_maquina(pieza.slug),'),
+          exige=(Prompt("scripts/repaso.prompt.md", "se supervisa"),),
+          en=("repasado",),
+          nota="Lo que los pasos automaticos movieron en el corte. Jaime: «los"
+               " procesos declarados no desaparecen, son supervisados y"
+               " entendidos por el LLM, que se da cuenta cuando un borde quedo"
+               " mas cerrado». Los pasos ya lo anotaban en `incidencia` y nadie"
+               " se lo ensenaba a quien compone."),
     Campo("tramos_actuales",
-          manda=None,
-          deuda="ver `nota`",
+          manda=Aguja("scripts/servicios/repaso.py", '**_contexto_del_corte(pieza.slug)}'),
           exige=(Prompt("scripts/revalidar.prompt.md", "qué edición la salva"),),
           en=("revalidado",),
           nota="EXIGIDO Y NO ENVIADO. Se pide mover la costura y del montaje"

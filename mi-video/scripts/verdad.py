@@ -74,6 +74,42 @@ class Verdad:
 
 VERDADES = (
     Verdad(
+        decision="Cuándo es el evento",
+        vive_en="el último escalón de la tabla `precio` — su `hasta` es el"
+                " cierre, con la nota «cierra con el evento»",
+        lee=(Aguja("scripts/dominio/precio.py", "def evento(fecha=None):"),),
+        prohibido=(Aguja("scripts/reels/cta.mjs", 'fecha: "21 de septiembre",'),),
+        copia="`src/muestras.ts` la lleva escrita, pero es un fixture del"
+              " catálogo de formas: no entra en ninguna pieza.",
+        costo="Jaime: *«simplifica las fuentes, sólo queremos una fuente de"
+              " verdad»*. El día vivía a mano en `cta.mjs` y como hecho en la"
+              " tabla, y la escalera se movió DOS VECES en una tarde. Seis de"
+              " los siete diseñadores escribieron además la fecha en sus props"
+              " —dos de ellos corrigiendo una vencida— porque nada decía de"
+              " dónde sale. Derivarla da además el año, que sin él la pieza"
+              " caduca el 22 de septiembre al reutilizarse.",
+    ),
+    Verdad(
+        decision="Qué placas de fondo existen y qué dibuja cada una",
+        vive_en="`ads/fondos.json`",
+        lee=(Aguja("scripts/servicios/caja.py", "def placas_que_existen():"),
+             Aguja("scripts/reels/material.mjs", "const PLACAS = JSON.parse"),),
+        prohibido=(),
+        copia="Las tablas `placa` y `placa_etapa` son una IMPORTACIÓN del JSON"
+              " que hace `db.py` y **no las lee nadie**: 14 y 39 filas que se"
+              " regeneran solas y no alimentan ningún paso. Redundancia del"
+              " modelo, sin consumidor.",
+        costo="Las catorce placas llevaban semanas en el repositorio, con su"
+              " `dice` y su `siente` escritos, y el pedido del diseñador no las"
+              " mandaba: iban las 26 láminas del canon, que son para mirar, y"
+              " no las placas, que son las que se pueden usar. Se pidieron"
+              " treinta y cinco formas nuevas por código teniendo"
+              " `r1-mecanismo` —«un canal que lleva bloques hacia el punto de"
+              " fuga y una derivación que se los lleva fuera del cuadro»—"
+              " esperando. Jaime: *«no es reinventar la rueda, es seguir la"
+              " identidad gráfica»*.",
+    ),
+    Verdad(
         decision="El libreto de una pieza",
         vive_en="tabla `libreto` de `ads/decisiones.db`",
         lee=(Aguja("scripts/beats.py", "Los beats de la pieza, **desde la base**"),),
@@ -97,6 +133,25 @@ VERDADES = (
         costo="Cuatro entregas idénticas. La descripción de reel-01 e3 se"
               " reescribió a las 12:42 del 31 de agosto y el tablero seguía"
               " saliendo del literal: re-describir no cambiaba el vídeo.",
+    ),
+    Verdad(
+        decision="Cómo suena la voz en el remate de una etapa",
+        vive_en="`escena_desc.voz`, escrito por el que monta",
+        lee=(Aguja("scripts/dominio/remate.py",
+                   "select etapa_orden, voz from escena_desc"),
+             Aguja("scripts/musica.sh",
+                   "VOZ=$(python scripts/dominio/remate.py"),),
+        prohibido=(),
+        copia="Ninguna, y no cabe una segunda: la ventana se deriva de"
+              " `src/reels.json` —lo que el render dibujó— y el trato sale de"
+              " `remate.TRATOS`, que es el mismo catálogo que viaja en el pedido"
+              " y el que se aplica en la mezcla.",
+        costo="Todavía ninguno, y es a propósito: la decisión nace con una sola"
+              " fuente. La avería que se evita es la conocida —lo declarado en"
+              " un sitio y aplicado desde otro, que es como el tablero pudo"
+              " salir cuatro veces igual (C-142)—. Aquí el paso de audio le"
+              " pregunta a la misma columna que el diseñador escribe, y sin"
+              " declaración contesta `anull`.",
     ),
     Verdad(
         decision="El nivel de un efecto de sonido",

@@ -24,8 +24,17 @@ Uso:
 """
 import argparse
 import json
+import os
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# **Los dos umbrales viven en el dominio, no aquí.** Quien LEE estos tramos
+# —`dominio.cinta`— necesita saber cuánto silencio lleva pegado cada extremo
+# para poder decir dónde suena la voz de verdad. Escritos en los dos sitios son
+# dos reglas: basta correr esto con otro `--keep` para que el otro mienta.
+from dominio.cinta import MARGEN, PAUSA  # noqa: E402
 
 
 def detect_silences(wav, noise_db, min_dur):
@@ -82,8 +91,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("wav")
     ap.add_argument("--noise", type=float, default=-36.0, help="umbral en dB")
-    ap.add_argument("--keep", type=float, default=0.45, help="pausa que se respeta (s)")
-    ap.add_argument("--pad", type=float, default=0.06, help="margen a cada lado (s)")
+    ap.add_argument("--keep", type=float, default=PAUSA, help="pausa que se respeta (s)")
+    ap.add_argument("--pad", type=float, default=MARGEN, help="margen a cada lado (s)")
     args = ap.parse_args()
 
     total = duration(args.wav)

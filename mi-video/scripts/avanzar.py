@@ -87,6 +87,17 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         actual = ruta[0]
         if not ver:
             anotar(pieza.video_id, actual["id"])
+    orden = {f["nombre"]: k for k, f in enumerate(ruta)}
+    # **Aqui NO se vuelve a redundancia.** Hubo un momento en que esto mandaba
+    # la pieza atras cuando su corte cambiaba, y eso es un bucle: vuelve, se
+    # re-corta, cambia la huella, vuelve otra vez. Jaime lo paro en seco: *«no
+    # me gusta que entren en dinamicas circulares, y menos cuando son por
+    # codigo… la redundancia es editorial y la repeticion es una excepcion; eso
+    # no debe ir en codigo, debe ir en composicion»*.
+    #
+    # Lo que queda del intento es util y vive donde le toca: `dominio.repeticion`
+    # mide tono y volumen de las dos entregas — un instrumento, no una regla— y
+    # quien compone decide con el delante.
     # **Y si la etiqueta miente, se corrige antes de recorrer nada.**
     orden = {f["nombre"]: k for k, f in enumerate(ruta)}
     if orden.get(actual["nombre"], -1) >= orden.get("montado", 10 ** 9):
@@ -416,6 +427,48 @@ def despachar(a) -> None:
         # Aqui es lo contrario de lo que hace falta — hay seis piezas mas
         # esperando su turno, y apagar el reparto por una es dejar de repartir.
         # Se dice una vez, se apunta, y se sigue con las demas.
+        # **Lo contestado entra ANTES de avanzar.**
+        #
+        # Estaba detras del recorrido, o sea detras de una pasada de
+        # renders que puede durar veinte minutos: la respuesta esperaba a
+        # que terminara de renderizar piezas que iban a cambiar por esa
+        # misma respuesta. Seis composiciones se quedaron sin aplicar asi,
+        # y las piezas salieron identicas a la vuelta anterior.
+        #
+        # Una respuesta que llega tarde se aplica igual
+        #
+        # Jaime: *«las etiquetas les asignan el pedido hasta que salen y se
+        # archivan»*. Si la pieza ya paso de ese paso cuando llega la respuesta,
+        # nadie la consume — y la decision existe, esta escrita, y no pasa nada.
+        # Es la forma mas cara de perder trabajo: se pago la llamada y no llego a
+        # la pantalla.
+        #
+        # Paso con el gancho de reel-01: su composicion se escribio mientras la
+        # pieza ya estaba en `montado`, asi que el render salio identico al de
+        # antes y Jaime lo vio: *«no hay diferencia entre este y el que me
+        # mostraste antes»*. Tenia razon, y el fichero llevaba una hora en disco.
+        #
+        # El despachador la devuelve al paso que la espera. Es su trabajo: el
+        # pedido sigue asignado a esa etiqueta hasta que se archiva.
+        # **Y los tickets cuyo problema ya no esta se cierran solos.**
+        # Si no, la lista dice que no se ha hecho nada aunque este hecho — que
+        # es lo que Jaime vio: cuatro de las cinco cosas que habia senalado ya no
+        # sonaban en la pieza y sus tickets seguian abiertos.
+        try:
+            from dominio.ticket import cerrar_los_resueltos
+
+            for n in piezas_de(a):
+                cerrados = cerrar_los_resueltos(f"reel-{int(n):02d}")
+                if cerrados:
+                    print(f"  reel-{int(n):02d}: {cerrados} ticket(s) cerrados"
+                          f" midiendo")
+        except Exception as e:                     # noqa: BLE001
+            registro.aviso("despachador", "no se pudieron cerrar tickets",
+                           detalle=f"{type(e).__name__}: {e}"[:200], eco=False)
+        for paso, slug in _contestadas_tarde():
+            print(f"  respuesta tardia -> {paso}/{slug}: vuelve a su paso")
+            _devuelve(slug, paso)
+
         movidos = _una_vuelta(a)
         # **Lo que espera a un agente se dice, porque es la senal de lanzarlo.**
         # Jaime: *«y lanzas el agente cuando el log sea por falta de agente»*.
@@ -439,6 +492,57 @@ def despachar(a) -> None:
         except KeyboardInterrupt:
             print("\ndespachador apagado")
             return
+
+
+#: Que fase espera la respuesta de cada carpeta de pedidos.
+DE_QUIEN = {"disenar": "disenado", "describir": "descrito", "repaso": "repasado",
+            "redundancia": "sin_redundancia", "revalidar": "revalidado",
+            "revisar": "revisado", "visto": "visto", "fuentes": "respaldado"}
+
+
+def piezas_de(a) -> list:
+    """Las piezas que este despachador atiende."""
+    return list(a.reels or rutas.piezas())
+
+
+def _contestadas_tarde() -> list:
+    """Respuestas escritas para un paso que la pieza ya dejo atras."""
+    import glob
+
+    ruta = camino()
+    orden = {f["nombre"]: k for k, f in enumerate(ruta)}
+    fuera = []
+    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
+                                           "*.respuesta.json"))):
+        paso = os.path.basename(os.path.dirname(f))
+        slug = os.path.basename(f)[:-len(".respuesta.json")]
+        fase = DE_QUIEN.get(paso)
+        if not fase or fase not in orden:
+            continue
+        try:
+            pieza = Pieza(int(slug[-2:]))
+            actual = fase_de(pieza)
+        except Exception:                          # noqa: BLE001
+            continue
+        if actual and orden.get(actual["nombre"], -1) > orden[fase]:
+            fuera.append((paso, slug))
+    return fuera
+
+
+def _devuelve(slug: str, paso: str) -> None:
+    """Manda la pieza a la fase que espera esa respuesta."""
+    fase = DE_QUIEN.get(paso)
+    con = _con()
+    destino = con.execute("select id from fase where nombre = ?",
+                          (fase,)).fetchone()
+    con.close()
+    if destino is None:
+        return
+    pieza = Pieza(int(slug[-2:]))
+    if pieza.video_id is None:
+        return
+    anotar(pieza.video_id, destino["id"],
+           f"llego la respuesta de «{paso}» y la pieza ya habia pasado")
 
 
 def _sin_contestar() -> list:

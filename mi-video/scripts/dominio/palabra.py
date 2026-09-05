@@ -86,6 +86,25 @@ class Palabra:
         return dataclasses.replace(
             self, acaba=round(max(fin_del_habla, self.empieza), 3))
 
+    def desde_el_ataque(self, voz_desde: float, maximo: float) -> "Palabra":
+        """Adelantada a donde la voz arranca. **La otra mitad de `pegada_a`.**
+
+        De las dos sólo estaba escrita una, y por ahí se colaba el corte que se
+        come la palabra: el modelo estira la última palabra sobre el silencio
+        *y* entra tarde en la primera —0,25 s de mediana—, así que entre el
+        arranque medido de la voz y la marca del transcript queda una tierra de
+        nadie que parece silencio y es el ataque de la palabra. Medido en
+        `reel-03`: tres entradas caían justo ahí, y las tres sonaban a -8, -10 y
+        -15 dBFS, o sea a pleno volumen.
+
+        `maximo` acota. Si la palabra entra mucho más tarde que la voz, en medio
+        hay habla sin texto —eso es un hueco, y lo dice `huecos()`— y adelantarla
+        sería inventar de qué palabra es ese sonido.
+        """
+        if not 0 < self.empieza - voz_desde <= maximo:
+            return self
+        return dataclasses.replace(self, empieza=round(voz_desde, 3))
+
     def en_el_hueco(self, desde: float, hasta: float) -> "Palabra":
         """La coloca dentro del hueco que le toca, sin pisar a nadie.
 

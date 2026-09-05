@@ -34,7 +34,8 @@ import { color, layout, tracking } from "../brand/tokens";
  *
  * Los bloques entran **de uno en uno**, no todos a la vez: apilarse delante del
  * espectador es lo que convierte una lista en un argumento.
- */
+  * @clase tablero
+*/
 export type TarjetaProps = {
   /** Nombre del framework del playbook. Va en la cabecera. */
   framework: string;

@@ -14,6 +14,7 @@ import { FPS } from "./reloj.mjs";
 import { ADELANTO, SOLAPE, duracionTablero } from "./lectura.mjs";
 import { placaDe } from "./material.mjs";
 
+
 /**
  * **Una tarjeta y un tablero no pueden empezar en el mismo frame.**
  *
@@ -47,7 +48,7 @@ export const empujaTablero = (cartas) => (at) =>
  * recorta el `<Sequence>` en silencio y el tablero desaparece a media
  * construcción sin que nadie se entere.
  */
-export function armarTableros(bs, { slug, reloj, duracion, empuja }) {
+export function armarTableros(bs, { slug, reloj, duracion, empuja, captions }) {
   const fin = Math.round(duracion * FPS);
   return bs
     .map((b) => {
@@ -66,7 +67,7 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja }) {
       //
       // Si no viene declarado, se ancla al beat como siempre: una pieza vieja no
       // se rompe porque el mecanismo nuevo exista.
-      const at = empuja(_anclaDeclarada(b, reloj) ?? reloj.anclaDe(b.beat));
+      const at = empuja(_anclaDeclarada(b, reloj, captions) ?? reloj.anclaDe(b.beat));
       // **Y no se come la etapa siguiente.**
       //
       // El `Math.max` dejaba que un tablero durase lo que su forma pide aunque
@@ -98,7 +99,36 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja }) {
         // es como lo hace el canon. Los ficheros de `public/sfx/` ya existen,
         // así que el sonido de los movimientos se enciende: niveles bajos, la
         // voz manda.
-        props: { ...b.props, sound: true, placa: placaDe(slug, b.beat),
+        // **Y la que ELIGE el diseñador gana.** Esto ponia `placaDe()`
+        // DESPUES de sus props, asi que una placa declarada no llegaba nunca:
+        // el mismo dia que las catorce placas empezaron a viajar en el pedido
+        // —para que se pudiera elegir— el codigo seguia imponiendo la del
+        // `sirve`. Declarar sin poder aplicar es no declarar.
+        //
+        // `placaDe` se queda de respaldo, que es lo que era: la asignacion
+        // pensada de antemano para ese beat.
+        props: { ...b.props, sound: true,
+                 placa: b.props?.placa ?? placaDe(slug, b.beat),
+                 // **A cuadro completo la placa LLENA el cuadro.**
+                 //
+                 // El recorte geometrico —cuna, columna, esquina— es canon
+                 // cuando la placa compone sobre un fondo de color: *«en el
+                 // canon la fotografia nunca cubre el cuadro entero»*. Pero un
+                 // tablero a `pleno` no tiene fondo de color detras: tiene el
+                 // VIDEO. La diagonal dejaba ver lo que hubiera, y lo que hay
+                 // depende de donde cayera el encuadre — en la sesion de noche,
+                 // las rodillas.
+                 //
+                 // Jaime, viendolo: *«se ve feo ese tablero; el objetivo era
+                 // mantener mi cara en el mismo espacio de mis pies, no abrir
+                 // espacio para ver mi cara; mejor dejar el tablero sin
+                 // video»*.
+                 //
+                 // Se aplica solo a `pleno`, y solo si el diseno no dijo otra
+                 // cosa: los que acompanan siguen recortados, que ahi la placa
+                 // convive con el plano en vez de sustituirlo.
+                 recorte: b.props?.recorte
+                   ?? ((b.props?.cubre ?? "pleno") === "pleno" ? "lleno" : undefined),
                  duracion: dur },
       };
     })
@@ -132,10 +162,21 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja }) {
  * escribió: ése es su orden de lectura. Lo que no es texto —familia, cubre,
  * oro— es cromo y no se rotula.
  */
+// **`figura` es el nombre de un dibujo, no una linea de copy.** Un panel sin
+// `bloques` explicitos deriva sus rotulos de los props string, asi que
+// `figura: "ceda"` acababa rotulando «ceda» en pantalla — el nombre interno de
+// una senal de trafico, en versales, delante del espectador. Es el mismo
+// accidente que el «430» de `duracion` en `TableroDeclarado`, y por la misma
+// puerta: una clave escrita para otro consumidor tratada como si fuera texto.
+//
+// `sfx` y `camara` entran con ella: las tres las escribe quien compone para que
+// las lea el motor, no la pantalla.
 const NO_TEXTO = new Set(["familia", "zona", "cubre", "oro", "sound", "fondo",
-                          "filete", "source", "paso", "entrada"]);
+                          "filete", "source", "paso", "entrada",
+                          "figura", "sfx", "camara",
+                          "recorte", "fuerza", "deriva", "placa"]);
 
-export function armarPaneles(bs, reloj, tableros) {
+export function armarPaneles(bs, reloj, tableros, captions) {
   return bs
     .map((b) => {
       const yaSon = Array.isArray(b.props?.bloques) ? b.props.bloques : null;
@@ -143,6 +184,20 @@ export function armarPaneles(bs, reloj, tableros) {
         .filter(([k, v]) => !NO_TEXTO.has(k) && typeof v === "string" && v.trim())
         .slice(0, 3)
         .map(([, v]) => ({ texto: v }));
+      // **La placa tambien en el panel, no solo a pleno.** `SidePanel` sabe
+      // pintarla desde hace tiempo —la mete detras del bloque al 50% para que
+      // el collage asome sin comerse el texto— y esto no se la pasaba nunca:
+      // una placa declarada en un tablero `panel` se perdia aqui.
+      //
+      // Quien compuso reel-01 lo vio y **se nego a declararla** por eso mismo,
+      // que es lo correcto: declarar sin poder aplicar es la averia de la casa.
+      // Va en UN bloque —el fuerte, o el primero—, no en los tres: tres
+      // fotomontajes apilados es papel pintado, no collage.
+      const placa = b.props?.placa;
+      if (placa && bloques.length) {
+        const i = Math.max(0, bloques.findIndex((x) => x.fuerte));
+        bloques[i] = { ...bloques[i], placa };
+      }
       return { beat: b.beat, bloques };
     })
     .filter((b) => b.bloques.length)
@@ -169,7 +224,7 @@ export function armarPaneles(bs, reloj, tableros) {
       //
       // Se empuja con la misma regla que ya existe, aplicada a los tableros que
       // ya estan colocados en vez de a las tarjetas.
-      const at = empujaTablero(tableros)(_anclaDeclarada(b, reloj) ?? inicio);
+      const at = empujaTablero(tableros)(_anclaDeclarada(b, reloj, captions) ?? inicio);
       return dur
         ? { at, duration: Math.min(dur, tope), bloques: b.bloques }
         : null;
@@ -203,10 +258,38 @@ export function armarPaneles(bs, reloj, tableros) {
  * misma referencia con la que se compuso. Se toma el primero: es cuando se dice
  * lo que el tablero nombra.
  */
-function _anclaDeclarada(b, reloj) {
+function _anclaDeclarada(b, reloj, captions) {
   const a = b?.props?.anclas;
   const s = Array.isArray(a) ? a[0] : a;
   const seg = typeof s === "object" && s !== null ? (s.segundo ?? s.en) : s;
+  // **Y si el ancla es TEXTO, se resuelve contra el corte de hoy.**
+  //
+  // Jaime, al ver que esto era lo unico que no se re-derivaba: *«hay una linea
+  // de produccion, ¿por que no se deriva solo?»*.
+  //
+  // Porque `anclas` era el unico dato del diseno escrito en SEGUNDOS, y los
+  // segundos se mueven. Todo lo demas esta expresado contra algo estable —los
+  // tableros contra su etapa, los subtitulos contra la transcripcion, los
+  // encuadres contra las escenas— y por eso sobrevive a que se corte.
+  //
+  // Es la regla que el propio Jaime fijo para los cortes: *«las anclas tienen la
+  // funcion de establecer los lugares; si el video se edita o se corta, el ancla
+  // cambia»*. `revision.ancla` la cumple desde hace semanas; el diseno no.
+  //
+  // Ahora un `anclas: "por cada 100 dolares"` se busca en los subtitulos y sale
+  // donde esa frase suene HOY. Un numero sigue valiendo, y sigue quedandose
+  // clavado: por eso lo dice la auditoria de `llega.py`.
+  if (typeof seg === "string" && seg.trim() && Number.isNaN(Number(seg))) {
+    const q = seg.trim().toLowerCase();
+    const cue = (captions ?? []).find((c) =>
+      String(c.text ?? "").toLowerCase().includes(q),
+    );
+    if (cue) {
+      const inicio = reloj.anclaDe(b.beat);
+      return cue.at >= inicio ? cue.at : inicio;
+    }
+    return null;
+  }
   const n = Number(seg);
   if (!Number.isFinite(n) || n < 0) return null;
   const at = Math.round(n * FPS);

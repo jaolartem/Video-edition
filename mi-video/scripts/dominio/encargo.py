@@ -164,7 +164,9 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
         if ya:
             d["ya_dicho"] = {k: v for k, v in ya.items()
                              if k not in ("video_slug", "etapa_orden")}
-        d["bordes"] = p.bordes.get(orden) or []
+        # La clave de `bordes_sucios` es texto, siempre: viaja por JSON y ahi
+        # deja de ser numero. Ver `Montaje.bordes_sucios`.
+        d["bordes"] = p.bordes.get(str(orden)) or []
         d["repetido"] = [r for r in p.repetido if r["etapa"] == orden]
         if not rehacer:
             # **Se describe UNA vez.** Jaime, el 1 de septiembre: *«solo

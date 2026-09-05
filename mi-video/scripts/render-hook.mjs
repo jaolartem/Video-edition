@@ -81,7 +81,11 @@ const DECODE = GPU ? ["-hwaccel", "d3d11va"] : [];
 const ENCODE = GPU
   ? ["-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp",
      "-qp_i", "18", "-qp_p", "18"]
-  : ["-c:v", "libx264", "-preset", "medium", "-crf", "20"];
+  // `crf 18`, no 20, y por lo que dice el parrafo de arriba: este fichero es
+  // INTERMEDIO y Remotion lo vuelve a codificar, asi que la perdida se paga
+  // dos veces. El camino de GPU ya iba a `qp 18`; los dos listones tenian que
+  // ser el mismo y no lo eran.
+  : ["-c:v", "libx264", "-preset", "medium", "-crf", "18"];
 
 if (!source || !planPath) {
   console.error("Uso: node scripts/render-hook.mjs --source <mp4> --plan <plan.json> [--out <mp4>]");

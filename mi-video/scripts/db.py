@@ -127,7 +127,25 @@ def migrar():
                  1 if b.get("obligatorio") else 0))
 
         # Apertura y cierre: decisiones de oído sobre la pieza entera.
-        cx.execute("DELETE FROM corte_fijo WHERE video_id = ?", (vid,))
+        #
+        # **Sólo se borra lo que esta migración vuelve a escribir.** Borraba
+        # `corte_fijo` ENTERA y reinsertaba únicamente apertura y cierre desde
+        # `frames.json`, así que se llevaba por delante las declaraciones de
+        # etapa —`papel='etapa'`, las que escribe `fijar.declarar`— y lo hacía
+        # en **cada invocación del motor**: `avanzar.main()` llama a `migrar()`
+        # al arrancar, antes de recorrer nada.
+        #
+        # Medido: 117 declaraciones vivas en el commit 01c82ea (ids 405-630) y
+        # **cero** en el siguiente, con los ids de apertura y cierre saltando de
+        # 1-13 a 893-907 — la firma del DELETE+INSERT repetido. Hoy quedan 119
+        # marcas `fijado` huérfanas en los siete EDL y ni una fila que las
+        # sostenga.
+        #
+        # Ése es el «se corrige un corte, se vuelve a lanzar la línea y el vídeo
+        # sale igual» de dos noches seguidas: la decisión existía y la migración
+        # la borraba antes de que nadie la leyera.
+        cx.execute("DELETE FROM corte_fijo WHERE video_id = ? AND papel IN"
+                   " ('apertura','cierre')", (vid,))
         if f.get("apertura"):
             cx.execute("INSERT INTO corte_fijo (video_id, papel, orden, desde, "
                        "hasta, por_que) VALUES (?,'apertura',0,?,?,?)",
@@ -185,6 +203,46 @@ def migrar():
     return cx
 
 
+def recuperar(slug):
+    """Repone las declaraciones de etapa que la migración borró, **con su id**.
+
+    Vive aquí y no en `fijar.py` porque el destrozo fue de la migración: lo que
+    escribe apertura y cierre en `corte_fijo` es este fichero, y reponer lo que
+    borró de más es suyo. `fijar.huerfanas` dice cuáles faltan; esto las mete.
+
+    **Y se hace por la máquina, no a mano.** La marca `fijado` que `fijar.aplicar`
+    dejó en el EDL lleva el id de la declaración, el beat, la cinta y el porqué:
+    con eso se reconstruye la fila entera. El id se conserva a propósito —si se
+    reinsertara con uno nuevo, las 119 marcas del lote seguirían huérfanas y la
+    puerta seguiría parando.
+
+    Lo que NO se recupera es la posición original: 17 de las 24 declaraciones
+    comparables contra el commit 01c82ea habían derivado hasta **4,17 s** porque
+    los pasos del cosido las movían sin preguntar. Vuelven donde están hoy; que
+    no se vuelvan a mover es trabajo de `Tijera`, no de esto.
+
+    **No es automática.** Correrla dentro de `migrar()` resucitaría también las
+    declaraciones que `fijar.declarar` sustituyó legítimamente —el EDL conserva
+    el recibo viejo hasta que `aplicar` lo reescribe—, así que la pide la puerta
+    por su nombre y la lanza quien la lee.
+    """
+    import datetime
+
+    import fijar
+
+    filas = fijar.huerfanas(slug)
+    cx = abrir()
+    ahora = datetime.datetime.now().isoformat(timespec="seconds")
+    vid = cx.execute("SELECT id FROM video WHERE slug = ?", (slug,)).fetchone()["id"]
+    cx.executemany(
+        "INSERT OR IGNORE INTO corte_fijo (id, video_id, papel, orden, desde,"
+        " hasta, toma, por_que, quien, fecha) VALUES (?,?,'etapa',?,?,?,?,?,?,?)",
+        [(i, vid, b, x, y, tk, pq or "recuperado del recibo del EDL",
+          "recuperar", ahora) for i, b, x, y, tk, pq in filas])
+    cx.commit()
+    return len(filas)
+
+
 def _resumen(cx):
     for t in ("estructura", "etapa_canonica", "mecanismo", "toma", "video",
               "etapa", "unidad", "asignacion", "placa", "placa_etapa",
@@ -200,7 +258,15 @@ if __name__ == "__main__":
     sub.add_parser("migrar")
     sub.add_parser("falta")
     p = sub.add_parser("plan"); p.add_argument("reel", type=int)
+    r = sub.add_parser("recuperar"); r.add_argument("reels", nargs="*", type=int)
     a = ap.parse_args()
+
+    if a.cmd == "recuperar":
+        import rutas
+        for n in (a.reels or rutas.piezas()):
+            s = f"reel-{n:02d}"
+            print(f"{s}: {recuperar(s)} declaracion(es) repuestas desde el recibo")
+        raise SystemExit(0)
 
     if a.cmd == "crear":
         crear(); print(f"esquema creado en {RUTA}")

@@ -72,7 +72,7 @@ import { sql } from "./consulta.mjs";
 import { valida } from "./describir-esquema.mjs";
 import { PROMPT, pedidoDe } from "./describir-pedido.mjs";
 import {
-  dejaPedido, guardaRespuesta, leeRespuesta, porCli, rutaPedido,
+  archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta, porCli, rutaPedido,
 } from "./servicio.mjs";
 
 /** El paso al que pertenecen el pedido y la respuesta, dentro del contrato. */
@@ -177,6 +177,11 @@ for (const [slug, suyas] of porPiezas(filas)) {
   }
 }
 
+// **Y lo aplicado se archiva.** Una respuesta que se queda en la carpeta
+// despues de aplicarse es una peticion abierta que miente: ver `archivaUsado`.
+for (const [slug] of porPiezas(filas)) {
+  if (!esperan.includes(slug)) archivaUsado(PASO, slug);
+}
 console.log(`${ok}/${filas.length} descritas y guardadas`);
 if (esperan.length) {
   console.error(

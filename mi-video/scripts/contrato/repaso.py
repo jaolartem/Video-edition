@@ -65,7 +65,7 @@ CLAVES = (
                " que hace utilizable la objeción: sin él hay que volver a"
                " buscar dónde pasaba."),
     Clave("dijo",
-          dispara=(Aguja("scripts/dominio/ticket.py", "def abrir(pieza, dijo, segundo=None, tipo=\"objecion\"):"),),
+          dispara=(Aguja("scripts/dominio/ticket.py", "def abrir(pieza, dijo, segundo=None, tipo=\"objecion\","),),
           efecto="abre el ticket con el texto tal cual",
           obligatoria=True,
           nota="Sin texto no hay ticket: `abrir` lo salta. Describe el EFECTO"

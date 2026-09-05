@@ -74,18 +74,25 @@ import sys
 
 # **La velocidad del montaje, y vive aqui porque la usan cinco pasos.**
 #
-# 1, no 1,15. Jaime, al ver las duraciones reales: *«ninguno hay que acelerar la
-# verdad, todos estan por debajo de los 120 y en el rango de los 90s»*. A
-# velocidad natural el lote va de 47,6 a 118,5 s, con cuatro de seis entre 72 y
-# 89 — formato corto sin forzar nada.
+# **1,15, y lo decide su oido sobre las piezas montadas.**
 #
-# Y quita de la cadena la resintesis mas grande: `rubberband` no es un filtro,
-# reconstruye la senal. Con la voz limpiada fuera eran **dos resintesis
-# encadenadas**, y ahi es donde empezo a sonar a papilla.
+# Estuvo en 1,0 por una frase suya mirando las duraciones —*«ninguno hay que
+# acelerar la verdad, todos estan por debajo de los 120 y en el rango de los
+# 90s»*— y el argumento tecnico acompanaba: `rubberband` no es un filtro,
+# reconstruye la senal, y sobre una voz ya reconstruida por Adobe son **dos
+# resintesis encadenadas**.
+#
+# Pero `voz-limpia.py` guardaba una copia en 1,15 y era la que mandaba, asi que
+# las siete entregas salieron aceleradas contra lo declarado. Al oirlas: *«me
+# gustaron asi, fue un buen error»*.
+#
+# O sea que la medida se equivocaba y el oido no. Se deja en 1,15 **porque el lo
+# aprobo escuchandolo**, no porque el fallo siga ahi: el fallo era tener el
+# numero en dos sitios, y eso esta arreglado — `voz-limpia` lo importa de aqui.
 #
 # Estaba repetido en seis ficheros, que es como se acaba teniendo dos
 # velocidades distintas en el mismo montaje.
-VELOCIDAD = 1.0
+VELOCIDAD = 1.15
 
 sys.path.insert(0, os.path.dirname(__file__))
 import transcribir  # noqa: E402

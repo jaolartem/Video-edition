@@ -61,10 +61,16 @@ class Aritmetica:
         return Habla.de(cinta, self.tij.m.palabras(cinta))
 
     # ── el mecanismo ────────────────────────────────────────────────────────
-    def recorre(self, propone, resumen: str) -> int:
+    def recorre(self, propone, resumen: str, ajusta: bool = False) -> int:
         """A cada borde se le pregunta, y lo que conteste se mueve.
 
         `propone(borde, i, tijera)` devuelve `(Tramo, qué se hizo)` o `None`.
+
+        Con `ajusta`, el cambio entra también en los trozos declarados **si no
+        cambia lo que dicen** (`Tijera.ajustar`). Se pide paso a paso y no de
+        oficio: cuadrar el corte a palabra entera no cambia la etapa, pero
+        recortarle el aire o tirar un trozo corto sí puede, y ésos se siguen
+        parando delante de una declaración.
         """
         if not self.existe:
             return 0
@@ -82,6 +88,8 @@ class Aritmetica:
             if self.ver:
                 print(f"  {self.slug} e{self.tij.beat(i)}: {t} -> {nuevo}"
                       f"{'  ' + dice if dice else ''}")
+            elif ajusta:
+                self.tij.ajustar(i, nuevo)
             else:
                 self.tij.mover(i, nuevo)
         if not self.ver:
@@ -91,9 +99,17 @@ class Aritmetica:
 
     # ── las garantías ───────────────────────────────────────────────────────
     def palabras_enteras(self) -> int:
-        """Ningún corte cae dentro de una palabra. Ver `Borde.entero`."""
+        """Ningún corte cae dentro de una palabra. Ver `Borde.entero`.
+
+        **Y entra en lo declarado**, porque no cambia lo que la etapa dice: lo
+        comprueba `Tijera.ajustar` con la huella del texto antes de escribir.
+        Sin eso, la queja de Jaime sobre `reel-03` —«frases que no inician en
+        donde deben sino que se comen la palabra»— no tenía arreglo posible: sus
+        tres entradas sucias estaban en trozos marcados `fijado`.
+        """
         return self.recorre(lambda b, i, t: _di(b.entero()),
-                            "corte(s) sacados de dentro de una palabra")
+                            "corte(s) sacados de dentro de una palabra",
+                            ajusta=True)
 
     def ataques(self) -> int:
         """Ningún corte entra pisando la primera palabra. `Borde.con_ataque`.
@@ -102,6 +118,13 @@ class Aritmetica:
         final del tramo de voz anterior —medido en `work/cuts`— ni el del trozo
         anterior del montaje. Medido en el lote: 42 cortes empezaban justo en el
         ataque.
+
+        **Y entra en lo declarado, por lo mismo que `palabras_enteras`**: son 80
+        ms de silencio delante, con el suelo puesto por la onda, así que no puede
+        traerse ni media palabra — y `Tijera.ajustar` lo comprueba con la huella
+        antes de escribir. Sin esto, dos entradas de `reel-03` se quedaban
+        clavadas **en el arranque mismo de la voz**, que es la otra mitad de lo
+        que Jaime señaló: la consonante inicial no llega a oírse.
         """
         from .cinta import Cinta
 
@@ -118,7 +141,7 @@ class Aritmetica:
             return hecho and (hecho[0],
                               f"para que se oiga {hecho[1].texto!r}")
 
-        return self.recorre(propone, "corte(s) respiran el ataque")
+        return self.recorre(propone, "corte(s) respiran el ataque", ajusta=True)
 
     def colas(self, pausas=()) -> int:
         """Ningún trozo entra antes de hablar ni se queda después de callar.

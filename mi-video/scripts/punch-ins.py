@@ -123,9 +123,13 @@ def find_anchor(frames):
     return ax, ay
 
 
-# Encuadres, como fracción de la altura del frame original.
-# El más cerrado es 0.52: por debajo de la mitad se empieza a notar el reescalado
-# al subir a 1080 de ancho.
+# Encuadres, como fraccion de la altura del frame original.
+#
+# **El suelo ya no se escribe aqui: se deriva.** Este comentario decia 0.52
+# y el de `frac_completo` decia 0.46 — dos cifras distintas para la misma
+# regla, las dos a ojo, y ninguna tenia en cuenta que el acercamiento
+# MULTIPLICA. Lo que manda es `frac_nitido()`, con la altura real del
+# material y el zoom de la escena.
 # **La cabeza es SIEMPRE el eje.** Cada encuadre se define solo por cuanto
 # abarca; la altura de la cabeza dentro del cuadro no cambia nunca. Asi el
 # sujeto no se mueve al cortar entre planos: cambia el tamano, no la posicion,
@@ -147,6 +151,12 @@ def find_anchor(frames):
 # 23% de altura; 0.32 los sube a la primera linea de tercios.
 HEAD_POS = 0.32
 
+#: Cuanto baja el menton por debajo de la coronilla, en fraccion del alto del
+#: cuadro. Medido sobre los planos de este corpus: coronilla 0,32 · ojos 0,37 ·
+#: menton 0,54, o sea 0,22 de recorrido. Sirve para saber que franja del cuadro
+#: ocupa la cara, que es contra lo que hay que comprobar la banda de subtitulos.
+ALTO_CARA = 0.22
+
 # Cuanto por debajo de la coronilla caen los ojos, en fraccion de la altura del
 # cuadro. El ancla mide el borde superior del movimiento —la coronilla—, pero el
 # punto que el espectador sigue, y el que tiene que quedarse quieto en un
@@ -158,7 +168,9 @@ OJOS_BAJO_CORONILLA = 0.05
 # distancia de brazo, y el gesto facial —que es donde esta la interpretacion— se
 # pierde. El mas abierto de la serie ya es un plano medio.
 #
-# El mas cerrado es 0.46: por debajo, subir a 1080 de ancho empieza a ablandar.
+# El mas cerrado de la lista es 0.46, pero lo que decide es `frac_nitido()`:
+# con 3840 de alto util el suelo real es 0.50, asi que `primerisimo` se abre
+# solo. La lista dice que se QUIERE; la nitidez dice hasta donde se puede.
 # El plano completo VUELVE a la serie: la composicion original fue intencional
 # —encuadre, lampara, fondo— y merece presentarse. Recortarlo siempre seria
 # tirar una decision que ya estaba tomada en el rodaje.
@@ -209,6 +221,47 @@ ENCUADRES = [
     ("pecho",        0.66),
     ("primerisimo",  0.46),
 ]
+
+
+#: La salida. Un recorte que acaba por debajo de esto se AMPLIA al escalar, y
+#: ampliar es interpolar: `scale` de 875 a 1080 no inventa detalle.
+SALIDA_W, SALIDA_H = 1080, 1920
+
+#: Cuanto se admite ampliar, y **lo fijo Jaime**: *«si hay un plano que pierde
+#: calidad asegurate de que menos o maximo un 10%, todavia es poco notable»*.
+#:
+#: No es holgura de ingeniero: es lo que devuelve la serie de encuadres. Con
+#: tolerancia 1.00 el suelo sale en 0,50 y `primerisimo` (0,46) tenia que
+#: abrirse hasta ahi — quedaba a un 4% de `primer plano`, o sea el mismo plano
+#: con dos nombres. Con 1,10 el suelo baja a 0,455, `primerisimo` se queda como
+#: se diseño, y `primer plano` recupera su acercamiento entero.
+#:
+#: Lo que NO cambia es que se cuente: por encima de esto el paso para.
+TOLERANCIA = 1.10
+
+
+def frac_nitido(src_h, zoom=1.0):
+    """La fraccion mas cerrada que aun cabe dentro de `TOLERANCIA`.
+
+    Jaime: *«componemos en 1080x1920, los videos son en 4K asi que puedes hacer
+    zoom sin perder calidad; **asegurate de no perder calidad**»*. Lo segundo es
+    lo que faltaba: el margen existe y nadie comprobaba que se respetara.
+
+    El recorte es `ch = src_h * frac` de alto y `cw = ch * 9/16` de ancho, y
+    acaba escalado a `SALIDA_W`. Para no pasar de la tolerancia hace falta
+    `cw >= SALIDA_W / TOLERANCIA`:
+
+        src_h * frac * 9/16 >= 1080 / 1,10   ->   frac >= 1920 / (src_h * 1,10)
+
+    Con 3840 de alto util eso da **0,455**. Y el acercamiento MULTIPLICA —el
+    recorte final es `frac * zoom`—, asi que el piso sube con el.
+
+    Medido sobre los planes de las siete piezas antes de esto: **74 de 266
+    recortes acababan por encima de 1080**, el peor a 1,23x — fuera de la
+    tolerancia. El dato estaba escrito en cada escena (`reescalado`) y no lo
+    miraba nadie.
+    """
+    return (SALIDA_W * 16 / 9) / (src_h * max(zoom, 0.01) * TOLERANCIA)
 
 
 def crop_rect(frac, anchor, src_w, src_h):
@@ -372,6 +425,7 @@ if __name__ == "__main__":
         global_ancla, dxg, dyg = propia
 
     idx = 0
+    blandos = []
     for i, e in enumerate(escenas):
         if e.get("hereda_encuadre") and i > 0:
             prev = escenas[i - 1]
@@ -389,10 +443,59 @@ if __name__ == "__main__":
         if args.anchor_x is not None: ax = args.anchor_x
         if args.anchor_y is not None: ay = args.anchor_y
 
-        nombre, frac = ENCUADRES[idx % len(ENCUADRES)]
+        # **El encuadre se pide; si nadie lo pide, se reparte.**
+        #
+        # Los cinco llevaban aqui desde el principio y se asignaban con la
+        # rueda de abajo: cinco planos construidos y ninguno elegible. Un
+        # primer plano caia donde tocara, no donde la etapa lo pedia — y quien
+        # componia no tenia forma de decirlo, porque no habia por donde.
+        #
+        # Lo declara `escena_desc.camara` y lo trae el plan (`plan-reel.mjs`).
+        # Sin declarar, `pedido` es `None` y la rueda sigue igual que siempre:
+        # una pieza sin componer sale exactamente como salia.
+        pedido = e.get("encuadre")
+        elegido = next((p for p in ENCUADRES if p[0] == pedido), None)
+        if elegido:
+            nombre, frac = elegido
+        else:
+            nombre, frac = ENCUADRES[idx % len(ENCUADRES)]
+            idx += 1
         if nombre == "completo":
             frac = frac_completo(ay)
-        idx += 1
+
+        # **Y no puede acabar por debajo de 1080. Nunca.**
+        #
+        # Mismo trato que el sujeto que se sale, y por el mismo motivo: antes
+        # que un plano cerrado y blando, uno algo mas abierto y nitido.
+        #
+        # **Cede el acercamiento antes que el plano, y ese orden importa.** El
+        # primer intento bajaba solo el encuadre y con eso `primer plano` (0.52)
+        # y `primerisimo` (0.46) acababan los dos en 0.57: dos de los cinco
+        # planos convertidos en el mismo, o sea la variedad que da la serie
+        # tirada para salvar un acercamiento que nadie pidio. El tamaño del
+        # plano es de que HABLA la etapa; el empuje es textura.
+        #
+        # Y en un plano muy cerrado no queda sitio para acercarse mas — eso no
+        # es una regla, es la resolucion del material. Se dice en vez de
+        # simularlo.
+        piso = frac_nitido(sh)
+        if frac < piso:
+            blandos.append(f"  {i} {nombre}: el plano solo ya dejaria"
+                           f" {(SALIDA_W * 16 / 9) / (sh * frac):.2f}x, por"
+                           f" encima de {TOLERANCIA:.2f}; se abre de"
+                           f" {frac:.2f} a {piso:.2f}")
+            frac = min(1.0, piso)
+        z = e.get("zoom")
+        if z:
+            # Lo mas que se puede cerrar sin pasarse de la tolerancia, con este
+            # encuadre ya fijado.
+            tope = min(1.0, frac_nitido(sh) / frac)
+            if z["hasta"] < tope:
+                blandos.append(f"  {i} {nombre}: el acercamiento a"
+                               f" {z['hasta']:.2f} dejaria"
+                               f" {(SALIDA_W * 16 / 9) / (sh * frac * z['hasta']):.2f}x;"
+                               f" se queda en {tope:.2f} (el plano no se toca)")
+                z["hasta"] = tope
 
         # **El sujeto no puede salirse. Nunca.**
         #
@@ -416,6 +519,32 @@ if __name__ == "__main__":
         e["filtro"] = f"crop={cw}:{ch}:{x}:{y},scale=1080:1920:flags=lanczos"
         e["reescalado"] = round(escala, 2)
         e["recorrido"] = {"x": round(dx, 3), "y": round(dy, 3)}
+
+        # **Y DONDE QUEDA LA CARA en el cuadro final, que es el dato que nadie
+        # tenia.**
+        #
+        # Jaime, viendo su cara debajo de los subtitulos: *«¿y esas guardas de
+        # que protegen, si lo que hacen es poner mi cara debajo de los
+        # titulos?»*. Tenia razon: las tres guardas de aqui —nitidez, sujeto
+        # dentro del cuadro, coronilla al 32%— miran el RECORTE aislado, y
+        # ninguna ve lo que se dibuja encima despues.
+        #
+        # El ancla se calculaba, se usaba para recortar y se tiraba. Asi que
+        # ningun paso posterior podia saber donde cae la cara, y la banda de
+        # subtitulos —fija en el 55-65% del cuadro— aterrizaba donde cayera.
+        #
+        # `HEAD_POS` es lo que se PIDE; esto es lo que SALE. No coinciden cuando
+        # el recorte topa con un borde y `crop_rect` lo pega ahi: entonces la
+        # coronilla baja y la cara con ella, sin que nadie lo cuente.
+        _cor = (ay * sh - y) / ch if ch else HEAD_POS
+        e["cara"] = {
+            # Fracciones del cuadro final (0 arriba, 1 abajo).
+            "coronilla": round(max(0.0, min(1.0, _cor)), 3),
+            "menton": round(max(0.0, min(1.0, _cor + ALTO_CARA)), 3),
+            "pedido": HEAD_POS,
+            # Si esto es `True`, el encuadre no pudo colocarla donde queria.
+            "pegado": y == 0 or y + ch >= sh - 1,
+        }
 
         # Destino del acercamiento, si la escena lo pide.
         #
@@ -457,6 +586,13 @@ if __name__ == "__main__":
             fx = max(0, min(fx, sw - fcw))
             fy = max(0, min(fy, sh - fch))
             e["zoom"]["crop_final"] = {"x": fx, "y": fy, "w": fcw, "h": fch}
+            # **El reescalado es el del punto MAS cerrado, no el del principio.**
+            #
+            # Se anotaba con el recorte inicial, asi que una escena que empieza
+            # holgada y se acerca quedaba registrada como nitida y acababa
+            # ampliando. El aviso miraba el numero bueno del sitio equivocado.
+            escala = max(escala, SALIDA_W / fcw)
+            e["reescalado"] = round(escala, 2)
             deriva_u = abs((px - fx) / fcw - u)
             deriva_v = abs((py - fy) / fch - v)
             print(f"     zoom -> {fcw}x{fch} en ({fx},{fy}) · "
@@ -470,6 +606,32 @@ if __name__ == "__main__":
         print(f"  {i} {nombre:12} {cw}x{ch} en ({x},{y}) · esc {escala:.2f}x"
               f" · mov {dx*sw:.0f}x{dy*sh:.0f}px{nota}")
 
+    # **La nitidez se cuenta, no se supone.**
+    #
+    # `reescalado` se escribia en cada escena desde el principio y no lo miraba
+    # nadie: 74 de 266 recortes acababan ampliando, el peor a 1,23x. Un dato
+    # medido que nadie lee es un dato que no existe.
+    if blandos:
+        print(f"\nABIERTOS PARA NO AMPLIAR — {len(blandos)}:")
+        for b in blandos:
+            print(b)
+        print(f"  (el recorte pedido se pasaba del {(TOLERANCIA - 1) * 100:.0f}%"
+              f" de ampliacion admitido)")
+    peor = max((e.get("reescalado", 0) for e in escenas), default=0)
     json.dump(plan, open(args.plan, "w", encoding="utf-8"),
               indent=2, ensure_ascii=False)
     print(f"\nplan actualizado → {args.plan}")
+    if peor > TOLERANCIA + 0.001:
+        # **Y para.** La vara la puso Jaime: *«si hay un plano que pierde
+        # calidad asegurate de que menos o maximo un 10%, todavia es poco
+        # notable»*. Con el piso puesto esto no deberia pasar nunca, y por eso
+        # mismo es una guarda: si pasa es que alguien movio la aritmetica, y un
+        # aviso impreso entre trescientas lineas de plan no lo lee nadie.
+        raise SystemExit(
+            f"\nPARA: la peor escena AMPLIA {peor:.2f}x, por encima del"
+            f" {(TOLERANCIA - 1) * 100:.0f}% admitido — y el piso de"
+            f" `frac_nitido` deberia haberlo evitado.")
+    estirados = sum(1 for e in escenas if e.get("reescalado", 0) > 1.001)
+    print(f"nitidez: el peor reescalado es {peor:.2f}x (tope {TOLERANCIA:.2f}x)"
+          + (f" · {estirados} de {len(escenas)} escena(s) dentro del margen"
+             if estirados else " · ninguna escena amplia"))

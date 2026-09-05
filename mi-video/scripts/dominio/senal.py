@@ -36,6 +36,30 @@ MEDIDA = 0.020
 #: salir nunca.
 GANA = 3.0
 PUERTA = 12.0
+#: **Cuando el corte cae con la voz sonando.** No es lo mismo que «se puede
+#: mejorar»: es que la palabra se parte y se oye. Medido sobre las siete piezas
+#: —30 de 132 salidas—, los bordes que Jaime señaló como *«el corte se come el
+#: final de las palabras»* estaban entre -7 y -14 dB; los limpios, por debajo
+#: de -40. El suelo va en medio y con margen.
+SUENA = -35.0
+#: Cuánto se puede alargar un corte para que la palabra termine. Medio segundo
+#: es una sílaba larga con su cola; más que eso ya no es cerrar la palabra, es
+#: traerse la siguiente. **1,2 s y no 0,5**: medido, los bordes que quedaban
+#: sucios necesitaban entre 700 y 1.255 ms, y si el audio sigue fuerte todo ese
+#: rato es que la frase no ha terminado — que es exactamente lo que Jaime pide
+#: Cuanto se puede alargar una salida para cerrar la palabra. **0,35 s: una
+#: silaba larga, no una frase.**
+#:
+#: Estuvo en 1,2 s porque los bordes que quedaban sucios pedian entre 700 y
+#: 1.255 ms — pero eso no era una palabra sin cerrar: era un corte a mitad de
+#: habla continua, que es lo que un montaje hace. Con 1,2 s este paso **deshizo
+#: un corte editorial**: Jaime quito la primera de las dos veces que dice «eso no
+#: es mala suerte» en el gancho de reel-01, y la pasada siguiente la resucito
+#: entera alargando el borde hasta el silencio de despues.
+#:
+#: Cerrar una palabra son decimas. Todo lo que pase de ahi es material, y el
+#: material lo decide el corte, no un paso de limpieza.
+ALARGA = 0.35
 
 
 class Senal:
@@ -118,6 +142,44 @@ class Senal:
         if mejor_e <= 0 or aqui / max(mejor_e, 1e-9) < 10 ** (GANA / 20):
             return t, 0.0
         return round(mejor, 3), 20 * math.log10(aqui / max(mejor_e, 1e-9))
+
+    def suena(self, t: float) -> float:
+        """dBFS justo DESPUES de `t`. Por encima de `SUENA`, la voz sigue.
+
+        **Y se mira despues, no antes.** Medirlo antes contaba como sucio todo
+        corte que cierra una frase —que suene justo antes es lo normal, es la
+        ultima silaba— y daba seis falsos positivos que pedian «+5 ms». Lo que
+        parte una palabra no es que suene antes: es que **siga sonando
+        despues**.
+        """
+        e = self.energia(t + 0.04)
+        return 20 * math.log10(max(e, 1e-9))
+
+    def donde_calla(self, t: float, maximo: float = ALARGA):
+        """Hasta dónde estirar el corte para que la palabra acabe. `None` si ya.
+
+        **Es la otra mitad de `mas_callado`, y hacía falta.** Aquélla busca el
+        mínimo de una ventana de ±120 ms y se conforma con él: si dentro de esa
+        ventana no hay silencio —porque la sílaba dura más— devuelve el punto
+        menos malo y da el corte por bueno. Medido: 30 de 132 salidas quedaban
+        así, cortando a -10 dB, o sea a pleno volumen.
+
+        Aquí no se busca el mínimo: se avanza hasta que **deja de sonar**, que
+        es lo que pidió Jaime —*«hay que dejar terminar la frase y ahí sí
+        cortar, no por whisper, por sonido»*—. Y se avanza poco: `ALARGA` es
+        medio segundo, lo que cierra una sílaba y no lo que trae la siguiente.
+        """
+        x, sr = self.muestras
+        if x is None or self.suena(t) <= SUENA:
+            return None
+        fin, u = len(x) / sr, t
+        while u <= t + maximo:
+            if u >= fin:
+                return None
+            if 20 * math.log10(max(self.energia(u), 1e-9)) <= SUENA:
+                return round(u + GRANO, 3)
+            u += GRANO
+        return None
 
     def __str__(self) -> str:
         return f"señal de {self.nombre}"

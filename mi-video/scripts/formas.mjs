@@ -43,6 +43,10 @@
  *     node scripts/formas.mjs        # el inventario: qué está construido y qué no
  */
 
+import fs from "node:fs";
+
+const DIR_C = "src/components";
+
 /** Los topes de `src/brand/copy.ts`. Se repiten aquí porque este módulo es
  *  node plano y no puede importar el `.ts`; si divergen, `--comprobar` lo dice. */
 export const TOPE = { title: 42, statement: 52, outcome: 38, label: 26, legal: 190 };
@@ -65,7 +69,49 @@ const CROMO = {
 };
 
 /** Las formas que `src/Ad.tsx` sabe dibujar hoy. Lo demás es encargo de código. */
-const CONSTRUIDAS = new Set(["causal", "twopaths", "comparacion", "acumulacion"]);
+/**
+ * Las que tienen componente propio, **leidas de quien las despacha**.
+ *
+ * Esto era una lista escrita a mano, y habia otra igual en `reels/base.mjs`
+ * (`DIBUJA`) y una tercera implicita en el ternario de `Ad.tsx`. Tres copias de
+ * la misma verdad: al construir `BeliefSwap` y `Compuerta` se actualizaron dos
+ * y la tercera siguio diciendo «sale con TableroDeclarado» de dos formas que ya
+ * se dibujaban. Jaime: *«si trabajamos con POO lo obvio es no escribir o dejar
+ * nada a mano»*.
+ *
+ * Ahora se saca del propio `Ad.tsx`: si esta en el despacho, esta construida.
+ * Anadir un componente lo pone en la lista sin tocar la lista.
+ */
+/**
+ * El rol de copy de cada prop, **leido de los `assertShort` que lo aseguran**.
+ *
+ * Un rol escrito aqui y otro en el componente son dos tallas para el mismo
+ * texto, y la que decide es siempre la del componente porque es la que aborta
+ * el render. Leyendolo, la lista no puede desviarse de lo que se dibuja.
+ */
+const ROLES = (() => {
+  const fuera = {};
+  const dirs = [DIR_C, ...fs.readdirSync(DIR_C, { withFileTypes: true })
+    .filter((d) => d.isDirectory()).map((d) => `${DIR_C}/${d.name}`)];
+  for (const d of dirs) {
+    for (const f of fs.readdirSync(d).filter((x) => x.endsWith(".tsx"))) {
+      const src = fs.readFileSync(`${d}/${f}`, "utf8");
+      for (const m of src.matchAll(
+        /assertShort\([^,]+,\s*"([a-z]+)",\s*"([A-Za-z]+)\.([a-zA-Z_]+)"/g,
+      )) {
+        const [, rol, forma, prop] = m;
+        const clave = forma.charAt(0).toLowerCase() + forma.slice(1);
+        for (const k of [forma, clave]) (fuera[k] ??= {})[prop] = rol;
+      }
+    }
+  }
+  return fuera;
+})();
+
+export const CONSTRUIDAS = new Set(
+  [...fs.readFileSync("src/Ad.tsx", "utf8")
+      .matchAll(/cue\.kind === "([^"]+)"/g)].map((m) => m[1]),
+);
 
 export class Forma {
   /**
@@ -85,9 +131,21 @@ export class Forma {
     return CONSTRUIDAS.has(this.nombre);
   }
 
-  /** Todos los props válidos: los suyos más el cromo compartido. */
+  /**
+   * Todos los props validos: los suyos, el cromo compartido, y **el rol de copy
+   * que asegura el propio componente**, que manda sobre lo escrito aqui.
+   *
+   * `Acumulacion.concepto` estaba declarado `statement` (52) y el componente lo
+   * asegura como `label` (26): el disenador validaba contra esta lista, pasaba,
+   * y el render moria en el frame 581 con 37 caracteres. Dos declaraciones del
+   * mismo rol y la que no dibuja ganando la validacion.
+   *
+   * Jaime: *«la idea es que no haya redundancias ni en el modelo ni en el
+   * codigo»*. La que dibuja es la fuente; esta lista dice QUE props hay, no de
+   * que talla son.
+   */
   get admite() {
-    return { ...CROMO, ...this.propios };
+    return { ...CROMO, ...this.propios, ...(ROLES[this.nombre] ?? {}) };
   }
 
   /**
@@ -118,7 +176,12 @@ export class Forma {
     // Los props no declarados se devuelven aparte, para poder ampliar la clase
     // cuando se repitan — que es como una forma crece sin rediseñarse.
     this.nuevos = Object.keys(p).filter((k) => !(k in this.admite));
-    for (const [k, rol] of Object.entries(this.propios)) {
+    // **`admite`, no `propios`.** El tope se comprobaba contra la lista escrita
+    // a mano y no contra el rol que asegura el componente, asi que un texto
+    // podia pasar la revision y tumbar el render: `acumulacion.concepto` estaba
+    // aqui como `statement` (52), el componente lo asegura como `label` (26), y
+    // 37 caracteres mataron el lote en el frame 581 con seis piezas sin salir.
+    for (const [k, rol] of Object.entries(this.admite)) {
       if (!(rol in TOPE)) continue;
       const v = p[k];
       for (const t of Array.isArray(v) ? v : [v]) {
@@ -155,6 +218,18 @@ export const FORMAS = [
   // formas tienen componente propio. Todo lo demas lo dibuja
   // `TableroDeclarado` con lo que el diseñador escribio, sin pedirle permiso a
   // ninguna lista.
+  // **Las dos que se construyeron con lo que ya habia.** Jaime: *«que utilicen
+  // los fondos que ya existen, para generar texto encima de ellos, como lo
+  // muestran los ejemplos de carruseles; no es reinventar la rueda, es seguir
+  // la identidad grafica»*. Ninguna dibuja geometria propia: componen `Cinta`,
+  // `Marco` y `Fondo` sobre una placa de `public/fondos/`.
+  new Forma("BeliefSwap", "la creencia se tacha y la verdad entra en oro",
+            { creencia: "statement", verdad: "statement", condicion: "legal" },
+            ["creencia", "verdad"]),
+  new Forma("Compuerta", "lo que entra, lo que atraviesa y lo que sale distinto",
+            { entra: "outcome", compuerta: "label", sale: "outcome",
+              condicion: "legal" },
+            ["entra", "compuerta", "sale"]),
   new Forma("comparacion", "dos cantidades enfrentadas sobre la misma reticula",
             { premisa: "title", izquierda: "statement", derecha: "statement",
               remate: "outcome", condicion: "legal" },

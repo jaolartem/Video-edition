@@ -48,7 +48,8 @@ export type { CtaCardProps } from "./ctaCard/tipos";
  * reparto sobre la duración en [`ctaCard/horario`](./ctaCard/horario.ts) y la
  * columna en [`ctaCard/Cuenta`](./ctaCard/Cuenta.tsx) — que además vivía
  * declarada dentro del cuerpo de este componente.
- */
+  * @clase tablero
+*/
 export const CtaCard: React.FC<CtaCardProps> = ({
   promesa,
   fecha,
@@ -61,7 +62,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
   tone = "base",
   accent,
   duracion,
-  placa,
+  placa, recorte = "cuna",
 }) => {
   const entra = useEntrada();
   const base = modes[mode];
@@ -78,7 +79,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: t.ground }}>
       {placa ? (
-        <Fondo placa={placa} recorte="cuna" fuerza={1} deriva={h.total} />
+        <Fondo placa={placa} recorte={recorte} fuerza={1} deriva={h.total} />
       ) : null}
 
       {/**
@@ -177,9 +178,21 @@ export const CtaCard: React.FC<CtaCardProps> = ({
               />
             </>
           ) : precio ? (
+            /**
+             * **La cifra arriba y la condicion debajo**, igual que en la rama
+             * de `cuenta`. Aqui se pasaba `precio` entero al hueco de la cifra
+             * —«$20 hasta el 4 sep · luego $30 y $40»— y el ajuste automatico
+             * lo encogia hasta dejarlo ilegible: en reel-03 el $20 salia mas
+             * pequeno que su propia etiqueta.
+             *
+             * Jaime: *«en el tercero si queda bien poner lo de los 20 dolares,
+             * y en pantalla el resto»*. El precio es la cifra; el calendario
+             * de la escalera es su pie.
+             */
             <Cuenta
               etiqueta="Precio"
-              cifra={precio}
+              cifra={precio.split(" ")[0]}
+              pie={precio.split(" ").slice(1).join(" ")}
               oro
               progreso={entra(h.cuestaAt)}
             />

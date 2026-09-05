@@ -68,15 +68,145 @@ BASE = "ads/decisiones.db"
 #:   cosido; lo que llega aqui es tropiezo dentro de la toma o **figura**, y
 #:   distinguirlos es entender, no medir.
 NO_PARAN = ("habla de otro texto", "sin contestar: ['describir']",
-            "dos veces seguidas")
+            "dos veces seguidas",
+            # El trabajo grafico: ticket en la entrega, obligatorio en la final.
+            # `separa()` lo deja pasar sólo mientras la pieza no esté aprobada.
+            "obligatorio en la final",
+            # **La voz que sigue despues del corte: anota, no para.**
+            #
+            # Con la vara absoluta (C-173) quedaron 6 bordes de 129 que el
+            # cosido NO puede cerrar: son micro-saltos dentro de la misma cinta
+            # —se quitan de 0,45 a 2,24 s y se sigue— asi que alargar hasta el
+            # silencio significaria deshacer un corte que alguien decidio.
+            #
+            # Bloquear las siete piezas por eso es el callejon de siempre: una
+            # puerta que exige lo que el arreglo no puede dar. Y va contra la
+            # regla de Jaime — *«el bloqueo en el paso final, no aca»*.
+            "dejan voz sonando despues")
 
 
-def separa(mal):
-    """Parte los motivos en los que paran la pieza y los que solo se anotan."""
+def _queda_trabajo(paso: str, slug: str) -> bool:
+    """¿El pedido abierto de ese paso tiene trabajo detras, o es huerfano?
+
+    Un pedido se cuenta por el fichero que hay en disco, y eso basta mientras el
+    paso siga teniendo algo que preguntar. Cuando ya no lo tiene —porque su
+    trabajo se aplico por otra via, o porque otro paso lo cubrio— el fichero se
+    queda ahi **bloqueando el render de una pregunta que nadie necesita**, y el
+    paso que lo retiraria esta ANTES en el camino: la pieza ya paso por el, asi
+    que no vuelve a correr. Sin salida.
+
+    Paso hoy con `disenar`: las siete piezas con sus 43 tableros compuestos y
+    paradas por siete pedidos vacios, despues de que Jaime llevara 45 minutos
+    esperando. Lo que hay que preguntar es si queda trabajo, no si hay fichero.
+    """
+    if paso != "disenar":
+        return True
+    try:
+        from servicios.disenar import encargos
+
+        return bool(encargos(slug))
+    except Exception:                              # noqa: BLE001
+        return True
+
+
+def separa(mal, final: bool = False, slug: str = ""):
+    """Parte los motivos en los que paran la pieza y los que solo se anotan.
+
+    `final=True` es el render de despues de la aprobacion: ahi lo que era ticket
+    pasa a bloquear, porque ya no hay otra vuelta donde arreglarlo.
+
+    **Y antes de parar se le pregunta a Jaime — a lo que ya dijo.** Regla suya,
+    despues de contestar tres veces lo mismo: *«cada pasada estoy resolviendo los
+    mismos problemas porque no se estan guardando mis decisiones; no quiero estar
+    decidiendo 5 veces lo mismo y menos 50 asuntos similares. Sistematiza mi
+    respuesta a las dudas y que las consulten antes de parar»*.
+
+    Se guardaban: `revision` tiene sus palabras y `instruccion` sus reglas, y
+    `servicio.pedir()` ya se las lleva a los pedidos de IA. Lo que faltaba es
+    esta mitad — **quien para la linea no preguntaba**. Medido hoy: el montaje se
+    detuvo con «reel-03 e6: sin material y sin tablero» teniendo en la misma base
+    la nota #661 con su decision y la #662 confirmando que el corpus no tiene
+    otra toma.
+
+    Un motivo contestado **no se calla**: pasa a aviso diciendo que decision lo
+    contesta. Silenciarlo sin decir por que seria aflojar la guarda, no
+    aprenderla.
+    """
+    from dominio import contestado as _c
+
     paran, avisan = [], []
     for m in mal:
-        (avisan if any(x in m for x in NO_PARAN) else paran).append(m)
+        blando = any(x in m for x in NO_PARAN)
+        if blando and final and "obligatorio en la final" in m:
+            blando = False
+        if not blando and slug:
+            ya = _c.contestado(m, slug)
+            if ya:
+                avisan.append(f"{m}  — YA DECIDIDO ({ya[0]}): «{ya[1]}»")
+                continue
+        (avisan if blando else paran).append(m)
     return paran, avisan
+
+
+def _fecha_ajena(slug, edl):
+    """La pieza no puede nombrar una fecha que no sea la del evento.
+
+    Jaime: *«la unica fecha es el 21»*. reel-07 anunciaba dos —«este 31 de
+    agosto desarrollamos una masterclass» en un tramo y «el 21 de septiembre»
+    en el cierre—, porque el corpus mezcla grabaciones de convocatorias
+    distintas y una toma vieja suena igual de bien que una nueva.
+
+    **Es cumplimiento, no montaje**, y por eso para: una pieza que anuncia dos
+    fechas manda al espectador al dia equivocado, y eso no se arregla despues.
+    La fecha buena es la que declara el CTA — no se escribe aqui.
+    """
+    import re
+
+    import transcribir as _tr
+
+    # La fecha buena es la que el render DIBUJA, o sea la del spec. No se
+    # escribe aqui: una segunda copia de la fecha es la forma exacta de que un
+    # dia digan cosas distintas.
+    buena = ''
+    try:
+        with open('src/reels.json', encoding='utf-8') as f:
+            for pieza in json.load(f):
+                if pieza.get('id') == f"Reel-R{int(slug[-2:])}":
+                    buena = ((pieza.get('cta') or {}).get('fecha') or '').lower()
+                    break
+    except (OSError, ValueError):
+        buena = ''
+    if not buena:
+        return []
+    mb = re.search(r'(\d{1,2})\s+de\s+(\w+)', buena)
+    buena_norm = f'{int(mb.group(1))} de {mb.group(2).lower()}' if mb else buena
+    MES = ('enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre'
+           '|octubre|noviembre|diciembre')
+    patron = re.compile(r'(\d{1,2})\s+de\s+(' + MES + r')', re.I)
+    cache, ajenas = {}, []
+    for (a, b), det in zip(edl['segmentos'], edl['detalle']):
+        cinta = det.get('toma')
+        if not cinta:
+            continue
+        if cinta not in cache:
+            try:
+                cache[cinta] = _tr.exigir(cinta)['segmentos']
+            except SystemExit:
+                cache[cinta] = []
+        dicho = ' '.join(w['text'] for w in cache[cinta]
+                         if _tr.suena(w, a, b))
+        for m in patron.finditer(dicho):
+            # **Cadena completa, no `in`.** «1 de septiembre» esta CONTENIDO en
+            # «21 de septiembre», asi que con `not in` una fecha equivocada
+            # pasaba la puerta por ser subcadena de la buena.
+            dia, mes = m.group(1), m.group(2).lower()
+            if f'{int(dia)} de {mes}' != buena_norm:
+                ajenas.append(m.group(0))
+    if ajenas:
+        return [f"{slug}: nombra una fecha que no es la del evento"
+                f" — «{'», «'.join(sorted(set(ajenas)))}» frente a «{buena}»."
+                f" Una pieza con dos fechas manda al dia equivocado."]
+    return []
 
 
 def revisar(slug):
@@ -86,6 +216,7 @@ def revisar(slug):
         return [f"{slug}: no hay EDL"]
     edl = json.load(open(ruta, encoding="utf-8"))
     mal = []
+    mal += _fecha_ajena(slug, edl)
     con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row
 
@@ -129,6 +260,82 @@ def revisar(slug):
             mal.append(
                 f"{slug}: la descripción de las etapas {viejas} habla de otro"
                 f" texto — mira ESAS contra el corte de hoy, no la pieza entera.")
+
+    # 1 · **Los $180.000 son FACTURACION, y no se llaman de otra manera.**
+    #
+    # Jaime lo ha corregido tantas veces que dejo de contarlas: *«no es utilidad,
+    # y esto lo he corregido N veces tambien; dice facturacion porque es la
+    # comparacion de dos personas en un mismo umbral maximo, una con estructura y
+    # otra sin estructura»*.
+    #
+    # Y seguia saliendo EN PANTALLA —«MISMA VENTA · $180,000 DE UTILIDAD»— aunque
+    # la tabla `dato` ya estuviera corregida, porque el rotulo vive en el prop del
+    # tablero y son dos sitios distintos. Se corrige un sitio, se ve el otro, y la
+    # correccion parece no haberse hecho.
+    #
+    # Lo que esto impide no es un error de estilo: llamar utilidad a la
+    # facturacion **cambia lo que el espectador entiende**, que es la unica clase
+    # de cosa que el proyecto no deja pasar.
+    try:
+        import json as _js
+
+        _cx = basedatos.abrir()
+        for _o, _tb in _cx.execute(
+                "select etapa_orden, tablero from escena_desc"
+                " where video_slug = ? and tablero is not null and tablero <> ''",
+                (slug,)):
+            _txt = _js.dumps(_js.loads(_tb), ensure_ascii=False).lower()
+            if "180" in _txt and "utilidad" in _txt:
+                mal.append(
+                    f"{slug} e{_o}: el tablero llama «utilidad» a los $180.000, y"
+                    f" son FACTURACION — es la comparacion de dos personas en el"
+                    f" mismo umbral, una con estructura y otra sin ella")
+    except Exception:                              # noqa: BLE001
+        pass
+
+    # 1a · **No se renderiza sin el trabajo grafico, y sin otro compitiendo.**
+    #
+    # Jaime, viendo que la pieza salia igual que antes: *«tienes que renderizar
+    # con el trabajo grafico, no se puede volver a saltar eso… debe haber una
+    # correccion, o un seguro: que si ya lo tiene se asegure de que no hay otro
+    # diseno compitiendo, y si no lo tiene que llame el trabajo y que lo
+    # integre»*.
+    #
+    # Faltaban las dos mitades. reel-01 renderizo con **4 de 8 etapas
+    # compuestas y el gancho sin poner**, y ademas con su composicion del gancho
+    # escrita y sin aplicar: la respuesta llevaba una hora en disco. Ninguna de
+    # las dos cosas la miraba nadie, asi que el render salio identico al de la
+    # manana y parecia que no se habia hecho nada.
+    try:
+        from servicios.disenar import encargos
+
+        faltan_tableros = [f["etapa_orden"] for f in encargos(slug)]
+        if faltan_tableros:
+            # **En la entrega de aprobacion no para: levanta ticket.** Jaime:
+            # *«no me importa que en el paso intermedio, en el reel de
+            # aprobacion, no esten — ojala si, pero si no, entonces se abre el
+            # ticket; de donde si o si tienen que salir con eso es de la
+            # final»*.
+            #
+            # Y tiene razon en lo que separa: un tablero que falta no impide
+            # juzgar si el mensaje llega, que es para lo que sirve la entrega.
+            # En la final si, porque ahi ya no hay otra vuelta.
+            mal.append(
+                f"{slug}: las etapas {faltan_tableros} llevan tablero y nadie lo"
+                f" ha compuesto — obligatorio en la final, ticket en la entrega")
+    except Exception as e:                         # noqa: BLE001
+        mal.append(f"{slug}: no se pudo comprobar el trabajo grafico:"
+                   f" {type(e).__name__}")
+    # Y el otro lado: una respuesta de diseno escrita y sin aplicar es **otro
+    # diseno compitiendo** con el que esta puesto. Renderizar asi elige uno de
+    # los dos por accidente.
+    _sin_aplicar = os.path.join("work", "servicio", "disenar",
+                                f"{slug}.respuesta.json")
+    if os.path.exists(_sin_aplicar):
+        mal.append(
+            f"{slug}: hay una composicion escrita y sin aplicar"
+            f" ({_sin_aplicar}) — obligatorio en la final: si no, el render sale"
+            f" con el diseno viejo y otro compitiendo")
 
     # 1b · **Una etapa no puede sonar dos veces.**
     #
@@ -228,8 +435,23 @@ def revisar(slug):
     # Un paso de IA con el pedido abierto significa que la pieza se monto sin esa
     # decision — sin la lectura de redundancia, o sin la descripcion de escena. No
     # es un aviso: es que falta un paso del camino.
+    # **Y solo cuenta lo que va ANTES del render.**
+    #
+    # Esto contaba cualquier pedido abierto, incluidos los de pasos que vienen
+    # DESPUES de montar. `visto` es la revision de la pieza ya renderizada —no se
+    # puede contestar sin verla— y su pedido abierto estaba impidiendo el render:
+    # la puerta pedia una decision que solo existe despues de pasar la puerta.
+    #
+    # Tuvo a Jaime dos veces sin poder ver los reels de aprobacion, que es
+    # exactamente para lo que existen: *«no he podido escucharlos ni cambiar sus
+    # audios»*. Un ciclo asi no se ve venir porque cada mitad, por separado, es
+    # razonable.
     import servicio as _sv
-    abiertos = [p for p, sl, _ in _sv.pendientes() if sl == slug]
+
+    DESPUES_DEL_RENDER = {"visto", "revisar"}
+    abiertos = [p for p, sl, _ in _sv.pendientes()
+                if sl == slug and p not in DESPUES_DEL_RENDER
+                and _queda_trabajo(p, slug)]
     if abiertos:
         mal.append(f"{slug}: pedido(s) de IA sin contestar: {abiertos}."
                    f" La pieza se montaria sin esa decision.")
@@ -341,10 +563,21 @@ def revisar(slug):
     # porque es el mismo código en seco.
     import costuras as _co
 
-    quedan = _co.a_lo_callado(slug, ver=True, minimo=_co.PUERTA)
-    if quedan:
-        mal.append(f"{slug}: {quedan} corte(s) caen en pleno sonido y hay un"
-                   f" punto callado a menos de 120 ms. Corre el paso `cosido`.")
+    # **La pregunta es si queda voz colgando, no si hay algo mas callado.**
+    #
+    # Preguntaba `a_lo_callado(minimo=PUERTA)`, o sea «¿hay un punto mejor a 120
+    # ms?». Con eso reel-07 no pudo renderizarse teniendo sus tres bordes a -105
+    # dBFS: silencio de sobra, pero veinte milisegundos mas alla habia -123 y la
+    # puerta lo llamaba «pleno sonido». El paso de arreglo tampoco podia
+    # cerrarlo, asi que la pieza quedaba parada para siempre.
+    #
+    # Se sigue preguntando al mismo codigo —la puerta no inventa criterio— pero
+    # la pregunta es absoluta: ¿la voz sigue sonando despues del corte?
+    sucios = _co.bordes_en_sonido(slug)
+    if sucios:
+        donde = ", ".join(f"{t:.2f}" for _c, t in sucios[:4])
+        mal.append(f"{slug}: {len(sucios)} corte(s) dejan voz sonando despues"
+                   f" del corte ({donde}). Corre el paso `cosido`.")
 
     # **El tablero mudo.** Un tablero se construye por tiempo de lectura: cada
     # nodo entra cuando el anterior ya se pudo leer, o sea que **es una
@@ -426,7 +659,7 @@ def main():
     todo = []
     for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
-        paran, avisan = separa(revisar(slug))
+        paran, avisan = separa(revisar(slug), slug=slug)
         todo += paran
         print(f"{slug}: {'OK' if not paran else str(len(paran)) + ' motivo(s)'}"
               + (f"  ({len(avisan)} anotado(s))" if avisan else ""))

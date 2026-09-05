@@ -23,7 +23,8 @@ import { color, layout, videoText, tracking } from "../brand/tokens";
  * por fundido.
  *
  * Cada bloque entra por su lado y se queda: la pila se construye, no aparece.
- */
+  * @clase capa
+*/
 export const SidePanel: React.FC<{
   /** Líneas del panel, de arriba abajo. Cortas: es un ancla, no un párrafo. */
   bloques: { texto: string; fuerte?: boolean; placa?: string }[];

@@ -40,7 +40,8 @@ import { color, layout } from "../brand/tokens";
  *
  * Va en la banda alta, por encima de la cara (24–40%) y muy lejos de la de
  * subtítulos (50–60%): las tres capas caben sin pisarse.
- */
+  * @clase tablero
+*/
 export type ContrasteProps = {
   izq: { etiqueta: string; cifra: string; at: number; de100?: number; placa?: string };
   der: { etiqueta: string; cifra: string; at: number; de100?: number; placa?: string };
