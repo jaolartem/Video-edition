@@ -1,0 +1,68 @@
+import franjaJson from "./franja.json";
+import { layout } from "./tokens";
+
+/**
+ * **La franja del subtítulo, y quién cede ante quién.**
+ *
+ * Instrucción de Jaime (T-02), después de ver en R-04 un tablero de texto
+ * cruzándose con los subtítulos quemados: *«durante los tableros el subtítulo
+ * pasa a estilo tradicional discreto: cuerpo pequeño, sin caja ni contorno,
+ * apoyado en el **borde inferior de la zona segura** —no del cuadro—. El
+ * tablero es la capa de información y el subtítulo sólo acompaña. Por
+ * implicación: **ningún tablero baja hasta esa franja**, que queda reservada al
+ * subtítulo»*.
+ *
+ * Son dos reglas y una sola geometría, y por eso viven juntas aquí:
+ *
+ * - el subtítulo **se apoya** en el suelo de la franja mientras hay tablero,
+ * - el tablero **no llega** al techo de la franja, nunca.
+ *
+ * ## De dónde sale el número, que no se inventó
+ *
+ * `franja.json` lo declara una vez y esto sólo lo traduce a píxeles. La
+ * derivación es la de `tokens.ts`: Meta reserva el **35% inferior** de la pieza
+ * (672 px sobre 1920), así que el borde inferior de la zona segura cae en el
+ * **65%** de la altura; y la banda de subtítulos son **200 px**, el 10,4166%.
+ * La franja va del **54,58% al 65%**.
+ *
+ * Y el motivo de que el suelo sea el de la zona segura y no el del cuadro lo
+ * dio Jaime con la cuenta: en Reels y Stories la interfaz de la plataforma
+ * ocupa el ~20% inferior —nombre de cuenta, caption, botones— así que el texto
+ * que cae por debajo de la zona segura desaparece bajo la interfaz. Y como la
+ * mayoría mira sin audio, ahí no se pierde un adorno: se pierde el argumento.
+ */
+const SUELO = franjaJson.suelo;
+const ALTO = franjaJson.alto;
+
+export const franja = {
+  /** Suelo, en fracción de altura: 0,65. El borde inferior de la zona segura. */
+  suelo: SUELO,
+  /** Techo, en fracción de altura: 0,5458333. Ningún tablero baja de aquí. */
+  techo: SUELO - ALTO,
+  /** Alto, en fracción de altura: 0,1041666 (200 px sobre 1920). */
+  alto: ALTO,
+  /** Distancia del suelo de la franja al borde inferior del cuadro: 672 px. */
+  desdeAbajo: Math.round((1 - SUELO) * layout.height),
+  /**
+   * **Lo que un tablero deja libre por abajo: 872 px.**
+   *
+   * Es la zona segura inferior más la banda. Coincide con lo que
+   * `CausalChain` y `TwoPaths` ya reservaban escribiendo
+   * `layout.safe.bottom + layout.captionBand` en cada uno — que era el mismo
+   * número escrito cuatro veces, y por eso `Comparacion` y `Acumulacion`
+   * pudieron ignorarlo sin que nadie se enterara.
+   */
+  reserva: Math.round((1 - SUELO + ALTO) * layout.height),
+  /** El techo, en píxeles desde arriba: 1048. */
+  techoPx: Math.round((SUELO - ALTO) * layout.height),
+  /** Cuerpo del subtítulo discreto. Ver `franja.json`. */
+  cuerpo: franjaJson.cuerpo,
+} as const;
+
+/**
+ * La franja dicha en porcentaje, para quien la tiene que respetar sin dibujar:
+ * el prompt del que compone, el informe y los documentos.
+ */
+export const franjaEnPorcentaje = (): string =>
+  `del ${(franja.techo * 100).toFixed(1)}% al ${(franja.suelo * 100).toFixed(1)}%` +
+  ` de la altura`;

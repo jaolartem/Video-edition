@@ -17,14 +17,19 @@ Cara y máxima expresividad, mucho movimiento dentro de la toma, ganchos visuale
 múltiples, sonido acompañando el título y los subtítulos animados. Maximalismo
 coherente: romper el patrón y generar curiosidad antes de que el pulgar decida.
 
-**tablero** — leído y entregado plano, o idea compleja. *«Los tableros son
-ideales para ideas complejas.»* Y el copy sale de la propia lectura: por ser
-exacta dice lo que el libreto quería, palabra por palabra.
+**tablero** — **leído**, o idea compleja. *«Los tableros son ideales para ideas
+complejas.»* Y el copy sale de la propia lectura: por ser exacta dice lo que el
+libreto quería, palabra por palabra.
 
-**cercano** — leído **pero bien entregado**. Jaime: *«excepto si el delivery
+**cercano** — idea densa **bien entregada**. Jaime: *«excepto si el delivery
 emocional es especialmente bueno, en cuyo caso buscamos planos cercanos
-enfatizando la emoción en la cara y animaciones que expliquen la idea»*. La
-lectura no descalifica: descalifica leer sin voz.
+enfatizando la emoción en la cara y animaciones que expliquen la idea»*.
+
+Aquí llegaba también la toma **leída y bien entregada**, y eso se acabó con la
+instrucción T-01: *«si en el audio se está leyendo, ese tramo va cubierto con
+tablero: la cara no aparece en cámara limpia mientras se lee»*. La excepción del
+delivery sigue valiendo para la idea densa —que es de lo que hablaba— pero no
+para la lectura: leer bien es leer, y en R-04 se veía.
 
 **metafora** — el párrafo trae un ejemplo concreto o una comparación obvia.
 *«Cuando hablamos del dentista, una ilustración de un odontólogo puede ser útil;
@@ -190,6 +195,29 @@ def decidir(*, desde_s, dura_s, parrafo, texto, literal, voz_st,
     # sobre ellos porque el gancho dura 5 s aunque el segmento dure 2.
     if desde_s < GANCHO_CLAVE_S:
         return "portada", "el primer segundo, que es el que decide"
+    leida = literal is not None and literal >= LEIDA
+    plana = voz_st is not None and voz_st < VOZ_SALVA
+    # **T-01 · Un tramo leido va cubierto, y eso no se delega.**
+    #
+    # Instruccion de Jaime, tras verse leyendo en camara limpia en R-04: *«si en
+    # el audio se esta leyendo, ese tramo va cubierto con tablero: la cara no
+    # aparece en camara limpia mientras se lee. El disparador es el audio, no el
+    # frame. El tablero deja de ser un parche y pasa a ser lo que corresponde a
+    # esos tramos por diseno»*.
+    #
+    # Va **antes** de `decidido` a proposito, con la portada y el CTA. Lo que se
+    # le delega al LLM es el criterio —que necesita el contexto del video— y
+    # esto no es criterio: es una condicion de la toma, medida, igual de
+    # mecanica que saber cual es la etapa que abre. Debajo estaba, y por eso el
+    # lote llego con ocho tramos leidos en camara limpia: dos que la heuristica
+    # mandaba a `cercano` por venir bien entregados, y seis que el paso de
+    # descripcion coloco en `metafora` o `diapositiva` sin saber que se leian.
+    #
+    # Y ya no exige que ademas venga plana. Esa condicion es la que cerro el
+    # mecanismo entero una vez (C-68): pedia lo que el embudo elimina.
+    if leida:
+        return "tablero", (f"lee el libreto al {literal:.0%}: va cubierto con"
+                           f" tablero, no en camara limpia ({_st(voz_st)})")
     # **Si el LLM ya lo decidio viendo la pieza entera, manda el LLM.**
     # La portada va antes porque es mecanica —es la etapa que abre— y no se
     # renegocia; el resto es criterio, y el criterio necesita el contexto del
@@ -197,14 +225,6 @@ def decidir(*, desde_s, dura_s, parrafo, texto, literal, voz_st,
     # descripcion no ha corrido todavia.
     if decidido and decidido[0] and decidido[0] != "portada":
         return decidido[0], (decidido[1] or "lo decidio el paso de descripcion")
-    leida = literal is not None and literal >= LEIDA
-    plana = voz_st is not None and voz_st < VOZ_SALVA
-    if leida and plana:
-        return "tablero", (f"lee el libreto al {literal:.0%} y lo entrega"
-                           f" plano ({_st(voz_st)})")
-    if leida:
-        return "cercano", (f"lee al {literal:.0%} pero lo entrega"
-                           f" ({_st(voz_st)}): plano cerrado y animacion")
     # **La complejidad basta para pedir tablero.** Jaime: *«los reels leidos o
     # con demasiada densidad y complejidad, en estos casos conviene un tablero,
     # excepto si el delivery emocional es especialmente bueno»*. Exigir ademas
