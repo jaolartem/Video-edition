@@ -106,7 +106,7 @@ mkdir -p "$TMPDIR" out/entrega out/revision
 # obra —a reel-06 le «lastimaba», en reel-03 «no se escuchaba»—. Lo que gobierna
 # es la DISTANCIA a la voz, y hasta que ese bucle viva aqui, `MUSI` se puede
 # poner por pieza desde fuera en vez de editar el fichero.
-MUSI=${MUSI:--15}
+MUSI_FIJO="${MUSI:-}"
 #: Donde y cuanto se le quita a la musica para que no pise la voz.
 #: 300 Hz son los armonicos que enturbian; 2 kHz, las consonantes.
 # ── la talla: bajar SOLO las frecuencias que compiten con la voz ─────────────
@@ -234,7 +234,18 @@ for n in "${REELS[@]}"; do
   SRC="$RENDER"
   if awk -v v="$VELOCIDAD" 'BEGIN{exit !(v > 1.0)}' \
      && [ -f "out/entrega/reel-R$n.mp4" ]; then
-    SRC="out/entrega/reel-R$n.mp4"
+    # **El nivel de la cama es POR PIEZA, y sale de su fichero.**
+  #
+  # Un solo numero no puede servir a siete obras distintas: con -15 en todas, la
+  # separacion real entre la cama y su voz salio entre 2,3 y 19,7 dB. Para
+  # dejarlas todas a 14 dB —donde esta reel-04, la unica que nunca levanto
+  # queja— reel-02 necesita -0,2 y reel-03 necesita -20,8. Veintiun decibelios
+  # entre dos piezas del mismo lote.
+  #
+  # `MUSI` desde fuera sigue mandando: sirve para tantear una pieza sin tocar el
+  # fichero. Lo que ya no vale es el numero escrito aqui dentro.
+  MUSI="${MUSI_FIJO:-$(python -c "import json,sys;d=json.load(open('src/brand/cama.json',encoding='utf-8'));print(d['piezas'].get('reel-%02d'%int(sys.argv[1]),d['por_defecto']))" "$n" 2>/dev/null || echo -15)}"
+  SRC="out/entrega/reel-R$n.mp4"
   fi
   MP3="public/musica/reel-0$n.mp3"
   [ -f "$SRC" ] || { echo "R$n: falta $SRC"; continue; }
