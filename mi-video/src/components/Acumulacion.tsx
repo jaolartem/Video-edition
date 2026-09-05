@@ -4,6 +4,7 @@ import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
+import { franja } from "../brand/franja";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo, Panel } from "./Fondo";
 import { Barra } from "./acumulacion/Barra";
@@ -246,7 +247,19 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
           position: "absolute",
           left: 0,
           right: 0,
-          top: 1452,
+          // **Se apoya en el techo de la franja, no en un 1452 escrito a mano.**
+          //
+          // A 1452 la banda entera caia DENTRO de los 872 px que el subtitulo y
+          // la interfaz de la plataforma tienen reservados: en el movil esta
+          // condicion no se veia. Instruccion de Jaime (T-02): *«ningun tablero
+          // baja hasta esa franja»*, y el porque — *«como la mayoria del publico
+          // ve sin audio, texto por debajo de la zona segura desaparece bajo la
+          // interfaz y ahi se pierde el argumento»*.
+          //
+          // El numero vive en `src/brand/franja.json` y de ahi lo lee todo el
+          // mundo. Escrito aqui era la segunda copia, que es exactamente lo que
+          // permitio que este componente ignorara la reserva sin que se notara.
+          bottom: franja.reserva,
           backgroundColor: color.lightNeutral,
           transform: "rotate(0.9deg)",
           padding: "22px 74px",

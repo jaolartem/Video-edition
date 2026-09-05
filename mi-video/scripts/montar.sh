@@ -408,6 +408,17 @@ for r in "${REELS[@]}"; do
   # comentario, *«sin musica tambien hay que masterizar»*—. La rama duplicaba
   # la pregunta y se llevaba por delante la mitad que no duplicaba.
   bash scripts/musica.sh "$n"
+  # **Y la entrega se sella: el montaje entero queda guardado.**
+  #
+  # Jaime, cuando su entrega aprobada no se pudo rehacer: *«no se trata de
+  # commits, todo debia estar en base de datos, y nada se borra de la base de
+  # datos; para eso esta»*. La tabla `version` guardaba una huella —con que
+  # distinguir dos versiones, no con que reconstruir una—, asi que las siete
+  # piezas del 4 de septiembre se volvieron irrepetibles esa misma noche.
+  #
+  # Va aqui, pegado a la entrega, y no en un paso aparte: un paso que hay que
+  # acordarse de correr no es un paso, y ese error ya se pago con `costuras.py`.
+  python scripts/sellar.py "$n"
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done
 # **La verificacion va DESPUES de entregar, y la llama el runner.** No la

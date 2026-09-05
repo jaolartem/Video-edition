@@ -40,6 +40,7 @@ BASE = "ads/decisiones.db"
 # **Lo que una fase ES vive en el dominio**; aquí sólo se recorre. Se
 # importan con su nombre de siempre porque `donde.py` y `aprobar.py` ya
 # los llaman así, y mover algo no tiene por qué romper a quien lo usa.
+from dominio import abierto as _abierto  # noqa: E402
 from dominio.fase import (  # noqa: E402,F401
     _con, _fallo_antes, _render_caduco, VUELVE_SI_CADUCO, anotar, camino,
     fase_de)
@@ -87,7 +88,6 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         actual = ruta[0]
         if not ver:
             anotar(pieza.video_id, actual["id"])
-    orden = {f["nombre"]: k for k, f in enumerate(ruta)}
     # **Aqui NO se vuelve a redundancia.** Hubo un momento en que esto mandaba
     # la pieza atras cuando su corte cambiaba, y eso es un bucle: vuelve, se
     # re-corta, cambia la huella, vuelve otra vez. Jaime lo paro en seco: *«no
@@ -126,6 +126,25 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         puede, por_que = serv.puede(pieza)
         if not puede:
             motivo = f"{siguiente['nombre']}: {por_que}"
+            break
+
+        # **Y no se pasa de largo por encima de una correccion suya.**
+        #
+        # Jaime, tras una noche con trece correcciones sin aplicar: *«siempre
+        # estoy repitiendo las mismas correcciones porque nunca llegan las
+        # indicaciones»*. Y no llegaban: la tabla `revision` las guarda con sus
+        # palabras y **la linea no la miraba**, asi que la pieza atravesaba
+        # `recortado`, `disenado` y `nivelado` y salia igual que entro.
+        #
+        # Aqui no se aplica nada —eso es trabajo del paso, y adivinarlo seria
+        # peor—: se para y se nombra. Lo que garantiza es que ninguna pieza se
+        # entrega con un tiquet suyo abierto.
+        vencidas = _abierto.vencidas(pieza.slug, actual["nombre"], orden)
+        if vencidas:
+            uno = vencidas[0]
+            motivo = (f"tiene {len(vencidas)} correccion(es) de Jaime sin"
+                      f" aplicar y su paso ya quedo atras — #{uno[0]}"
+                      f" ({uno[1]}, va en «{uno[2]}»): «{uno[3]}»")
             break
 
         if ver:
@@ -355,6 +374,7 @@ def main():
     # Un pedido abierto sobre un material que todavia puede cambiar es una
     # pregunta que no se puede contestar, y contestarla es trabajo tirado.
     if a.despachar:
+        from despachador import despachar
         despachar(a)
         return
     _una_vuelta(a)
@@ -398,103 +418,6 @@ def _una_vuelta(a) -> int:
     return sum(total.values())
 
 
-def despachar(a) -> None:
-    """Queda encendido: reparte pedidos y recoge respuestas segun llegan.
-
-    **Lo que es este programa.** Jaime, el 1 de septiembre: *«como el programa es
-    un despachador, debe permanecer encendido mientras trabajamos; las etiquetas
-    les asignan el pedido hasta que salen y se archivan; tus agentes reemplazan
-    el llamado por API, pero el programa funciona como tal»*.
-
-    Corriendolo a mano, cada respuesta esperaba a que a mi se me ocurriera
-    empujar la linea. Y esperar no es gratis: entre que una respuesta se escribe
-    y alguien la recoge, otra pieza puede mover la cinta que comparten y dejarla
-    desfasada — 20 analisis completos se perdieron asi. Un despachador encendido
-    la recoge cuando llega.
-
-    No adivina cuando hay trabajo: **mira los ficheros de respuesta**. Mientras
-    nadie conteste no hay nada que hacer y no se gasta nada en comprobarlo.
-    """
-    import time
-
-    huella, quieto, atascadas = None, 0, set()
-    print("despachador encendido — Ctrl-C para parar")
-    while True:
-        # **Una pieza atascada no apaga el despachador.**
-        #
-        # `avanzar` para en seco cuando una pieza falla dos veces por lo mismo, y
-        # eso esta bien para una corrida a mano: dice que hay algo que arreglar.
-        # Aqui es lo contrario de lo que hace falta — hay seis piezas mas
-        # esperando su turno, y apagar el reparto por una es dejar de repartir.
-        # Se dice una vez, se apunta, y se sigue con las demas.
-        # **Lo contestado entra ANTES de avanzar.**
-        #
-        # Estaba detras del recorrido, o sea detras de una pasada de
-        # renders que puede durar veinte minutos: la respuesta esperaba a
-        # que terminara de renderizar piezas que iban a cambiar por esa
-        # misma respuesta. Seis composiciones se quedaron sin aplicar asi,
-        # y las piezas salieron identicas a la vuelta anterior.
-        #
-        # Una respuesta que llega tarde se aplica igual
-        #
-        # Jaime: *«las etiquetas les asignan el pedido hasta que salen y se
-        # archivan»*. Si la pieza ya paso de ese paso cuando llega la respuesta,
-        # nadie la consume — y la decision existe, esta escrita, y no pasa nada.
-        # Es la forma mas cara de perder trabajo: se pago la llamada y no llego a
-        # la pantalla.
-        #
-        # Paso con el gancho de reel-01: su composicion se escribio mientras la
-        # pieza ya estaba en `montado`, asi que el render salio identico al de
-        # antes y Jaime lo vio: *«no hay diferencia entre este y el que me
-        # mostraste antes»*. Tenia razon, y el fichero llevaba una hora en disco.
-        #
-        # El despachador la devuelve al paso que la espera. Es su trabajo: el
-        # pedido sigue asignado a esa etiqueta hasta que se archiva.
-        # **Y los tickets cuyo problema ya no esta se cierran solos.**
-        # Si no, la lista dice que no se ha hecho nada aunque este hecho — que
-        # es lo que Jaime vio: cuatro de las cinco cosas que habia senalado ya no
-        # sonaban en la pieza y sus tickets seguian abiertos.
-        try:
-            from dominio.ticket import cerrar_los_resueltos
-
-            for n in piezas_de(a):
-                cerrados = cerrar_los_resueltos(f"reel-{int(n):02d}")
-                if cerrados:
-                    print(f"  reel-{int(n):02d}: {cerrados} ticket(s) cerrados"
-                          f" midiendo")
-        except Exception as e:                     # noqa: BLE001
-            registro.aviso("despachador", "no se pudieron cerrar tickets",
-                           detalle=f"{type(e).__name__}: {e}"[:200], eco=False)
-        for paso, slug in _contestadas_tarde():
-            print(f"  respuesta tardia -> {paso}/{slug}: vuelve a su paso")
-            _devuelve(slug, paso)
-
-        movidos = _una_vuelta(a)
-        # **Lo que espera a un agente se dice, porque es la senal de lanzarlo.**
-        # Jaime: *«y lanzas el agente cuando el log sea por falta de agente»*.
-        # Un pedido abierto no es un fallo: es un turno pedido y sin servir, y
-        # mezclarlo con los atascos hace que no se distinga cual de los dos es.
-        for paso, slug in _sin_contestar():
-            clave = f"{paso}/{slug}"
-            if clave not in atascadas:
-                atascadas.add(clave)
-                print(f"  espera agente -> {clave}")
-        ahora = _respuestas()
-        if movidos or ahora != huella:
-            quieto = 0
-        else:
-            quieto += 1
-            if quieto == 1:
-                print("  (esperando respuestas)")
-        huella = ahora
-        try:
-            time.sleep(min(2 + quieto * 2, 20))
-        except KeyboardInterrupt:
-            print("\ndespachador apagado")
-            return
-
-
-#: Que fase espera la respuesta de cada carpeta de pedidos.
 DE_QUIEN = {"disenar": "disenado", "describir": "descrito", "repaso": "repasado",
             "redundancia": "sin_redundancia", "revalidar": "revalidado",
             "revisar": "revisado", "visto": "visto", "fuentes": "respaldado"}

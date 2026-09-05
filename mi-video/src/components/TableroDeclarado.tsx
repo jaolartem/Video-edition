@@ -276,21 +276,19 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
         </div>
       ) : null}
 
-      {/* La forma que el diseñador pidió, para que se vea qué falta construir. */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 24,
-          right: layout.safe.right,
-          fontFamily: fontFamily.data,
-          fontSize: 20,
-          letterSpacing: tracking.labelMono,
-          textTransform: "uppercase",
-          color: color.navyHi,
-        }}
-      >
-        {kind}
-      </div>
+      {/* **Aquí NO va el nombre de la forma.**
+
+          Estaba, y con buena intención —«para que se vea qué falta
+          construir»—, pero esto se dibuja en la pieza que se publica: las
+          entregas del 5 de septiembre llevaban escritas en pantalla las
+          palabras FUSION, DESVIO, LISTANUMERADA, EVIDENCECARD y ANIDADO,
+          porque diecinueve formas declaradas caen aquí. Cinco de las siete
+          piezas salieron con un rótulo de diagnóstico encima.
+
+          El dato es útil y no se pierde: que una forma declarada no tenga
+          componente es un cable suelto, y lo dice `scripts/conectado.py`, que
+          corre al empezar cualquier sesión. Un informe se lee cuando toca; un
+          rótulo en el frame se publica. */}
     </AbsoluteFill>
   );
 };

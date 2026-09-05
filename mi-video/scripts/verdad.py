@@ -208,7 +208,7 @@ VERDADES = (
         vive_en="`scripts/trato.py`, con la medida de `seleccionar.py :: literal()`",
         lee=(Aguja("scripts/trato.py", "LEIDA = 0.60"),
              Aguja("scripts/lectura.mjs", "export const LEIDA = 0.60;"),
-             Aguja("scripts/seleccionar.py", "def literal(texto, parrafo, n=4):"),),
+             Aguja("scripts/seleccionar.py", "def literal(v, parrafo, n=4):"),),
         copia="`reading-detect.py` mide la altura de la cabeza y **no decide**:"
               " la hipótesis no se sostuvo (rango intercuartílico 0,016) y el"
               " disparador es el audio, no el frame.",

@@ -141,6 +141,18 @@ def main():
 
     print("\nY lo que dice la puerta ahora mismo:")
     subprocess.run([sys.executable, "scripts/verificar.py", "--avisa"])
+    # **Y si el sistema esta conectado, que es lo primero que hay que saber.**
+    #
+    # Jaime, despues de una noche de correcciones suyas que no llegaban: *«tu
+    # objetivo no es editar videos, es vigilar que el sistema funcione y este
+    # todo conectado; aca no esta conectado»*.
+    #
+    # Va aqui y no en `montar.sh` a proposito: un cable suelto no tiene por que
+    # parar una entrega —Jaime quiere ver la pieza—, pero **no puede pasar
+    # inadvertido al empezar**. Un productor sin consumidor no da error nunca;
+    # sale cuando el mira la entrega y echa en falta lo que pidio.
+    print()
+    subprocess.run([sys.executable, "scripts/conectado.py"])
 
 
 if __name__ == "__main__":

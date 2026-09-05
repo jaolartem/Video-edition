@@ -33,20 +33,35 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-#: Los eslabones, EN ORDEN. Cada uno: cómo se llama, qué fichero produce, y con
-#: qué se le despierta. El orden es el de la línea y no se reordena por
-#: conveniencia: es el orden en que un dato depende del anterior.
+#: Los eslabones, EN ORDEN, y **de quién depende cada uno**. Cuatro cosas: cómo
+#: se llama, qué fichero produce, con qué se le despierta, y de qué eslabón
+#: anterior come.
+#:
+#: **La dependencia se declara, no se deduce de la posición.** Estaba deducida —
+#: cada eslabón se comparaba con el que tuviera delante en la lista— y eso metía
+#: parentescos que no existen: `cara` iba detrás de `subtitulos`, así que
+#: resubtitular una pieza daba por caducada la medida de la cara de las SIETE.
+#: La cara se mide sobre el corte y no sabe nada del subtítulo.
+#:
+#: Costaba `sujeto.py` —MediaPipe, el paso lento— siete veces por nada. Jaime,
+#: viéndolo: *«no empezar de 0»*.
+#:
+#: Y hay un agravante que conviene tener presente: `subtitulos` escribe UN solo
+#: fichero para las siete (`work/subs/todos.json`), así que tocar una pieza
+#: mueve la fecha de todas. Mientras siga compartido, cualquier eslabón que
+#: cuelgue de él caduca en bloque.
 ESLABONES = [
-    ("edl",         "ads/{s}/edl-sell.json",              "revision --aplicar · depurar · costuras"),
-    ("plan",        "work/scenes/{s}/plan-full.json",     "plan-reel.mjs"),
-    ("encuadres",   "work/scenes/{s}/plan-full.json",     "punch-ins.py"),
-    ("corte",       "public/{s}.mp4",                     "render-hook.mjs"),
-    ("subtitulos",  "work/subs/todos.json",               "subtitular.py"),
-    ("cara",        "work/scenes/{s}/cara.json",          "sujeto.py"),
-    ("spec",        "src/reels.json",                     "reels-spec.mjs"),
-    ("render",      "out/reels/reel-R{n}.mp4",            "render.mjs"),
-    ("efectos",     "out/audio-voz/reel-R{n}-efectos.wav", "efectos.mjs"),
-    ("entrega",     "out/entrega/reel-R{n}.mp4",          "voz-limpia.py · musica.sh"),
+    ("edl",         "ads/{s}/edl-sell.json",              "revision --aplicar · depurar · costuras", None),
+    ("plan",        "work/scenes/{s}/plan-full.json",     "plan-reel.mjs",      "edl"),
+    ("encuadres",   "work/scenes/{s}/plan-full.json",     "punch-ins.py",       "plan"),
+    ("corte",       "public/{s}.mp4",                     "render-hook.mjs",    "encuadres"),
+    ("subtitulos",  "work/subs/todos.json",               "subtitular.py",      "corte"),
+    # De `corte`, no de `subtitulos`: se mide la cara sobre el vídeo cortado.
+    ("cara",        "work/scenes/{s}/cara.json",          "sujeto.py",          "corte"),
+    ("spec",        "src/reels.json",                     "reels-spec.mjs",     "cara"),
+    ("render",      "out/reels/reel-R{n}.mp4",            "render.mjs",         "spec"),
+    ("efectos",     "out/audio-voz/reel-R{n}-efectos.wav", "efectos.mjs",       "render"),
+    ("entrega",     "out/entrega/reel-R{n}.mp4",          "voz-limpia.py · musica.sh", "efectos"),
 ]
 
 
@@ -57,17 +72,18 @@ def _cuando(ruta):
 def desde(n):
     """El primer eslabón caducado de la pieza `n`, o `None` si está al día."""
     s = f"reel-{n:02d}"
-    previo = None
-    for i, (nombre, patron, quien) in enumerate(ESLABONES):
+    cuando, donde = {}, {}
+    for i, (nombre, patron, quien, come_de) in enumerate(ESLABONES):
         ruta = patron.format(s=s, n=n)
         t = _cuando(ruta)
         if t is None:
             return (i, nombre, quien, f"no existe {ruta}")
+        padre = cuando.get(come_de)
         # `encuadres` comparte fichero con `plan`: no se compara consigo mismo.
-        if previo is not None and ruta != previo[1] and t < previo[0]:
+        if padre is not None and ruta != donde[come_de] and t < padre:
             return (i, nombre, quien,
-                    f"{ruta} es mas viejo que {previo[1]}")
-        previo = (t, ruta)
+                    f"{ruta} es mas viejo que {donde[come_de]}")
+        cuando[nombre], donde[nombre] = t, ruta
     return None
 
 

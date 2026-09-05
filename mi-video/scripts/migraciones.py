@@ -237,6 +237,27 @@ def _ciclo(con):
                         " values (?,?,?)", (nombre, orden, serv))
 
 
+def _version_guarda_el_montaje(con):
+    """`version` guardaba una huella; ahora guarda **el montaje**.
+
+    Jaime, cuando le dije que la entrega que había aprobado no se podía volver a
+    producir: *«no se trata de commits, todo debía estar en base de datos, y nada
+    se borra de la base de datos; para eso está»*. Tenía razón y la tabla le daba
+    la razón a medias: `huella`, `duracion_s` y `commit_git` dicen **que** una
+    versión es distinta de otra, no **cómo** estaba hecha.
+
+    El coste fue exacto: siete piezas entregadas el 4 de septiembre a las 19:20,
+    trece correcciones suyas sobre ellas, y ninguna forma de rehacerlas —los
+    cortes se habían movido y no quedaba de dónde sacar los de esa entrega—.
+
+    Con `edl` y `spec` dentro, una versión se vuelve a montar sola.
+    """
+    cols = {r["name"] for r in con.execute("pragma table_info(version)")}
+    for c, tipo in (("edl", "TEXT"), ("spec", "TEXT"), ("sha_entrega", "TEXT")):
+        if c not in cols:
+            con.execute(f"alter table version add column {c} {tipo}")
+
+
 def _clave_por_slug(con):
     """Las tablas que referian al video por texto ganan su clave foranea."""
     hecho = []
@@ -279,6 +300,7 @@ def migrar():
     _corte_fijo_huella(con)
     _escalera(con)
     _ciclo(con)
+    _version_guarda_el_montaje(con)
     hecho = _clave_por_slug(con)
     hecho += _muertas(con)
     con.commit()

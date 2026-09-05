@@ -74,6 +74,9 @@ import { PROMPT, pedidoDe } from "./describir-pedido.mjs";
 import {
   archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta, porCli, rutaPedido,
 } from "./servicio.mjs";
+import { criterio as criterioDeFranja } from "./franja.mjs";
+import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 
 /** El paso al que pertenecen el pedido y la respuesta, dentro del contrato. */
 const PASO = "describir";
@@ -86,7 +89,35 @@ function describePieza(slug, filas) {
   // `quien` tiene que decir QUIEN contesto. Puso «gemini» cuando esa via ni
   // existia, y decir «cli» de lo que contesto la sesion es el mismo error con
   // otro nombre: el campo esta para poder auditar de donde salio una decision.
-  const entrada = pedidoDe(slug, filas);
+  // **La franja va en el encargo, no en la cabeza de quien compone.**
+  //
+  // Instruccion de Jaime (T-02): *«ningun tablero baja hasta esa franja»*. Una
+  // regla que el que compone no ve en su pedido no existe para el — elige de la
+  // carta que le damos, igual que le paso con la cortinilla retirada. Y el
+  // numero sale de `franja.mjs`, que lo lee de `franja.json`: escribirlo aqui
+  // seria la segunda copia, que es como `Comparacion` y `Acumulacion` acabaron
+  // dibujando bajo la interfaz de la plataforma.
+  // **La revisión del compositor va en su pedido, y es la SUYA, no la del que
+  // dibuja.** Jaime: *«tanto el diseñador como el compositor tienen procesos
+  // simplificados de revisión; por ejemplo el compositor tiene que escuchar los
+  // bordes de las escenas para asegurarse de que no hay escenas cortadas a la
+  // mitad, tiene que estar seguro de que los subtítulos dicen lo que el vídeo
+  // dice, y de que lo que se dice es coherente con la intención»*.
+  //
+  // El diseñador mira cinco fotogramas por escena; esto es otra cosa: recortes
+  // de audio en cada empalme y el libreto al lado del texto que sobrevivió al
+  // corte. Por texto esos tramos parecían limpios — el defecto que él oyó en
+  // reel-03, frases que se comen la primera palabra, **sólo se oye**.
+  let escucha = null;
+  try {
+    escucha = JSON.parse(
+      execFileSync("python", ["scripts/escucha.py", String(Number(slug.slice(-2)))],
+                   { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } })
+      && fs.readFileSync(`work/escucha/${slug}/revision.json`, "utf8"),
+    );
+  } catch { escucha = null; }
+  const entrada = { ...pedidoDe(slug, filas), franja: criterioDeFranja(),
+                    revisa_oyendo: escucha };
   const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que

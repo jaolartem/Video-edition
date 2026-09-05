@@ -69,7 +69,18 @@ const COMPONENTE = {
  * `Acumulacion` acabaron dibujando a 1390, 1452 y 1570 — bajo la interfaz.
  */
 export const respeta = (componente) => {
-  const t = leer(`src/components/${componente}.tsx`);
+  // **Un componente que no existe no respeta nada, y eso se dice.**
+  //
+  // Esto reventaba con `ENOENT` sobre `Anidado.tsx`: un `kind` declarado en el
+  // spec que **no dibuja nadie** —no hay componente, no esta en el despachador—
+  // y que en pantalla sale como un hueco sin dar error. Reel-R2 beat 6 lo lleva.
+  //
+  // Que la comprobacion muriera ahi era lo peor de los dos mundos: ni se veia el
+  // tablero fantasma ni se comprobaban los demas. Ahora falla como lo que es,
+  // una falta, y el resto de la lista se sigue mirando.
+  const f = `src/components/${componente}.tsx`;
+  if (!fs.existsSync(f)) return null;
+  const t = leer(f);
   return t.includes("<ZonaTablero>") || t.includes("paddingBottom: franja.reserva");
 };
 
@@ -94,7 +105,7 @@ if (process.argv[1] && process.argv[1].endsWith("franja.mjs")) {
       `\n  reserva del tablero: ${franja.reserva} px`,
   );
   const filas = invasores();
-  const mal = filas.filter((f) => !f.ok);
+  const mal = filas.filter((f) => f.ok !== true);
   for (const f of filas) {
     console.log(`  ${f.ok ? "ok " : "NO "} ${f.pieza} · ${f.componente}`);
   }

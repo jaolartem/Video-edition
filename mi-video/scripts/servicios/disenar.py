@@ -41,6 +41,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dominio import abierto as _abierto  # noqa: E402
+import fotogramas as _fotogramas  # noqa: E402
 from dominio import remate as _remate  # noqa: E402
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
@@ -64,6 +66,8 @@ from .caja import (COMO_COMBINAR, CORRECCION, VERSE, catalogo_de_piezas,  # noqa
 # sitio donde más caro sale.
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PROMPT = os.path.join(RAIZ, "scripts", "disenar.prompt.md")
+
+
 BASE = "ads/decisiones.db"
 
 #: Un `grafico` que pide tipografía en vez de figura. Mismo vocabulario que
@@ -179,7 +183,23 @@ def _pide_tablero(fila):
 
 
 def encargos(slug):
-    """Las etapas que llevan tablero y todavía no lo tienen montado."""
+    """Las etapas que llevan tablero y todavía no lo tienen **o están mal**.
+
+    La segunda mitad faltaba, y es por donde se perdían las correcciones
+    gráficas de Jaime. Este paso sólo preguntaba por lo que **no existía**: una
+    etapa con su tablero puesto ya no entraba en el encargo, aunque él hubiera
+    dicho que ese tablero está mal.
+
+    Medido el 5 de septiembre: cuatro piezas devueltas a `disenado` con tiquets
+    suyos abiertos —el tiempo de lectura de reel-01, el abuso del glitch de
+    reel-05, el tramo leído de reel-07— y **ningún pedido escrito**, porque los
+    tableros ya estaban montados. La pieza atravesaba el paso sin preguntar
+    nada y salía igual. Es su queja exacta: *«siempre estoy repitiendo las
+    mismas correcciones porque nunca llegan las indicaciones»*.
+
+    Un tiquet suyo sobre una etapa la vuelve a poner en el encargo. No la
+    rehace: la abre para que el que compone la mire con su corrección delante.
+    """
     con = _con()
     filas = [dict(r) for r in con.execute(
         "select etapa_orden, que_pasa, emocion, componente, grafico, color,"
@@ -187,7 +207,8 @@ def encargos(slug):
         " where video_slug = ?"
         " order by etapa_orden", (slug,))]
     con.close()
-    return [f for f in filas if _pide_tablero(f) and not f["tablero"]]
+    return [f for f in filas if _pide_tablero(f)
+            and (not f["tablero"] or _abierto.abre(slug, "disenado", f))]
 
 
 def arco(slug):
@@ -305,8 +326,12 @@ class ServicioDisenar(Servicio):
         # pedido describe cada etapa como si la pieza estuviera en blanco, y no
         # lo esta: lo que se pide es el material B sobre una linea A cerrada.
         hay = ya_en_pantalla(pieza.slug)
+        # La ultima prueba se hace MIRANDO: el dossier dice lo que se pidio y
+        # el frame lo que salio. El porque vive en `fotogramas.py`.
+        mirar, _ = _fotogramas.sacar(pieza.n)
         payload = {
             "pieza": pieza.slug,
+            "mira_estos_fotogramas": mirar,
             # **El arco, que es lo que deja hacer un gancho de verdad.** Sin el,
             # el que monta disena tableros correctos que no saben donde caen.
             "arco": arco(pieza.slug),
@@ -369,6 +394,10 @@ class ServicioDisenar(Servicio):
         }
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
+        # **El contrato tiene dos capas y esta es la segunda.** Las
+        # capacidades no cambian —son lo que sabe hacer—; lo que cambia es el
+        # encargo. El porque, con sus palabras, vive en `dominio/abierto.py`.
+        prompt, payload = _abierto.modo(prompt, payload, pieza.slug, "disenado")
         r = contrato.pedir("disenar", pieza.slug, prompt, payload)
         if r is None:
             return Resultado(
@@ -535,7 +564,14 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     if voz_mal:
         hecho += " · voz NO declarada en " + "; ".join(voz_mal)
     _archiva_respuesta(pieza.slug)
-    return Resultado(True, salida=hecho)
+    # **El que arregla el tiquet lo cierra.** Componia y dejaba la nota abierta,
+    # asi que la linea volvia a pararse por una correccion ya hecha — y la unica
+    # forma de sacarla de ahi era cerrarla a mano contra la base, que es
+    # exactamente como se pierde el estado. El porque del cierre es la respuesta
+    # que acaba de aplicarse, no una opinion.
+    cerrados = _abierto.cerrar(pieza.slug, "disenado", f"lo compuso: {hecho}")
+    return Resultado(True, salida=hecho + (f" · tiquets {cerrados} cerrados"
+                                           if cerrados else ""))
 
 
 def _archiva_respuesta(slug: str) -> None:
