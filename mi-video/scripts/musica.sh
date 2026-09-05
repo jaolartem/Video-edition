@@ -101,7 +101,12 @@ mkdir -p "$TMPDIR" out/entrega out/revision
 #: Es el borde alto de lo que aguanta un lecho bajo palabra, y aguanta por una
 #: razon concreta: la banda de la voz sigue recortada 18-23 dB. Sin ese recorte,
 #: -15 seria musica encima de la frase.
-MUSI=-15
+# **Y se puede fijar desde fuera.** Un solo numero no puede servir a siete obras
+# distintas: medido, -15 dio de 2,3 a 19,7 dB de separacion de la voz segun la
+# obra —a reel-06 le «lastimaba», en reel-03 «no se escuchaba»—. Lo que gobierna
+# es la DISTANCIA a la voz, y hasta que ese bucle viva aqui, `MUSI` se puede
+# poner por pieza desde fuera en vez de editar el fichero.
+MUSI=${MUSI:--15}
 #: Donde y cuanto se le quita a la musica para que no pise la voz.
 #: 300 Hz son los armonicos que enturbian; 2 kHz, las consonantes.
 # ── la talla: bajar SOLO las frecuencias que compiten con la voz ─────────────

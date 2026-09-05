@@ -96,6 +96,14 @@ def preparar(toma, rehacer=False, pasadas=None, barato=False):
     #
     # Ahora se dice que falta y se sigue con las demas: una cinta sin
     # preparar es un trabajo pendiente, no una corrida rota.
+    # **Lo que hace el trabajo se importa aqui.** Faltaba, y esta funcion moria
+    # con `NameError: name 'transcribir' is not defined` — o sea que rehacer una
+    # cinta era imposible por la via canonica. Lo cazo Jaime pidiendo justo eso:
+    # *«re transcribe ese tramo y aplica el corte»*. Va dentro y no arriba porque
+    # `transcribir` importa de aqui: al reves seria un ciclo.
+    from transcribir import MODELOS, VENTANA  # noqa: F811
+    from transcribir import transcribir as _hacer
+
     cuts = f"work/cuts/{toma}.json"
     if not os.path.exists(cuts):
         registro.aviso("transcribir", "cinta sin tramos de voz: se salta",
@@ -114,8 +122,7 @@ def preparar(toma, rehacer=False, pasadas=None, barato=False):
     # fragilidad.
     paso = (VENTANA if barato
             else (VENTANA / pasadas if pasadas else None))
-    palabras, mapa, dudosos = transcribir(
-        toma, runs, modelo=modelo, paso=paso)
+    palabras, mapa, dudosos = _hacer(toma, runs, modelo=modelo, paso=paso)
     ruta = guardar(toma, palabras, mapa, dudosos, modelo, paso)
     con_texto = [m for m in mapa if m.get("texto")]
     largas = sum(w["larga"] for w in palabras)
