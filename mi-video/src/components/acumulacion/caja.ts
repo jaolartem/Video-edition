@@ -9,10 +9,20 @@ import type { Tramo } from "./tipos";
  * dibujando donde estaba.
  */
 
-/** Caja del panel sobre el que se apoya todo. */
-export const PANEL = { x: 46, y: 300, w: 988, h: 1090 } as const;
+/**
+ * Caja del panel sobre el que se apoya todo.
+ *
+ * **Medía 300–1390, y por eso este tablero fabricó la instrucción T-02**: el
+ * suelo del gráfico caía en 1170 y el resultado en 1232, dentro de los 872 px
+ * que el subtítulo y la interfaz de la plataforma tienen reservados. No es que
+ * compitiera con el subtítulo — es que el espectador **no lo veía**.
+ *
+ * Ahora el panel entero vive entre 200 y 880: por encima del techo de la franja
+ * (1048) y dejando los últimos ~145 px para la banda de la condición.
+ */
+export const PANEL = { x: 46, y: 200, w: 988, h: 680 } as const;
 /** Caja del gráfico, en coordenadas del panel. */
-export const EJE = { x: 60, y: 230, alto: 640 } as const;
+export const EJE = { x: 60, y: 140, alto: 370 } as const;
 /** Ancho de la barra. */
 export const BARRA = 330;
 /** Base del gráfico: la línea sobre la que crece todo. */

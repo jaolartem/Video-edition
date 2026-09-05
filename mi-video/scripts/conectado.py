@@ -160,11 +160,19 @@ def pasos_sin_quien_los_llame():
 def formas_sin_componente():
     """Formas de tablero declaradas que no las dibuja nadie.
 
-    `Ad.tsx` despacha seis; el resto cae en `TableroDeclarado`, que las pinta
-    como puede. Eso no da error y en pantalla sale un hueco — y hasta hoy salía
-    con el nombre interno de la forma escrito encima, porque el componente lo
-    rotulaba «para que se vea qué falta construir». Se quitó de ahí y se dice
-    aquí: un informe se lee cuando toca, un rótulo en el frame se publica.
+    El despachador conocía seis formas; el resto caía en `TableroDeclarado`, que
+    las pinta como puede. Eso no da error y en pantalla sale un hueco — y hasta
+    hace poco salía con el nombre interno de la forma escrito encima, porque el
+    componente lo rotulaba «para que se vea qué falta construir». Se quitó de
+    ahí y se dice aquí: un informe se lee cuando toca, un rótulo en el frame se
+    publica.
+
+    **Y se pregunta al render entero, no a `Ad.tsx`.** El despachador se mudó a
+    `src/components/Tablero.tsx` cuando `Ad.tsx` pasó del techo de 300 líneas, y
+    esta comprobación se habría quedado mirando un fichero donde ya no está la
+    respuesta: habría dicho que **ninguna** forma se despacha, justo el día en
+    que todas se despachan. La pregunta nunca fue «¿está en `Ad.tsx`?» sino
+    «¿la dibuja alguien?».
     """
     import json
 
@@ -172,7 +180,10 @@ def formas_sin_componente():
         return []
     with open("src/reels.json", encoding="utf-8") as f:
         piezas = json.load(f)
-    despacha = _texto(os.path.join(RAIZ, "src", "Ad.tsx"))
+    despacha = "\n".join(
+        _texto(os.path.join(base, f))
+        for base, _d, ficheros in os.walk(os.path.join(RAIZ, "src"))
+        for f in ficheros if f.endswith(".tsx"))
     fuera, vistas = [], set()
     for p in piezas:
         for b in (p.get("boards") or []):
@@ -184,7 +195,7 @@ def formas_sin_componente():
                 continue
             hay = os.path.exists(os.path.join(RAIZ, "src", "components",
                                               f"{k}.tsx"))
-            por = ("no la despacha Ad.tsx" if hay
+            por = ("no la despacha el render" if hay
                    else "no existe su componente")
             fuera.append(f"la forma «{k}» se declara y {por}: cae en"
                          f" TableroDeclarado y sale un hueco")

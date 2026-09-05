@@ -110,7 +110,13 @@ def sellar(n, carpeta=ENTREGA):
         "insert into version (video_id, n, huella, duracion_s, fichero,"
         " commit_git, fecha, edl, spec, sha_entrega)"
         " values (?,?,?,?,?,?,?,?,?,?)",
-        (vid, ult + 1, hashlib.sha1(edl.encode()).hexdigest()[:12], _dura(mp4),
+        # **La huella identifica la ENTREGA, no solo el corte.** Era el sha del
+        # EDL y la tabla exige `(video_id, huella)` unico, asi que sellar una
+        # entrega nueva del mismo corte —el audio corregido sobre la misma
+        # imagen, que es justo lo que hace `remezclar.py`— chocaba con la
+        # anterior. Y son dos entregas distintas: suenan distinto.
+        (vid, ult + 1,
+         hashlib.sha1((edl + sha).encode()).hexdigest()[:12], _dura(mp4),
          mp4.replace("\\", "/"), _git(), datetime.datetime.now().isoformat(),
          edl, spec, sha))
     # **Y el audio de esa version, que es la otra mitad de poder rehacerla.**

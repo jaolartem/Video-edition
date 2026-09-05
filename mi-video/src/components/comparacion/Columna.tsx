@@ -12,10 +12,17 @@ import type { Columna as Datos } from "./tipos";
  * bajo un tablero la voz **sigue diciendo cosas que el tablero no enseña** —es
  * un L-cut— y el 85% mira sin sonido.
  *
- * La banda vive en 960–1160 (`captionBottom` 760 + `captionBand` 200), así que
- * las columnas acaban en 900 y el remate y el pie se van por debajo de ella.
+ * **Y «por debajo de la banda» era el fallo.** Debajo están los 872 px que el
+ * subtítulo y la interfaz de la plataforma tienen reservados: el remate salía a
+ * 1390 y el pie a 1570, o sea donde el espectador **no los ve** — no donde se
+ * ven mal. Instrucción de Jaime (T-02): *«ningún tablero baja hasta esa
+ * franja»*.
+ *
+ * Ahora las tres piezas caben sobre el techo de la franja (1048 px): las
+ * columnas del 240 al 760, el remate a 790 y el pie apoyado en el techo. Y el
+ * recorte de `ZonaTablero` hace que volver a salirse sea un fallo **visible**.
  */
-export const COL = { y: 260, alto: 640 } as const;
+export const COL = { y: 240, alto: 520 } as const;
 
 /**
  * Una de las dos columnas: cabecera, cifra y pie, sobre un bloque plano.

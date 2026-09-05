@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
+import { franja } from "../brand/franja";
 import { layout, size, tracking, weight } from "../brand/tokens";
 
 /**
@@ -26,6 +27,13 @@ import { layout, size, tracking, weight } from "../brand/tokens";
  * composición: el playbook exige que el argumento funcione sin audio, y esa
  * carga la lleva el subtítulo. Si el tablero se le echa encima, la pieza deja de
  * cumplir para el 85% que mira en silencio.
+ *
+ * **Y el número sale de `franja`, no de una suma escrita aquí.** Decía
+ * `layout.safe.bottom + layout.captionBand`, que es la misma cuenta escrita por
+ * cuarta vez — y por eso `Comparacion` y `Acumulacion` pudieron dibujar a 1390,
+ * 1452 y 1570 sin que nadie se enterara: cuatro copias de un número no fallan,
+ * divergen. Instrucción de Jaime (T-02): *«ningún tablero baja hasta esa
+ * franja»*, y la franja vive en `src/brand/franja.json` y en ningún otro sitio.
  */
 export const Marco: React.FC<{
   style?: React.CSSProperties;
@@ -34,7 +42,7 @@ export const Marco: React.FC<{
   <AbsoluteFill
     style={{
       paddingTop: layout.safe.top,
-      paddingBottom: layout.safe.bottom + layout.captionBand,
+      paddingBottom: franja.reserva,
       paddingLeft: layout.safe.left,
       paddingRight: layout.safe.right,
       display: "flex",

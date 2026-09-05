@@ -4,8 +4,8 @@ import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
-import { franja } from "../brand/franja";
 import { MotionSound } from "./MotionSound";
+import { ZonaTablero } from "./ZonaTablero";
 import { Cinta, Fondo, Panel } from "./Fondo";
 import { Barra } from "./acumulacion/Barra";
 import { EJE, PANEL, SUELO, cruzaEn } from "./acumulacion/caja";
@@ -134,12 +134,20 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
        * respete su secuencia. Eso lo garantiza el montaje, no un rótulo.
        */}
 
+      {/**
+       * **Todo el contenido dentro de la zona del tablero.** Este componente y
+       * `Comparacion` son los dos que fabricaron la instrucción T-02: dibujaban
+       * a 1390, 1452 y 1570, o sea bajo la interfaz de la plataforma. Con
+       * `ZonaTablero` salirse vuelve a ser un fallo visible en vez de un
+       * argumento perdido. La placa se queda fuera: sigue a cuadro entero.
+       */}
+      <ZonaTablero>
       {/* Cinta de encabezado: las condiciones de la comparación. Va arriba y en
           claro, como en el canon — es el marco del dato, no el dato. */}
       <div
         style={{
           position: "absolute",
-          top: 152,
+          top: 108,
           left: layout.safe.left,
           right: layout.safe.right,
           display: "flex",
@@ -171,7 +179,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
         <div
           style={{
             position: "absolute",
-            top: 44,
+            top: 26,
             left: 56,
             right: 56,
             fontFamily: fontFamily.bloque,
@@ -179,7 +187,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
               ancho: PANEL.w - 112,
               largo: title.length,
               registro: "anton",
-              tope: 96,
+              tope: 92,
             }),
             lineHeight: 0.94,
             letterSpacing: "0.004em",
@@ -206,14 +214,14 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
               position: "absolute",
               left: EJE.x - 34,
               right: 56,
-              top: SUELO + 62,
+              top: SUELO + 26,
               opacity: entra(t.resultadoAt),
             }}
           >
             <div
               style={{
                 fontFamily: fontFamily.bloque,
-                fontSize: 132,
+                fontSize: 96,
                 lineHeight: 0.9,
                 letterSpacing: "0.002em",
                 textTransform: "uppercase",
@@ -259,10 +267,14 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
           // El numero vive en `src/brand/franja.json` y de ahi lo lee todo el
           // mundo. Escrito aqui era la segunda copia, que es exactamente lo que
           // permitio que este componente ignorara la reserva sin que se notara.
-          bottom: franja.reserva,
+          //
+          // Dentro de `ZonaTablero` el suelo YA es el techo de la franja, asi
+          // que la banda se apoya en `bottom: 0` y el numero deja de aparecer
+          // dos veces en el mismo fichero.
+          bottom: 0,
           backgroundColor: color.lightNeutral,
           transform: "rotate(0.9deg)",
-          padding: "22px 74px",
+          padding: "18px 74px 22px",
           fontFamily: fontFamily.video,
           fontSize: 26,
           fontWeight: 700,
@@ -273,6 +285,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
       >
         {condicion}
       </div>
+      </ZonaTablero>
     </AbsoluteFill>
   );
 };

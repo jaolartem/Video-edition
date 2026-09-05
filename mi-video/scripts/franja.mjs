@@ -54,19 +54,37 @@ export const criterio = () =>
   ` ahi, y debajo de ella vive la interfaz de la plataforma. El tablero dibuja` +
   ` entre el borde de arriba y ese techo — ${franja.techoPx} px de alto util.`;
 
-/** Qué componente dibuja cada clase de tablero. Ver `src/Ad.tsx`. */
+/**
+ * Qué componente dibuja cada clase de tablero. **Es el mismo reparto que
+ * `dibuja()` en `src/Ad.tsx`**, y por eso las formas que comparten componente
+ * aparecen aquí apuntando al mismo fichero: cuatro de las siete que no dibujaba
+ * nadie eran la misma idea con otro nombre.
+ */
 const COMPONENTE = {
   causal: "CausalChain",
   twopaths: "TwoPaths",
   comparacion: "Comparacion",
   acumulacion: "Acumulacion",
+  Anidado: "Anidado",
+  fusion: "Fusion",
+  desvio: "Desvio",
+  Fichas: "Fichas",
+  EvidenceCard: "Fichas",
+  BandaFecha: "Fichas",
+  ListaNumerada: "Fichas",
 };
 
 /**
  * Un componente **respeta la franja** si la reserva por construcción: o recorta
- * su contenido con `ZonaTablero`, o descuenta `franja.reserva` del alto útil.
- * Cualquier otra cosa es un número escrito a mano, que es como `Comparacion` y
- * `Acumulacion` acabaron dibujando a 1390, 1452 y 1570 — bajo la interfaz.
+ * su contenido con `ZonaTablero`, o descuenta `franja.reserva` del alto útil
+ * —directamente o a través de `Marco`, que es quien lo hace por todos los que
+ * lo usan—. Cualquier otra cosa es un número escrito a mano, que es como
+ * `Comparacion` y `Acumulacion` acabaron dibujando a 1390, 1452 y 1570 — bajo
+ * la interfaz.
+ *
+ * `<Marco` cuenta desde que `Canon.tsx` lee `franja.reserva` en vez de sumar
+ * `layout.safe.bottom + layout.captionBand`. Antes no podía contar: era la
+ * cuarta copia del número, y una copia no es una reserva.
  */
 export const respeta = (componente) => {
   // **Un componente que no existe no respeta nada, y eso se dice.**
@@ -81,7 +99,9 @@ export const respeta = (componente) => {
   const f = `src/components/${componente}.tsx`;
   if (!fs.existsSync(f)) return null;
   const t = leer(f);
-  return t.includes("<ZonaTablero>") || t.includes("paddingBottom: franja.reserva");
+  return t.includes("<ZonaTablero>") ||
+    t.includes("paddingBottom: franja.reserva") ||
+    t.includes("<Marco");
 };
 
 export const invasores = () => {

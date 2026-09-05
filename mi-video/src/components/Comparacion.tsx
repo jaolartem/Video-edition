@@ -5,6 +5,7 @@ import { assertShort } from "../brand/copy";
 import { useEntrada } from "../brand/horario";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo } from "./Fondo";
+import { ZonaTablero } from "./ZonaTablero";
 import { Columna } from "./comparacion/Columna";
 import { horarioDe } from "./comparacion/horario";
 import { color, layout, size, tracking } from "../brand/tokens";
@@ -77,8 +78,6 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   // de verdad y el pie legal tiene su banda.
   const util = layout.width - layout.safe.left * 2;
   const ancho = (util - 34) / 2;
-  /** Donde empieza la banda de subtítulos. Nada del tablero la invade. */
-  const cc = layout.height - layout.captionBottom;
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
@@ -109,6 +108,17 @@ export const Comparacion: React.FC<ComparacionProps> = ({
        * respete su secuencia. Eso lo garantiza el montaje, no un rótulo.
        */}
 
+      {/**
+       * **Todo el contenido dentro de la zona del tablero.**
+       *
+       * Este componente es uno de los dos que fabricaron la instrucción T-02:
+       * el remate salía a 1390 y el pie a 1570, o sea bajo la interfaz de la
+       * plataforma, donde no se ve mal — **no se ve**. `ZonaTablero` lo recorta
+       * al techo de la franja por construcción, así que salirse vuelve a ser un
+       * fallo visible en vez de un argumento perdido. El fondo se queda fuera:
+       * la placa sigue ocupando el cuadro entero.
+       */}
+      <ZonaTablero>
       {/* Cinta de premisa: la condición común. Sin ella la comparación no es
           honesta — el playbook exige que el punto de partida sea el mismo. */}
       <div
@@ -147,7 +157,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
         <div
           style={{
             position: "absolute",
-            top: cc + layout.captionBand + 30,
+            top: 790,
             left: layout.safe.left,
             right: layout.safe.right,
             display: "flex",
@@ -175,10 +185,11 @@ export const Comparacion: React.FC<ComparacionProps> = ({
           position: "absolute",
           left: 0,
           right: 0,
-          top: cc + layout.captionBand + 210,
+          // Apoyado en el techo de la franja, no en un 1570 escrito a mano.
+          bottom: 0,
           backgroundColor: color.lightNeutral,
           transform: "rotate(0.8deg)",
-          padding: "20px 74px 24px",
+          padding: "18px 74px 22px",
           opacity: entra(t.pieAt),
         }}
       >
@@ -206,6 +217,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
           {condicion}
         </div>
       </div>
+      </ZonaTablero>
     </AbsoluteFill>
   );
 };

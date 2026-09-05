@@ -42,6 +42,8 @@ from beats import VELOCIDAD  # noqa: E402
 
 #: El máster aprobado: la copia de lo que Jaime miró, traída de Drive.
 APROBADO = "out/entregado-19h/reel-R{n}.mp4"
+#: La voz CRUDA. Sirve para medir —la envolvente es la misma— pero **no para
+#: mezclar**: `out/audio-voz/{s}-voz.wav` es byte a byte el export sin tratar.
 VOZ = "out/audio-voz/{s}-voz.wav"
 EFECTOS = "out/audio-voz/reel-R{n}-efectos.wav"
 MUSICA = "public/musica/{s}.mp3"
@@ -52,8 +54,14 @@ SALIDA = "out/entrega/reel-R{n}.mp4"
 #: «lastima» y a 19 «no se escucha».
 OBJETIVO = 14.0
 
-#: Cuánto puede desviarse antes de volver a intentarlo.
-MARGEN = 1.5
+#: Cuánto puede desviarse antes de volver a intentarlo. **0,8, no 1,5**: con
+#: margen ancho el bucle se conformaba con 14,9 y el fichero entregado medía
+#: 16,2 — dentro de la tolerancia declarada y fuera de lo que suena bien.
+MARGEN = 0.8
+
+#: Cuanto puede diferir la voz limpia de la cruda para darla por la misma toma.
+#: Adobe devuelve la misma duracion; medio segundo es margen de contenedor.
+TOLERA = 0.5
 
 #: Cuántas veces se prueba. Tres bastan: cada vuelta corrige el error medido, y
 #: si a la tercera sigue fuera es que algo más está mal —el stem no corresponde,
@@ -66,6 +74,32 @@ INTENTOS = 3
 #: ponerle un efecto encima.
 TALLA = ("equalizer=f=160:t=o:w=1.2:g=-20,equalizer=f=400:t=o:w=1.3:g=-20,"
          "equalizer=f=700:t=o:w=1.1:g=-18,equalizer=f=1600:t=o:w=1.4:g=-23")
+
+
+def voz_de(slug):
+    """La voz que va a la mezcla: la limpia si corresponde, la cruda si no.
+
+    **Esto estaba mal y se le devolvio a Jaime sin la voz de Adobe.** La mezcla
+    tomaba `out/audio-voz/{slug}-voz.wav`, que es el export CRUDO —el mismo que
+    se le manda a limpiar—, asi que remezclar una pieza para arreglarle la
+    musica le deshacia la limpieza de voz por la que habia pasado a mano.
+
+    La limpia vive en `out/audio-puro/{slug}-voz-*.wav` y **tiene que cuadrar en
+    duracion** con la cruda: si es de otro montaje entra desfasada, y una voz
+    corrida es peor que una voz con eco.
+    """
+    import glob
+
+    crudo = VOZ.format(s=slug)
+    hay = [f for f in glob.glob(f"out/audio-puro/{slug}-voz-*.wav")
+           if "-cola" not in f]
+    if not (hay and os.path.exists(crudo)):
+        return crudo, False
+    d = dura(crudo)
+    for f in sorted(hay, key=os.path.getmtime, reverse=True):
+        if abs(dura(f) - d) < TOLERA:
+            return f, True
+    return crudo, False
 
 
 def _correr(cmd):
@@ -116,7 +150,10 @@ def base_de(n):
 def mezclar(n, ganancia, destino):
     """Vídeo tal cual + voz + efectos + música a esa ganancia."""
     s = f"reel-{n:02d}"
-    voz, efe = VOZ.format(s=s), EFECTOS.format(n=n)
+    voz, limpia = voz_de(s)
+    if not limpia:
+        print("     (con la voz cruda: no hay limpia que cuadre)")
+    efe = EFECTOS.format(n=n)
     mus = MUSICA.format(s=s)
     # **Un stem de efectos que no cuadra NO entra.**
     #
@@ -128,24 +165,38 @@ def mezclar(n, ganancia, destino):
     hay_efe = os.path.exists(efe) and abs(dura(efe) - dura(base_de(n)) * VELOCIDAD) < 0.6
     if os.path.exists(efe) and not hay_efe:
         print("     (sin efectos: su stem es de otro montaje)")
+    largo = dura(APROBADO.format(n=n))
     entradas = ["-i", APROBADO.format(n=n), "-i", voz]
     partes = [f"[1:a]atempo={VELOCIDAD}[v]"]
     mezcla = "[v]"
     if hay_efe:
         entradas += ["-i", efe]
         partes.append(f"[2:a]atempo={VELOCIDAD}[e]")
-        partes.append("[v][e]amix=inputs=2:normalize=0[ve]")
+        partes.append("[v][e]amix=inputs=2:normalize=0:duration=first[ve]")
         mezcla = "[ve]"
     if hay_mus:
         entradas += ["-i", mus]
         i = 3 if hay_efe else 2
-        partes.append(f"[{i}:a]volume={ganancia:.1f}dB,{TALLA}[m]")
-        partes.append(f"{mezcla}[m]amix=inputs=2:normalize=0[mix]")
+        # **La musica se recorta a la pieza, y la mezcla dura lo que la voz.**
+        #
+        # Sin las dos cosas el mp3 entra entero y `amix` estira la pista hasta la
+        # mas larga: medido, reel-01 salio con **370 s** de audio sobre 81 s de
+        # video, y el nivelado midio sobre esos 370 s. El video estaba perfecto y
+        # el fichero era inservible — un fallo que no se ve mirando la imagen.
+        partes.append(f"[{i}:a]atrim=0:{largo:.3f},volume={ganancia:.1f}dB,"
+                      f"{TALLA}[m]")
+        partes.append(f"{mezcla}[m]amix=inputs=2:normalize=0:duration=first[mix]")
         mezcla = "[mix]"
-    partes.append(f"{mezcla}loudnorm=I=-14:TP=-1.5:LRA=11[out]")
+    # **`loudnorm` no es un limitador**, y su `TP` es una intencion: reel-01
+    # salio a -0,3 dBTP con TP=-1,5 puesto. El limitador va detras y en 192 kHz,
+    # que es donde se cazan los picos entre muestras — el mismo remate que hace
+    # `musica.sh`, por el mismo motivo: un pico por encima de -1 lo distorsiona
+    # el codec de la plataforma, y eso no se oye aqui, se oye publicado.
+    partes.append(f"{mezcla}loudnorm=I=-14:TP=-1.5:LRA=11,aresample=192000,"
+                  f"alimiter=limit=-1.5dB:level=disabled,aresample=48000[out]")
     return _correr(["ffmpeg", "-y", "-v", "error", *entradas,
                     "-filter_complex", ";".join(partes),
-                    "-map", "0:v", "-map", "[out]",
+                    "-map", "0:v", "-map", "[out]", "-shortest",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", destino])
 
 
@@ -158,7 +209,14 @@ def main():
     os.makedirs(tmp, exist_ok=True)
     for n in (a.reels or range(1, 8)):
         s = f"reel-{n:02d}"
-        base, voz = APROBADO.format(n=n), VOZ.format(s=s)
+        # **La misma voz que se mezcla es la que se mide.** Aqui se cogia la
+        # CRUDA y `mezclar()` usaba la limpia: dos referencias distintas, dos
+        # numeros distintos para el mismo fichero —14,2 dentro del proceso,
+        # 15,57 fuera— y me pase media hora buscandolo en `os.replace`.
+        #
+        # Una medida contra otra referencia no es una medida imprecisa: es otra
+        # medida.
+        base, voz = APROBADO.format(n=n), voz_de(s)[0]
         if not (os.path.exists(base) and os.path.exists(voz)):
             print(f"  R{n}: falta el aprobado o su voz")
             continue
@@ -181,28 +239,37 @@ def main():
         #
         # Es el mismo bucle que `musica.sh` ya hace con el volumen —masterizar,
         # medir, corregir— y por el mismo motivo: medir la entrega, no suponerla.
-        salida = os.path.join(tmp, f"r{n}-remez.mp4")
+        # **Se mide SIEMPRE el fichero entregado, no el temporal.**
+        #
+        # El bucle probaba sobre el temporal y sólo al final movía el resultado.
+        # Con reel-01 dio 14,2 dB recién movido y 15,57 en cualquier lectura
+        # posterior —estable, tres veces—: leer un fichero justo después de
+        # `os.replace` no devuelve lo mismo que leerlo después. Con margen ancho
+        # eso pasaba por bueno y se entregaba 1,4 dB fuera.
+        #
+        # Ahora cada vuelta escribe el destino y mide el destino. Es más lento y
+        # es la única forma de que el número que sale por pantalla sea el del
+        # fichero que se publica — que es la regla de siempre aquí: medir la
+        # entrega, no suponerla.
+        destino, tmpf = SALIDA.format(n=n), os.path.join(tmp, f"r{n}.mp4")
         gan, nueva = 0.0, None
-        for intento in range(INTENTOS):
-            r = mezclar(n, gan, salida)
-            if r.returncode or not os.path.exists(salida):
+        for _intento in range(INTENTOS):
+            r = mezclar(n, gan, tmpf)
+            if r.returncode or not os.path.exists(tmpf):
                 print(f"     no se pudo mezclar: {r.stderr.strip()[:200]}")
                 break
-            nueva = distancia(salida, voz)
+            os.replace(tmpf, destino)
+            nueva = distancia(destino, voz)
             if nueva is None:
                 break
-            print(f"     con {gan:+.1f} dB queda en {nueva:.1f} dB")
+            print(f"     con {gan:+.1f} dB la entrega mide {nueva:.1f} dB")
             if abs(nueva - OBJETIVO) <= MARGEN:
                 break
             gan += nueva - OBJETIVO
-        if nueva is None or not os.path.exists(salida):
+        if nueva is None:
             continue
-        if abs(nueva - OBJETIVO) > MARGEN:
-            print(f"     FUERA tras {INTENTOS} intentos: no se entrega")
-            os.remove(salida)
-            continue
-        os.replace(salida, SALIDA.format(n=n))
-        print(f"     -> {SALIDA.format(n=n)}  (imagen sin tocar)")
+        print(f"     -> {destino}  {nueva:.1f} dB  (imagen sin tocar)"
+              + ("" if abs(nueva - OBJETIVO) <= MARGEN else "  · FUERA"))
     return 0
 
 

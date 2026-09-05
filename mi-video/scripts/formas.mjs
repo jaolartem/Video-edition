@@ -108,8 +108,18 @@ const ROLES = (() => {
   return fuera;
 })();
 
+/**
+ * **Y se lee del despachador, no de `Ad.tsx`.**
+ *
+ * Leía `src/Ad.tsx`, que es donde estaba el ternario. El día que `Ad.tsx` pasó
+ * del techo de 300 líneas el despacho se mudó a `components/Tablero.tsx`, y con
+ * la ruta escrita a fuego esto habría devuelto un conjunto **vacío**: el parte
+ * habría mandado a construir las once formas que ya se dibujan, justo el día en
+ * que se acabaron de construir. Es la misma verdad copiada, esta vez por la
+ * puerta de la ruta.
+ */
 export const CONSTRUIDAS = new Set(
-  [...fs.readFileSync("src/Ad.tsx", "utf8")
+  [...fs.readFileSync(`${DIR_C}/Tablero.tsx`, "utf8")
       .matchAll(/cue\.kind === "([^"]+)"/g)].map((m) => m[1]),
 );
 

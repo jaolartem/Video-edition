@@ -51,15 +51,32 @@ POR_SLUG = ("revision", "escena_desc", "densidad", "descartado")
 # Vacias y sin nadie que las lea. Una tabla que no se usa no es inofensiva:
 # aparece en el esquema, alguien la lee como si significara algo, y ahi empieza
 # el error.
-MUERTAS = ("tarjeta_bloque", "tarjeta_remate", "render", "escena")
+# **Y tres mas, que `conectado.py` encontro vacias y sin nadie que las
+# escriba.** `tarjeta` y `tratamiento` guardan datos que hoy viven en otro sitio
+# —el pie de las tarjetas sale del paso 2, la velocidad es una sola para el
+# lote—, y `asignacion` duplica `work/asignacion/*.json`. Una tabla declarada y
+# vacia es una promesa de estado que no se cumple: mejor no tenerla que tenerla
+# mintiendo. Si alguna vuelve a hacer falta, vuelve con quien la escriba.
+MUERTAS = ("tarjeta_bloque", "tarjeta_remate", "render", "escena",
+           "tarjeta", "tratamiento", "asignacion")
 
 # La escalera que fijo Jaime el 29 de agosto de 2026, corrida para arrancar hoy.
 # El Early Bird se conserva como fila pasada: es el ancla.
+# **Y corrida otra vez el 4 de septiembre, que es la que vale.** Jaime: *«otro
+# tiket, deja el precio de 20 dolares hasta el 9 de septiembre»* y *«el bloque
+# de 30 corrio hasta el 15 y el resto pues de 40»*.
+#
+# Aqui seguia la anterior —20 al 4, 30 al 11— y esta lista se **reinserta en
+# cada migracion**, asi que la escalera vieja volvia a aparecer al lado de la
+# nueva. Con las dos vivas, `precio_vigente` saco a pantalla «$20 hasta el 4 sep
+# · luego $20 y $30 y $30 y $40»: una fecha vencida ese mismo dia y una escalera
+# que no existe, en las siete piezas. El precio es lo unico de la pieza que el
+# espectador va a pagar.
 ESCALERA = [
     (10, None, "2026-08-28", 1, "Early Bird — fila pasada, ancla"),
-    (20, "2026-08-29", "2026-09-04", 0, None),
-    (30, "2026-09-05", "2026-09-11", 0, None),
-    (40, "2026-09-12", "2026-09-21T11:30", 0, "cierra con el evento"),
+    (20, "2026-08-29", "2026-09-09", 0, None),
+    (30, "2026-09-10", "2026-09-15", 0, None),
+    (40, "2026-09-16", "2026-09-21T11:30", 0, "cierra con el evento"),
 ]
 
 

@@ -6,13 +6,15 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { CausalChain, type CausalChainProps } from "./components/CausalChain";
-import { Comparacion, type ComparacionProps } from "./components/Comparacion";
-import { BeliefSwap, type BeliefSwapProps } from "./components/BeliefSwap";
-import { Compuerta, type CompuertaProps } from "./components/Compuerta";
-import { Acumulacion, type AcumulacionProps } from "./components/Acumulacion";
-import { TwoPaths, type TwoPathsProps } from "./components/TwoPaths";
-import { TableroDeclarado } from "./components/TableroDeclarado";
+import { dibujaTablero } from "./components/Tablero";
+// Sólo los tipos: **quién dibuja cada forma vive en `components/Tablero.tsx`**,
+// y aquí se declara nada más el contrato de lo que el spec puede pedir.
+import type { CausalChainProps } from "./components/CausalChain";
+import type { ComparacionProps } from "./components/Comparacion";
+import type { BeliefSwapProps } from "./components/BeliefSwap";
+import type { CompuertaProps } from "./components/Compuerta";
+import type { AcumulacionProps } from "./components/Acumulacion";
+import type { TwoPathsProps } from "./components/TwoPaths";
 import { CaptionBand, type Compuesto } from "./components/CaptionBand";
 import { color } from "./brand/tokens";
 import { mode as modes, type Mode } from "./brand/tokens";
@@ -229,30 +231,10 @@ export const Ad: React.FC<AdProps> = ({
         >
           {/* Cada estructura tiene su tablero. Un mismo componente en cuatro
               frameworks distintos hace que los cuatro se vean iguales, y
-              entonces el tablero deja de significar nada. */}
-          {cue.kind === "causal" ? (
-            <CausalChain {...(cue.props as CausalChainProps)} mode={mode} />
-          ) : cue.kind === "comparacion" ? (
-            <Comparacion {...(cue.props as ComparacionProps)} />
-          ) : cue.kind === "acumulacion" ? (
-            <Acumulacion {...(cue.props as AcumulacionProps)} />
-          ) : cue.kind === "twopaths" ? (
-            <TwoPaths {...(cue.props as TwoPathsProps)} mode={mode} />
-          ) : cue.kind === "BeliefSwap" ? (
-            <BeliefSwap {...(cue.props as BeliefSwapProps)} />
-          ) : cue.kind === "Compuerta" ? (
-            <Compuerta {...(cue.props as CompuertaProps)} />
-          ) : (
-            /* **Y lo demás también se dibuja.** Aquí caían diecinueve formas
-               declaradas por el diseñador y no salía nada — ni en pantalla ni
-               en el log. `TwoPaths` era el `else`, así que una forma que no
-               fuera ninguna de las tres primeras se intentaba dibujar como dos
-               trayectorias y reventaba o salía vacía. */
-            <TableroDeclarado
-              kind={cue.kind}
-              props={cue.props as Record<string, unknown>}
-            />
-          )}
+              entonces el tablero deja de significar nada. Quién dibuja cada
+              forma lo dice `dibujaTablero`,
+              en `components/Tablero.tsx`. */}
+          {dibujaTablero(cue, mode)}
         </Sequence>
       ))}
 

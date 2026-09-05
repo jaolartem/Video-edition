@@ -44,6 +44,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dominio import abierto as _abierto  # noqa: E402
 import fotogramas as _fotogramas  # noqa: E402
 from dominio import remate as _remate  # noqa: E402
+from dominio.mudo import sin_copy as _sin_copy  # noqa: E402
+from dominio.arco import arco  # noqa: E402
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
 from .marca import _canon, _laminas, _sonidos, _topes  # noqa: E402
@@ -165,6 +167,18 @@ def _pide_tablero(fila):
     """
     if fila["componente"]:
         return True
+    # **Y una etapa que YA tiene tablero montado lleva tablero.** Parece una
+    # perogrullada y era el agujero: reel-05 e2 tenía uno declarado —mudo, ver
+    # `_sin_copy`— y su `grafico` describe fichas, así que ni nombraba
+    # `componente` ni sonaba a tipografía. Con las dos preguntas de abajo daba
+    # **False**, o sea «esta etapa no lleva tablero», con un tablero puesto.
+    #
+    # Consecuencia: no entraba nunca al encargo, ni para revisarlo ni para
+    # corregirlo, y los 13,6 s de la etapa 2 se quedaron con tres paralelogramos
+    # de 40 px durante cinco ciclos. El filtro de `encargos()` sigue decidiendo
+    # si hay algo que pedir; esto sólo deja de mentir sobre si hay tablero.
+    if fila.get("tablero"):
+        return True
     # **Y el gancho siempre lleva, lo diga o no.**
     #
     # Es la etapa 1 y es la unica que no puede quedarse sin composicion: los
@@ -199,6 +213,10 @@ def encargos(slug):
 
     Un tiquet suyo sobre una etapa la vuelve a poner en el encargo. No la
     rehace: la abre para que el que compone la mire con su corrección delante.
+
+    **Y un tablero mudo también la abre.** Ver `_sin_copy`: una etapa con la
+    columna `tablero` puesta y sin una línea de copy dentro no dibuja nada, y
+    para este paso era indistinguible de una etapa resuelta.
     """
     con = _con()
     filas = [dict(r) for r in con.execute(
@@ -208,59 +226,8 @@ def encargos(slug):
         " order by etapa_orden", (slug,))]
     con.close()
     return [f for f in filas if _pide_tablero(f)
-            and (not f["tablero"] or _abierto.abre(slug, "disenado", f))]
-
-
-def arco(slug):
-    """El arco narrativo y el emocional, en orden. Los da el compositor.
-
-    Regla de Jaime, y es la que sube el techo de este paso: *«el compositor puede
-    darle informacion respecto al arco narrativo y al arco emocional al
-    disenador; el disenador puede hacer un gancho visual mucho mas potente, por
-    ejemplo»*.
-
-    Sin esto el que monta ve un encargo por tablero y nada mas, asi que disena
-    tableros correctos que **no saben donde caen**: el gancho no sabe que tiene
-    que abrir, el cierre no sabe que tiene que rematar, y el tablero del medio no
-    sabe si esta en la subida o en la caida. Con el arco delante, la forma puede
-    acompanar al argumento en vez de ilustrarlo.
-
-    Son dos arcos y no uno:
-
-    - **narrativo** — que funcion cumple cada etapa en el frame, en orden. Es la
-      estructura del argumento.
-    - **emocional** — que siente el espectador en cada etapa. Jaime lo describio
-      como onda: *«arriba, luego abajo, luego arriba»*.
-    """
-    con = _con()
-    filas = [dict(r) for r in con.execute(
-        "select e.orden, ec.nombre funcion, e.mensaje_esperado, e.obligatorio,"
-        "       d.emocion, d.que_pasa, d.trato"
-        "  from etapa e join video v on v.id = e.video_id"
-        "  left join etapa_canonica ec"
-        "         on ec.estructura_id = e.estructura_id"
-        "        and ec.orden = e.etapa_orden"
-        "  left join escena_desc d on d.video_slug = v.slug"
-        "   and d.etapa_orden = e.orden"
-        " where v.slug = ? order by e.orden", (slug,))]
-    con.close()
-    return {
-        # **La intención narrativa de CADA segmento, no la de la pieza.** Jaime:
-        # *«el segundo recibe la intención narrativa y el arco emocional de cada
-        # segmento; con eso puede potenciarlo con diseño»*. Saber que la etapa 4
-        # es la revelación y tiene que decir tal cosa es lo que deja diseñar
-        # para eso, en vez de ilustrar la frase que se oye.
-        "narrativo": [{"etapa": f["orden"], "funcion": f["funcion"],
-                       "tiene_que_decir": f["mensaje_esperado"],
-                       "obligatoria": bool(f["obligatorio"])}
-                      for f in filas],
-        # Y la onda: arriba, abajo, arriba. Con el tratamiento que ya lleva, que
-        # es lo que dice si ese punto pide sostener o golpear.
-        "emocional": [{"etapa": f["orden"], "emocion": f["emocion"],
-                       "trato": f["trato"],
-                       "que_pasa": (f["que_pasa"] or "")[:120]}
-                      for f in filas],
-    }
+            and (not f["tablero"] or _sin_copy(f)
+                 or _abierto.abre(slug, "disenado", f))]
 
 
 def resumen_pieza(slug):
