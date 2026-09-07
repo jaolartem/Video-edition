@@ -503,6 +503,21 @@ for r in "${REELS[@]}"; do
   #
   # Va aqui, pegado a la entrega, y no en un paso aparte: un paso que hay que
   # acordarse de correr no es un paso, y ese error ya se pago con `costuras.py`.
+  # **Y se mide cómo SUENA lo que se acaba de entregar.**
+  #
+  # `suena.py` llevaba días escrito y no lo llamaba nadie — uno de los cinco
+  # seguros desconectados que salieron en la auditoría del 7-9-2026. Corrido a
+  # mano ese día encontró **9 costuras audibles en reel-01 y 12 en reel-06**,
+  # que es exactamente lo que Jaime describió de oído: *«los demás sí están
+  # raros»*. Un seguro que existe y no corre es peor que no tenerlo: hace creer
+  # que eso ya se mira.
+  #
+  # **No para y no abre tiquets**, y las dos cosas son a propósito. Lo dice su
+  # propia cabecera —«nada de esto decide, informa»— y lo segundo lo enseñó
+  # C-307: un aviso automático por pieza y por corrida entierra la lista. Se
+  # imprime y se guarda en `medicion`, que es donde un número sobrevive a la
+  # corrida.
+  python scripts/suena.py "$n" --guardar 2>&1 | sed 's/^/  /' || true
   python scripts/sellar.py "$n"
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done
