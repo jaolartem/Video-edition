@@ -67,8 +67,12 @@ _TMP_PROY="$TMPDIR"
 # Y **una vez al dia, no en cada guion**: esto lo sourcean treinta scripts y
 # recorrer el temporal en cada uno seria pagar la limpieza treinta veces para no
 # encontrar nada. La marca es un fichero vacio con su fecha.
+# La guardia del `-n`: sin temporal, `_BARRIDO` seria «/.barrido» y el `: >`
+# de abajo escribiria en la raiz. No puede pasar —`temporal.mjs` se planta
+# antes—, pero una redireccion sobre una ruta que sale de una variable se
+# comprueba, que es la mitad del trabajo de este fichero.
 _BARRIDO="$_TMP_PROY/.barrido"
-if [ -z "$(find "$_BARRIDO" -newermt '-1 day' 2>/dev/null)" ]; then
+if [ -n "$_TMP_PROY" ] && [ -z "$(find "$_BARRIDO" -newermt '-1 day' 2>/dev/null)" ]; then
   _VIEJAS=$(find "$_TMP_PROY" -maxdepth 1 -type d -mtime +2     \( -name 'render-*' -o -name 'bundle-*' -o -name 'sfx-*'        -o -name 'seg-*' -o -name 'remotion-*' \) 2>/dev/null | wc -l)
   if [ "$_VIEJAS" -gt 0 ]; then
     find "$_TMP_PROY" -maxdepth 1 -type d -mtime +2       \( -name 'render-*' -o -name 'bundle-*' -o -name 'sfx-*'          -o -name 'seg-*' -o -name 'remotion-*' \)       -exec rm -rf {} + 2>/dev/null

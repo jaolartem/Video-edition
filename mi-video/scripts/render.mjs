@@ -114,7 +114,15 @@ const CONCURRENCIA = Math.min(
 );
 
 const t0 = Date.now();
-if (!process.env.BUNDLE_LOTE) console.log('empaquetando una vez para todas…');
+// **En `--solo-bundle`, por la salida estandar va la ruta y NADA mas.**
+//
+// Quien la pide la captura con `$(...)`, asi que cualquier otra linea en stdout
+// se le cuela dentro: el lote exportaria una ruta que no existe, cada pieza
+// volveria a empaquetar por su cuenta y no fallaria nada — se perderia el
+// ahorro en silencio, que es peor que un error. Lo informativo va a stderr, que
+// es donde se lee igual.
+const di = soloBundle ? console.error : console.log;
+if (!process.env.BUNDLE_LOTE) di('empaquetando una vez para todas…');
 // **El bundle se hace SIN cache, y esa es la palanca buena.**
 //
 // `src/reels.json` se importa dentro del bundle, asi que lo que el render dibuja
@@ -157,7 +165,7 @@ const servedUrl = heredado
       enableCaching: false,
       onProgress: () => {},
     });
-console.log(
+di(
   heredado
     ? `bundle del lote: ${prestado}`
     : `bundle listo en ${((Date.now() - t0) / 1000).toFixed(1)} s`,

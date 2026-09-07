@@ -101,6 +101,31 @@ TICKET
 # nada: se comprueba todo, como hasta hoy.
 del_lote() { [ -n "${EN_LOTE:-}" ]; }
 
+# **Le pregunta a la cadena, y un ERROR no es «al dia».**
+#
+# `cadena.py --hay-que` contesta con el codigo de salida, y hasta ahora tenia
+# dos: 0 «rehazlo» y 1 «esta al dia». El problema es que un eslabon mal escrito
+# tambien salia con 1 — el mismo codigo—, asi que una errata se leia como «no
+# hace falta» y el paso se saltaba **sin una linea de aviso**. Es la forma de
+# fallar mas cara que tiene esta linea: hacia menos trabajo y decia que todo iba
+# bien.
+#
+# Ahora hay un tercero, el 2, y aqui se trata como lo que es: si la cadena no
+# pudo contestar, no se decide por ella.
+#
+# El `|| c=$?` no es adorno: con `set -e`, la salida 1 de un comando suelto
+# mataria el guion antes de poder mirarla.
+_hay_que() {
+  local c=0
+  python scripts/cadena.py --hay-que "$1" "$2" || c=$?
+  if [ "$c" -gt 1 ]; then
+    echo "montar.sh: la cadena no pudo contestar por «$1» (codigo $c)."
+    echo "  No se sigue: un error leido como «al dia» salta el paso en silencio."
+    exit 1
+  fi
+  return "$c"
+}
+
 #: `--solo-lote`: solo la mitad que mira el proyecto entero. Ver la nota
 #: donde este fichero se parte, mas abajo.
 SOLO_LOTE=0
@@ -311,7 +336,7 @@ for r in "${PIEZAS_CORTE[@]}"; do
   # lo que come cada uno y con su productor como fuente. Lo unico que le
   # faltaba era que alguien le preguntara — se le citaba tres veces en este
   # fichero, siempre dentro de un comentario.
-  if python scripts/cadena.py --hay-que corte "$((10#$r))"; then
+  if _hay_que corte "$((10#$r))"; then
     node scripts/render-hook.mjs --source "$SRC" \
       --plan "work/scenes/reel-$r/plan-full.json" \
       --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
@@ -342,10 +367,10 @@ for r in "${PIEZAS_CORTE[@]}"; do
   #
   # A diferencia de `sujeto.py`, estas dos solo miran el video: si el corte no
   # se movio la medida vale, y por eso van con la pregunta delante.
-  if python scripts/cadena.py --hay-que huecos "$((10#$r))"; then
+  if _hay_que huecos "$((10#$r))"; then
     PYTHONIOENCODING=utf-8 python scripts/dominio/hueco.py "$((10#$r))" 2>&1 | tail -1
   fi
-  if python scripts/cadena.py --hay-que trasfondo "$((10#$r))"; then
+  if _hay_que trasfondo "$((10#$r))"; then
     PYTHONIOENCODING=utf-8 python scripts/dominio/trasfondo.py "$((10#$r))" 2>&1 | tail -1
   fi
   python scripts/subtitular.py "$r"
@@ -475,7 +500,7 @@ for r in "${REELS[@]}"; do
   # y no el CLI—, asi que rehacerla es la unica forma de que la linea
   # converja.
   RENDERIZADA=0
-  if python scripts/cadena.py --hay-que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
+  if _hay_que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
     node scripts/render.mjs "$n"
     RENDERIZADA=1
   fi
@@ -616,7 +641,7 @@ for r in "${REELS[@]}"; do
   # los efectos, que cuelgan del render: si nada de eso se movio, remezclar
   # produce el mismo fichero y cuesta las pasadas de `loudnorm` enteras.
   ENTREGA_NUEVA=0
-  if python scripts/cadena.py --hay-que entrega "$n"; then
+  if _hay_que entrega "$n"; then
     ENTREGA_NUEVA=1
     "$(command -v bash || command -v sh)" scripts/musica.sh "$n"
   fi
