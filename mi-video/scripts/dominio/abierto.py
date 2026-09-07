@@ -91,8 +91,13 @@ def suyas(slug):
             (slug, MAQUINA)).fetchall()
     except sqlite3.Error:
         return []
+    # **Enteras.** El tope de 120 venia de cuando una correccion era una linea.
+    # Hoy llevan la decision dentro, y cortarlas manda el titular sin el
+    # encargo: el 7-9-2026 la #805 le llego al disenador cortada en «...no
+    # sostiene: «usted no es» —justo antes de la frase que Jaime eligio— y
+    # eligio otra distinta. La instruccion viaja entera o no viaja.
     suyas_ = [(r["id"], r["accion"], FASE.get(r["accion"], "disenado"),
-               " ".join((r["que"] or "").split())[:120]) for r in filas]
+               " ".join((r["que"] or "").split())) for r in filas]
     return suyas_ + _tiquets(slug)
 
 

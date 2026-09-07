@@ -190,7 +190,17 @@ def anotar(video_id, fase_id, por_que=None):
                 (video_id, fase_id, datetime.datetime.now().isoformat(
                     timespec="seconds"), por_que))
     con.commit()
+    r = con.execute("select slug from video where id = ?", (video_id,)).fetchone()
     con.close()
+    # **Y se publica.** Mover la pieza y decirlo son lo mismo: un estado que solo
+    # vive en la base no lo puede leer quien tiene `Read` y `Write` y nada mas,
+    # que son los dos oficios de la linea. Ver `dominio/estado.py`.
+    try:
+        from . import estado as _e
+        if r:
+            _e.escribe(r["slug"])
+    except Exception:                              # noqa: BLE001
+        pass
 
 
 #: **Qué eslabón de `cadena.py` produce cada fase**, para las que producen un

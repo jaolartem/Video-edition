@@ -76,6 +76,22 @@ def dossier(pieza: Pieza) -> dict | None:
         return None
 
     d = {"pieza": pieza.slug, "fichero": os.path.basename(mp4)}
+    # **Y los fotogramas, porque este paso es de mirar.** El prompt que recibe
+    # cierra con «antes de contestar: MIRALO» y el pedido no traia una sola
+    # imagen: se juzgaba con numeros la unica cosa que existe para verse.
+    # `fotogramas.sacar` estaba escrito para esto —cinco por escena, del render
+    # entregado— y no lo llamaba nadie. Jaime: *«que tome cinco fotogramas
+    # repartidos de la escena, va a verlos, y con esos decide»*.
+    try:
+        import fotogramas
+
+        tiros, por_que = fotogramas.sacar(n)
+        d["mira"] = tiros if tiros else []
+        if por_que:
+            d["sin_fotogramas"] = por_que
+    except Exception as e:                         # noqa: BLE001
+        d["mira"] = []
+        d["sin_fotogramas"] = f"{type(e).__name__}: {e}"[:160]
     # Una pasada de ffmpeg para las cuatro medidas, no una por medida: los
     # tres filtros miden y dejan pasar, asi que en serie dicen lo mismo.
     d.update(suena.pasada(mp4))

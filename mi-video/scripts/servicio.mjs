@@ -53,8 +53,31 @@ export function dejaPedido(paso, slug, prompt, datos) {
 export function leeRespuesta(paso, slug) {
   const r = rutaRespuesta(paso, slug);
   if (!fs.existsSync(r)) return null;
-  const arr = JSON.parse(fs.readFileSync(r, "utf8"));
+  return desenvuelve(JSON.parse(fs.readFileSync(r, "utf8")));
+}
+
+/**
+ * **La respuesta es un array; si viene envuelta, se desenvuelve.**
+ *
+ * El 7-9-2026 dos de las tres respuestas del dia volvieron rechazadas por
+ * «la respuesta no es un array», y las dos traian el trabajo entero: `{tiquets,
+ * etapas}` en vez de la lista pelada. El rechazo era correcto y era inutil —
+ * paraba por la forma del envoltorio, no por lo que decia dentro, y costaba una
+ * vuelta completa del servicio cada vez.
+ *
+ * La forma del transporte no es una decision: se acepta y se sigue. Lo que si
+ * se conserva es `tiquets`, que es lo unico del envoltorio que significa algo —
+ * dice que correcciones se atienden— y sin el se cerraria ninguna.
+ */
+export function desenvuelve(d) {
+  if (Array.isArray(d)) return d;
+  const arr = d && (d.etapas || d.escenas || d.respuesta);
   if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
+  const suyos = d.tiquets;
+  if (Array.isArray(suyos) && suyos.length && arr.length
+      && !arr.some((x) => x && x.tiquets)) {
+    arr[0] = { ...arr[0], tiquets: suyos };
+  }
   return arr;
 }
 

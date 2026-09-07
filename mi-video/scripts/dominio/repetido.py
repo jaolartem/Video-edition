@@ -41,6 +41,26 @@ from .guion import Guion  # noqa: E402
 PEGADO = 2
 
 
+#: Lo que como minimo dura una palabra dicha. Por debajo de esto la toma no es
+#: una toma: son los tiempos inventados del transcript.
+#:
+#: **Y esto no lo atrapaba la guarda de duracion cero.** El 7-9-2026 reel-02
+#: traia seis `se_queda` de 0,01 a 0,02 segundos —tres palabras en 20 ms— y
+#: aplicarlos habria borrado su CTA entero: «y el 21 de septiembre le explico el
+#: resto, abajo le queda el link». Miden mas que cero, asi que pasaban.
+#:
+#: El umbral esta medido, no elegido: los seis artefactos van de 0,003 a 0,06 s
+#: por palabra y la toma real mas rapida del lote da 0,123. Cabe holgado entre
+#: las dos cosas.
+POR_PALABRA = 0.10
+
+
+def _de_verdad(v, n):
+    """Si esa ventana pudo decirse de verdad, o son tiempos inventados."""
+    dura = float(v.get("acaba", 0)) - float(v.get("empieza", 0))
+    return dura / max(n, 1) >= POR_PALABRA
+
+
 def repetido(montaje, n: int = 3) -> list:
     """Los n-gramas que la pieza dice más de una vez, con la prueba al lado.
 
@@ -99,7 +119,8 @@ def repetido(montaje, n: int = 3) -> list:
                 continue
             v["intensidad"] = (round(float(m["intensidad"]), 2)
                                if m.get("intensidad") is not None else None)
-        medidas = [v for v in veces if v["intensidad"] is not None]
+        medidas = [v for v in veces if v["intensidad"] is not None
+                   and _de_verdad(v, n)]
         beat = seq[sitios[0]][2]
         una_toma = len({v["trozo"] for v in veces}) == 1
         en_libreto = " ".join(
