@@ -54,15 +54,34 @@ _guardas() {
   salida=$(node scripts/guardas.mjs 2>&1) || {
     echo "$salida"
     if [ "$FINAL" = "1" ]; then return 1; fi
+    # **Una aguja rota es UN ticket, no siete por corrida.**
+    #
+    # Esto abria uno por pieza cada vez que corria, y `montar.sh` corre una vez
+    # por pieza: siete piezas x siete tickets = 49 por vuelta, con el mismo
+    # texto. Medido el 7-9-2026: **98 de los 206 tickets abiertos** eran esto,
+    # de solo SIETE agujas distintas — C-170 sola habia abierto 35.
+    #
+    # El dano no es el ruido: es que 98 pendientes falsos entierran los 108 de
+    # verdad, y una lista en la que no se puede confiar deja de leerse. Ahora se
+    # abre uno por aguja rota, con su codigo en el texto, y no se repite si ya
+    # hay uno abierto por esa misma.
     PYTHONIOENCODING=utf-8 python - "$salida" <<'TICKET'
+import re
 import sys
+
 sys.path.insert(0, "scripts")
 from dominio import ticket as tk
-for n in (1, 2, 3, 4, 5, 6, 7):
-    tk.abrir(f"reel-{n:02d}",
-             "una guarda de codigo no se sostiene y la entrega salio igual: "
-             + " ".join(sys.argv[1].split())[:600],
-             None, "dato")
+
+salida = " ".join(sys.argv[1].split())
+codigos = dict.fromkeys(re.findall(r"C-\d+", salida)) or {"": None}
+abiertos = " ".join(t["dijo"] or "" for t in tk.abiertos())
+for c in codigos:
+    if c and c in abiertos:
+        continue
+    tk.abrir("reel-01",
+             f"una guarda de codigo no se sostiene y la entrega salio igual"
+             f"{' (' + c + ')' if c else ''}: {salida[:600]}",
+             None, "dato", vuelve_a="", cierra_con="guardas")
 TICKET
     echo "montar.sh: guarda rota anotada como ticket; la entrega sigue."
   }
