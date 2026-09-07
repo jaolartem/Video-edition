@@ -42,6 +42,17 @@ def _sin_tildes(t: str) -> str:
     return "".join(c for c in t if unicodedata.category(c) != "Mn")
 
 
+def apodo(t: str) -> str:
+    """Para **nombrar una carpeta o un fichero** con lo que dijo alguien.
+
+    Todo lo que no sea letra o dígito pasa a guion. Estaba escrita tres veces
+    —`cortar.py`, `publicar.py`, `revisar.py`— palabra por palabra igual, que es
+    la forma barata de esta avería: tres copias idénticas hoy son tres reglas
+    distintas el día que alguien toque una.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", _sin_tildes(t)).strip("-") or "sin-nombre"
+
+
 def comparable(t: str) -> str:
     """Para **buscar un ancla** en la línea de montaje.
 

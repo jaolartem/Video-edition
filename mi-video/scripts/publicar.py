@@ -43,11 +43,10 @@ import rutas  # noqa: E402
 BASE = os.path.join("ads", "decisiones.db")
 
 
-def apodo(t):
-    """Nombre de carpeta legible y sin sorpresas de codificación."""
-    t = unicodedata.normalize("NFD", (t or "").lower())
-    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
-    return re.sub(r"[^a-z0-9]+", "-", t).strip("-") or "sin-nombre"
+# El apodo lo hace `dominio.texto`, que es el dueño de cómo se normaliza un
+# texto en este proyecto. Estaba copiado aquí, en `publicar.py` y en
+# `revisar.py`, las tres veces igual.
+from dominio.texto import apodo  # noqa: E402
 
 
 def aprobados(con):

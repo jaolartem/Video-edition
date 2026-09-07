@@ -98,9 +98,8 @@ def _st(v):
     return "sin medir" if v is None else f"{v:.1f} st"
 
 
-def _limpio(t):
-    t = unicodedata.normalize("NFD", (t or "").lower())
-    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+# Igual que en `redundancia.py`: el dueño de esto es `dominio.texto`.
+from dominio.texto import _sin_tildes as _limpio  # noqa: E402
 
 
 def densidad(slug, orden, base="ads/decisiones.db"):

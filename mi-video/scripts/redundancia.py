@@ -105,10 +105,9 @@ def _vecinas(palabras, borde, lado):
 # de palabras bonitas, son las cuatro formas en que este proyecto pide la accion
 # —el link, la descripcion, inscribirse, el cupo— y estan tomadas de lo que
 # Jaime dice de verdad en las cintas, no inventadas.
-def _sin_tildes(t):
-    import unicodedata
-    t = unicodedata.normalize("NFD", t.lower())
-    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+# Quitar tildes lo hace `dominio.texto`, que es su dueño. Estaba copiado aquí
+# palabra por palabra.
+from dominio.texto import _sin_tildes  # noqa: E402
 
 
 CIERRE = re.compile(

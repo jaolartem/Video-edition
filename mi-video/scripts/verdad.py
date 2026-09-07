@@ -232,6 +232,28 @@ VERDADES = (
               " dos componentes y los otros dos no la miraban.",
     ),
     Verdad(
+        decision="Cuándo dos textos dicen lo mismo",
+        vive_en="`scripts/dominio/texto.py` — `comparable` para buscar un ancla,"
+                " `palabras` para contar, `contenido` para medir de qué habla y"
+                " `apodo` para nombrar un fichero",
+        lee=(Aguja("scripts/dominio/texto.py", "def _sin_tildes(t: str) -> str:"),
+             Aguja("scripts/dominio/texto.py", "def apodo(t: str) -> str:"),
+             Aguja("scripts/subtitular.py", "from dominio.texto import comparable as _comparable"),
+             Aguja("scripts/redundancia.py", "from dominio.texto import _sin_tildes"),
+             Aguja("scripts/trato.py", "from dominio.texto import _sin_tildes as _limpio"),
+             Aguja("scripts/cortar.py", "from dominio.texto import apodo"),),
+        copia="Ninguna en la línea. Quedan dos en `find-start.py` y"
+              " `pick-takes.py`, que no los llama nadie, y una distinta a"
+              " propósito en `repeticiones.py`, que tira los dígitos — ver el"
+              " costo.",
+        costo="Doce normalizaciones de texto en doce ficheros y **ninguna igual a"
+              " otra**, contadas el 7-9-2026. Tres eran `apodo` copiado palabra"
+              " por palabra; dos, `_sin_tildes` copiado igual. Y una decide"
+              " distinto: `repeticiones.py` parte con `[a-z]+` y se come los"
+              " dígitos, así que no ve repetida una cifra — y es el paso que"
+              " decide qué se corta por repetirse.",
+    ),
+    Verdad(
         decision="Cuándo un tramo es lectura",
         vive_en="`scripts/trato.py`, con la medida de `seleccionar.py :: literal()`",
         lee=(Aguja("scripts/trato.py", "LEIDA = 0.60"),

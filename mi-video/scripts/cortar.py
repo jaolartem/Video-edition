@@ -45,10 +45,10 @@ ENCODE = ["-c:v", "h264_amf", "-quality", "balanced", "-b:v", "8M",
           "-c:a", "aac", "-b:a", "160k"]
 
 
-def apodo(t):
-    t = unicodedata.normalize("NFD", (t or "").lower())
-    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
-    return re.sub(r"[^a-z0-9]+", "-", t).strip("-") or "sin-nombre"
+# El apodo lo hace `dominio.texto`, que es el dueño de cómo se normaliza un
+# texto en este proyecto. Estaba copiado aquí, en `publicar.py` y en
+# `revisar.py`, las tres veces igual.
+from dominio.texto import apodo  # noqa: E402
 
 
 def huella(toma, a, b, filtro):

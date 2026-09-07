@@ -26,6 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
+from dominio.texto import comparable as _comparable  # noqa: E402
 
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 FPS = 30
@@ -82,6 +83,39 @@ def agrupar(words):
             caps.append(buf); buf = None
     if buf:
         caps.append(buf)
+    # **Un subtitulo nunca es UNA palabra suelta.**
+    #
+    # Jaime, tres veces sobre reel-01: *«al final queda un "semanales"
+    # huerfano; "le cuesta hasta ... semanales" va en una misma frase»*, y la
+    # tercera: *«el semanales persiste»*.
+    #
+    # Las tres veces se arreglo **el corte**, y las tres veces volvio, porque el
+    # corte no era el problema: el EDL ya trae la frase entera en UN segmento
+    # —«...costando hasta 550 dolares semanales», cinta 562,85-571,05—. Quien la
+    # partia es esto: whisper oye una micro-pausa antes de «semanales», escribe
+    # «dolares. Semanales.», y aqui se cerraba el subtitulo en ese punto.
+    #
+    # **Es la averia que el nombro:** dos cosas decidiendo donde se parte la
+    # frase —el corte y el agrupador— y el arreglo aplicandose siempre a una
+    # sola. El corte sabe que es una frase; el agrupador no le preguntaba.
+    #
+    # La regla que lo cierra no necesita preguntar nada: una palabra sola no es
+    # un subtitulo. Se pega a la anterior aunque pase de `TOPE` —una palabra de
+    # mas se lee; una palabra huerfana se nota— y si venia detras de un punto
+    # que whisper invento, ese punto se va con ella.
+    fuera = []
+    for c in caps:
+        if fuera and len(c["text"].split()) == 1:
+            prev = fuera[-1]
+            suelta = c["text"]
+            if prev["text"].endswith(".") and suelta[:1].isupper():
+                prev["text"] = prev["text"][:-1]
+                suelta = suelta[:1].lower() + suelta[1:]
+            prev["text"] += " " + suelta
+            prev["end"] = c["end"]
+            continue
+        fuera.append(c)
+    caps = fuera
     # **Sin huecos.** Cada subtitulo se estira hasta el siguiente: la mayoria ve
     # los reels sin audio, asi que un instante sin texto es un instante sin
     # argumento. Un hueco de medio segundo no descansa la vista, la corta.
@@ -134,10 +168,11 @@ def esperadas(slug):
     return out
 
 
+# **Comparar dos palabras es `dominio.texto.comparable`**, y estaba escrito
+# aquí otra vez. Es la vara con la que se decide si el subtítulo dice lo mismo
+# que la cinta, así que tenerla en dos sitios es tener dos varas.
 def _limpia(t):
-    t = unicodedata.normalize("NFD", t.lower())
-    return "".join(c for c in t if unicodedata.category(c) != "Mn"
-                   and (c.isalnum() or c == " ")).strip()
+    return _comparable(t).strip()
 
 
 def glosario(caps):
@@ -301,10 +336,22 @@ def reconciliar(caps, esperado, ventana=6):
         empieza y acaba donde parece.
         """
         i = ops.index(t)
-        izq = ops[i - 1] if i else None
-        der = ops[i + 1] if i + 1 < len(ops) else None
-        basta = lambda o: o is None or (o[0] == "equal" and o[2] - o[1] >= 2)
-        return basta(izq) and basta(der)
+
+        def basta(j):
+            # Fuera de la lista no hay nada que desalinear: el borde ancla.
+            if j < 0 or j >= len(ops):
+                return True
+            o = ops[j]
+            if o[0] != "equal":
+                return False
+            # Dos palabras iguales bastan para saber que el desajuste empieza y
+            # acaba donde parece. **Y una tambien, si detras no queda nada**:
+            # «pierda la mitad en puestos de» contra «...impuestos de» tiene un
+            # solo «de» al final y es el caso de C-80, el que este paso existe
+            # para arreglar. Pidiendo dos se rechazaba a si mismo.
+            return o[2] - o[1] >= 2 or j in (0, len(ops) - 1)
+
+        return basta(i - 1) and basta(i + 1)
 
     for t in ops:
         op, i1, i2, j1, j2 = t
