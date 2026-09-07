@@ -274,9 +274,19 @@ for r in "${PIEZAS_CORTE[@]}"; do
     echo "  (recalculando encuadres)"
     python scripts/punch-ins.py --source "$SRC"       --plan "work/scenes/reel-$r/plan-full.json" --ancla-global 2>&1 | grep -E "ancla global"
   fi
-  node scripts/render-hook.mjs --source "$SRC" \
-    --plan "work/scenes/reel-$r/plan-full.json" \
-    --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
+  # **El corte se rehace si hace falta, y lo dice `cadena.py`.**
+  #
+  # Corria SIEMPRE: 29 escenas del bruto 4K HEVC a 2,26 s cada una son 65 s
+  # medidos por pieza, en cada montaje, hubiera cambiado el plan o no. Y la
+  # respuesta ya estaba escrita: `cadena.py` declara los trece eslabones con
+  # lo que come cada uno y con su productor como fuente. Lo unico que le
+  # faltaba era que alguien le preguntara — se le citaba tres veces en este
+  # fichero, siempre dentro de un comentario.
+  if python scripts/cadena.py --hay-que corte "$((10#$r))"; then
+    node scripts/render-hook.mjs --source "$SRC" \
+      --plan "work/scenes/reel-$r/plan-full.json" \
+      --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
+  fi
   # **Donde esta su cara se mide sobre ESTE corte, no sobre el de antes.**
   # `cadena.py` declara `cara` colgando de `corte` desde el principio, y sin
   # embargo `montar.sh` no corria `sujeto.py` en ningun sitio: cada re-corte
@@ -295,6 +305,20 @@ for r in "${PIEZAS_CORTE[@]}"; do
   # No cuesta: `de_la_pieza` son cuatro fotogramas de MediaPipe y
   # `recortes_de_la_pieza` ya salta por si solo lo que esta al dia.
   PYTHONIOENCODING=utf-8 python scripts/dominio/sujeto.py "$((10#$r))" 2>&1 | tail -1
+  # **Las otras dos medidas del corte, declaradas y sin correr.** `cadena.py`
+  # cuelga `huecos` y `trasfondo` del corte y los declara como las DOS
+  # entradas del spec; ninguna linea los ejecutaba, asi que `reels-spec.mjs`
+  # se comia el fichero que hubiera en disco — de otro montaje o de ninguno.
+  # Declarado y no producido, la averia de la casa (C-256).
+  #
+  # A diferencia de `sujeto.py`, estas dos solo miran el video: si el corte no
+  # se movio la medida vale, y por eso van con la pregunta delante.
+  if python scripts/cadena.py --hay-que huecos "$((10#$r))"; then
+    PYTHONIOENCODING=utf-8 python scripts/dominio/hueco.py "$((10#$r))" 2>&1 | tail -1
+  fi
+  if python scripts/cadena.py --hay-que trasfondo "$((10#$r))"; then
+    PYTHONIOENCODING=utf-8 python scripts/dominio/trasfondo.py "$((10#$r))" 2>&1 | tail -1
+  fi
   python scripts/subtitular.py "$r"
   # **Y el subtitulo, cruzado con el libreto. Aqui, no cuando alguien se acuerde.**
   #
@@ -412,7 +436,20 @@ for r in "${REELS[@]}"; do
   # Ahi dentro van tambien el bundle limpio —el CLI sirve un spec cacheado— y la
   # concurrencia 4. El reintento a 16 se disparaba siempre, asi que 4 no era el
   # plan B: era el valor bueno escrito en el sitio equivocado.
-  node scripts/render.mjs "$n"
+  # **Y solo si hace falta.** Igual que el corte: `cadena.py` sabe si el
+  # render de esta pieza corresponde al spec de ahora. Son 3,6 min medidos
+  # por pieza, y el aviso «salio IDENTICA al render anterior» era exactamente
+  # esto — la informacion correcta, cobrada despues de pagarla entera.
+  #
+  # **Y la huella tambien lo despierta.** Si el mp4 esta al dia pero le falta
+  # su `.huella`, la pieza sale caduca para siempre —la escribe `render.mjs`
+  # y no el CLI—, asi que rehacerla es la unica forma de que la linea
+  # converja.
+  RENDERIZADA=0
+  if python scripts/cadena.py --hay-que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
+    node scripts/render.mjs "$n"
+    RENDERIZADA=1
+  fi
   # **Y se comprueba que el render dejo su huella.**
   #
   # Aqui es donde se cerro la averia: `_render_caduco()` lleva dias exigiendo
@@ -474,14 +511,18 @@ for r in "${REELS[@]}"; do
   #
   # Se compara la huella del video, no la del fichero: los metadatos llevan
   # fecha y harian que dos renders identicos parecieran distintos.
-  HUELLA_ANTES=""
-  [ -f "$DESTINO/reels/reel-R$n.sha" ] && HUELLA_ANTES=$(cat "$DESTINO/reels/reel-R$n.sha")
-  HUELLA=$(ffmpeg -v error -i "$DESTINO/reels/reel-R$n.mp4" -map 0 -c copy -f hash -hash sha256 - 2>/dev/null | tail -1)
-  echo "$HUELLA" > "$DESTINO/reels/reel-R$n.sha"
-  if [ -n "$HUELLA_ANTES" ] && [ "$HUELLA" = "$HUELLA_ANTES" ]; then
-    echo "  OJO: Reel-R$n sale IDENTICO al render anterior."
-    echo "       Lo que se cambio no llega a la pantalla. No lo entregues como nuevo."
-    IDENTICAS+=("R$n")
+  # Sin render nuevo no hay nada que comparar: el fichero es el mismo de
+  # antes a proposito, y decir «IDENTICA» ahi seria una alarma falsa.
+  if [ "$RENDERIZADA" = 1 ]; then
+    HUELLA_ANTES=""
+    [ -f "$DESTINO/reels/reel-R$n.sha" ] && HUELLA_ANTES=$(cat "$DESTINO/reels/reel-R$n.sha")
+    HUELLA=$(ffmpeg -v error -i "$DESTINO/reels/reel-R$n.mp4" -map 0 -c copy -f hash -hash sha256 - 2>/dev/null | tail -1)
+    echo "$HUELLA" > "$DESTINO/reels/reel-R$n.sha"
+    if [ -n "$HUELLA_ANTES" ] && [ "$HUELLA" = "$HUELLA_ANTES" ]; then
+      echo "  OJO: Reel-R$n sale IDENTICO al render anterior."
+      echo "       Lo que se cambio no llega a la pantalla. No lo entregues como nuevo."
+      IDENTICAS+=("R$n")
+    fi
   fi
 
   # **Sin aprobar no lleva musica, igual que no lleva efectos.**
@@ -542,7 +583,14 @@ for r in "${REELS[@]}"; do
   # El interprete se pregunta, no se nombra: el antivirus se llevo
   # `usr/bin/bash.exe` de la instalacion de Git y no deja reponerlo. `sh.exe` es
   # el mismo binario y estaba al lado, asi que la linea moria por el nombre.
-  "$(command -v bash || command -v sh)" scripts/musica.sh "$n"
+  # **La mezcla tambien pregunta.** `cadena.py` declara la entrega colgando de
+  # los efectos, que cuelgan del render: si nada de eso se movio, remezclar
+  # produce el mismo fichero y cuesta las pasadas de `loudnorm` enteras.
+  ENTREGA_NUEVA=0
+  if python scripts/cadena.py --hay-que entrega "$n"; then
+    ENTREGA_NUEVA=1
+    "$(command -v bash || command -v sh)" scripts/musica.sh "$n"
+  fi
   # **Y la entrega se sella: el montaje entero queda guardado.**
   #
   # Jaime, cuando su entrega aprobada no se pudo rehacer: *«no se trata de
@@ -567,7 +615,11 @@ for r in "${REELS[@]}"; do
   # C-307: un aviso automático por pieza y por corrida entierra la lista. Se
   # imprime y se guarda en `medicion`, que es donde un número sobrevive a la
   # corrida.
-  python scripts/suena.py "$n" --guardar 2>&1 | sed 's/^/  /' || true
+  # Y solo cuando la entrega es nueva: medir dos veces el mismo fichero da el
+  # mismo numero y cuesta las pasadas de ffmpeg enteras.
+  if [ "$ENTREGA_NUEVA" = 1 ]; then
+    python scripts/suena.py "$n" --guardar 2>&1 | sed 's/^/  /' || true
+  fi
   python scripts/sellar.py "$n"
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done

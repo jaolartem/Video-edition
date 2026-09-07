@@ -78,14 +78,28 @@ const VELOCIDAD = Number(arg("velocidad", "1"));
 
 const GPU = !process.argv.includes("--cpu");
 const DECODE = GPU ? ["-hwaccel", "d3d11va"] : [];
+/**
+ * **Un fotograma clave cada medio segundo (`-g 15`), y no cada cuatro.**
+ *
+ * Este fichero es lo que Remotion lee frame a frame, y Chrome no lo pide en
+ * orden: cada peticion fuera de sitio paga decodificar desde el keyframe
+ * anterior. El corte salia con 24 keyframes en 99 s —uno cada 4,1 s de media,
+ * alguno a 8 s— y en el banco de 300 frames eso eran 33,4 s contra 27,5 s con
+ * keyframes densos: **un 18% del render, sin tocar un pixel de lo que se ve**.
+ *
+ * No es bajar la calidad: `qp 18` sigue igual. Es como se ORGANIZA el fichero,
+ * que es justo lo que la nota del 1 de septiembre dejo escrito como lo unico
+ * que se podia cambiar sin perder informacion. Pesa algo mas en disco y es un
+ * intermedio que se borra.
+ */
 const ENCODE = GPU
   ? ["-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp",
-     "-qp_i", "18", "-qp_p", "18"]
+     "-qp_i", "18", "-qp_p", "18", "-g", "15"]
   // `crf 18`, no 20, y por lo que dice el parrafo de arriba: este fichero es
   // INTERMEDIO y Remotion lo vuelve a codificar, asi que la perdida se paga
   // dos veces. El camino de GPU ya iba a `qp 18`; los dos listones tenian que
   // ser el mismo y no lo eran.
-  : ["-c:v", "libx264", "-preset", "medium", "-crf", "18"];
+  : ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-g", "15"];
 
 if (!source || !planPath) {
   console.error("Uso: node scripts/render-hook.mjs --source <mp4> --plan <plan.json> [--out <mp4>]");

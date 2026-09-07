@@ -76,8 +76,9 @@ def dossier(pieza: Pieza) -> dict | None:
         return None
 
     d = {"pieza": pieza.slug, "fichero": os.path.basename(mp4)}
-    d.update(suena.onda(mp4))
-    d.update(suena.aire(mp4))
+    # Una pasada de ffmpeg para las cuatro medidas, no una por medida: los
+    # tres filtros miden y dejan pasar, asi que en serie dicen lo mismo.
+    d.update(suena.pasada(mp4))
     d["costuras"] = suena.costuras(pieza.slug)
 
     # Lo que se dice dos veces, con la entrega de cada una al lado.
