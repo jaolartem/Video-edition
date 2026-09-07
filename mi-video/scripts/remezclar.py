@@ -193,9 +193,27 @@ def distancia(mp4, voz):
     # voz NO puede durar mas que la pieza: si sobra, es de otro corte. Medir la
     # diferencia en los dos sentidos hacia que la guarda se negara en cuatro de
     # las siete por llevar CTA, que es justo lo contrario de lo que hace falta.
-    if dura(voz) > dura(mp4) * VELOCIDAD + 0.5:
+    # **El reloj de la referencia se deduce de su duracion, no se supone.**
+    #
+    # Habia una sola forma prevista —un stem del bruto, sin acelerar— y por eso
+    # la entrega se ralentizaba para comparar. Pero la referencia BUENA es
+    # `out/entrega/.sin-musica/reel-RN.mp4`, que es literalmente la voz que
+    # entro en la mezcla: mismo corte, mismo reloj, sin musica. Con el stem,
+    # cinco de las siete contestaban «no se puede medir» —el stem es de otro
+    # montaje en cuanto se recorta algo— y `cama.json` acababa con numeros
+    # «medidos» que no se podian volver a medir.
+    dv, dm = dura(voz), dura(mp4)
+    if abs(dv - dm) <= max(1.0, dm * 0.03):
+        tempo = None                      # ya viene al reloj del montaje
+    elif abs(dv - dm * VELOCIDAD) <= max(1.0, dm * 0.05):
+        tempo = 1 / VELOCIDAD             # viene del bruto, sin acelerar
+    else:
+        # **Ni un reloj ni el otro: la referencia es de OTRO montaje.** Aqui se
+        # prefiere no contestar (C-243): un numero plausible sacado de indices
+        # que caen donde el esta hablando describe otra cosa, y en reel-07 dio
+        # 2,4 dB de separacion con la musica a -60 LUFS, o sea sin musica.
         return None
-    a, b = marco(voz), marco(mp4, tempo=1 / VELOCIDAD)
+    a, b = marco(voz), marco(mp4, tempo=tempo)
     k = min(len(a), len(b))
     if k < 20:
         return None

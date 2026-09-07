@@ -194,11 +194,20 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
     # `corte_fijo` es `(video, papel, orden, desde)`: el segundo no entra, hace
     # saltar la insercion entera y con ella la etapa. Se quedan una vez, y el
     # mas largo de los que empiecen igual.
-    vistos = {}
-    for x, y, tk in sorted(tramos, key=lambda t: (t[0], -(t[1] - t[0]))):
-        if x not in vistos:
-            vistos[x] = (x, y, tk)
-    tramos = [vistos[k] for k in sorted(vistos)]
+    #
+    # **Y quitar repetidos no es ordenar.** Esto ordenaba por `desde` de paso, y
+    # con eso una etapa no podia decir «esta frase va PRIMERO aunque en la cinta
+    # este despues» — que es justo lo que pidio Jaime para el gancho de reel-03.
+    # El orden es el que se declara; aqui solo se cae lo repetido.
+    vistos, orden = {}, []
+    for x, y, tk in tramos:
+        if x in vistos:
+            if y - x > vistos[x][1] - vistos[x][0]:
+                vistos[x] = (x, y, tk)
+            continue
+        vistos[x] = (x, y, tk)
+        orden.append(x)
+    tramos = [vistos[k] for k in orden]
     if not tramos:
         return {"error": f"{slug} e{beat}: los tramos propuestos no tienen voz"}
     # La medida se hace sobre la cinta principal —la que mas segundos aporta—,
@@ -377,8 +386,20 @@ def aplicar(slug, solo=None):
     por_beat = {}
     for f in fjs:
         por_beat.setdefault(f["beat"], []).append(f)
+    # **En el orden en que se DECLARARON, no en el de la cinta.**
+    #
+    # Ordenar por `desde` daba por hecho que el montaje sigue a la grabacion, y
+    # eso hace imposible lo unico que un editor pide a veces: traerse una frase
+    # de mas adelante al principio. Jaime, 7-9-2026, sobre reel-03: *«le
+    # cambiamos el gancho por la frase mas fuerte, sin quitar el gancho y
+    # repitiendo la frase en donde originalmente va»* — la frase esta en el
+    # segundo 337 de la cinta y tiene que sonar antes que el segundo 28.
+    #
+    # No cambia nada de lo que ya hay: comprobados los 27 grupos de mas de un
+    # tramo del proyecto, en los 27 el orden de declaracion y el de cinta son el
+    # mismo. Lo unico que cambia es que ahora se puede decir otra cosa.
     for v in por_beat.values():
-        v.sort(key=lambda x: x["desde"])
+        v.sort(key=lambda x: x["id"])
     # **Un fijado ya aplicado no se vuelve a aplicar.** `aplicar` rehace la etapa
     # entera, asi que corriendolo dos veces borraba lo que hubiera pasado por
     # encima despues —los recortes de redundancia, sobre todo— y la pieza se
@@ -483,8 +504,17 @@ def aplicar(slug, solo=None):
             if t:
                 d["trato"], d["trato_porque"] = t, porque
 
-    orden = sorted(range(len(det)), key=lambda i: (det[i].get("beat") or 0,
-                                                  segs[i][0]))
+    # **Por etapa, y DENTRO de la etapa como se construyo.**
+    #
+    # La segunda clave era `segs[i][0]`, o sea el segundo de la cinta, y eso
+    # daba por hecho que dentro de una etapa el montaje sigue a la grabacion.
+    # Es el tercer sitio donde se colaba la misma suposicion —los otros dos son
+    # `declarar` y el reparto por beat de aqui arriba—, y entre los tres hacian
+    # imposible traerse una frase de mas adelante al principio: la de reel-03,
+    # que Jaime pidio como gancho. `sorted` es estable, asi que quitando la
+    # segunda clave el orden de dentro es el que trajo cada rama: el declarado
+    # para las etapas fijadas, el que ya tenia el EDL para las demas.
+    orden = sorted(range(len(det)), key=lambda i: det[i].get("beat") or 0)
     edl["segmentos"] = [segs[i] for i in orden]
     edl["detalle"] = [det[i] for i in orden]
     edl["duracion_s"] = round(sum(b - a for a, b in edl["segmentos"]), 2)

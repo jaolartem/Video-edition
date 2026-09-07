@@ -16,6 +16,7 @@ menos donde alucinar.
 Se pide granularidad de palabra (`-ml 1 -sow`) para poder agrupar en frases
 cortas con tiempos reales.
 """
+import difflib
 import json
 import os
 import re
@@ -31,6 +32,11 @@ FPS = 30
 # Medido sobre render: la Montserrat 800 gasta ~0,70 em por caracter, así que a
 # 62 px caben ~22 por línea en los 950 útiles. 36 da dos líneas con holgura.
 TOPE = 36
+# **Cuantas palabras seguidas se aceptan cambiar de una vez.** Un desajuste
+# de una, dos o tres palabras es una mal oida; de cuatro para arriba ya no es
+# eso, es que la cinta y el montaje no son del mismo corte, y ahi sustituir
+# seria inventar la frase en vez de corregirla.
+TRAMO = 3
 
 
 def transcribir(mp4, wav, base):
@@ -230,50 +236,148 @@ def glosario(caps):
 
 
 def reconciliar(caps, esperado, ventana=6):
-    """Sustituye la palabra del montaje por la de la cinta cuando difieren.
+    """Sustituye las palabras del montaje por las de la cinta cuando difieren.
 
-    Alineacion posicional con ventana: las dos secuencias dicen lo mismo y en el
-    mismo orden, asi que basta mirar cerca.
+    **El tiempo lo da el montaje; las palabras las da la cinta** (C-80). La
+    cinta lleva cuatro pasadas y el montaje una sola, asi que donde discrepan
+    manda la cinta.
 
-    **Y solo una regla, la segura:** se sustituye cuando la palabra de la cinta
-    *contiene* a la del montaje por el final y es mas larga — «impuestos» contra
-    «puestos», que es el error tipico de una pasada unica, comerse el arranque.
+    Las dos secuencias dicen lo mismo y en el mismo orden, asi que se alinean
+    con `difflib` y se mira **donde no coinciden**. No es parecido de letras
+    —esa regla hacia mas dano que bien y esta fuera desde C-80—: es alineacion
+    exacta, y solo se toca lo que cae entre dos trozos que si coinciden.
 
-    Hubo una segunda regla para palabras cortas —misma inicial, longitud
-    parecida— pensada para las siglas, y **hacia mas dano que bien**: convertia
-    «es» en «esta», «los» en «le» y «el» en «en». Tres destrozos por un acierto.
-    Las siglas se arreglan con un glosario, que es la herramienta que les
-    corresponde, no con parecido de letras.
+    ## Por que no bastaba sustituir palabra a palabra
+
+    La version anterior recorria las dos listas con un puntero y solo sabia
+    cambiar **una palabra por una**, cuando la de la cinta contenia a la del
+    montaje por el final («impuestos» contra «puestos»). Un desajuste de
+    **dos palabras por una** le era invisible, y ahi se colo el peor error del
+    lote: reel-01 decia en pantalla *«de manera legal y no las reglas»* donde la
+    cinta dice *«de manera legal siguiendo las reglas»*. Las dos palabras
+    sobrantes eran de dos y tres letras, por debajo del minimo de la regla, asi
+    que pasaron enteras y **el subtitulo afirmaba lo contrario de lo que el
+    dice**. Jaime: *«eso es peligrosisimo»*, y lo es: es cumplimiento, no estilo.
+
+    ## Los limites, y por que hay limites
+
+    Se sustituye un tramo por otro solo si **los dos son cortos** (`TRAMO`) y
+    ninguna linea se queda vacia. Un desajuste largo no es una palabra mal oida:
+    es que la cinta y el montaje son de cortes distintos, y ahi reescribir seria
+    inventar. Eso **no se calla** — se cuenta al final, porque un subtitulo que
+    discrepa de la cinta y nadie mira es como salio «y no las reglas».
     """
     if not esperado:
         return caps, 0
-    plano = [_limpia(x) for x in esperado]
-    j, cambios = 0, 0
-    for c in caps:
-        piezas = c["text"].split(" ")
-        for k, pieza in enumerate(piezas):
-            n = _limpia(pieza)
-            if not n:
-                continue
-            # Avanza hasta encontrarla; si esta, no hay nada que corregir.
-            hit = next((i for i in range(j, min(j + ventana, len(plano)))
-                        if plano[i] == n), None)
-            if hit is not None:
-                j = hit + 1
-                continue
-            cand = None
-            for i in range(j, min(j + ventana, len(plano))):
-                e = plano[i]
-                if len(n) >= 4 and e.endswith(n) and len(e) > len(n):
-                    cand = i
-                    break
-            if cand is None:
-                continue
-            cola = "".join(ch for ch in pieza if not ch.isalnum())
-            piezas[k] = esperado[cand] + cola
-            j = cand + 1
-            cambios += 1
-        c["text"] = " ".join(piezas)
+    # **La cinta pasa primero por el glosario.** No es autoridad absoluta: hay
+    # errores que las cuatro pasadas cometen igual —lo dice el propio glosario,
+    # «la cinta tambien dice Electric System»—. Sin esto, cuadrar contra ella
+    # ROMPIA palabras que estaban bien: «su contador» pasaba a «su contado» en
+    # reel-02 y reel-03, porque asi lo escribe la cinta y el glosario lo
+    # arreglaba despues... sobre el subtitulo, cuando ya se habia estropeado.
+    esperado = glosario([{"text": " ".join(esperado)}])[0][0]["text"].split()
+    plano = [(i, w) for i, c in enumerate(caps) for w in c["text"].split()]
+    dicho = [_limpia(w) for _, w in plano]
+    cinta = [_limpia(x) for x in esperado]
+    nuevas = [[] for _ in caps]
+    cambios, sin_resolver = 0, []
+
+    def tal_cual(i1, i2):
+        for k in range(i1, i2):
+            nuevas[plano[k][0]].append(plano[k][1])
+
+    ops = difflib.SequenceMatcher(None, dicho, cinta,
+                                 autojunk=False).get_opcodes()
+
+    def anclado(t):
+        """¿El tramo `t` tiene a los lados trozos que SI coinciden?
+
+        Es el limite que faltaba, y lo enseño reel-01: sin el, «Es un negocio
+        que esta vendiendo» se convertia en «Su negocio QUE esta vendiendo»
+        —la cinta dice «Su negocio esta vendiendo», y el «que» sobrante caia en
+        otro tramo, asi que se cambiaba medio desajuste y quedaba peor que
+        antes—. Un cambio solo es seguro cuando lo que hay pegado a los dos
+        lados coincide palabra por palabra: entonces se sabe que el desajuste
+        empieza y acaba donde parece.
+        """
+        i = ops.index(t)
+        izq = ops[i - 1] if i else None
+        der = ops[i + 1] if i + 1 < len(ops) else None
+        basta = lambda o: o is None or (o[0] == "equal" and o[2] - o[1] >= 2)
+        return basta(izq) and basta(der)
+
+    for t in ops:
+        op, i1, i2, j1, j2 = t
+        # `equal` no toca nada, y `delete` —el montaje dice algo que la cinta no
+        # tiene— se respeta: borrar palabras deja la linea sin el tiempo que
+        # ocupa. `insert` tampoco entra: una palabra de la cinta que el montaje
+        # no dice no tiene sitio en ningun subtitulo.
+        if op in ("equal", "delete"):
+            tal_cual(i1, i2)
+            continue
+        if op == "insert":
+            sin_resolver.append("+ " + " ".join(esperado[j1:j2]))
+            continue
+        # **Las cifras no las arregla la cinta.** El montaje escribe «180.000»
+        # y la cinta «180 mil»: las dos dicen lo mismo y la del montaje se lee
+        # mejor en pantalla. Lo que va rotulado lo gobiernan el copy y su
+        # `fuente`, no el transcript, asi que aqui no se toca.
+        if any(any(ch.isdigit() for ch in w) for w in
+               [w for _, w in plano[i1:i2]] + list(esperado[j1:j2])):
+            tal_cual(i1, i2)
+            continue
+        # **Y dos formas de que la cinta este PEOR que el montaje, medidas en
+        # el lote.** La primera: la cinta se come una letra del final —escribe
+        # «contado» por «contador», «lastre» por «elastre»—, o sea que el
+        # montaje trae la palabra mas completa. Es la regla de C-80 al reves, y
+        # al reves no vale. La segunda: la cinta ofrece solo palabras cortas
+        # —«le» por «la», «porque» por «o que»—, que es ruido de funcion y no
+        # una palabra mal oida. Las de verdad son largas: «siguiendo»,
+        # «palancarse», «moledora», «bootcamp».
+        corta = max((len(x) for x in cinta[j1:j2]), default=0) < 4
+        recorta = (i2 - i1 == 1 and j2 - j1 == 1
+                   and dicho[i1].endswith(cinta[j1])
+                   and len(dicho[i1]) > len(cinta[j1]))
+        if corta or recorta:
+            tal_cual(i1, i2)
+            continue
+        if i2 - i1 > TRAMO or j2 - j1 > TRAMO or not anclado(t):
+            sin_resolver.append(f"{' '.join(w for _, w in plano[i1:i2])}"
+                                f" -> {' '.join(esperado[j1:j2])}")
+            tal_cual(i1, i2)
+            continue
+        # **La linea de destino se mantiene**: cada palabra de la cinta va a la
+        # linea de la palabra del montaje que ocupa su sitio, y la ultima se
+        # lleva las que sobren. Asi un tramo que cruza una costura no vacia la
+        # linea siguiente, que la dejaria sin nada que dibujar.
+        destino = [plano[min(i1 + k, i2 - 1)][0] for k in range(j2 - j1)]
+        if any(d not in destino for d in {plano[k][0] for k in range(i1, i2)}):
+            sin_resolver.append(f"{' '.join(w for _, w in plano[i1:i2])}"
+                                f" -> {' '.join(esperado[j1:j2])} (vaciaria una"
+                                " linea)")
+            tal_cual(i1, i2)
+            continue
+        # La mayuscula inicial y la puntuacion final son del montaje: la cinta
+        # trae la palabra, no la forma en que estaba escrita en la frase.
+        trozo = list(esperado[j1:j2])
+        if plano[i1][1][:1].isupper():
+            trozo[0] = trozo[0][:1].upper() + trozo[0][1:]
+        # **Y no se apila puntuacion.** La palabra de la cinta suele traer ya la
+        # suya: «saberlo,» del montaje contra «saberlo.» de la cinta daba
+        # «saberlo,.» — y salio en el rotulo grande del gancho de reel-03, que
+        # es donde mas se ve. Solo se hereda la del montaje si la de la cinta
+        # acaba en letra.
+        if trozo[-1][-1:].isalnum():
+            trozo[-1] += "".join(c for c in plano[i2 - 1][1] if not c.isalnum())
+        for d, w in zip(destino, trozo):
+            nuevas[d].append(w)
+        cambios += 1
+
+    for c, ws in zip(caps, nuevas):
+        c["text"] = " ".join(ws)
+    if sin_resolver:
+        print(f"    contra la cinta: {len(sin_resolver)} tramo(s) que NO se"
+              f" pudieron cuadrar — {sin_resolver[:6]}")
     return caps, cambios
 
 

@@ -42,6 +42,7 @@ export const CANON = {
   regla: J.regla,
   reglaGrosor: J.reglaGrosor,
   quieto: J.quieto,
+  salida: J.salida,
   /** Lo que dura el gancho, en segundos. Lo lee también `dominio/sujeto.py`. */
   dura: J.dura,
   /** Cuándo queda armado el bloque del rótulo, ya en frames. Ver `_armado`. */

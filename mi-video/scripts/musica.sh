@@ -192,6 +192,20 @@ RATIO=6
 # Reel-02 salio a -0,5 dBTP y reel-06 a +0,2 por esto, con el limitador puesto
 # y trabajando. La guarda los paro — que es lo unico que funciono aqui.
 I=-14; TP=-1.5; LRA=11
+# **El techo del limitador deja sitio para el pico REAL.**
+#
+# Estaba escrito -2 dB, y el objetivo de pico real es -1,5: entre los dos hay
+# que caber el pico entre muestras, que en reel-02 midio 1,7 dB. Con el techo a
+# -2 la entrega salio a -0,3 dBTP, o sea 1,2 por encima del objetivo, y entonces
+# se disparaba la pasada del pico — que baja la pieza ENTERA para arreglar un
+# puñado de muestras. R2 acabo a -15,9 LUFS con el objetivo en -14, fuera de
+# tolerancia, y el paso fallo con razon: **las dos correcciones se peleaban**,
+# una subia el nivel y la otra lo bajaba.
+#
+# Bajarlo dos decibelios da margen para ese pico y deja el nivel donde lo puso
+# `loudnorm`. La pasada del pico se queda como red de seguridad, que es lo que
+# tenia que haber sido.
+TECHO=$(awk -v t="$TP" 'BEGIN{ printf "%.1f", t - 2 }')
 
 # **La velocidad del montaje se pregunta, no se escribe aqui.** Vive en
 # `beats.VELOCIDAD` —«estaba repetido en seis ficheros, que es como se acaba
@@ -471,7 +485,7 @@ for n in "${REELS[@]}"; do
     [1:a]atrim=0:${DUR},volume=${GAIN}dB,${TALLA}[mus];
     [0:a]${VOZ}[dicho];
     [dicho][mus]amix=inputs=2:normalize=0,
-      loudnorm=I=${I}:TP=${TP}:LRA=${LRA},aresample=192000,alimiter=limit=-2dB:level=disabled,aresample=48000[out]
+      loudnorm=I=${I}:TP=${TP}:LRA=${LRA},aresample=192000,alimiter=limit=${TECHO}dB:level=disabled,aresample=48000[out]
   "
   # **Y la musica entra por donde `cama.py` dijo.** Medir el tramo elegido y
   # luego mezclar desde el segundo cero seria elegir un pasaje y usar otro: la
@@ -480,7 +494,7 @@ for n in "${REELS[@]}"; do
   # eso el `-ss` va aqui tambien, pegado a la misma variable.
   ENTRADAS=(-i "$SRC" -ss "${DESDE:-0}" -i "$MP3")
   else
-  FILTRO="[0:a]${VOZ},loudnorm=I=${I}:TP=${TP}:LRA=${LRA},aresample=192000,alimiter=limit=-2dB:level=disabled,aresample=48000[out]"
+  FILTRO="[0:a]${VOZ},loudnorm=I=${I}:TP=${TP}:LRA=${LRA},aresample=192000,alimiter=limit=${TECHO}dB:level=disabled,aresample=48000[out]"
   ENTRADAS=(-i "$SRC")
   fi
 
@@ -541,7 +555,7 @@ for n in "${REELS[@]}"; do
     FALTA=$(awk -v i="$INT" -v o="$I" 'BEGIN{ d=o-i; printf "%.2f", d }')
     SUBE=$(awk -v d="$FALTA" 'BEGIN{ print (d>0.3 || d<-0.3) ? 1 : 0 }')
     if [ "$SUBE" = "1" ]; then
-      ffmpeg -y -v error -i "out/entrega/reel-R$n.mp4"         -af "volume=${FALTA}dB,aresample=192000,alimiter=limit=-2dB:level=disabled,aresample=48000"         -c:v copy -c:a aac -b:a 192k "$TMPDIR/r$n-nivel.mp4"         && mv -f "$TMPDIR/r$n-nivel.mp4" "out/entrega/reel-R$n.mp4"         && echo "R$n  segunda pasada: ${FALTA} dB para llegar a ${I} LUFS"
+      ffmpeg -y -v error -i "out/entrega/reel-R$n.mp4"         -af "volume=${FALTA}dB,aresample=192000,alimiter=limit=${TECHO}dB:level=disabled,aresample=48000"         -c:v copy -c:a aac -b:a 192k "$TMPDIR/r$n-nivel.mp4"         && mv -f "$TMPDIR/r$n-nivel.mp4" "out/entrega/reel-R$n.mp4"         && echo "R$n  segunda pasada: ${FALTA} dB para llegar a ${I} LUFS"
       MED=$(ffmpeg -hide_banner -nostats -i "out/entrega/reel-R$n.mp4" -af ebur128=peak=true -f null - 2>&1)
       INT=$(echo "$MED" | grep -A4 "Integrated loudness" | grep "I:" | tail -1 | awk '{print $2}')
     fi
@@ -588,11 +602,27 @@ for n in "${REELS[@]}"; do
   # comillas, escrito como salto real, aborta
   # awk con «unterminated string», y con `set -e` eso se lleva por delante el
   # resto del paso. Es la misma nota que ya esta en `montar.sh`.
+  #
+  # **Y cuando las dos no caben, manda el pico.** Una pieza densa —reel-02 sale
+  # con LRA 2,7— no llega a -14 LUFS sin pasar del techo: subirla 2,1 dB no la
+  # sube, la aplasta contra el limitador y vuelve a bajar. Las dos correcciones
+  # se peleaban y el paso fallaba con las dos bien hechas.
+  #
+  # La que no se negocia es el pico: por encima de 0 dBTP la plataforma
+  # distorsiona al recodificar, y eso se oye. La sonoridad SI se negocia, porque
+  # la plataforma la normaliza igual — 1,6 LU por debajo no se nota, y ganarlos
+  # cuesta compresion, que es justo lo que Jaime llamo *«quedo muy dura»*.
+  #
+  # Asi que quedarse corto de nivel CON el pico en su sitio se dice y no se
+  # falla. Pasarse de nivel sigue siendo fallo: eso no lo justifica el techo.
   awk -v i="${INT:-999}" -v tp="${PICO:-999}" -v obj="$I" -v lim="$TP" 'BEGIN{
     mal = 0
-    if (i != 999 && (i - obj > 1 || obj - i > 1)) {
+    if (i != 999 && i - obj > 1) {
       print "    FUERA: la entrega esta a " i " LUFS y el objetivo es " obj " (tolerancia 1 LU)."
       mal = 1
+    }
+    if (i != 999 && obj - i > 1) {
+      print "    ojo: " i " LUFS, " obj - i " por debajo del objetivo. No se sube mas sin pasar del techo del limitador: la pieza ya viene densa y la plataforma normaliza. El pico manda."
     }
     if (tp != 999 && tp > lim + 0.5) {
       print "    FUERA: pico real " tp " dBTP, por encima de " lim "."
@@ -643,8 +673,31 @@ for n in "${REELS[@]}"; do
   # Es la averia de siempre —lo declarado en un sitio y lo entregado en otro—, y
   # la unica forma de que no vuelva es medir la ENTREGA y decirlo. No para el
   # lote: una pieza fuera es una pieza que hay que oir, no un fallo de build.
+  # **Y la pieza tiene que salir con la duracion que entro.** Medido el 7 de
+  # septiembre: tres corridas seguidas sobre reel-01 dejaron la entrega en
+  # 79,7 s cuando su fuente muda dura 86,2, o sea **seis segundos y medio de
+  # pieza desaparecidos** sin un solo error en pantalla. La cola, el pico y la
+  # segunda pasada re-multiplexan el fichero tres veces y cualquiera de las tres
+  # puede quedarse corta; con `2>/dev/null` puesto, callan.
+  #
+  # Es el fallo mas caro que puede tener este paso: el nivel se mide sobre lo
+  # que quedo, sale plausible, y lo que falta es el final de la pieza — que es
+  # justo donde vive el CTA.
+  LARGO=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "out/entrega/reel-R$n.mp4")
+  CORTA=$(awk -v l="${LARGO:-0}" -v d="$DUR" -v c="${COLA:-0}" 'BEGIN{ f = d + c - l; if (f > 0.5) printf "%.1f", f }')
+  if [ -n "$CORTA" ]; then
+    echo "R$n  FUERA: faltan $CORTA s de pieza — la entrega dura $LARGO y su fuente muda $DUR. No se publica asi."
+    MALAS="$MALAS R$n(corta)"
+  fi
+
   OBJ=$(python scripts/cama.py --objetivo 2>/dev/null || echo "")
-  SEP=$(python -c "import sys;sys.path.insert(0,'scripts');import remezclar as R;d=R.distancia('out/entrega/reel-R$n.mp4',R.voz_de('reel-%02d'%$n)[0]);print('' if d is None else round(d,1))" 2>/dev/null || echo "")
+  # **La referencia es `$SRC`, que es la voz que ENTRO en esta mezcla.**
+  # Con el stem del bruto, cinco de las siete contestaban «no se puede medir»
+  # —basta recortar un segundo para que el stem sea de otro montaje—, asi que
+  # `cama.json` acumulaba numeros «medidos» que nadie podia volver a medir.
+  # Aqui el mismo corte esta garantizado por construccion: es el fichero que
+  # acaba de entrar por `-i`. El reloj lo deduce `distancia` de la duracion.
+  SEP=$(python -c "import sys;sys.path.insert(0,'scripts');import remezclar as R;d=R.distancia('out/entrega/reel-R$n.mp4','$SRC');print('' if d is None else round(d,1))" 2>/dev/null || echo "")
   awk -v s="${SEP:-}" -v o="${OBJ:-}" -v n="$n" 'BEGIN{
     if (s == "" || o == "") { print "    ojo: NO SE PUDO MEDIR la separacion de la cama — casi siempre es que el stem de voz es de otro corte, y entonces la medida se niega a contestar en vez de dar un numero falso (C-243). Mira las duraciones antes de tocar el nivel."; exit }
     d = s - o; if (d < 0) d = -d

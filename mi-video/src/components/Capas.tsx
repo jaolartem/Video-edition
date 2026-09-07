@@ -70,14 +70,29 @@ export const PunchIn: React.FC<{
   const activa = capas.find(
     (c) => frame >= c.at && frame < c.at + (c.duration ?? 0),
   );
+  // **Y si la capa trae `salida`, el ultimo tramo la suelta.** No es una
+  // decision de aqui: los tres numeros —`hasta`, `vuelve` y cuantos frames
+  // tarda— vienen resueltos en la capa, igual que todo lo demas. Existe porque
+  // sin ella el punch del gancho se cortaba en seco: la escala pasaba de 1,08 a
+  // 1 en un frame y el plano daba un tiron con el rotulo puesto.
+  const salida = Number(activa?.props.salida ?? 0);
+  const dura = activa ? (activa.duration ?? 1) : 1;
   const escala = activa
     ? interpolate(
         frame,
-        [activa.at, activa.at + (activa.duration ?? 1)],
-        [
-          Number(activa.props.desde ?? 1),
-          Number(activa.props.hasta ?? 1),
-        ],
+        salida > 0
+          ? [activa.at, activa.at + dura - salida, activa.at + dura]
+          : [activa.at, activa.at + dura],
+        salida > 0
+          ? [
+              Number(activa.props.desde ?? 1),
+              Number(activa.props.hasta ?? 1),
+              Number(activa.props.vuelve ?? 1),
+            ]
+          : [
+              Number(activa.props.desde ?? 1),
+              Number(activa.props.hasta ?? 1),
+            ],
         {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",

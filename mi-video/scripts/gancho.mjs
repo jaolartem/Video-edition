@@ -127,11 +127,26 @@ export const portada = {
     //     Lineal es un travelling: nunca acelera, nunca frena y **nunca para**,
     //     así que los tres segundos tienen movimiento de fondo por debajo de
     //     todo lo que entra encima.
+    //
+    //     **Y no para en seco.** El punch acababa en el frame 150 y la escala
+    //     volvia a 1 en UN frame, con el rotulo todavia puesto: un tiron. Jaime
+    //     lo vio en reel-01 —*«el cambio de escena es muy brusco, y el corte
+    //     con el gancho se ve feo»*— y dio el arreglo: *«mantener la escena del
+    //     segundo 5 en la misma posicion que en el segundo 4»*. Asi que la capa
+    //     dura `salida` frames mas y en ellos vuelve sola: la ventana cierra
+    //     soltando el encuadre, que es el «zoom out» que el ofrecio como
+    //     alternativa. Le pasaba a SEIS de las siete.
     out.push({
       tipo: "punch",
       at,
-      duration: fin - at,
-      props: { desde: 1.0, hasta: 1.08, curva: "lineal" },
+      duration: fin - at + CANON.salida,
+      props: {
+        desde: 1.0,
+        hasta: 1.08,
+        vuelve: 1.0,
+        salida: CANON.salida,
+        curva: "lineal",
+      },
     });
 
     // 2 · El rótulo, DETRÁS de su cabeza. Dos líneas escalonadas en el tercio

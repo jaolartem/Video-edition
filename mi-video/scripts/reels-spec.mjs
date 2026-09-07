@@ -36,15 +36,15 @@ import { FPS, Reloj } from "./reels/reloj.mjs";
 // Las tres importaciones de `material.mjs` que había aquí eran una.
 import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
 import { colocaPaneles } from "./reels/paneles.mjs";
-import { correccionesDe, descDe, tablerosDe }
-  from "./reels/base.mjs";
+import { pelado } from "./reels/pelado.mjs";
+import { eco } from "./reels/eco.mjs";
+import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
 // **El pie sale de `cifras.mjs`, que es su dueño y llevaba sin correr desde que
 // se escribió.** El que corría era una copia en `base.mjs` que casaba la fila de
 // `dato` por contención de texto crudo y, sobre todo, **pisaba lo declarado**:
 // su spread iba después de `b.props`. Ver `reels/cifras.mjs`.
 import { pieDe } from "./reels/cifras.mjs";
-import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe }
-  from "./reels/copy.mjs";
+import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe } from "./reels/copy.mjs";
 import { acotarAlCta, ctaDe, faltasDelCierre } from "./reels/cta.mjs";
 import { caminosDe, contrasteDe, cortinillasDe, cortinillasSinSitio,
   faltaMezcla, glitchesDe, repartirPorCubre, tarjetasDe }
@@ -205,7 +205,8 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     sostiene: SOSTIENE,
     cta,
     captions: marca.captions,
-    desatura: marca.desatura,
+    // Y el plano que suena dos veces va en gris la primera: `reels/eco.mjs`.
+    desatura: [...marca.desatura, ...eco(edl, reloj.cortes)],
     cortes: reloj.cortes,
     /**
      * Lado libre del cuadro: el contrario a donde está el sujeto. Sale del ancla
@@ -293,9 +294,12 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     ...(pieza.cta ? [{ at: pieza.cta.at * FPS, duration: pieza.cta.dur * FPS }] : []),
     { at: pieza.entra, duration: 9 + pieza.sostiene + 9 },
   ], ventanas);
+  // **Y la pieza no se queda desnuda.** Aquí, que es donde está entera: medirlo
+  // sobre una sola de sus listas dio 147 s falsos. Ver `reels/pelado.mjs`.
+
   // Y el panel que caía dentro del gancho se corre detrás de él: se pintaba
   // encima del rótulo, que son los dos bloques compitiendo otra vez.
-  faltas.push(...apartaDelGancho(pieza, slug));
+  faltas.push(...pelado(pieza, slug), ...apartaDelGancho(pieza, slug));
 
   // **El subtítulo del gancho baja a su franja**, y va DESPUÉS de componer:
   // componer es lo último que puede meter texto en esa ventana, así que marcar
@@ -426,3 +430,4 @@ if (faltas.length) {
 } else {
   console.log("\ncaminos: todas las indicaciones se cumplen");
 }
+

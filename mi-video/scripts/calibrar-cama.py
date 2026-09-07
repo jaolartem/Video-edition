@@ -73,9 +73,11 @@ def _mide(n, musi):
     entorno = dict(os.environ, MUSI=str(musi))
     subprocess.run(["bash", "scripts/musica.sh", str(n)],
                    capture_output=True, env=entorno)
-    slug = f"reel-{n:02d}"
+    # La referencia es la voz que entro en la mezcla, no el stem del bruto:
+    # ese es de otro montaje en cuanto se recorta algo, y entonces la medida se
+    # niega a contestar — cinco de las siete se quedaron sin calibrar por eso.
     return remezclar.distancia(f"out/entrega/reel-R{n}.mp4",
-                               remezclar.voz_de(slug)[0])
+                               f"out/entrega/.sin-musica/reel-R{n}.mp4")
 
 
 def _guardar(slug, musi, por_que):

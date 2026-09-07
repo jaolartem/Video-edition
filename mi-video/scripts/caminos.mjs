@@ -320,6 +320,12 @@ export const construir = (ctx) => {
  * son dos ganchos: son un gancho y una escena que se cree gancho, compitiendo
  * por la atención en los primeros segundos. Salía en reel-04 y reel-05 y no lo
  * veía nadie.
+ *
+ * **Lo desnudo NO se mide aquí**, y el intento costó un informe equivocado:
+ * `capas` es sólo una de las listas que dibujan —al lado viven `boards`,
+ * `paneles`, `tarjetas` y `recortes`— así que contar huecos sobre ella sola dio
+ * 147 s en las siete cuando son 25 s en dos. Vive en `reels-spec.mjs :: pelado`,
+ * que es el único sitio donde la pieza está entera.
  */
 export const revisarPieza = (capas) => {
   const faltas = [];
