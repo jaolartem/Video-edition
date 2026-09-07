@@ -404,6 +404,26 @@ def integrar(n, ver=False):
     if not wav:
         print(f"R{n}: sin audio limpiado todavia")
         return False
+    # **Y la voz limpia tiene que ser DE ESTE corte.**
+    #
+    # La limpieza se exporta desde `public/reel-NN.mp4`, asi que una que sea mas
+    # vieja que ese fichero se hizo sobre otro montaje. Las guardas de abajo
+    # comparan segundos y eso no lo ven: el 7-9-2026 las siete piezas se
+    # entregaron con la voz del corte del dia anterior, seis con 0,2-0,5 s de
+    # deriva —que se oye como el subtitulo adelantado; Jaime: *«el cc esta
+    # desfasado»*— y reel-03 con 2,33 s, o sea **el gancho entero mudo**:
+    # *«se ve la imagen pero no se escucha mi voz»*.
+    #
+    # Es C-308 en el audio: lo que no sabe de que corte es, sobrevive al corte.
+    # Y aqui se prefiere la voz cruda EN SU SITIO a una limpia de otro montaje,
+    # que es la misma regla que ya aplica `distancia` al negarse a medir.
+    if os.path.getmtime(wav) < os.path.getmtime(f"public/reel-{n:02d}.mp4"):
+        print(f"R{n}: la voz limpia es MAS VIEJA que el corte — se hizo sobre"
+              f" otro montaje. No se sustituye: sale con su voz cruda, en su"
+              f" sitio. Vuelve a limpiarla desde el corte de hoy.")
+        registro.aviso("voz-limpia", "voz limpiada de otro corte",
+                       detalle=f"R{n}: {os.path.basename(wav)}", eco=False)
+        return False
     # **Primero se pone en su sitio, y despues se mide si cabe.**
     #
     # El orden importa y estaba al reves. Las guardas de duracion de abajo

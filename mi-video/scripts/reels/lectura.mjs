@@ -85,7 +85,17 @@ const BARRE = 16;
 const ENTREGA = 1.15;
 
 /** El texto de un tablero, venga en el prop que venga. */
-const textos = (p) => {
+/**
+ * **Lo que la lamina DIBUJA**, que no es todo lo que trae en `props`.
+ *
+ * Se exporta desde el 7-9-2026 porque ya son DOS las puertas que lo
+ * preguntan —esta, que mide si da tiempo a leerlo, y `coherencia.mjs`, que
+ * mide si dice lo mismo que la voz—. Escrito dos veces serian dos ideas de
+ * que se ve en pantalla, que es justo la averia que Jaime mando a cerrar:
+ * *«hay varias que pueden utilizar lo mismo... no tiene sentido que se
+ * rehagan»*.
+ */
+export const textos = (p) => {
   const fuera = [];
   const mete = (v) => {
     if (typeof v === "string" && v.trim()) fuera.push(v);
@@ -121,14 +131,37 @@ const textos = (p) => {
     // escriben ahi —300 caracteres en reel-07 e1— habria pedido diez segundos
     // por un texto que no se dibuja. `declarado/lineas.ts` ya no la rotula; esto
     // es la otra mitad de la misma lista.
+    // Y por la misma puerta, tres mas, contadas el 7-9-2026 listando lo que
+    // esto devuelve en el lote: `fondo` es un color —«navy», «richBlack»—,
+    // `alinea` y `eje` son colocacion —«izq», «columna»— y `entrada` es la
+    // prosa que describe el movimiento, no lo que se lee. Un color contado como
+    // bloque pedia 0,75 s de lectura por una palabra que nadie ve; y en la
+    // regla de coherencia era peor: «navy» no esta en la voz, asi que un
+    // tablero que repetia la frase entera **se salvaba por el nombre del
+    // color**.
     if (["placa", "sound", "sfx", "cubre", "familia", "oro", "figura", "zona",
          "source", "anclas", "recorte", "ventana", "signo", "total",
-         "sujeto", "sujeto_src", "sujeto_css",
+         "sujeto", "sujeto_src", "sujeto_css", "fondo", "alinea", "eje",
+         "entrada",
          "pie", "fuente", "condicion", "condition", "limitation",
          "condicion_completa"].includes(k)) continue;
     mete(v);
   }
   return fuera;
+};
+
+/**
+ * **Lo que la lámina ARGUMENTA**: lo que dibuja, menos el pie de cumplimiento.
+ *
+ * `textos` contesta «qué hay que mirar» y esto contesta «qué está diciendo».
+ * Son dos preguntas distintas sobre la misma lámina y por eso viven juntas: el
+ * pie legal y la condición **se dibujan** —cuentan para el tiempo de lectura—
+ * pero no son el argumento, y contarlos como tal salvaba a cualquier tablero de
+ * la regla de coherencia por llevar su línea de fuente.
+ */
+export const argumento = (p) => {
+  const { condicion, pie, fuente, ...resto } = p ?? {};
+  return textos(resto);
 };
 
 const _tablero = (kind, p) => {

@@ -31,7 +31,8 @@
 import fs from "fs";
 import { createHash } from "node:crypto";
 import { faltasDeclaradas, rotuloDe } from "./caminos.mjs";
-import { lecturaCorta } from "./reels/lectura.mjs";
+import { argumento, lecturaCorta } from "./reels/lectura.mjs";
+import { coherencia } from "./reels/coherencia.mjs";
 import { FPS, Reloj } from "./reels/reloj.mjs";
 // Las tres importaciones de `material.mjs` que había aquí eran una.
 import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
@@ -46,15 +47,12 @@ import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
 import { pieDe } from "./reels/cifras.mjs";
 import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe } from "./reels/copy.mjs";
 import { acotarAlCta, ctaDe, faltasDelCierre } from "./reels/cta.mjs";
-import { caminosDe, contrasteDe, cortinillasDe, cortinillasSinSitio,
-  faltaMezcla, glitchesDe, repartirPorCubre, tarjetasDe }
-  from "./reels/capas.mjs";
+import { caminosDe, contrasteDe, cortinillasDe, cortinillasSinSitio, faltaMezcla, glitchesDe, repartirPorCubre, tarjetasDe } from "./reels/capas.mjs";
 import { armarPaneles, armarTableros } from "./reels/tableros.mjs";
 // Quién cede cuando dos capas toman el mismo tramo: ver `reels/ocupacion.mjs`.
 import { contrastePisado, empujaTablero } from "./reels/ocupacion.mjs";
 import { imagenDe } from "./reels/imagen.mjs";
-import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad, trataElCc }
-  from "./reels/subtitulos.mjs";
+import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad, trataElCc } from "./reels/subtitulos.mjs";
 import { porEscena, rellenar } from "./reels/escenas.mjs";
 import { revisar } from "./reels/puerta.mjs";
 import { apartaDelGancho, armarGancho, bajarEnElGancho, titularDe }
@@ -260,7 +258,10 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   // tablero tiene que tener tiempo suficiente de lectura»*. La regla llevaba
   // escrita en el contrato del disenador desde el principio —0,75 s por bloque
   // mas medio segundo— y no la miraba nadie.
-  faltas.push(...lecturaCorta(tableros).map((f) => `${slug}: ${f}`));
+  // Y si la lamina dice lo mismo que la voz o habla de otra cosa: `coherencia`.
+  faltas.push(...lecturaCorta(tableros).map((f) => `${slug}: ${f}`),
+    ...coherencia(tableros, pieza?.captions ?? captions, argumento)
+      .map((f) => `${slug}: ${f}`));
 
   /**
    * **El subtítulo se compone al final**, cuando ya se sabe qué hay en pantalla.
