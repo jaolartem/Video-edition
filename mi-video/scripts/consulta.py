@@ -171,6 +171,23 @@ def evento(fecha=None):
 # quien lo llama desde Python—; el CLI necesita además código de salida y
 # mensaje, que es `SystemExit`. La traducción vive aquí, en el borde, y no dentro
 # del objeto: un dominio que lanza `SystemExit` mata al que lo importa.
+def acotado(slug, fase):
+    """Las etapas que los tiquets abiertos de esa fase acotan, o `null`.
+
+    `null` significa «la pieza entera», que es el modo normal —componer de cero—
+    y tambien lo que pasa cuando una correccion suya no nombra etapa. Una lista
+    significa: **solo estas**, y el resto ya esta aprobado.
+
+    Existe porque `describir.mjs` pedia las siete escenas de reel-03 para
+    arreglar ocho segundos de gancho. La medida ya estaba escrita en
+    `dominio/abierto.py :: alcance`; lo que faltaba era que node pudiera
+    preguntarla, que es lo unico que hace esta puerta.
+    """
+    from dominio import abierto
+    hay, etapas, todas = abierto.alcance(slug, fase)
+    return None if (not hay or todas or not etapas) else sorted(etapas)
+
+
 def guardar_escena(slug, orden, d):
     """Guarda la descripción de una etapa, con el texto que describe."""
     try:
@@ -216,6 +233,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "fijos": fijos,
           "precio_vigente": precio_vigente,
           "evento": evento,
+          "acotado": acotado,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
 

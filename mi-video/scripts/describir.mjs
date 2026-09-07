@@ -136,7 +136,12 @@ function describePieza(slug, filas) {
       return { ...f, fotogramas: JSON.parse(j) };
     } catch { return f; }
   });
-  const entrada = { ...pedidoDe(slug, conFotos), franja: criterioDeFranja(),
+  // **`pedidoDe` devuelve UN TEXTO, no un objeto.** Esto lo esparcia con `...`,
+  // y esparcir una cadena en un objeto la parte caracter a caracter: el pedido
+  // de reel-03 salia con 3.420 claves —`"0": "R", "1": "e", "2": "e"…`— que son
+  // casi todo su peso. No falla: se escribe, se valida y se manda, y quien
+  // contesta tiene que reconstruir el texto letra a letra antes de empezar.
+  const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
                     revisa_oyendo: escucha };
   const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
@@ -189,7 +194,17 @@ function porPiezas(filas) {
 
 const rehacer = process.argv.includes("--rehacer");
 const reels = process.argv.slice(2).filter((x) => /^\d$/.test(x));
-const filas = JSON.parse(sql("escenas_por_describir", [reels, rehacer]));
+let filas = JSON.parse(sql("escenas_por_describir", [reels, rehacer]));
+// **Y si hay tiquets, se pide SOLO lo que acotan.** `--rehacer` pedia la pieza
+// entera aunque la correccion nombrara una etapa: el 7-9-2026 el compositor de
+// reel-03 recibio las siete escenas —252 KB— para arreglar ocho segundos de
+// gancho, y estuvo veinte minutos redescribiendo lo que Jaime ya habia
+// aprobado. La medida vive en `dominio/abierto.py :: alcance`; aqui solo se
+// pregunta. `null` sigue siendo «la pieza entera», que es el modo normal.
+filas = filas.filter((f) => {
+  const solo = JSON.parse(sql("acotado", [f.slug, "descrito"]) || "null");
+  return !solo || solo.includes(Number(f.orden));
+});
 if (!filas.length) {
   console.log("nada que describir (usa --rehacer para volver a pedirlo)");
   process.exit(0);

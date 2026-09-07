@@ -275,6 +275,27 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     return cur.lastrowid
 
 
+def situar(id_, segundo):
+    """Declara **en que segundo de la pieza** cae un tiquet abierto sin el.
+
+    Hermana de `medir`, y por el mismo motivo: `abrir` acepta un tiquet sin
+    segundo —hay objeciones que son de la pieza entera— pero entonces se queda
+    sin `beat`, y sin beat no se puede acotar. El 7-9-2026 el #282 salio asi y
+    el pedido del compositor pidio las ocho escenas de reel-01 para arreglar
+    una palabra.
+
+    No es una puerta trasera: **deja el segundo escrito** y el beat se deriva
+    como en cualquier otro, con `beat_en`.
+    """
+    cx = _con()
+    cx.execute("update ticket set segundo = ?, beat = ? where id = ?",
+               (float(segundo), _beat(
+                   cx.execute("select pieza from ticket where id = ?",
+                              (id_,)).fetchone()["pieza"], float(segundo)), id_))
+    cx.commit()
+    return segundo
+
+
 def medir(id_, medida):
     """Declara **qué medida cierra** un ticket que se abrió sin decirlo.
 

@@ -91,8 +91,49 @@ def suyas(slug):
             (slug, MAQUINA)).fetchall()
     except sqlite3.Error:
         return []
-    return [(r["id"], r["accion"], FASE.get(r["accion"], "disenado"),
-             " ".join((r["que"] or "").split())[:120]) for r in filas]
+    suyas_ = [(r["id"], r["accion"], FASE.get(r["accion"], "disenado"),
+               " ".join((r["que"] or "").split())[:120]) for r in filas]
+    return suyas_ + _tiquets(slug)
+
+
+def _tiquets(slug):
+    """Y los tiquets abiertos, que son lo mismo escrito en la otra tabla.
+
+    **Dos tablas para una decision, y el que reparte solo miraba una.** Una
+    correccion de Jaime vive en `revision` y una objecion suya sobre una pieza
+    vive en `ticket` — la separacion tiene su motivo, la explica
+    `dominio/ticket.py`—, pero para ESTA pregunta son la misma cosa: qué tiene
+    que mirar el paso que viene, y por tanto qué NO tiene que volver a mirar.
+
+    Sin esto el pedido salia con `modo: null` y `tiquets: null`, o sea sin
+    acotar: el 7-9-2026 el compositor de reel-03 recibio las 7 escenas enteras
+    —252 KB— para arreglar 8 segundos de gancho, y estuvo veinte minutos
+    redescribiendo la parte que Jaime ya habia aprobado. Es el mismo defecto que
+    el docstring de arriba cuenta con el #752, arreglado por el lado del filtro
+    y no por el de la tabla.
+
+    El paso lo declara el propio tiquet en `vuelve_a`, que es donde ya estaba.
+    """
+    try:
+        from . import ticket as _t
+        cx = basedatos.abrir(BASE)
+        cx.row_factory = sqlite3.Row
+        filas = cx.execute(
+            "select id, dijo, beat, vuelve_a from ticket"
+            " where pieza = ? and estado = 'abierto'"
+            " and ifnull(vuelve_a,'') <> '' order by id", (slug,)).fetchall()
+    except (sqlite3.Error, ImportError):
+        return []
+    fuera = []
+    for r in filas:
+        # El beat que el tiquet ya trae vale mas que buscarlo en la prosa:
+        # `abrir` lo derivo del segundo que Jaime dijo. Se antepone al texto
+        # porque `etapa_de` lee ahi, y asi acotar no depende de como se redacto.
+        txt = " ".join((r["dijo"] or "").split())[:120]
+        if r["beat"] is not None:
+            txt = f"e{r['beat']} · {txt}"[:120]
+        fuera.append((r["id"], "otro", r["vuelve_a"], txt))
+    return fuera
 
 
 def vencidas(slug, fase_actual, orden):
