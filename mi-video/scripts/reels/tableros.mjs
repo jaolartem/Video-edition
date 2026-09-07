@@ -10,26 +10,55 @@
  * el frame — 0,75 s por bloque más medio segundo de respiro. Y va calculada, no
  * escrita a mano: a mano se desfasa al primer reajuste del corte y no avisa.
  */
+import fs from "node:fs";
 import { FPS } from "./reloj.mjs";
+import { anclaDeclarada, cuandoSeDice } from "./anclas.mjs";
+import { empujaTablero } from "./ocupacion.mjs";
 import { ADELANTO, SOLAPE, duracionTablero } from "./lectura.mjs";
-import { placaDe } from "./material.mjs";
-
+import { placaDe, precioVigente, sujetoDe } from "./material.mjs";
+import { HAY_CIFRA } from "./paneles.mjs";
+import { tratoDelSujeto } from "../imagen.mjs";
 
 /**
- * **Una tarjeta y un tablero no pueden empezar en el mismo frame.**
+ * **La escalera de precios se DERIVA; en un tablero no se escribe.**
  *
- * Un beat sin material se ancla donde empieza el siguiente —no tiene sitio
- * propio— y si ese siguiente lleva tablero, los dos ocupan el cuadro entero a la
- * vez: se pintan uno encima del otro y la tarjeta no existe. En el reel 2 la del
- * beat 2 y el tablero del beat 3 salían los dos en 6,9 s. La tarjeta va primero
- * —es el beat anterior— y el tablero entra cuando ella termina, que además es el
- * orden del argumento.
+ * Instrucción de lote de Jaime (#64, 4-9-2026): *«el precio en pantalla está mal
+ * y vencido»* — el escalón sale de `precioVigente()`, no de un literal. El CTA ya
+ * lo cumplía (`reels/copy.mjs`), y el tablero que enseña los peldaños uno debajo
+ * de otro no tenía por dónde: escribir «$30» y «$40» a mano en
+ * `escena_desc.tablero` es la misma avería un piso más abajo, y ahí sin fecha de
+ * caducidad a la vista.
+ *
+ * Quien compone declara `escalera: true` y aquí se sustituye por `escalones`, ya
+ * redactados en `scripts/dominio/precio.py :: vigente`. Redactarlos aquí sería la
+ * segunda redacción del mismo peldaño, que es como se separan dos rótulos.
+ *
+ * Se pregunta **una vez por corrida**: cada llamada lanza un subproceso Python.
  */
-export const empujaTablero = (cartas) => (at) =>
-  cartas.reduce(
-    (t, c) => (c.at <= t && t < c.at + c.duration ? c.at + c.duration : t),
-    at,
-  );
+const ESCALERA = precioVigente();
+
+/**
+ * Sustituye `escalera: true` por los peldaños de hoy.
+ *
+ * Si ya no hay escalón vigente la clave **se retira y se dice**: dejarla puesta
+ * rotularía «true» en versales, que es el accidente del «430» de
+ * `TableroDeclarado` por la misma puerta. Y una tarifa cerrada en pantalla es
+ * peor que ninguna.
+ */
+const conEscalera = (props, donde, faltas) => {
+  if (props?.escalera !== true) return props;
+  const { escalera: _pide, ...resto } = props;
+  if (!ESCALERA?.escalones?.length) {
+    faltas.push(
+      `${donde}: el tablero pide la escalera de precios y ya no hay escalón ` +
+      `vigente en la tabla \`precio\`. Sale sin ella — una tarifa cerrada en ` +
+      `pantalla es peor que ninguna.`,
+    );
+    return resto;
+  }
+  return { ...resto, escalones: ESCALERA.escalones };
+};
+
 
 /**
  * Los tableros con su horario. **El tablero dura lo que cuesta leerlo, no lo que
@@ -48,7 +77,9 @@ export const empujaTablero = (cartas) => (at) =>
  * recorta el `<Sequence>` en silencio y el tablero desaparece a media
  * construcción sin que nadie se entere.
  */
-export function armarTableros(bs, { slug, reloj, duracion, empuja, captions }) {
+export function armarTableros(
+  bs, { slug, reloj, duracion, empuja, captions, desc = {}, faltas = [] },
+) {
   const fin = Math.round(duracion * FPS);
   return bs
     .map((b) => {
@@ -67,7 +98,7 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja, captions }) {
       //
       // Si no viene declarado, se ancla al beat como siempre: una pieza vieja no
       // se rompe porque el mecanismo nuevo exista.
-      const at = empuja(_anclaDeclarada(b, reloj, captions) ?? reloj.anclaDe(b.beat));
+      const at = empuja(anclaDeclarada(b, reloj, captions) ?? reloj.anclaDe(b.beat));
       // **Y no se come la etapa siguiente.**
       //
       // El `Math.max` dejaba que un tablero durase lo que su forma pide aunque
@@ -94,21 +125,28 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja, captions }) {
         // antes de que nadie dijera lo que anuncia (reel-06 e2).
         beat: b.beat,
         kind: b.kind,
-        // La placa del beat, si la hay: **los fondos son para usarse**. El
-        // collage asoma alrededor y los bloques opacos sostienen las cifras, que
-        // es como lo hace el canon. Los ficheros de `public/sfx/` ya existen,
-        // así que el sonido de los movimientos se enciende: niveles bajos, la
-        // voz manda.
+        // La placa de la pieza: **los fondos son para usarse**. El collage
+        // asoma alrededor y los bloques opacos sostienen las cifras, que es
+        // como lo hace el canon. Los ficheros de `public/sfx/` ya existen, así
+        // que el sonido de los movimientos se enciende: niveles bajos, la voz
+        // manda.
         // **Y la que ELIGE el diseñador gana.** Esto ponia `placaDe()`
         // DESPUES de sus props, asi que una placa declarada no llegaba nunca:
         // el mismo dia que las catorce placas empezaron a viajar en el pedido
-        // —para que se pudiera elegir— el codigo seguia imponiendo la del
-        // `sirve`. Declarar sin poder aplicar es no declarar.
+        // —para que se pudiera elegir— el codigo seguia imponiendo la asignada.
+        // Declarar sin poder aplicar es no declarar.
         //
-        // `placaDe` se queda de respaldo, que es lo que era: la asignacion
-        // pensada de antemano para ese beat.
-        props: { ...b.props, sound: true,
-                 placa: b.props?.placa ?? placaDe(slug, b.beat),
+        // `placaDe` se queda de respaldo y **es de la pieza, no del beat**:
+        // Jaime, *«es un FONDO de tablero por reel»*. Que gane la declarada no
+        // abre la puerta a dos suelos en una misma pieza — eso lo para
+        // `reels/fondo.mjs`, que compara lo que acaba en pantalla.
+        // `conEscalera` va en el spread de entrada, no después: lo que sustituye
+        // es una declaración de quien compone, así que tiene que llegar antes de
+        // que nadie lea los props — y lo que el motor añade abajo sigue mandando
+        // sobre ella, como hasta ahora.
+        props: { ...conEscalera(b.props, `${slug} e${b.beat}`, faltas),
+                 sound: true,
+                 placa: b.props?.placa ?? placaDe(slug),
                  // **A cuadro completo la placa LLENA el cuadro.**
                  //
                  // El recorte geometrico —cuna, columna, esquina— es canon
@@ -129,10 +167,33 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja, captions }) {
                  // convive con el plano en vez de sustituirlo.
                  recorte: b.props?.recorte
                    ?? ((b.props?.cubre ?? "pleno") === "pleno" ? "lleno" : undefined),
+                 // **Él dentro del tablero: el fichero y el tratamiento los pone
+                 // el spec, no quien compone.**
+                 //
+                 // El diseño declara UNA cosa —`sujeto`, o sea de qué lado va—
+                 // y de ahí sale todo lo demás: el recorte lo produce
+                 // `dominio/sujeto.py` con su nombre de convención, y el
+                 // tratamiento sale de `escena_desc.color`, que es el arco
+                 // emocional. *«En color o en sepia, depende del arco»* — así
+                 // que pedirlo dos veces sería dejar que se contradigan.
+                 ...(b.props?.sujeto
+                   ? { sujeto_src: sujetoDe(slug, b.beat) ?? undefined,
+                       sujeto_css: tratoDelSujeto(desc?.[b.beat]?.color).css }
+                   : {}),
                  duracion: dur },
       };
     })
     .filter((b) => {
+      // **Un tablero que lo pide y no tiene recorte se dice.** Sin esto sale
+      // igual, sin él dentro y sin avisar: exactamente la avería de la casa —
+      // una decisión declarada que se descarta aguas abajo en silencio.
+      if (b.props.sujeto && !b.props.sujeto_src) {
+        faltas.push(
+          `${slug}: el tablero del beat ${b.beat} lleva a Jaime dentro y no hay` +
+            ` recorte en public/recorte/${slug}-e${b.beat}.webm — falta la` +
+            ` pasada de scripts/dominio/sujeto.py sobre este corte.`,
+        );
+      }
       if (b.duration > 0) return true;
       console.log(
         `    ojo: un tablero queda fuera de la pieza (empieza en ` +
@@ -171,19 +232,95 @@ export function armarTableros(bs, { slug, reloj, duracion, empuja, captions }) {
 //
 // `sfx` y `camara` entran con ella: las tres las escribe quien compone para que
 // las lea el motor, no la pantalla.
+//
+// `volumen` es de la misma clase que `figura`: el nombre de una animación del
+// catálogo de `src/brand/volumenes.json`, escrito para `SidePanel` y no para la
+// pantalla. Sin esta línea el panel rotularía «compuerta» en versales.
+// `eje` es de la misma clase que `entrada` y `zona`: la descripcion de un
+// movimiento, escrita para quien compone. Sin esta linea el panel de reel-02 e10
+// rotulaba en pantalla los 112 caracteres de «una sola linea horizontal: su
+// marca muy adelantada, la de usted en el arranque, y la linea sigue fuera de
+// cuadro». Es el mismo accidente que «ceda» y que el «430», por la misma puerta.
+//
+// **Y lo que va al PIE no es un bloque del panel**, que es la misma clase por la
+// puerta contraria: `condicion` es texto de cumplimiento —hasta 190 caracteres—
+// escrito para la línea de debajo, no para una cinta de 24. Mientras el panel
+// tuvo tres rótulos delante nunca llegó al `slice(0, 3)`; en cuanto una lámina
+// se lleva los rótulos —el reparto de reel-02 e1 deja uno— `condicion` sube al
+// segundo puesto y **tumba el render**, porque `assertShort(…, "panel")` son 24.
+//
+// La lista de lo que va al pie ya existe y la escribe `reels/cifras.json`: es la
+// misma con la que `cifrasDe` decide qué NO cuenta como cifra rotulada. Se lee
+// de ahí y no se copia — dos listas de lo mismo divergen a la primera.
+const AL_PIE = JSON.parse(
+  fs.readFileSync(new URL("./cifras.json", import.meta.url), "utf8"),
+).al_pie;
+
 const NO_TEXTO = new Set(["familia", "zona", "cubre", "oro", "sound", "fondo",
-                          "filete", "source", "paso", "entrada",
-                          "figura", "sfx", "camara",
-                          "recorte", "fuerza", "deriva", "placa"]);
+                          "filete", "source", "paso", "entrada", "eje",
+                          "figura", "sfx", "camara", "volumen",
+                          "recorte", "fuerza", "deriva", "placa",
+                          // **Y `anclas` es un puntero al transcript, no copy.**
+                          // Desde que un panel puede arrancar con la palabra, su
+                          // ancla puede ser TEXTO —«de cada 100 dólares»— y
+                          // entonces cae en la derivación de rótulos y sale en
+                          // versales sobre el plano. Los tres paneles que ya la
+                          // declaraban la traían en segundos y por eso no se
+                          // veía: un número no pasa el `typeof v === "string"`.
+                          "anclas",
+                          ...AL_PIE]);
+
+/**
+ * **Un prop cuyo valor es el NOMBRE de otro prop es un puntero, no copy.**
+ *
+ * `NO_TEXTO` es una lista de nombres y va a la zaga: ya se le escaparon `figura`
+ * («ceda» rotulado en versales), `duracion` (el «430» de `TableroDeclarado`),
+ * `eje` (112 caracteres de descripción de movimiento) y `volumen`. La quinta fue
+ * `tachado: "creencia"`, y el panel de reel-02 e5 salió rotulando **CREENCIA**
+ * como tercer bloque: el nombre interno de un campo, en pantalla, delante del
+ * espectador.
+ *
+ * Añadir el nombre número cinco a la lista arregla ese caso y espera al sexto.
+ * Esto arregla la clase: si el valor de un prop coincide con la clave de otro
+ * prop del mismo tablero, ese prop está señalando a un hermano — quien compone
+ * lo escribe para el motor, y el motor no lo rotula.
+ */
+const ES_PUNTERO = (props) => {
+  const claves = new Set(Object.keys(props ?? {}));
+  return ([, v]) => typeof v === "string" && claves.has(v.trim());
+};
 
 export function armarPaneles(bs, reloj, tableros, captions) {
   return bs
     .map((b) => {
       const yaSon = Array.isArray(b.props?.bloques) ? b.props.bloques : null;
-      const bloques = yaSon ?? Object.entries(b.props ?? {})
+      // **La lámina del panel, cuando el diseño la declara.**
+      //
+      // Con `figuras.json` y `volumenes.json` cerradas —*«gráficos y palabras,
+      // como tablero de clase»*— un panel se quedó sin nada que dibujar: los
+      // cuatro de reel-04 salieron como bloques negros apilados en una esquina,
+      // tres formas declaradas distintas con el mismo aspecto, porque
+      // `repartirPorCubre` manda el `panel` por aquí y aquí se tira el `kind`.
+      //
+      // `casillas` va APARTE de `bloques` porque no son lo mismo: la tira de
+      // días con la fecha sellada lleva además sus tres renglones debajo. Ver
+      // `src/components/Casillas.tsx`.
+      const casillas = Array.isArray(b.props?.casillas) ? b.props.casillas : null;
+      // **La otra lámina de la misma instrucción: el gráfico de datos.** Cerrada
+      // la biblioteca, lo que entra son *«barras, repartos, acumulados, columnas
+      // comparadas — y palabras»*; `casillas` pone las palabras a escuadra y esto
+      // pone el dato. Es un objeto, así que nunca cae en la derivación de
+      // rótulos: lo que iba a pasar sin esta línea es que no llegara a ningún
+      // sitio y el panel volviera a decir con letras lo que la barra hace ver.
+      const reparto = b.props?.reparto?.porciones?.length
+        ? b.props.reparto
+        : null;
+      const puntero = ES_PUNTERO(b.props);
+      const bloques = yaSon ?? (casillas ? [] : Object.entries(b.props ?? {})
         .filter(([k, v]) => !NO_TEXTO.has(k) && typeof v === "string" && v.trim())
+        .filter((e) => !puntero(e))
         .slice(0, 3)
-        .map(([, v]) => ({ texto: v }));
+        .map(([, v]) => ({ texto: v })));
       // **La placa tambien en el panel, no solo a pleno.** `SidePanel` sabe
       // pintarla desde hace tiempo —la mete detras del bloque al 50% para que
       // el collage asome sin comerse el texto— y esto no se la pasaba nunca:
@@ -198,20 +335,76 @@ export function armarPaneles(bs, reloj, tableros, captions) {
         const i = Math.max(0, bloques.findIndex((x) => x.fuerte));
         bloques[i] = { ...bloques[i], placa };
       }
-      return { beat: b.beat, bloques };
+      // **Y la animación del panel viaja con él.** `cubre` viaja también: no es
+      // cromo aquí, es lo que distingue un panel —que ilustra, y por eso tiene
+      // que moverse— de una banda de pie, que es un rótulo. Lo lee la puerta.
+      return { beat: b.beat, bloques,
+               casillas: casillas ?? undefined,
+               reparto: reparto ?? undefined,
+               eje: b.props?.eje ?? undefined,
+               // **Y el ancla del panel, que estaba declarada y no llegaba.**
+               // `_anclaDeclarada` lee `b.props.anclas`, y en la segunda vuelta
+               // este objeto ya no tiene `props`: un panel no podía arrancar con
+               // la palabra por mucho que lo declarase.
+               anclas: b.props?.anclas ?? undefined,
+               // El movimiento con el que entra cada casilla lo declara quien
+               // compone, igual que el del tablero: `Casillas` lo emite en el
+               // frame en que la casilla se mueve.
+               sfx: b.props?.sfx ?? undefined,
+               volumen: b.props?.volumen ?? undefined,
+               // **El pie de cumplimiento viaja con el panel.** `source` estaba
+               // en `NO_TEXTO` —bien, no es copy de pantalla— y ahi se quedaba:
+               // el panel de reel-02 e1 enseñaba «SE VA $54» y «LE QUEDA $46»
+               // con la fuente declarada en su tablero y ningun sitio por donde
+               // llegar al render. Declarar sin poder aplicar es la averia de
+               // la casa; quien lo exige ahora es `paneles.mjs`.
+               //
+               // **Y viaja solo si hay cifra que respaldar.** `source` sirve
+               // para dos cosas distintas: el pie que va en pantalla y la nota
+               // del que compone diciendo por que NO hay cifra —«sin cifra: no
+               // rotula ninguna cantidad…»—. La segunda esta escrita para quien
+               // compone, no para el espectador, y pasarla como pie es el mismo
+               // accidente que el «ceda» de `figura` y el «430» de `duracion`:
+               // un valor de un consumidor tratado como si fuera texto. Lo que
+               // convierte un `source` en pie es que el panel ensene un digito.
+               // **Y un reparto SIEMPRE enseña cifras**: las rotula la propia
+               // barra, así que el pie es obligatorio aunque los rótulos que
+               // queden al lado no lleven un dígito. Sin esta mitad, mover el
+               // «$54 / $46» de los bloques a la barra se llevaba por delante la
+               // atribución — la cifra en pantalla y su fuente en la base.
+               fuente: bloques.some((x) => HAY_CIFRA.test(x.texto)) || reparto
+                 ? b.props?.source ?? undefined
+                 : undefined,
+               cubre: String(b.props?.cubre ?? "panel") };
     })
-    .filter((b) => b.bloques.length)
+    // **Un panel existe si tiene algo que poner en pantalla**, y desde que la
+    // lámina es una vía propia eso ya no son sólo los rótulos: un panel de sólo
+    // casillas —cinco síntomas que se tachan— se caía aquí sin decir nada.
+    .filter((b) => b.bloques.length || b.casillas?.length)
     .map((b) => {
       const inicio = reloj.anclaDe(b.beat);
+      // **Lo que hay que leer son las dos vías juntas.** `ADELANTO` reparte
+      // 0,75 s por bloque más medio segundo, y contando sólo los rótulos un
+      // panel de cinco casillas se quedaba con medio segundo para construirse.
+      // Las porciones del reparto cuentan igual: cada una entra con su cifra y
+      // su rótulo, y son lo que hay que leer. Contando sólo el bloque que las
+      // acompaña, el panel de reel-02 e1 se retiraba 1,3 s después de acabar de
+      // construirse.
+      // Y cuentan las que se LEEN: las casillas anónimas de una tira de días no
+      // dicen, cuentan, y sumarlas pediría siete tiempos de lectura por siete
+      // cuadrados iguales.
+      const leible = [...b.bloques, ...(b.casillas ?? []),
+                      ...(b.reparto?.porciones ?? [])]
+        .filter((x) => x.texto || x.dato || x.rotulo);
       // Se busca **por etapa**, no por el frame en que arranca: ver arriba.
       const suyo = tableros.find((t) => t.beat === b.beat);
       if (suyo) {
-        const dur = ADELANTO(b.bloques);
+        const dur = ADELANTO(leible);
         const at = suyo.at - dur;
-        return at < 0 ? null : { at, duration: dur, bloques: b.bloques };
+        return at < 0 ? null : { ...b, at, duration: dur,
+                                 casillas: cuandoSeDice(b.casillas, at, captions) };
       }
       const dur = reloj.duracionDe(b.beat);
-      const tope = ADELANTO(b.bloques) + 3 * FPS;
       // Y si el diseno declaro cuando entra, manda eso: es la misma regla que
       // el tablero —arranca con la palabra— y el panel dice lo mismo antes.
       // **Y un panel no entra mientras un tablero sigue puesto.**
@@ -224,9 +417,27 @@ export function armarPaneles(bs, reloj, tableros, captions) {
       //
       // Se empuja con la misma regla que ya existe, aplicada a los tableros que
       // ya estan colocados en vez de a las tarjetas.
-      const at = empujaTablero(tableros)(_anclaDeclarada(b, reloj, captions) ?? inicio);
+      const at = empujaTablero(tableros)(anclaDeclarada(b, reloj, captions) ?? inicio);
+      const casillas = cuandoSeDice(b.casillas, at, captions);
+      /**
+       * **Una lámina anclada a la voz dura hasta la última que se dice.**
+       *
+       * «Lo que se tarda en leer más tres segundos» es el tope correcto para una
+       * pila de rótulos: dice lo suyo y devuelve el cuadro. Una lámina cuyas
+       * casillas se tachan cuando se dicen no puede irse antes de la última — en
+       * reel-04 e5 las cinco se resuelven a lo largo de 10 s de voz y el panel se
+       * retiraba a los 7,3, así que el sello del remate no llegaba a salir.
+       *
+       * Dos segundos después de la última: lo que cuesta leer lo que acaba de
+       * quedar en pantalla. Y por eso la etapa deja de ser el techo: quien manda
+       * es el transcript, que es contra lo que se ancló.
+       */
+      const ultima = Math.max(0, ...(casillas ?? []).map((c) => c.en ?? 0));
+      const pide = Math.max(ADELANTO(leible) + 3 * FPS,
+                            ultima ? ultima + 2 * FPS : 0);
       return dur
-        ? { at, duration: Math.min(dur, tope), bloques: b.bloques }
+        ? { ...b, at, casillas,
+            duration: ultima ? pide : Math.min(dur, pide) }
         : null;
     })
     .filter(Boolean)
@@ -251,63 +462,3 @@ export function armarPaneles(bs, reloj, tableros, captions) {
 }
 
 
-/**
- * El frame donde el tablero tiene que entrar, si el diseño lo declaró.
- *
- * `props.anclas` son segundos de la PIEZA MONTADA —lo que se oye—, que es la
- * misma referencia con la que se compuso. Se toma el primero: es cuando se dice
- * lo que el tablero nombra.
- */
-function _anclaDeclarada(b, reloj, captions) {
-  const a = b?.props?.anclas;
-  const s = Array.isArray(a) ? a[0] : a;
-  const seg = typeof s === "object" && s !== null ? (s.segundo ?? s.en) : s;
-  // **Y si el ancla es TEXTO, se resuelve contra el corte de hoy.**
-  //
-  // Jaime, al ver que esto era lo unico que no se re-derivaba: *«hay una linea
-  // de produccion, ¿por que no se deriva solo?»*.
-  //
-  // Porque `anclas` era el unico dato del diseno escrito en SEGUNDOS, y los
-  // segundos se mueven. Todo lo demas esta expresado contra algo estable —los
-  // tableros contra su etapa, los subtitulos contra la transcripcion, los
-  // encuadres contra las escenas— y por eso sobrevive a que se corte.
-  //
-  // Es la regla que el propio Jaime fijo para los cortes: *«las anclas tienen la
-  // funcion de establecer los lugares; si el video se edita o se corta, el ancla
-  // cambia»*. `revision.ancla` la cumple desde hace semanas; el diseno no.
-  //
-  // Ahora un `anclas: "por cada 100 dolares"` se busca en los subtitulos y sale
-  // donde esa frase suene HOY. Un numero sigue valiendo, y sigue quedandose
-  // clavado: por eso lo dice la auditoria de `llega.py`.
-  if (typeof seg === "string" && seg.trim() && Number.isNaN(Number(seg))) {
-    const q = seg.trim().toLowerCase();
-    const cue = (captions ?? []).find((c) =>
-      String(c.text ?? "").toLowerCase().includes(q),
-    );
-    if (cue) {
-      const inicio = reloj.anclaDe(b.beat);
-      return cue.at >= inicio ? cue.at : inicio;
-    }
-    return null;
-  }
-  const n = Number(seg);
-  if (!Number.isFinite(n) || n < 0) return null;
-  const at = Math.round(n * FPS);
-  // No se adelanta a la etapa: un tablero que entra antes de que su beat exista
-  // se pinta sobre lo que dice otra cosa.
-  const inicio = reloj.anclaDe(b.beat);
-  return at >= inicio ? at : null;
-}
-
-
-/**
- * ¿Este trozo se pisa con alguno de los que ya ocupan el cuadro?
- *
- * El contraste es la tercera capa que toma el frame entero y la unica que no
- * pasaba por ningun empujon: en reel-02 se pintaba sobre la cabecera del tablero
- * que venia detras. Vive aqui, con las otras dos reglas de ocupacion, y no en el
- * spec: el spec arma, esto decide quien cede.
- */
-export const sePisa = (x, ocupantes = []) =>
-  !!x && ocupantes.some((o) => o.at < x.at + x.duration &&
-                               o.at + o.duration > x.at);

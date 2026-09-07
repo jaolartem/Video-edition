@@ -34,23 +34,31 @@ import { faltasDeclaradas, rotuloDe } from "./caminos.mjs";
 import { lecturaCorta } from "./reels/lectura.mjs";
 import { FPS, Reloj } from "./reels/reloj.mjs";
 // Las tres importaciones de `material.mjs` que había aquí eran una.
-import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe }
-  from "./reels/material.mjs";
-import { correccionesDe, descDe, pieDe, tablerosDe }
+import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
+import { colocaPaneles } from "./reels/paneles.mjs";
+import { correccionesDe, descDe, tablerosDe }
   from "./reels/base.mjs";
+// **El pie sale de `cifras.mjs`, que es su dueño y llevaba sin correr desde que
+// se escribió.** El que corría era una copia en `base.mjs` que casaba la fila de
+// `dato` por contención de texto crudo y, sobre todo, **pisaba lo declarado**:
+// su spread iba después de `b.props`. Ver `reels/cifras.mjs`.
+import { pieDe } from "./reels/cifras.mjs";
 import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe }
   from "./reels/copy.mjs";
 import { acotarAlCta, ctaDe, faltasDelCierre } from "./reels/cta.mjs";
 import { caminosDe, contrasteDe, cortinillasDe, cortinillasSinSitio,
   faltaMezcla, glitchesDe, repartirPorCubre, tarjetasDe }
   from "./reels/capas.mjs";
-import { armarPaneles, armarTableros, empujaTablero, sePisa }
-  from "./reels/tableros.mjs";
+import { armarPaneles, armarTableros } from "./reels/tableros.mjs";
+// Quién cede cuando dos capas toman el mismo tramo: ver `reels/ocupacion.mjs`.
+import { contrastePisado, empujaTablero } from "./reels/ocupacion.mjs";
 import { imagenDe } from "./reels/imagen.mjs";
-import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad }
+import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad, trataElCc }
   from "./reels/subtitulos.mjs";
 import { porEscena, rellenar } from "./reels/escenas.mjs";
 import { revisar } from "./reels/puerta.mjs";
+import { apartaDelGancho, armarGancho, bajarEnElGancho, titularDe }
+  from "./reels/portada.mjs";
 
 /**
  * Lo que un camino exige y no se cumple. **No se acumula en silencio**: se
@@ -67,7 +75,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   // El DECLARADO y el que se usa son dos cosas: si se pasa el resuelto a
   // `literalesDe`, una pieza que cae al literal parece haberlo declarado.
   const rotuloDeclarado = rotuloDe(descDe(slug)?.[1]);
-  const lineas = rotuloDeclarado ?? LINEAS[slug] ?? [];
+  const lineas = rotuloDeclarado?.lineas ?? LINEAS[slug] ?? [];
   const marco = marcoDe(slug);
   const edl = edlDe(slug);
   const plan = planDe(slug);
@@ -123,8 +131,16 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   const tableros = armarTableros(
     // El pie sale de la fuente comprobada, no de una cadena a mano. Va antes
     // del horario porque la condición cuenta para el tiempo de lectura.
-    pleno.map((b) => ({ ...b, props: { ...b.props, ...pieDe(slug, b.beat, b.props) } })),
-    { slug, reloj, duracion, empuja: empujaTablero(cartas), captions },
+    //
+    // **Y `pieDe` devuelve props, no un parche que se derrame encima.** El
+    // spread `{...b.props, ...pieDe(...)}` era el defecto: lo que el diseñador
+    // escribió para esa cifra exacta quedaba debajo de lo que dijera `dato`.
+    pleno.map((b) => ({ ...b, props: pieDe(slug, b, faltas) })),
+    // `desc` viaja porque el tratamiento del recorte sale del arco emocional
+    // (`escena_desc.color`) y no de un prop escrito a mano; `faltas`, porque un
+    // tablero que pide a Jaime dentro y no tiene recorte tiene que decirlo.
+    { slug, reloj, duracion, empuja: empujaTablero(cartas), captions,
+      desc: descDe(slug), faltas },
   );
 
   // El CTA se calcula ahora y no antes porque su sitio sale de la duración del
@@ -145,12 +161,19 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   if (marca.enCta && cta) cta.corrige = marca.enCta;
 
   const { capas: caminos, faltas: fCaminos } =
-    caminosDe({ slug, plan, edl, desc: descDe(slug) });
+    caminosDe({ slug, plan, edl, desc: descDe(slug), lineas });
   faltas.push(...fCaminos);
 
-  // El virado del plano y la costura animada: lo que el diseñador pidió sobre
-  // la IMAGEN, con su horario. Ver `scripts/reels/imagen.mjs`.
-  const imagen = imagenDe(reloj);
+  // El virado del plano, la costura animada y el recorte del sujeto: lo que el
+  // diseñador pidió sobre la IMAGEN, con su horario. Ver `reels/imagen.mjs`.
+  //
+  // Las faltas salen aparte a propósito: `...imagen` se derrama dentro de la
+  // pieza, y una lista de avisos no es una capa que Remotion tenga que dibujar.
+  const { faltas: fImagen, ...imagen } = imagenDe(reloj, slug);
+  faltas.push(...fImagen);
+  // Y el gancho entra por esa misma puerta: el rótulo detrás de su cabeza es un
+  // recorte más, y la ventana es suya. Ver `reels/portada.mjs`.
+  faltas.push(...armarGancho(caminos, imagen, slug));
 
   const pieza = {
     id: `Reel-R${slug.slice(-1)}`,
@@ -177,7 +200,8 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
      * Si hay camino de portada, manda el camino. Si no lo hay, se queda el
      * anclaje por palabra, que para una pieza sin gancho declarado es correcto.
      */
-    entra: caminos.find((c) => c.tipo === "rotulo")?.at ?? entra,
+    entra: caminos.find((c) => c.tipo === "titular" || c.tipo === "rotulo")?.at
+      ?? entra,
     sostiene: SOSTIENE,
     cta,
     captions: marca.captions,
@@ -202,7 +226,9 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
      * dibujaba encima de su trabajo. Su contenido se migró a `escena_desc`, y
      * ahí ya lo mueve él.
      */
-    paneles: armarPaneles(panel, reloj, tableros, captions),
+    // Y cada panel se coloca donde SU escena deja sitio, no donde la pieza:
+    // `colocaPaneles` le pone el lado y el hueco medidos de esa escena.
+    paneles: colocaPaneles(armarPaneles(panel, reloj, tableros, captions), slug),
     // **Las que se piden, no todas.** Se probaron en TODAS las costuras y
     // quedaron mal —Jaime: «en el segundo 7 se ve raro; esos cortes de escena
     // no vale la pena dejarlos como cortes de escena»—: partian el rotulo por
@@ -219,7 +245,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     // se estira `SOLAPE` frames por encima de la frontera: un L-cut, y lo que
     // la tapa ademas explica algo.
     cortinillas: cortinillasDe(slug, reloj, marco),
-    // Y el virado y los filetes, que se piden por etapa y salen del plan.
+    // El virado, los filetes y los recortes: se piden por etapa y salen del plan.
     ...imagen,
     // Una costura con filete pedido ya está resuelta: el glitch encima serían
     // dos efectos en el mismo frame, que es ruido y no transición.
@@ -267,7 +293,23 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     ...(pieza.cta ? [{ at: pieza.cta.at * FPS, duration: pieza.cta.dur * FPS }] : []),
     { at: pieza.entra, duration: 9 + pieza.sostiene + 9 },
   ], ventanas);
-  pieza.captions = comp.captions;
+  // Y el panel que caía dentro del gancho se corre detrás de él: se pintaba
+  // encima del rótulo, que son los dos bloques compitiendo otra vez.
+  faltas.push(...apartaDelGancho(pieza, slug));
+
+  // **El subtítulo del gancho baja a su franja**, y va DESPUÉS de componer:
+  // componer es lo último que puede meter texto en esa ventana, así que marcar
+  // antes dejaría fuera lo que él añada. No calla —*«puedes mantener el
+  // subtítulo los primeros 5 segundos, con el cc abajo de mí»*—: se aparta de
+  // sitio, que es donde estaba el defecto.
+  // **Y con el sitio ya decidido, el fondo**, encadenado detrás y no en otra
+  // línea: el tratamiento se mide en la banda donde el cc está de verdad, y bajo
+  // el gancho ésa es otra, así que invertir el orden miraría el fondo que no es.
+  // Jaime: *«hay varios que quedarían bien sin el cuadro, otras a las que le
+  // queda bien y otras a las que le quedaría mejor negativo»*. Deja el reparto
+  // en `pieza.cc` para contarlo desde fuera sin volver a decidirlo, que es la
+  // diferencia entre comprobar y volver a opinar. Ver `reels/cc.mjs`.
+  pieza.captions = trataElCc(pieza, slug, bajarEnElGancho(comp.captions, titularDe(pieza)));
   // Las ventanas de beat viajan en el spec: sin ellas no se puede comprobar
   // desde fuera que cada beat lleve su tratamiento.
   pieza.ventanas = ventanas;
@@ -281,16 +323,14 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
    */
   const contraste = contrasteDe(pieza.id, CONTRASTE[slug], pieza.captions);
   faltas.push(...[precioSinEscala(slug, pieza.captions)].filter(Boolean));
-  if (sePisa(contraste, pieza.tableros ?? [])) {
+  // Quien cede cuando dos capas toman el mismo tramo lo decide
+  // `contrastePisado` (reels/tableros.mjs), que es donde viven las reglas de
+  // ocupacion: el spec arma, aquello decide. Tambien limpia los remates de
+  // debajo del contraste que si entra.
+  const pisado = contrastePisado(contraste, pieza.boards ?? [], pieza.captions);
+  if (pisado) {
     faltas.push(`${slug}: el contraste se pisaba con un tablero y se retira`);
-    pieza.contraste = null;
   } else if (contraste) {
-    for (const c of pieza.captions) {
-      if (c.compuesto && c.at < contraste.at + contraste.duration &&
-          c.at + c.duration > contraste.at) {
-        delete c.compuesto;
-      }
-    }
     pieza.escenas = porEscena(pieza, reloj);
   }
   /**
@@ -309,7 +349,9 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
    */
   pieza.rellenadas = rellenar(pieza);
   if (pieza.rellenadas) pieza.escenas = porEscena(pieza, reloj);
-  if (contraste) pieza.contraste = contraste;
+  // Y la retirada de arriba se respeta: publicar aquí sin mirar `pisado` es lo
+  // que deshacía la única regla que impedía dos capas dibujando lo mismo.
+  if (contraste && !pisado) pieza.contraste = contraste;
   pieza.compuestos = comp.n;
   return pieza;
 });

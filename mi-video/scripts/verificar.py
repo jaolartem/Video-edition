@@ -214,8 +214,22 @@ def revisar(slug):
     ruta = f"ads/{slug}/edl-sell.json"
     if not os.path.exists(ruta):
         return [f"{slug}: no hay EDL"]
-    edl = json.load(open(ruta, encoding="utf-8"))
+    # **Y ningun corte se come una palabra.** Jaime, tres piezas seguidas:
+    # «dice "para due-", sin terminar», «al final dice "el link esta a-"», «el
+    # cierre del R-04 quedo truncado tambien». Tres veces lo mismo en tres
+    # piezas distintas: no era de ninguna.
+    #
+    # `costuras.palabras_enteras` ya lo miraba y no los cazaba, porque pregunta
+    # al transcript — y aqui el transcript miente justo donde importa: palabras
+    # con duracion cero, otras estiradas. Daba 0 en reel-07, cuya frase estaba
+    # partida a la mitad. Esto lo oye en la cinta y saca 12 en las tres.
     mal = []
+    from dominio import bordes as _bordes
+
+    for m in _bordes.sucios(slug):
+        mal.append(f"{slug} b{m['beat']}: el corte de {m['en']}s cae encima de"
+                   f" la voz — se come una palabra")
+    edl = json.load(open(ruta, encoding="utf-8"))
     mal += _fecha_ajena(slug, edl)
     con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row

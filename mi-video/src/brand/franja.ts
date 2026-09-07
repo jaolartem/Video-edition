@@ -55,6 +55,21 @@ export const franja = {
   reserva: Math.round((1 - SUELO + ALTO) * layout.height),
   /** El techo, en píxeles desde arriba: 1048. */
   techoPx: Math.round((SUELO - ALTO) * layout.height),
+  /**
+   * **El suelo, en píxeles desde arriba: 1248.** Es donde empieza lo que va
+   * FUERA de la zona segura, y ahí vive el pie de fuente.
+   *
+   * Instrucción de Jaime (6-9-2026): *«por fuera de la zona segura; no me
+   * interesa que lo lean, sólo que sepan que existe»* — pegado por debajo de
+   * esta línea y **no al fondo del cuadro**, porque la interfaz de Meta se come
+   * el 35% inferior y ahí abajo la fuente no queda fuera de la zona segura:
+   * queda tapada, y entonces no cumple ni el único trabajo que se le pide.
+   *
+   * Estaba escrito a mano como `1262` en `PanelDentro` y en `acumulacion/Cierre`
+   * —dos copias del mismo número derivado—, que es exactamente cómo empezaron
+   * las cuatro copias de `layout.safe.bottom + layout.captionBand`.
+   */
+  sueloPx: Math.round(SUELO * layout.height),
   /** Cuerpo del subtítulo discreto. Ver `franja.json`. */
   cuerpo: franjaJson.cuerpo,
 } as const;

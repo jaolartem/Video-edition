@@ -130,11 +130,53 @@ def _con():
 SIN_EDL = object()
 
 
+def _por_el_plan(pieza, segundo):
+    """El beat según **el plan**, que es la línea que se renderiza.
+
+    Devuelve `None` si no hay plan que leer, para que el EDL siga de respaldo.
+    """
+    ruta = os.path.join(RAIZ, "work", "scenes", pieza, "plan-full.json")
+    if not os.path.exists(ruta):
+        return None
+    try:
+        escenas = json.load(open(ruta, encoding="utf-8")).get("escenas") or []
+    except (OSError, ValueError):
+        return None
+    for e in escenas:
+        a = float(e.get("montado_desde", 0.0))
+        if a <= segundo < a + float(e.get("duracion", 0.0)):
+            b = e.get("beat", e.get("etapa_orden"))
+            return None if b is None else int(b)
+    return None
+
+
 def beat_en(pieza, segundo):
     """Qué etapa cae en ese segundo de la pieza montada.
 
-    Se recorre el EDL sumando duraciones: el segundo que Jaime ve es tiempo de
-    montaje, no de cinta.
+    ## El reloj es el del PLAN, no el del EDL
+
+    Se recorría el EDL sumando duraciones, y el EDL **no es el reloj de la
+    pieza**: `plan-reel` le quita el aire a cada corte antes de repartirlo en
+    escenas —regla de Jaime, *«lo de los silencios también puede ser
+    aritmético»*— así que la imagen corre sobre una línea más corta. Está medido
+    en `reels/reloj.mjs`: 6,83 s en reel-01, y **el desfase crece hacia el
+    final**.
+
+    Consecuencia, medida el 6-9-2026 al abrir tres tickets sobre reel-07: el del
+    segundo 38 se archivó en la etapa 3 teniendo que ser la 4, y el del 63 en la
+    5 teniendo que ser la 6. Dos de tres, y las dos al final de la pieza, que es
+    donde vive el CTA.
+
+    Y no es un error de etiqueta: `dominio/abierto.py` empareja ticket y etapa
+    **por beat**, así que un ticket mal colocado abre en el pedido de diseño la
+    lámina de al lado. Es justo lo que este fichero declara que viene a evitar —
+    *«atender la objeción en la etapa equivocada es peor que no atenderla»*— y
+    lo hacía con la lista equivocada. Aprendizaje 33 otra vez: **manda la que se
+    renderiza**.
+
+    El EDL se queda de respaldo para la pieza que todavía no tiene plan: ahí es
+    la única referencia que hay, y una aproximación declarada vale más que un
+    `None`.
 
     **Y distingue dos «no» que no son el mismo.** `None` es «ese segundo no cae
     en ninguna etapa», que es una respuesta; `SIN_EDL` es «no pude leer el EDL»,
@@ -144,6 +186,9 @@ def beat_en(pieza, segundo):
     """
     if segundo is None:
         return None
+    porPlan = _por_el_plan(pieza, segundo)
+    if porPlan is not None:
+        return porPlan
     ruta = os.path.join(RAIZ, "ads", pieza, "edl-sell.json")
     if not os.path.exists(ruta):
         return SIN_EDL

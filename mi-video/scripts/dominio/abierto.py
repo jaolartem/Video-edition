@@ -57,15 +57,38 @@ FASE = {
 }
 
 
+#: Lo que NO es una correccion suya: las notas que levanta la propia maquina.
+#: Se marcan al escribirlas y es la unica excepcion.
+MAQUINA = "MAQUINA"
+
+
 def suyas(slug):
-    """Sus correcciones abiertas de esta pieza: (id, accion, fase, palabras)."""
+    """Sus correcciones abiertas de esta pieza: (id, accion, fase, palabras).
+
+    **Esto filtraba por `que like '%Jaime%'` y se comia tiquets enteros.**
+
+    El #752 de reel-02 —dos capas dibujando la misma comparacion, con las cifras
+    contradiciendose en el mismo frame— nunca llego al pedido de diseno: lo
+    habia escrito un agente contando el defecto medido, sin nombrarle. El pedido
+    salio con `modo: null` y `tiquets: null`, o sea que el paso siguiente no vio
+    la correccion. Es exactamente la averia que este proyecto existe para
+    impedir: la decision esta anotada y el que trabaja no se entera.
+
+    Buscar su nombre en el texto era adivinar quien escribio la nota. Ahora se
+    da la vuelta: **abierta es suya salvo que este marcada como de maquina**, que
+    es lo unico que se sabe de cierto porque se marca al escribirla. Equivocarse
+    hacia enviar de mas cuesta que el paso lea una linea que no le toca;
+    equivocarse hacia enviar de menos cuesta una entrega con el defecto dentro,
+    que es lo que llevamos pagando.
+    """
     try:
         cx = basedatos.abrir(BASE)
         cx.row_factory = sqlite3.Row
         filas = cx.execute(
             "select id, accion, que from revision where video_slug = ?"
-            " and estado = 'pendiente' and que like '%Jaime%' order by id",
-            (slug,)).fetchall()
+            " and estado = 'pendiente' and ifnull(que,'') not like ? || '%'"
+            " order by id",
+            (slug, MAQUINA)).fetchall()
     except sqlite3.Error:
         return []
     return [(r["id"], r["accion"], FASE.get(r["accion"], "disenado"),
@@ -114,6 +137,11 @@ Las capacidades de arriba siguen siendo las tuyas. Lo que cambia es el encargo:
   en vez de tocarla.
 - Si un tiquet ya está resuelto en el montaje de hoy, dilo también: cerrarlo
   vale tanto como aplicarlo, y callarlo no vale nada.
+- **Y di cuáles atiendes**, en `tiquets: [números]` al primer nivel de la
+  respuesta. Sólo se cierran ésos. Los que no nombras se quedan abiertos, que es
+  lo que hay que hacer con un tiquet que no has mirado — antes se cerraban todos
+  los de la fase y una respuesta sobre los paneles se llevó por delante el
+  tiquet del gancho.
 """
 
 
@@ -140,7 +168,7 @@ def etapa_de(texto):
     """
     import re
 
-    m = re.search(r"(?:e|etapa\s*|beat\s*)(\d{1,2})", (texto or "").lower())
+    m = re.search(r"\b(?:e|etapa\s*|beat\s*)(\d{1,2})\b", (texto or "").lower())
     return int(m.group(1)) if m else None
 
 
@@ -174,15 +202,30 @@ def modo(prompt, payload, slug, fase):
                                   "tiquets": tiquets}
 
 
-def cerrar(slug, fase, por_que):
-    """Cierra como `aplicada` los tiquets de esa fase. Devuelve sus números.
+def cerrar(slug, fase, por_que, atendidos=None):
+    """Cierra como `aplicada` los tiquets **que la respuesta dice haber atendido**.
 
     Lo llama **el paso que los arregló**, y por eso vive aquí: cerrar una
     corrección es parte de atenderla, no un trámite aparte. Sin esto el servicio
     componía, la nota seguía abierta y la línea se paraba otra vez por algo ya
     hecho — y la única salida era un `update` a mano contra la base.
+
+    **Y cierra los declarados, no todos los de la fase.** Cerraba todos, y con
+    dos pasos trabajando la misma pieza eso se cobró en el acto: una respuesta
+    que arreglaba los dos paneles de reel-07 cerró de paso el tiquet del gancho,
+    que nadie había mirado. La corrección de Jaime salía de los pendientes sin
+    haberse atendido — que es exactamente lo que este fichero existe para
+    impedir.
+
+    `atendidos` son los números que la respuesta declara. **Sin ellos no se
+    cierra nada**, y ése es el lado seguro: dejar una nota abierta cuesta otra
+    vuelta; cerrarla sin haberla hecho cuesta que él la vuelva a pedir. El modo
+    de tiquets ya se lo pide a quien compone — *«si un tiquet ya está resuelto en
+    el montaje de hoy, dilo también: cerrarlo vale tanto como aplicarlo»*.
     """
-    suyos = [t[0] for t in suyas(slug) if t[2] == fase]
+    quiere = {int(i) for i in (atendidos or [])
+              if str(i).strip().isdigit()}
+    suyos = [t[0] for t in suyas(slug) if t[2] == fase and t[0] in quiere]
     if not suyos:
         return []
     try:
@@ -197,6 +240,34 @@ def cerrar(slug, fase, por_que):
     return suyos
 
 
+def _de_la_tabla_ticket(slug, fase):
+    """Las etapas que abre un tiquet de `ticket`, por su `beat`.
+
+    **Son dos tablas para lo mismo y sólo una abría trabajo.** `revision` guarda
+    sus correcciones y es la que lee todo este fichero; `ticket` es la que
+    escribe el CLI que `CLAUDE.md` pone como forma de anotar una observación
+    —*«los abiertos viajan en el pedido de su pieza, así que el paso que decide
+    los ve colocados en su etapa»*—. Viajaban, sí: `servicio.pedir` los mete en
+    `lo_que_dijo_jaime_de_la_pieza`. Pero **no abrían la etapa**, así que la
+    lámina de la que hablaban seguía sin entrar al encargo y quien componía leía
+    la objeción sin poder tocar lo que objeta.
+
+    Un tiquet abre por `beat`, que ya lo trae medido y recolocado contra el
+    corte de hoy (`ticket.recolocar`). El que no tiene beat no abre nada: abrir
+    la pieza entera por una nota sin etapa es rehacer lo aprobado, que es lo que
+    el modo de tiquets viene a impedir.
+    """
+    try:
+        from . import ticket as _t
+    except ImportError:                                # pragma: no cover
+        return set()
+    try:
+        return {int(t["beat"]) for t in _t.abiertos(slug)
+                if (t.get("vuelve_a") or "") == fase and t.get("beat") is not None}
+    except Exception:                                  # noqa: BLE001
+        return set()
+
+
 def abre(slug, fase, fila):
     """¿Un tiquet suyo vuelve a poner esta etapa en el encargo?
 
@@ -205,4 +276,6 @@ def abre(slug, fase, fila):
     llegaba nunca a quien podía arreglarlo.
     """
     hay, etapas, todas = alcance(slug, fase)
-    return hay and (todas or fila["etapa_orden"] in etapas)
+    if hay and (todas or fila["etapa_orden"] in etapas):
+        return True
+    return int(fila["etapa_orden"]) in _de_la_tabla_ticket(slug, fase)

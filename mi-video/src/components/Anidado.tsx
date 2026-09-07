@@ -7,7 +7,6 @@ import { color, layout, readingFrames } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
-import { PieTablero } from "./PieTablero";
 
 /**
  * **Un universo, y lo que cabe dentro de él.** La contención dicha con
@@ -71,8 +70,6 @@ export const Anidado: React.FC<AnidadoProps> = ({
   base,
   capa_media,
   capa_dentro,
-  condicion,
-  source,
   placa,
   recorte = "lleno",
   sound = false,
@@ -196,10 +193,9 @@ export const Anidado: React.FC<AnidadoProps> = ({
           })}
         </div>
 
-        <PieTablero
-          lineas={[source, condicion].filter(Boolean) as string[]}
-          opacidad={entra(t)}
-        />
+        {/* **El pie ya no lo dibuja cada forma.** Va fuera de la zona segura,
+            en una línea, y lo monta `dibujaTablero` para las 24 láminas del
+            lote. Ver `PieTablero.tsx`. */}
       </ZonaTablero>
     </AbsoluteFill>
   );

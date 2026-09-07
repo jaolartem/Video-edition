@@ -35,6 +35,47 @@ def pal(t):
     return re.findall(r"[a-z]+", t)
 
 
+#: Los primeros segundos, donde una palabra repetida se nota y en el cuerpo no.
+#: Jaime: *«esas repeticiones al inicio, mal: al inicio es fluido y rapido»*.
+ARRANQUE = 20.0
+
+#: Cuantas veces puede salir la misma palabra de contenido en el arranque antes
+#: de que suene a machaqueo. Tres: dos es enfasis, tres ya es una muletilla.
+VECES_MAX = 2
+
+#: Palabras que se repiten sin molestar porque no llevan peso.
+LLANAS = {"que", "de", "la", "el", "los", "las", "un", "una", "y", "no", "en",
+          "es", "se", "su", "sus", "por", "con", "para", "lo", "le", "del",
+          "al", "mas", "pero", "como", "esta", "este", "ya", "si", "a"}
+
+
+def machaca(r, arranque=ARRANQUE, veces=VECES_MAX):
+    """Palabras de contenido que se repiten en el arranque de la pieza.
+
+    Jaime, sobre reel-03: *«usted, usted al inicio, y otra vez repeticion;
+    luego "y nunca le ha preguntado al contador porque", sigue, y "es que, es
+    que"»*. Y `revisar()` decia **cero repeticiones**: busca frases de cuatro
+    palabras repetidas, y esto es otra cosa — la misma palabra volviendo cada
+    pocos segundos.
+
+    En medio de la pieza eso puede ser cohesion. En el arranque es machaqueo, y
+    ahi Jaime no da margen: *«al inicio es fluido y rapido»*. Un tartamudeo a
+    mitad se perdona; en el gancho decide si se sigue viendo.
+    """
+    import collections
+
+    donde = collections.defaultdict(list)
+    for c in r["captions"]:
+        t = c["at"] / 30
+        if t > arranque:
+            break
+        for w in pal(c["text"]):
+            if len(w) > 2 and w not in LLANAS:
+                donde[w].append(round(t, 1))
+    return sorted(((w, cu) for w, cu in donde.items() if len(cu) > veces),
+                  key=lambda x: -len(x[1]))
+
+
 def revisar(r, n=4):
     """n-gramas de `n` palabras que aparecen mas de una vez en toda la pieza."""
     texto, marcas = [], []
@@ -81,9 +122,19 @@ def revisar(r, n=4):
     return len(limpio)
 
 
+def _arranque(r):
+    """Lo que machaca en los primeros segundos. Se cuenta aparte y pesa mas."""
+    m = machaca(r)
+    for w, cuando in m:
+        print(f"   ARRANQUE: «{w}» {len(cuando)} veces en {cuando}"
+              f" — al inicio es fluido y rapido")
+    return len(m)
+
+
 if __name__ == "__main__":
     reels = json.load(open("src/reels.json", encoding="utf-8"))
     sel = sys.argv[1:]
-    total = sum(revisar(r) for r in reels
-                if not sel or r["id"] in sel or r["id"][-1] in sel)
+    hoy = [r for r in reels
+           if not sel or r["id"] in sel or r["id"][-1] in sel]
+    total = sum(revisar(r) + _arranque(r) for r in hoy)
     print(f"\nTOTAL repeticiones a decidir: {total}")

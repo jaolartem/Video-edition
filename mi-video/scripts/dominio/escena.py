@@ -134,6 +134,15 @@ class Escena:
             # que es: una sugerencia para quien compone, no una entrega.
             "tablero_propuesto": (json.dumps(tablero, ensure_ascii=False)
                                   if tablero not in (None, "", {}) else None),
+            # **Y `tablero` viaja en None a propósito: es lo que el `coalesce`
+            # de `NO_SE_BORRAN` necesita para dejarlo como estaba.**
+            #
+            # Sin esta línea `guardar` no se podía llamar: `COLUMNAS` lo incluye
+            # y el `[valores[c] for c in COLUMNAS]` reventaba con `KeyError:
+            # 'tablero'` antes de tocar la base. O sea, el paso que describe una
+            # etapa llevaba roto desde que se separó la propuesta de la entrega,
+            # y no se veía porque el que falla es el llamador y no la consulta.
+            "tablero": None,
             "componente": (None if d.get("componente") in (None, "ninguno")
                            else d["componente"]),
             "color": d.get("color"), "sonido": d.get("sonido"),

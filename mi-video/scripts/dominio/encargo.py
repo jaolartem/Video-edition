@@ -189,3 +189,63 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
                 continue                 # ya descrita: no se vuelve a pedir
         fuera.append(d)
     return fuera
+
+
+def huella_del_encargo(grafico):
+    """La huella del `grafico` contra el que se compuso un tablero.
+
+    Ata la lámina a la descripción que contesta, igual que `huella` ata una nota
+    a su montaje (C-92). Sin ella el encargo se puede reescribir por debajo y el
+    tablero se queda contestando a la pregunta de antes — **sin que nada falle**,
+    que es la forma cara.
+    """
+    import hashlib
+
+    t = " ".join((grafico or "").split())
+    return hashlib.sha1(t.encode("utf-8")).hexdigest()[:12] if t else None
+
+
+def tablero_desfasado(fila):
+    """¿El tablero de esta etapa contesta a un `grafico` que ya no es el de hoy?
+
+    Es la misma pregunta que `dice_lo_mismo` hace de la descripción, del lado del
+    diseño, y **es el agujero que dejó reel-07 e6** (C-280): el paso de diseño
+    sólo devolvía las etapas sin tablero, con el tablero mudo o con un tiquet
+    abierto, así que una etapa re-descrita con su tablero ya puesto no volvía a
+    entrar nunca y la descripción nueva no podía llegar a la pantalla.
+
+    **Las filas sin huella no cuentan como desfasadas**: son las de antes de que
+    esto existiera y darlas por caducadas devolvería el lote entero al paso de
+    diseño de golpe.
+    """
+    import json
+
+    if not fila.get("tablero"):
+        return False
+    try:
+        guardada = (json.loads(fila["tablero"]) or {}).get("encargo")
+    except (TypeError, ValueError):
+        return False
+    return bool(guardada) and guardada != huella_del_encargo(fila.get("grafico"))
+
+
+def guardar_tablero(con, slug, beat, kind, props, ahora):
+    """Escribe el tablero de una etapa **con la huella de su encargo dentro**.
+
+    Las dos cosas van en la misma escritura porque separarlas es cómo se olvida:
+    un tablero sin huella es un tablero del que nadie puede saber si sigue
+    contestando a la descripción de hoy. La huella viaja fuera de `props`
+    —hermana de `kind`— porque no es copy: `reels/base.mjs :: tablerosDe` lee
+    `kind` y `props` y no la ve.
+    """
+    import json
+
+    g = con.execute(
+        "select grafico from escena_desc where video_slug = ? and etapa_orden = ?",
+        (slug, beat)).fetchone()
+    con.execute(
+        "update escena_desc set tablero = ?, fecha = ?"
+        " where video_slug = ? and etapa_orden = ?",
+        (json.dumps({"kind": kind, "props": props,
+                     "encargo": huella_del_encargo(g["grafico"] if g else None)},
+                    ensure_ascii=False), ahora, slug, beat))

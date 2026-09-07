@@ -15,7 +15,6 @@
  */
 import { DatabaseSync } from "node:sqlite";
 import { CONSTRUIDAS, revisarTablero } from "../formas.mjs";
-import { enPantalla } from "./lectura.mjs";
 
 const db = new DatabaseSync("ads/decisiones.db");
 
@@ -50,81 +49,29 @@ export const aprobadas = (() => {
 })();
 
 /**
- * El pie del tablero, **de la fuente comprobada y no de una cadena a mano**.
+ * **El pie del tablero NO vive aquí, y ésta es la lápida.**
  *
- * `fuente` y `condicion` se escribían por pieza dentro del spec. Es la trampa
- * que `fuentes.py` vino a quitar —no escala a 16-50 anuncios y no se puede
- * auditar— y era el último tramo sin conectar: el paso ya guardaba el respaldo
- * en `dato`, y el tablero seguía imprimiendo el literal.
+ * Aquí estaba `pieDe`, y era el que corría. `scripts/reels/cifras.mjs` —escrito
+ * para ser el único dueño de las cuatro preguntas sobre una cifra— **no lo
+ * importaba nadie**: su `pieDe` y su guarda `sinRespaldo` estaban completos y
+ * muertos, y esta copia los suplantaba con criterios peores.
  *
- * Importa más de lo que parece por lo que decía cada uno. El literal era
- * *«$30,000 sobre $180,000 de utilidad»*, que es de donde sale la resta pero no
- * de donde sale la verdad. Comprobado contra la CRA la diferencia real es
- * 33.500 $ y —esto es lo que cambia el mensaje— **buena parte es diferimiento**.
- * Sin esa condición el espectador entiende «me ahorro 30.000 al año», y eso la
- * fuente no lo sostiene.
+ * Tres diferencias, y las tres se veían en el lote del 6 de septiembre:
  *
- * **Y por eso admite `parcial`.** Sólo pintaba las cifras marcadas `si`, o sea
- * las que se sostienen sin matices — y las que más necesitan pie son justo las
- * otras: las que son ciertas **bajo una condición**. Una cifra así sin su
- * condición es peor que no ponerla, porque parece general. Regla de Jaime:
- * *«si esa parte no se sostiene, la aclaramos en pie de foto»*.
+ * 1. **Casaba por contención de `JSON.stringify(props)`**, no por token
+ *    normalizado. Un `53,53 %` del diseñador contra un `53.53%` de la base no
+ *    casaban, y el pie caía al `?? filas[0]`: el de OTRA cifra.
+ * 2. **Pisaba lo declarado.** El spread iba después de `b.props` en el spec, así
+ *    que la condición que el diseñador escribió para esa cifra exacta se
+ *    sustituía sin una línea de aviso. `reel-07 e3` declaraba la línea corta y
+ *    buena y salió con el rótulo largo de `dato`.
+ * 3. **Recortaba a 25 palabras con puntos suspensivos**, que es justo lo que
+ *    Jaime prohibió: *«sin abreviar hasta que deje de decir nada»*.
  *
- * Si no hay dato comprobado se deja lo que hubiera: una pieza sin verificar no
- * se queda muda de golpe.
+ * No se arregló aquí: se retiró. Dos lectores del mismo dato con criterios
+ * distintos es la divergencia que este proyecto persigue, y el bueno ya estaba
+ * escrito.
  */
-export const pieDe = (slug, beat, props) => {
-  try {
-    // **El pie es el de la cifra que SE ROTULA, no el de la mas larga.**
-    //
-    // Esto ordenaba `by length(d.cifra) desc`, o sea elegia la fila cuyo texto
-    // de cifra ocupara mas caracteres. En reel-07 e3 eso saca «53.53%
-    // (corroboracion independiente)» y el tablero rotula **32 %**: el pie salia
-    // con la nota de metodo de PwC debajo de una cifra que no es la suya, que es
-    // peor que no poner pie — parece respaldar lo que no respalda.
-    //
-    // Se busca la fila cuya cifra aparece en lo que el tablero pinta. Si no se
-    // puede saber, manda la que MAS necesita el pie: una proyeccion
-    // (`respalda = 'parcial'`) tiene condiciones que hay que decir; una cifra
-    // publicada se sostiene sola. Eso es un criterio; la longitud no era ninguno.
-    const pintado = JSON.stringify(props ?? {});
-    const filas = db.prepare(
-      "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d" +
-      "  left join fuente f on f.id = d.fuente_id" +
-      "  join video v on v.id = d.video_id" +
-      " where v.slug = ? and d.etapa_orden = ?" +
-      "   and d.respalda in ('si','parcial')",
-    ).all(slug, beat);
-    // **Y se comparan NORMALIZADAS.** La fila dice `53.53%` y el tablero puede
-    // pintar «53,53 %» —coma decimal y espacio antes del signo, que es como se
-    // escribe en español—: sin normalizar no casan, la busqueda falla en
-    // silencio y el pie cae al `?? filas[0]`, o sea **el pie de OTRA cifra
-    // debajo de esta**. Es peor que no poner pie: parece respaldar lo que no
-    // respalda, que es justo lo que el comentario de arriba vino a arreglar por
-    // la puerta de la longitud.
-    const igual = (s) => s.replace(/\s+/g, "").replace(/,(\d)/g, ".$1");
-    const plano_ = igual(pintado);
-    const suya = filas.find((x) => {
-      const n = String(x.cifra ?? "").match(/[\d.,]+\s*%?|\$[\d.,]+/);
-      return n && plano_.includes(igual(n[0]));
-    });
-    const r = suya
-      ?? filas.find((x) => x.respalda === "parcial")
-      ?? filas[0];
-    if (!r) return {};
-    const out = {};
-    if (r.rotulo) out.fuente = String(r.rotulo);
-    if (r.condiciones) {
-      const entera = String(r.condiciones);
-      out.condicion = enPantalla(entera);
-      // Lo que no cabe NO se tira: viaja en el spec para el copy del video.
-      if (out.condicion !== entera) out.condicion_completa = entera;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-};
 
 /**
  * Sólo pasan los `kind` que `Ad.tsx` sabe dibujar con componente propio. El

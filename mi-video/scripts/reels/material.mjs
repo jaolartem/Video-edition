@@ -66,17 +66,38 @@ export function duracionDelCorte(slug) {
 }
 
 /**
- * La placa asignada a un beat en `ads/fondos.json`.
+ * **La placa de la pieza**, declarada en `ads/fondos.json`.
+ *
+ * Jaime, 6-9-2026: *«es un FONDO de tablero por reel»*. Esto preguntaba por
+ * `pieza:beat` y devolvía una placa distinta según el beat, así que la misma
+ * pieza cambiaba de suelo al pasar de un tablero al siguiente: R6 salió con
+ * cuatro placas, R2 y R5 con tres. **El que elegía era el mapa, no nadie.**
+ *
+ * Ahora la asignación es de pieza y la respuesta no depende del beat. Un beat
+ * que pida otra cosa se resuelve con la composición encima —masas, figura,
+ * encuadre—, no cambiando el suelo.
  *
  * El fichero se lee una vez: se preguntaba por cada tablero y por cada CTA, o
  * sea que se parseaba treinta veces por corrida para contestar lo mismo.
  */
-const PLACAS = JSON.parse(fs.readFileSync("ads/fondos.json", "utf8")).placas;
+const PIEZAS = JSON.parse(fs.readFileSync("ads/fondos.json", "utf8")).pieza;
 
-export const placaDe = (slug, beat) =>
-  Object.keys(PLACAS).find((k) =>
-    (PLACAS[k].sirve ?? []).includes(`${slug}:${beat}`),
-  );
+export const placaDe = (slug) => PIEZAS?.[slug]?.placa;
+
+/**
+ * **El recorte con alfa de una etapa**, si la pasada ya corrió.
+ *
+ * Lo produce `scripts/dominio/sujeto.py` llamando a `text-behind.py`, y el
+ * nombre lo fija esa convención, no quien compone: un tablero que tuviera que
+ * escribir la ruta a mano la escribiría mal el día que el corte cambie de
+ * nombre. `null` si no está — y entonces quien lo pidió recibe una falta, que es
+ * mejor que un `staticFile` de algo que no existe: eso mata el render entero con
+ * un 404 en mitad de la pieza y el motivo que se lee habla de una URL.
+ */
+export const sujetoDe = (slug, beat) => {
+  const src = `recorte/${slug}-e${beat}.webm`;
+  return fs.existsSync(`public/${src}`) ? src : null;
+};
 
 /**
  * **El escalon de precio vigente hoy, preguntado a quien lo sabe.**
@@ -193,4 +214,45 @@ export const caraDe = (slug) => {
   if (!fs.existsSync(f)) return null;
   const m = JSON.parse(fs.readFileSync(f, "utf8"));
   return {coronilla: m.coronilla, pies: m.pies, visto: m.visto};
+};
+
+/**
+ * **El hueco que deja su cuerpo a cada lado, escena por escena.**
+ *
+ * Lo mide `scripts/dominio/hueco.py` en la banda de altura donde vive el volumen
+ * de un panel, y hay que preguntárselo **por instante**: en un primerísimo no
+ * queda un píxel libre y en un plano medio queda medio cuadro.
+ *
+ * Es la otra mitad de `caraDe`: aquélla dice a qué altura está él y ésta a qué
+ * lado, y las dos existen por el mismo motivo. El lado salía de una sola cuenta
+ * sobre el recorte de la PRIMERA escena, y con la cámara fija eso es una
+ * constante disfrazada de medida — daba `der` en seis piezas de siete e `izq` en
+ * reel-01, que es donde él está.
+ *
+ * Devuelve `null` si no está medido. Quien lo lea decide qué hacer con eso, que
+ * es lo contrario de rellenarlo con un valor plausible.
+ */
+export const huecosDe = (slug) => {
+  const f = `work/scenes/${slug}/huecos.json`;
+  if (!fs.existsSync(f)) return null;
+  return JSON.parse(fs.readFileSync(f, "utf8")).tramos ?? null;
+};
+
+/**
+ * **Qué hay detrás del subtítulo, escena por escena.**
+ *
+ * Lo mide `scripts/dominio/trasfondo.py` en las tres bandas donde el cc puede
+ * estar —la barbilla, el hueco de encima de su cabeza y la franja del gancho— y
+ * con eso `reels/cc.mjs` decide si esa escena lleva caja, va limpia o va en
+ * negativo. Jaime: *«hay varios que quedarían bien sin el cuadro, otras a las
+ * que le queda bien y otras a las que le quedaría mejor negativo»*.
+ *
+ * Devuelve `null` si no está medido, igual que `huecosDe`: sin medida el cc sale
+ * con el tratamiento por defecto —la caja— y eso se ve en el reparto, en vez de
+ * apostar por el más bonito sobre un fondo que nadie ha visto.
+ */
+export const trasfondoDe = (slug) => {
+  const f = `work/scenes/${slug}/trasfondo.json`;
+  if (!fs.existsSync(f)) return null;
+  return JSON.parse(fs.readFileSync(f, "utf8")).tramos ?? null;
 };

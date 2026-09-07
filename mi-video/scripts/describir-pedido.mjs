@@ -77,11 +77,50 @@ function portadaDe(slug) {
  * La pregunta entera de una pieza: sus etapas en orden, con las cuatro cosas
  * que el prompt necesita de cada una.
  */
+//: Cuantas etapas del principio se miran, y cuantas veces puede salir una
+//: palabra de contenido antes de que suene a machaqueo. Tres apariciones: dos
+//: son enfasis, tres ya es muletilla.
+const ETAPAS_ARRANQUE = 3;
+const VECES_MAX = 2;
+const LLANAS = new Set(("que de la el los las un una y no en es se su sus por"
+  + " con para lo le del al mas pero como esta este ya si a").split(" "));
+
+/** Las palabras de contenido que se repiten en las primeras etapas. */
+function machacaEnElArranque(filas) {
+  const cuenta = new Map();
+  for (const f of filas.slice(0, ETAPAS_ARRANQUE)) {
+    const t = (f.montaje || f.dicho || "").toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "");
+    for (const w of t.match(/[a-z]+/g) ?? []) {
+      if (w.length > 2 && !LLANAS.has(w)) cuenta.set(w, (cuenta.get(w) ?? 0) + 1);
+    }
+  }
+  return [...cuenta.entries()].filter(([, n]) => n > VECES_MAX)
+    .sort((a, b) => b[1] - a[1]).map(([w, n]) => `«${w}» ${n} veces`);
+}
+
 export function entradaDe(slug, filas) {
   const portada = portadaDe(slug);
+  // **Lo que se repite en el arranque, para que LO DECIDA el.**
+  //
+  // Jaime, sobre reel-03: *«usted, usted al inicio, y otra vez repeticion»*, y
+  // sobre quien lo resuelve: *«la decision la toma el compositor, en funcion
+  // del guion y de lo que el whisper va diciendo; la herramienta solo senala,
+  // el que compone decide. Si lo hubiera visto no habria tanta repeticion en
+  // esa parte»*.
+  //
+  // Lo ultimo es el punto: la medida existia y salia por consola, donde no la
+  // ve quien elige las tomas. Aqui no se corta nada ni se propone nada — se le
+  // pone delante, con su regla al lado: *«al inicio es fluido y rapido»*.
+  const drone = machacaEnElArranque(filas);
   return [
     `Reel: ${slug} — ${filas.length} etapas, en orden.`,
     portada === null ? "" : `La etapa ${portada} es la PORTADA (el gancho).`,
+    drone.length
+      ? `OJO CON EL ARRANQUE: se repiten ${drone.join(", ")}. Jaime: «al inicio`
+        + ` es fluido y rapido». Decide tu si sobra, si es enfasis buscado o si`
+        + ` hay otra toma que lo dice sin repetir — esto solo lo senala.`
+      : "",
     "",
     ...filas.map((f) =>
       [
@@ -96,6 +135,35 @@ export function entradaDe(slug, filas) {
         "Lo que de verdad se dijo:",
         f.montaje || f.dicho ||
           "(esta etapa no tiene toma: va con tablero o tarjeta)",
+        // **Y CINCO FOTOGRAMAS de esa toma, para que lo VEA.**
+        //
+        // Aqui hubo primero una medida de texto —la literalidad contra el
+        // libreto— y Jaime la rechazo con el motivo: *«no, esos ojos no sirven,
+        // ya han fallado. Que tome cinco fotogramas repartidos por toda la
+        // escena y mire la foto»*.
+        //
+        // Y tiene razon: **leer se ve, no se deduce**. Una toma puede repetir
+        // el libreto de memoria —literalidad alta, mirando a camara— y otra
+        // improvisar leyendo a ratos. La medida decia que si lo hacia y fallo,
+        // que es peor que no tenerla: da confianza en el sitio equivocado.
+        //
+        // Los frames salen de la CINTA y no del render, porque cuando el que
+        // compone elige, el montaje todavia no existe.
+        ...(f.fotogramas && f.fotogramas.length
+          ? ["Mira estos cinco fotogramas de la toma y dime si esta LEYENDO."
+             + " Que buscar, con sus palabras: «generalmente tengo el papel en"
+             + " las piernas, entonces estoy mirando hacia abajo». O sea: la"
+             + " MIRADA BAJA, hacia el regazo, no hacia la camara. No busques"
+             + " el papel —muchas veces no se ve, esta fuera de cuadro—: busca"
+             + " los ojos. Y mira los cinco: leyendo levanta la vista a ratos,"
+             + " asi que uno solo mirando a camara no prueba que no lea.",
+             ...f.fotogramas.map((x) => `  ${x.en}s  ${x.fichero}`),
+             "Si esta leyendo, esta etapa LLEVA TABLERO OBLIGATORIO —su cara no"
+             + " sale a camara limpia mientras lee— y NO SE PARTE: leyendo no"
+             + " hay respiraciones ni caidas de entonacion donde esconder un"
+             + " empalme, asi que cualquier tijera se oye. Jaime: «lo peor es"
+             + " que aun leyendo lo corto y se escucha cortado»."]
+          : []),
         // **Y la escena que YA se aprobo, si la hay.** Jaime: *«lo que ya se
         // aprobo no se vuelve a discutir: se revisa que este como se dijo»*.
         //

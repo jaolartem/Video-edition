@@ -201,6 +201,27 @@ def figuras_que_se_trazan():
     except OSError:
         return {"error": "no se pudo leer scripts/escena.mjs"}
     m = re.search(r"DIBUJAN = new Set\(\[(.*?)\]\)", t, re.S)
+    # **Y si la biblioteca esta cerrada, el menu no se ofrece.**
+    #
+    # Jaime, 6-9-2026. Ofrecer diez figuras que la puerta va a rechazar es
+    # declarar sin poder aplicar por el otro lado: quien compone elige de un
+    # catalogo, lo escribe, y se entera al final de la corrida. El pedido dice lo
+    # que hay, y hoy lo que hay es el dato y la letra.
+    cerrada = _cerrada("figuras.json")
+    if cerrada:
+        return {"se_trazan": [], "CERRADA": cerrada,
+                "la_regla": "NO pongas `figura` ni `silueta` en ningun tablero"
+                            " ni panel: lo para `scripts/formas.mjs ::"
+                            " figurasCerradas` al recibirlo. Lo que dibuja la"
+                            " lamina es un GRAFICO DE DATOS —barras, reparto,"
+                            " acumulado, columnas comparadas— o es tipografia."
+                            " Registro de tablero de clase: numeros y letras,"
+                            " ordenado y legible, sin ilustracion.",
+                "y_si_la_etapa_pedia_una": "El `grafico` de varias etapas describe"
+                                           " figuras: estan escritas antes de esta"
+                                           " instruccion. Compon lo que esa etapa"
+                                           " tiene que dejar entendido con el dato"
+                                           " o con la letra, y dilo en `por_que`."}
     return {
         "se_trazan": re.findall(r'"([^"]+)"', m.group(1)) if m else [],
         "la_regla": "Si tu escena pide una figura, ponla en **`props.figura`**"
@@ -209,9 +230,148 @@ def figuras_que_se_trazan():
                     " palabras no se dibuja: la escena sale sin figura y sin"
                     " aviso hasta el final de la corrida.",
         "no_en_grafico": "`grafico` es el ENCARGO en prosa y lo escribe el paso anterior, no tu. Poner ahi el nombre de la figura no la dibuja: el lector es `props.figura`.",
-        "y_si_no_esta": "La forma que necesitas no esta en la lista: dilo en"
-                        " `por_que` y sale como encargo de codigo. Es mejor que"
-                        " forzar una de las diez que no significa lo que quieres.",
+        "y_si_no_esta": "La forma que necesitas no esta en la lista: CONSTRUYELA."
+                        " Jaime, 6-9-2026: «si no existe se crea; el compositor"
+                        " la propone y el disenador la acepta o genera una mas"
+                        " compleja, nunca hacia abajo, siempre hacia arriba»."
+                        " Sustituirla por la mas parecida es bajar, y asi es"
+                        " como cuatro peticiones suyas acabaron en bloques de"
+                        " texto. Dilo en `por_que` y sale como encargo.",
+        "siluetas": _siluetas(),
+    }
+
+
+def _cerrada(fichero):
+    """El bloque `cerrada` de una biblioteca de `src/brand/`, o `None`.
+
+    Vive en el JSON —que es de donde el componente deriva su tipo— y no aqui:
+    una segunda declaracion de «esto esta cerrado» es exactamente la divergencia
+    que la biblioteca viene a evitar. Quitar el bloque la reabre en los tres
+    sitios que la leen, sin tocar ninguno.
+    """
+    import json
+
+    ruta = os.path.join(_raiz(), "src", "brand", fichero)
+    try:
+        return json.load(open(ruta, encoding="utf-8")).get("cerrada")
+    except (OSError, ValueError):
+        return None
+
+
+def _siluetas():
+    """Los objetos que `Silueta` sabe dibujar, leidos de su catalogo.
+
+    **Es la segunda lista que no viajaba.** `figuras_que_se_trazan` mandaba las
+    diez senales de `Pictograma` y nada mas, asi que un encargo que pedia «la
+    furgoneta del electricista» no tenia de donde sacarla y caia a texto — que es
+    de lo que Jaime se quejo cuatro veces. Y esta hecha para crecer: anadir un
+    objeto es anadir una entrada con su contorno.
+    """
+    import re
+
+    ruta = os.path.join(_raiz(), "src", "components", "Silueta.tsx")
+    try:
+        t = open(ruta, encoding="utf-8").read()
+    except OSError:
+        return {"error": "no se pudo leer src/components/Silueta.tsx"}
+    return {
+        "hay": re.findall(r"^  ([a-z]+): \{$", t, re.M),
+        "que_son": "Objetos reconocibles en geometria plana, con trazado real."
+                   " Acompanan a un texto y le ponen cara concreta a lo que se"
+                   " nombra; NO sostienen solas el argumento.",
+        "la_prueba": "Si tapas el texto y la figura ya no dice de que va el"
+                     " tramo, esa figura ACOMPANA y falta la que argumenta —el"
+                     " mecanismo, no el objeto.",
+        "y_si_no_esta": "Se anade al catalogo con su contorno. Un nombre que no"
+                        " existe LANZA: nunca dibuja la mas parecida.",
+    }
+
+
+def volumenes_que_se_animan():
+    """Las animaciones de panel que existen, leidas de la biblioteca.
+
+    Jaime, instruccion de lote del 5-9: *«para los paneles, las animaciones de
+    bolitas y palitos y ultra sencillas se acaban, quitan mas de lo que dan;
+    ahora solo animaciones complejas que muestren luz o movimiento, ojala con
+    animacion 3d, y que esten en consonancia con la idea del tablero o del
+    panel»*.
+
+    Va en el pedido por lo mismo que `figuras_que_se_trazan`: **no se elige de un
+    catalogo que no se ve**. La regla estaba escrita en `docs/canon.md` y en este
+    contrato, y los tres paneles de reel-01 salieron siendo tres rotulos quietos
+    —porque no habia por donde pedir otra cosa ni nada que lo comprobara—. Ahora
+    lo comprueba `scripts/reels/puerta.mjs :: panelesQuietos` y para la pieza.
+
+    Se lee de `src/brand/volumenes.json`, que es de donde `Volumen.tsx` deriva su
+    tipo: una segunda lista prometeria una animacion que no existe.
+    """
+    import json
+
+    ruta = os.path.join(_raiz(), "src", "brand", "volumenes.json")
+    try:
+        reg = json.load(open(ruta, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"error": "no se pudo leer src/brand/volumenes.json"}
+    # **Cerrada el 6-9-2026, y por eso el menu no se ofrece.** La instruccion del
+    # 5 empujaba al 3D; la del 6, mirando ese 3D ya construido, lo retira hasta
+    # que la biblioteca este a la altura. Lo que queda de las dos es lo mismo: el
+    # panel tiene que decir algo, y hoy lo dice el dato o la letra.
+    if reg.get("cerrada"):
+        return {"se_animan": {}, "CERRADA": reg["cerrada"],
+                "la_regla": "NO pongas `volumen` en ningun panel: lo para"
+                            " `scripts/reels/paneles.mjs`. Un panel de solo"
+                            " texto ya NO es una falta — la exigencia se"
+                            " invirtio el mismo dia. Lo que se compone es un"
+                            " grafico de datos o tipografia que entra.",
+                # **Y con que se compone, que si no es elegir de un catalogo que
+                # no se ve** (C-255). Los dos props existen y los dibuja
+                # `SidePanel`; su contrato esta en `src/components/panel/tipos.ts`.
+                "lo_que_dibuja_un_panel_hoy": {
+                    "casillas": "una serie de casillas iguales de las que UNA se"
+                                " sella en oro y las demas se tachan o se quedan:"
+                                " la lista que se descarta, el filtro de dos"
+                                " salidas, la tira de unidades con una marcada."
+                                " `eje: columna|fila`. Cada casilla puede llevar"
+                                " `ancla` —el texto del subtitulo con el que se"
+                                " resuelve— y `dato: \"fecha\"` para que su"
+                                " rotulo salga de su dueno en vez de escribirse.",
+                    "reparto": "el grafico de datos: un total partido en"
+                               " porciones, con el oro en la que importa."
+                               " `{total, porciones, signo, etiqueta}`.",
+                },
+                "sigue_valiendo": "Que el panel no sea tres rotulos quietos. Lo"
+                                  " que cambia es con que se cumple."}
+    return {
+        "se_animan": reg["volumenes"],
+        "la_regla": "Si la etapa lleva panel —`cubre: panel`—, pon"
+                    " **`props.volumen`** con UNO de esos nombres exactos. Un"
+                    " panel de solo texto NO se monta: lo para la puerta.",
+        "como_se_elige": "Por lo que la etapa tiene que dejar entendido, no por"
+                         " como se ve. Cada entrada dice QUE AFIRMA; un volumen"
+                         " que ilustra otra cosa es peor que ninguno.",
+        "la_banda_no": "`cubre: banda` es un rotulo de pie —fecha, condiciones—"
+                       " y no lleva volumen: ahi seria adorno, que es justo lo"
+                       " que la instruccion viene a quitar.",
+        "y_si_no_esta": "Si la idea del panel pide un movimiento que no esta,"
+                        " dilo en `por_que`: sale como encargo de codigo y queda"
+                        " en la biblioteca para las piezas siguientes.",
+        # **Y el sitio, que es lo que paraba la pieza sin estar declarado aqui.**
+        # `paneles.mjs` mide el hueco de la escena y no monta el panel si no
+        # cabe. Una regla que para y no esta en el pedido es la averia de la
+        # casa al reves: el diseno no puede cumplirla porque no la conoce.
+        "necesita_sitio": (
+            f"El volumen ocupa el {reg['caja']['ancho']:.0%} del ancho en el lado"
+            f" libre. Si en esa escena el cuerpo de Jaime deja menos de"
+            f" {reg['caja']['minimo'] + reg['caja']['margen']:.0%} libre, el panel"
+            " NO se monta: lo mide `scripts/dominio/hueco.py` y lo para la"
+            " puerta. En primerisimo no queda sitio — si la etapa lo pide, el"
+            " panel va en un beat de plano mas abierto o la etapa es `banda`."),
+        "la_cifra_lleva_pie": (
+            "Si el panel o la banda ensena un digito, `props.source` es"
+            " obligatorio y va EN UNA LINEA (78 caracteres) y en afirmativo:"
+            " «basado en X datos bajo X condiciones», con la cifra y el tramo"
+            " exactos. Un `source` que empieza por «sin cifra» es una nota tuya"
+            " y no se pinta."),
     }
 
 
@@ -302,7 +462,7 @@ CORRECCION = {
 }
 
 
-def placas_que_existen():
+def placas_que_existen(slug=None):
     """**El inventario de placas**, con lo que dibuja cada una y lo que provoca.
 
     Jaime, al elegir construir dos formas nuevas: *«que utilicen los fondos que
@@ -318,17 +478,33 @@ def placas_que_existen():
     lleva bloques hacia el punto de fuga y una derivacion que se los lleva fuera
     del cuadro»— es exactamente reinventar la rueda.
 
-    `sirve` no es una asignacion cerrada: dice a que beats se penso, y por eso
-    viaja. Una placa vale para otra etapa si lo que dibuja sostiene la idea.
+    **Y una sola por pieza.** Jaime, 6-9-2026: *«es un FONDO de tablero por
+    reel»*. El inventario viaja entero para que se vea de donde sale la que le
+    toco a esta pieza —y para poder decir que no sirve—, pero la eleccion ya
+    esta hecha y esta declarada en `ads/fondos.json`: quien compone no la elige
+    por beat. Un beat que pida otra cosa se resuelve con la composicion encima,
+    no cambiando el suelo.
     """
     import json
 
     ruta = os.path.join(_raiz(), "ads", "fondos.json")
     try:
-        placas = json.load(open(ruta, encoding="utf-8"))["placas"]
+        fondos = json.load(open(ruta, encoding="utf-8"))
+        placas = fondos["placas"]
     except (OSError, ValueError, KeyError):
         return {"error": "no se pudo leer ads/fondos.json"}
+    mia = (fondos.get("pieza") or {}).get(slug or "")
     return {
+        "la_de_esta_pieza": mia or "sin declarar en `ads/fondos.json`",
+        "y_es_una_sola": "Jaime, 6-9-2026: «es un FONDO de tablero por reel»."
+                         " Todos los tableros y paneles de esta pieza van sobre"
+                         " ESA placa. No declares `placa` en un tablero para"
+                         " cambiarla: la pieza la hereda sola y"
+                         " `scripts/reels/fondo.mjs` para el render si dos capas"
+                         " pintan placas distintas. Tres placas en una pieza son"
+                         " tres piezas cosidas. Si crees que la asignada no"
+                         " sirve al argumento central, dilo en `por_que` y no la"
+                         " cambies por tu cuenta.",
         "que_son": "Fotomontajes reales, con perspectiva y grano de papel. NO"
                    " son texturas: un corredor de archivadores con un solo cajon"
                    " enfrente ARGUMENTA. Se genero un collage por codigo una vez"
@@ -345,7 +521,7 @@ def placas_que_existen():
                               " reserva a las cortinillas, donde la placa ES el"
                               " plano.",
         "disponibles": {k: {"dibuja": v.get("dice"), "provoca": v.get("siente"),
-                            "pensada_para": v.get("sirve")}
+                            "nota": v.get("nota")}
                         for k, v in placas.items()},
         "y_si_ninguna_sirve": "Dilo en `por_que`. Una placa nueva la genera"
                               " Jaime, no el codigo: es la parte del sistema"

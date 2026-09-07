@@ -6,11 +6,12 @@ import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
-import { Cinta, Fondo, Panel } from "./Fondo";
+import { Cinta, Fondo } from "./Fondo";
 import { Barra } from "./acumulacion/Barra";
-import { EJE, PANEL, SUELO, cruzaEn } from "./acumulacion/caja";
-import { horarioDe } from "./acumulacion/horario";
-import { color, layout, size, tracking } from "../brand/tokens";
+import { Total } from "./acumulacion/Cierre";
+import { CINTA, TITULO, cruzaEn } from "./acumulacion/caja";
+import { BARRE, horarioDe } from "./acumulacion/horario";
+import { color, layout } from "../brand/tokens";
 import type { AcumulacionProps } from "./acumulacion/tipos";
 
 export type { AcumulacionProps, Tramo } from "./acumulacion/tipos";
@@ -26,35 +27,45 @@ export { duracionDe } from "./acumulacion/horario";
  * - R5 · *«cuando esa plata quieta cruzó cierto umbral, el gobierno empezó a
  *   cobrarle más sobre cada dólar nuevo»* — la barra cruza, y lo que asoma por
  *   encima se pone en oro. **$14,000.**
- * - R6 · *«en diez años eso es entre $250.000 y $300.000»* — la misma barra sin
- *   umbral: sólo acumulación sobre un horizonte declarado.
+ * - R2 · *«esta diferencia, 21 dólares de cada 100, en cinco años son 189 mil»*
+ *   — la misma barra sin umbral: cinco tramos que suman, el último en oro y la
+ *   cifra encima.
  *
  * Jaime: *«cada animación funciona como un tablero que muestra gráficamente lo
  * que se dice en el audio»*. Por eso la geometría no ilustra el tema, dice la
  * frase: hay una cantidad que sube, hay una raya, y el momento en que la
  * cantidad pasa la raya es el momento en que la voz lo dice.
  *
- * ## El canon
+ * ## La lámina, rehecha sobre la que Jaime aprobó
  *
- * La referencia son **los carruseles de Jaime**, y mandan sobre el canon — palabras
- * suyas: *«esto es más canon que el el canon; el el canon de hecho sirvió como inspiración,
- * pero esto es mucho más cercano a lo que quiero»*. De ahí sale la anatomía, y
- * lo que cambia respecto de la web es sustantivo:
+ * El 6-9-2026, mirando `work/fotogramas/reel-02/e07-3.jpg`: *«la caja negra se
+ * come el cuadro»* —la placa asomando sólo por los bordes—, *«cuatro bloques
+ * navy iguales: el ojo no sabe dónde mirar»*, *«dice cinco años y dibuja
+ * cuatro»* y la cifra que el tablero demuestra sin aparecer en pantalla.
  *
- * - **Condensada pesada en versales para TODO lo grande**, cifras incluidas. En
- *   los doce ejemplos no aparece la serif ni una vez. Playfair se queda en la
- *   web, que se lee con calma y sin compresión encima.
- * - **Fotomontaje debajo**, no fondo plano. Ver `Fondo`.
- * - **Panel opaco y girado** sosteniendo el contenido, y **cintas** cruzándolo.
- * - **El oro es superficie**, no sólo tinta: paneles y bandas enteras en oro.
+ * Lo que lo sustituye no se inventó: es el vocabulario del panel de la e2 de
+ * esta misma pieza, aprobado ese día tras seis vueltas y guardado en
+ * `docs/ejemplos/composicion/01-panel-con-el-dentro.png`.
+ *
+ * - **La placa a sangre** y el negro **sólo bajo lo que hay que leer**: el
+ *   bloque del título, la ficha de cada etiqueta, la banda del pie. El panel
+ *   opaco de 988×680 se retiró (ver `acumulacion/caja`).
+ * - **Un solo acento.** Sin umbral el oro es del último tramo, que es el que
+ *   cierra la cuenta. Con umbral sigue siendo lo que asoma por encima de la
+ *   raya. Nunca los dos.
+ * - **El remate barre el panel.** *«Puede borrar el panel o parte de él, pero
+ *   debe salir súper enfático»*: cuando la pila está entera, lo que la
+ *   construyó se retira y la cifra se queda sola.
+ * - **El pie fuera de la zona segura**, en una línea y en afirmativo.
  *
  * ## Aquí sólo se dibuja y se ata
  *
- * Las otras tres cosas viven fuera, cada una en su fichero: el contrato de
+ * Las otras cosas viven fuera, cada una en su fichero: el contrato de
  * cumplimiento en [`acumulacion/tipos`](./acumulacion/tipos.ts), el calendario
  * en [`acumulacion/horario`](./acumulacion/horario.ts), la geometría en
- * [`acumulacion/caja`](./acumulacion/caja.ts) y el gráfico en
- * [`acumulacion/Barra`](./acumulacion/Barra.tsx).
+ * [`acumulacion/caja`](./acumulacion/caja.ts), el gráfico en
+ * [`acumulacion/Barra`](./acumulacion/Barra.tsx) y lo que remata en
+ * [`acumulacion/Cierre`](./acumulacion/Cierre.tsx).
  *
  * Eran cuatrocientas líneas con todo mezclado, y el precio estaba a la vista:
  * el horario estaba escrito **dos veces dentro del mismo fichero** —el del
@@ -70,7 +81,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
   umbral,
   resultado,
   condicion,
-  placa, recorte = "columna",
+  placa, recorte = "lleno",
   sound = false,
 }) => {
   const entra = useEntrada();
@@ -83,34 +94,85 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
     assertShort(resultado.figure, "outcome", "Acumulacion.resultado.figure");
   }
 
-  const t = horarioDe({ tramos, condicion });
+  /**
+   * **Una acumulación acumula, y eso son tramos rotulados: por lo menos dos.**
+   *
+   * Con `tramos: [{etiqueta: "", alto: 1}]` este componente dibuja exactamente
+   * lo que le piden —un rectángulo partido por la raya— y en pantalla eso no es
+   * una acumulación: son dos bloques vacíos. Salió así en reel-05 e6, un tablero
+   * titulado «LA RAYA YA ESTABA PUESTA» con un horizonte que decía «TRIMESTRE A
+   * TRIMESTRE» y ni un trimestre dibujado, o sea **la lámina afirmando algo que
+   * no enseña**. Es el contraejemplo de `docs/ejemplos/composicion/03-tablero-como-NO.jpg`
+   * por su otra cara: allí decía cinco y dibujaba cuatro; aquí dice muchos y
+   * dibuja uno.
+   *
+   * Y el tramo sin etiqueta tampoco es una decisión de composición: `Barra` sólo
+   * pinta la ficha cuando hay texto, así que un tramo mudo es un bloque de color
+   * del que nadie sabe qué cuenta. Si un tramo no se puede nombrar, no es un
+   * tramo — es la barra entera, y entonces esto no es el componente.
+   *
+   * **Y con raya, además, cuánto es cada uno.** Rotularlos fue lo que salió mal
+   * la segunda vez: cuatro trimestres de 0,26 · 0,24 · 0,22 · 0,28 y una raya en
+   * 0,78 dibujan una escala en dólares —cuánto puso cada trimestre y en cuál se
+   * cruzó— que ninguna fila de `dato` sostiene. Ver `Tramo.valor`.
+   */
+  if (tramos.length < 2) {
+    throw new Error(
+      `Acumulacion: ${tramos.length} tramo(s) y una acumulación se ve porque` +
+        " algo se apila. Con uno solo lo que se dibuja es un rectángulo partido" +
+        " por la raya, no una cantidad que sube: declara los tramos que la voz" +
+        " nombra —los trimestres, los años— o usa otra forma.",
+    );
+  }
+  for (const tr of tramos) {
+    if (!tr.etiqueta.trim()) {
+      throw new Error(
+        "Acumulacion: un tramo sin `etiqueta` sale como un bloque de color que" +
+          " no dice qué cuenta —`Barra` no pinta ficha sin texto—. Cada tramo" +
+          " lleva el suyo, en versales y corto.",
+      );
+    }
+    if (umbral && !tr.valor?.trim()) {
+      throw new Error(
+        `Acumulacion: la raya rotula «${umbral.etiqueta}», así que la columna` +
+          ` deja de repartir un total y pasa a ser una escala en esa unidad:` +
+          ` «${tr.etiqueta}» dibuja cuánto puso sin decir cuánto es, y el cruce` +
+          " sale de esas alturas. Declara `valor` en cada tramo —una cantidad" +
+          " dibujada afirma igual que una cifra rotulada y necesita su fila en" +
+          " `dato`— o, si los importes no tienen respaldo, usa otra forma.",
+      );
+    }
+  }
+
+  const t = horarioDe({ tramos, condicion, resultado });
   const cruce = cruzaEn(tramos, umbral);
+  // El barrido, ya resuelto: 0 mientras el diagrama manda, 1 cuando la cifra se
+  // ha quedado sola. Todo lo que se retira lo hace multiplicando por `1 - barre`,
+  // que es como lo hace la lámina aprobada.
+  const barre = t.barrido === null ? 0 : entra(t.barrido, BARRE);
+  const queda = 1 - barre;
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
-      {placa ? <Fondo placa={placa} recorte={recorte} fuerza={1} deriva={t.finTramos + 60} /> : null}
       {/**
-       * **Tablero de datos: fondo PLANO.** No lleva fotomontaje.
-       *
-       * El canon tiene dos familias y se alternan. La cargada —punto de fuga,
-       * geometría rota, elemento conceptual— acompaña el golpe. La tranquila
-       * —negro o navy liso, geometría plana, grilla respetada— es donde hay
-       * cifras que leer, y ésta es de ésas: una tabla sobre un fotomontaje es
-       * una tabla que no se lee.
-       *
-       * Y la regla que las une: **lo que está torcido está torcido con
-       * intención**. Aquí lo único torcido son las cintas. El panel va a
-       * escuadra porque sostiene números.
+       * **La placa, a sangre.** Es la primera de las cuatro capas de la lámina
+       * aprobada, y la única que se queda fuera de `ZonaTablero`: el fondo está
+       * detrás de todo y no compite con nadie.
        */}
+      {placa ? (
+        <Fondo placa={placa} recorte={recorte} deriva={t.duracion + 60} />
+      ) : null}
 
       {sound ? (
         <>
           <MotionSound motion="draw" at={t.raya} />
           {t.entradas.map((f, i) => (
-            <MotionSound key={tramos[i]?.etiqueta} motion="mark" at={f} />
+            <MotionSound key={tramos[i]?.etiqueta ?? i} motion="mark" at={f} />
           ))}
-          {resultado ? <MotionSound motion="land" at={t.resultadoAt} /> : null}
-          {umbral && cruce >= 0 && !resultado ? (
+          {t.barrido !== null ? (
+            <MotionSound motion="land" at={t.barrido} />
+          ) : null}
+          {umbral && cruce >= 0 && t.barrido === null ? (
             <MotionSound motion="land" at={t.entradas[cruce] ?? 0} />
           ) : null}
         </>
@@ -119,19 +181,9 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
       {/**
        * **Sin cabecera.** Llevaba `EL CÓDIGO DEL EMPRESARIO / INFORMATION GAP`
        * y el contador `03—08`, y Jaime lo señaló: *«tiene un título en la parte
-       * superior que no debe ir ahí»*.
-       *
-       * Dos motivos, y los dos son de traducción de medio:
-       *
-       * - **El nombre de la estructura es vocabulario del playbook.** «Information
-       *   Gap» no significa nada para un dueño de negocio, igual que «revelación»
-       *   no significaba nada en la cortinilla.
-       * - **El contador es una prestación de carrusel.** Orienta cuando deslizas
-       *   seis láminas; en vídeo no hay nada que contar y sólo ocupa la franja
-       *   donde debería empezar el contenido.
-       *
-       * Que el frame esté presente no es imprimir su nombre: es que la pieza
-       * respete su secuencia. Eso lo garantiza el montaje, no un rótulo.
+       * superior que no debe ir ahí»*. El nombre de la estructura es vocabulario
+       * del playbook y el contador es una prestación de carrusel: en vídeo no
+       * hay nada que contar y sólo ocupa la franja donde empieza el contenido.
        */}
 
       {/**
@@ -142,150 +194,97 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
        * argumento perdido. La placa se queda fuera: sigue a cuadro entero.
        */}
       <ZonaTablero>
-      {/* Cinta de encabezado: las condiciones de la comparación. Va arriba y en
-          claro, como en el canon — es el marco del dato, no el dato. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 108,
-          left: layout.safe.left,
-          right: layout.safe.right,
-          display: "flex",
-          justifyContent: "center",
-          opacity: entra(0),
-          fontFamily: fontFamily.bloque,
-        }}
-      >
-        <Cinta tinte={color.lightNeutral} giro={-1.6} cuerpo={44}>
-          {concepto} · {horizonte}
-        </Cinta>
-      </div>
-
-      <Panel
-        giro={0}
-        style={{
-          left: PANEL.x,
-          top: PANEL.y,
-          width: PANEL.w,
-          height: PANEL.h,
-        }}
-      >
-        {/* Cuerpo ajustado a la linea, y `nowrap`.
-            El titulo se partia en «LA PLATA QUE SE QUEDO / QUIETA», con la
-            segunda linea huerfana. **Donde respira una frase lo decide quien la
-            escribe**, no el ancho que sobra — y el render es determinista, asi
-            que no hay layout al que preguntar: se estima. El avance de la Anton
-            lo declara `brand/medida`, medido sobre render y en un solo sitio. */}
+        {/* Cinta de encabezado: las condiciones de la comparación. Va arriba y
+            en claro, como en el canon — es el marco del dato, no el dato. **Y
+            no se la lleva el barrido**: cuando la cifra se queda sola, esta
+            línea es lo que dice de qué es. */}
         <div
           style={{
             position: "absolute",
-            top: 26,
-            left: 56,
-            right: 56,
-            fontFamily: fontFamily.bloque,
-            fontSize: cuerpoQueCabe({
-              ancho: PANEL.w - 112,
-              largo: title.length,
-              registro: "anton",
-              tope: 92,
-            }),
-            lineHeight: 0.94,
-            letterSpacing: "0.004em",
-            whiteSpace: "nowrap",
-            textTransform: "uppercase",
-            color: color.lightNeutral,
+            top: CINTA.y,
+            left: layout.safe.left,
+            right: layout.safe.right,
+            display: "flex",
+            justifyContent: "center",
             opacity: entra(0),
+            fontFamily: fontFamily.bloque,
           }}
         >
-          {title}
+          <Cinta tinte={color.lightNeutral} giro={-1.6} cuerpo={44}>
+            {concepto} · {horizonte}
+          </Cinta>
         </div>
 
-        <Barra
-          tramos={tramos}
-          umbral={umbral}
-          entradas={t.entradas}
-          raya={t.raya}
-          entra={entra}
-        />
-
-        {resultado ? (
+        {/* El título, en un bloque negro que **sangra por la izquierda**. Es la
+            masa de la lámina aprobada: sostiene lo que hay que leer y se acaba
+            donde se acaba el texto. Cuerpo ajustado a la línea y `nowrap` —
+            dónde respira una frase lo decide quien la escribe, no el ancho que
+            sobra, y el render es determinista, así que se estima con el avance
+            de `brand/medida`. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: TITULO.y,
+            width: TITULO.ancho,
+            padding: `24px ${TITULO.relleno}px 28px`,
+          }}
+        >
+          {/* El negro se abre desde el borde y **el texto no se estira con
+              él**: puesto como fondo del mismo div, el `scaleX` de la entrada
+              deformaba la Anton hasta que el bloque acababa de abrirse. */}
           <div
             style={{
               position: "absolute",
-              left: EJE.x - 34,
-              right: 56,
-              top: SUELO + 26,
-              opacity: entra(t.resultadoAt),
+              inset: 0,
+              backgroundColor: color.richBlack,
+              transformOrigin: "left",
+              transform: `scaleX(${entra(0) * queda})`,
+            }}
+          />
+          <div
+            style={{
+              position: "relative",
+              fontFamily: fontFamily.bloque,
+              fontSize: cuerpoQueCabe({
+                ancho: TITULO.ancho - TITULO.relleno * 2,
+                largo: title.length,
+                registro: "anton",
+                tope: TITULO.tope,
+              }),
+              lineHeight: 0.94,
+              letterSpacing: "0.004em",
+              whiteSpace: "nowrap",
+              textTransform: "uppercase",
+              color: color.lightNeutral,
+              // **La letra se va antes que su negro.** Con la misma curva que
+              // el bloque, a mitad del barrido el título asomaba fuera de su
+              // masa ya encogida y quedaba flotando sobre el collage como un
+              // fantasma. El negro se lleva la letra, no al revés.
+              opacity: entra(0) * Math.max(0, queda * 2 - 1),
             }}
           >
-            <div
-              style={{
-                fontFamily: fontFamily.bloque,
-                fontSize: 96,
-                lineHeight: 0.9,
-                letterSpacing: "0.002em",
-                textTransform: "uppercase",
-                color: color.gold,
-                whiteSpace: "nowrap",
-                transform: `translateY(${(1 - entra(t.resultadoAt)) * 22}px)`,
-              }}
-            >
-              {resultado.figure}
-            </div>
-            <div
-              style={{
-                marginTop: 14,
-                fontFamily: fontFamily.data,
-                fontSize: size.source,
-                letterSpacing: tracking.labelMono,
-                color: color.secondaryBlue,
-                textTransform: "uppercase",
-              }}
-            >
-              {resultado.source}
-            </div>
+            {title}
           </div>
-        ) : null}
-      </Panel>
+        </div>
 
-      {/* Banda inferior: la condición. Lleva banda propia y no vive de adorno
-          al pie — un límite que comparte pantalla con el argumento no se lee. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          // **Se apoya en el techo de la franja, no en un 1452 escrito a mano.**
-          //
-          // A 1452 la banda entera caia DENTRO de los 872 px que el subtitulo y
-          // la interfaz de la plataforma tienen reservados: en el movil esta
-          // condicion no se veia. Instruccion de Jaime (T-02): *«ningun tablero
-          // baja hasta esa franja»*, y el porque — *«como la mayoria del publico
-          // ve sin audio, texto por debajo de la zona segura desaparece bajo la
-          // interfaz y ahi se pierde el argumento»*.
-          //
-          // El numero vive en `src/brand/franja.json` y de ahi lo lee todo el
-          // mundo. Escrito aqui era la segunda copia, que es exactamente lo que
-          // permitio que este componente ignorara la reserva sin que se notara.
-          //
-          // Dentro de `ZonaTablero` el suelo YA es el techo de la franja, asi
-          // que la banda se apoya en `bottom: 0` y el numero deja de aparecer
-          // dos veces en el mismo fichero.
-          bottom: 0,
-          backgroundColor: color.lightNeutral,
-          transform: "rotate(0.9deg)",
-          padding: "18px 74px 22px",
-          fontFamily: fontFamily.video,
-          fontSize: 26,
-          fontWeight: 700,
-          lineHeight: 1.34,
-          color: color.richBlack,
-          opacity: entra(t.condicionAt),
-        }}
-      >
-        {condicion}
-      </div>
+        <div style={{ opacity: queda }}>
+          <Barra
+            tramos={tramos}
+            umbral={umbral}
+            entradas={t.entradas}
+            raya={t.raya}
+            entra={entra}
+          />
+        </div>
+
+        {resultado ? <Total figura={resultado.figure} barre={barre} /> : null}
       </ZonaTablero>
+
+      {/* **El pie ya no lo dibuja este componente.** Fue el primero en sacarlo
+          de la lámina —copiado de `PanelDentro`, con el 1262 escrito a mano en
+          los dos— y ahora lo monta `dibujaTablero` para las 24. Ver
+          `PieTablero.tsx`. */}
     </AbsoluteFill>
   );
 };

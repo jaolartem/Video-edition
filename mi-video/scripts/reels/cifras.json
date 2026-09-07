@@ -13,7 +13,8 @@
     "etiquetas", "figura"
   ],
 
-  "al_pie": ["source", "fuente", "condicion", "condition", "legal"],
+  "al_pie": ["pie", "source", "fuente", "condicion", "condition", "limitation", "legal", "condicion_completa"],
+  "_al_pie": "`condicion_completa` entra aqui aunque NO se dibuje: viaja en el spec para el copy del post, y contarla como cifra en pantalla hacia que `sinRespaldo` denunciara el «30.000 / 52 semanas» del propio pie de reel-01 e7. Lo que se dice al pie —el respaldo— y por tanto NO cuenta como cifra rotulada: contarlo haria que una cifra se respaldara a si misma. `pie` es la linea unica que dibuja src/components/PieTablero.tsx; los demas son lo que el disenador declara y de lo que esa linea se compone.",
 
   "casos": {
     "53.53%": "53,53%",

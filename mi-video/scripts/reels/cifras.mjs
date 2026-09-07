@@ -38,10 +38,18 @@
  */
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { enPantalla } from "./lectura.mjs";
 
 const CAMPOS = JSON.parse(
   fs.readFileSync(new URL("./cifras.json", import.meta.url), "utf8"),
+);
+
+/**
+ * La geometría del pie, declarada una vez y leída por los dos lados: aquí para
+ * saber si la línea cabe, y en `src/components/PieTablero.tsx` para dibujarla.
+ * Ver `src/brand/pie.json`.
+ */
+const PIE = JSON.parse(
+  fs.readFileSync(new URL("../../src/brand/pie.json", import.meta.url), "utf8"),
 );
 
 /** Props que son estructura, no texto en pantalla. Espejo de `TableroDeclarado`. */
@@ -154,62 +162,32 @@ const DE_CASA = (() => {
 })();
 const deCasa = (c) => DE_CASA.has(c.replace(/\D/g, ""));
 
-/**
- * **La condición no se parte dentro de un importe.**
- *
- * `enPantalla` corta por frases con `[^.!?]+[.!?]*`, y el punto del separador
- * de miles cuenta como fin de frase: `reel-02 e3` salía rotulando «Caso
- * hipotetico. Ontario, ano fiscal 2026. Los $180.» — el importe mutilado y la
- * frase diciendo otra cosa que la condición. Se protege el punto que va entre
- * dígitos y se devuelve después, así que el corte sigue siendo por frase.
- *
- * El arreglo definitivo es la expresión `(?<!\d)[.!?](?!\d)` dentro de
- * `lectura.mjs`, que sirve para todos sus lectores; queda declarado.
- */
-const PUNTO = "";
-export const condicionEnPantalla = (t) =>
-  enPantalla(String(t).replace(/(?<=\d)\.(?=\d)/g, PUNTO))
-    .split(PUNTO).join(".");
-
-/** Escribe `valor` en `destino` («a.b» admitido) sólo si el sitio está vacío. */
-const colocar = (props, destino, valor) => {
-  const [a, b] = destino.split(".");
-  if (!b) {
-    if (props[a]) return true;
-    props[a] = valor;
-    return true;
-  }
-  if (!props[a] || typeof props[a] !== "object") return false;
-  if (props[a][b]) return true;
-  props[a] = { ...props[a], [b]: valor };
-  return true;
-};
+/** El texto de un prop, limpio, o cadena vacía. */
+const txt = (v) => (typeof v === "string" ? v.trim() : "");
 
 /**
- * **Dónde lee el pie cada camino de dibujo.**
- *
- * `pieDe` calculaba `fuente` y `condicion` para todos los tableros a pleno, y
- * tres de los cinco componentes no tienen esos props: los destructuran por
- * nombre, sin rest, así que el valor llegaba y **se evaporaba sin error**.
- * Medido: `Reel-R2 e3` es `acumulacion`, su props lleva `fuente: "EY — Ontario…"`
- * y en pantalla no aparece ninguna fuente.
- *
- * `null` significa que ese camino no tiene sitio donde ponerlo, y entonces es
- * una falta: no se manda un pie a un componente que no lo dibuja.
- *
- * Lo que no está aquí sale con `TableroDeclarado`, que pinta `AL_PIE` tal cual.
+ * **Un destino, no uno por forma.** Aquí vivía `PIE_POR_KIND` —`fuente` en
+ * `comparacion`, `resultado.source` en `acumulacion`, `limitation` en `causal`—
+ * y existía sólo porque cada componente dibujaba su propio pie: cinco
+ * dibujantes, cinco destinos, y tres de ellos sin ninguno, así que el valor
+ * llegaba y se evaporaba sin error. Desde que el pie va fuera de la zona segura
+ * lo dibuja `dibujaTablero` para las 24 leyendo este prop. Uno no diverge.
  */
-const PIE_POR_KIND = {
-  comparacion: { fuente: "fuente", condicion: "condicion" },
-  acumulacion: { fuente: "resultado.source", condicion: "condicion" },
-  twopaths: { fuente: "difference.source", condicion: "condition" },
-  causal: { fuente: null, condicion: "limitation" },
-};
+const DESTINO = "pie";
+
+/**
+ * La línea del pie, junta. **No se redacta aquí**: redactarla en afirmativo
+ * exige entender la frase, y eso lo hace quien compone y lo deja escrito en
+ * `escena_desc.tablero.props.pie`. Aquí se junta lo declarado y se dice cuándo
+ * no cabe. El separador es el punto medio del canon.
+ */
+const unaLinea = (partes) =>
+  partes.map(txt).filter(Boolean).join(" · ").replace(/\s+/g, " ").trim();
 
 /**
  * **El pie de la cifra que SE ROTULA, y lo declarado manda.**
  *
- * Dos reglas, y las dos costaron una entrega:
+ * Tres reglas, y las tres costaron una entrega:
  *
  * 1. **Se casa por token normalizado**, no por contención de texto crudo. Sin
  *    esto ninguna fila casaba y ganaba el desempate, que traía la fuente de
@@ -217,78 +195,98 @@ const PIE_POR_KIND = {
  * 2. **Si ninguna casa, no hay pie.** El desempate `respalda === 'parcial'`
  *    era peor que no poner nada: un pie que no es de la cifra parece respaldar
  *    lo que no respalda, y sale sin decirlo. Ahora sale como falta.
+ * 3. **Lo declarado gana, y `dato` sólo rellena lo que falta.** Ésta es la que
+ *    estuvo rota hasta hoy: el que corría de verdad era `base.mjs :: pieDe`,
+ *    cuyo spread iba DESPUÉS de `b.props`, así que **pisaba sin avisar la
+ *    condición que el diseñador escribió para esa cifra exacta**. Medido en las
+ *    seis piezas: `reel-07 e3` declaraba la línea buena —*«53,53%: TAXTIPS.CA Y
+ *    PWC, ONTARIO 2026 · 32%: PROYECCIÓN, SIN CIFRA PUBLICADA»*— y en
+ *    `src/reels.json` quedó el rótulo largo de `dato`; `reel-01 e3` declaraba
+ *    *«CCPC con ingreso activo bajo el límite…»* y salió *«Es un supuesto de la
+ *    pieza, no un dato medido… —una…»*, o sea la redacción defensiva que Jaime
+ *    prohibió, además cortada por la mitad.
  *
- * Y la precedencia va al revés que antes: el spread de `pieDe` iba DESPUÉS de
- * `b.props`, así que la condición que el diseñador escribió para esa cifra
- * exacta se sobrescribía. En `reel-03 e3` escribió *«Tasa MARGINAL: se aplica
- * sólo al tramo que supera $253.414…»* —la del 53,53 %— y en `src/reels.json`
- * quedó la del 32 %. Es literalmente la producción gráfica del diseñador
- * reemplazada por otra en el último tramo.
+ * ## Y no se abrevia en silencio
  *
- * @returns `{props, faltas}` — los props con el pie puesto donde su componente
- *   lo lee, y lo que no se pudo resolver, dicho.
+ * `enPantalla` recortaba la condición a 25 palabras y le pegaba puntos
+ * suspensivos. Jaime pidió lo contrario: *«la cifra y el tramo exactos, sin
+ * abreviar hasta que deje de decir nada»*. Lo que no cabe **sale como falta** y
+ * se reescribe más corto, que es decisión de redacción y no recorte de máquina;
+ * el texto entero viaja igual en `condicion_completa` para el copy del vídeo.
+ *
+ * Las faltas se **empujan**, como en `armarTableros`: devolverlas obligaba a
+ * desestructurar en el sitio de llamada, que es donde una falta se olvida.
+ *
+ * @returns los props con `pie` puesto.
  */
-export function pieDe(slug, b) {
-  const faltas = [];
+export function pieDe(slug, b, faltas) {
   const props = { ...b.props };
+
+  // Lo que escribió el diseñador. `pie` es la línea ya redactada y gana entera;
+  // si no la hay, se junta con lo que declaró por campos.
+  const fuente = txt(props.fuente) || txt(props.source);
+  const condicion =
+    txt(props.condicion) || txt(props.condition) || txt(props.limitation);
+
   const pintadas = cifrasDe(props);
-  if (!pintadas.length) return { props, faltas };
-
   const filas = datos(slug, b.beat)
-    .filter((r) => r.respalda === "si" || r.respalda === "parcial");
-  const casan = filas.filter((r) => r.tokens.some((t) => pintadas.includes(t)));
-  // Manda la que MÁS necesita el pie: una proyección (`parcial`) tiene
-  // condiciones que hay que decir; una cifra publicada se sostiene sola.
-  const r = casan.find((x) => x.respalda === "parcial") ?? casan[0];
-  if (!r) {
+    .filter((f) => f.respalda === "si" || f.respalda === "parcial");
+  let r = null;
+  if (pintadas.length) {
+    const casan = filas.filter((f) => f.tokens.some((t) => pintadas.includes(t)));
+    // Manda la que MÁS necesita el pie: una proyección (`parcial`) tiene
+    // condiciones que hay que decir; una cifra publicada se sostiene sola.
+    r = casan.find((x) => x.respalda === "parcial") ?? casan[0] ?? null;
+    if (!r && !fuente) {
+      faltas.push(
+        `${slug} e${b.beat}: rotula ${pintadas.map((c) => `«${c}»`).join(", ")} y ` +
+        `ninguna fila de \`dato\` de esa etapa casa con lo rotulado ` +
+        `(hay ${filas.length}). Se queda sin pie a propósito: un pie que no es ` +
+        `de la cifra parece respaldar lo que no respalda.`,
+      );
+    }
+  } else if (filas.length === 1) {
+    /**
+     * **Un tablero sin cifra también puede afirmar algo, y entonces lleva pie.**
+     *
+     * `reel-04 e3` no rotula ningún número —«DEUDAS PERSONALES · DIVORCIO ·
+     * TARJETAS»— y aun así afirma que el banco pide empresa incorporada: eso es
+     * una fuente que hay que decir. Sólo se toma cuando la etapa declara **una**
+     * fila: con dos no hay forma de saber cuál respalda qué, y un pie que no es
+     * de lo que afirma parece respaldar lo que no respalda.
+     */
+    r = filas[0];
+  } else if (filas.length > 1 && !fuente && !txt(props[DESTINO])) {
     faltas.push(
-      `${slug} e${b.beat}: rotula ${pintadas.map((c) => `«${c}»`).join(", ")} y ` +
-      `ninguna fila de \`dato\` de esa etapa casa con lo rotulado ` +
-      `(hay ${filas.length}). Se queda sin pie a propósito: un pie que no es ` +
-      `de la cifra parece respaldar lo que no respalda.`,
+      `${slug} e${b.beat}: no rotula ninguna cifra y la etapa declara ` +
+      `${filas.length} filas de \`dato\`, así que no hay forma de saber cuál ` +
+      `respalda el tablero. Sale sin pie: el que corría antes cogía una de las ` +
+      `${filas.length} y la enseñaba como si fuera la del tablero. Se escribe ` +
+      `la línea en \`escena_desc.tablero.props.pie\`.`,
     );
-    return { props, faltas };
   }
 
-  const sitio = PIE_POR_KIND[b.kind] ?? { fuente: "fuente", condicion: "condicion" };
-  const pega = (campo, valor) => {
-    if (!valor) return;
-    const destino = sitio[campo];
-    if (!destino) {
-      faltas.push(
-        `${slug} e${b.beat}: «${b.kind}» no dibuja ${campo}, y la cifra la ` +
-        `necesita. El pie no se manda a un componente que no lo lee.`,
-      );
-      return;
-    }
-    // **Lo declarado gana, y una diferencia se dice.** Si el diseñador escribió
-    // su propio pie, el de `dato` no lo sustituye en silencio.
-    const [a, c] = destino.split(".");
-    const ya = c ? props[a]?.[c] : props[a];
-    if (ya && String(ya).trim() !== String(valor).trim()) {
-      faltas.push(
-        `${slug} e${b.beat}: el diseñador escribió ${campo} y \`dato\` dice ` +
-        `otra cosa. Manda lo declarado; la de \`dato\` era «${String(valor).slice(0, 60)}…».`,
-      );
-      return;
-    }
-    if (!colocar(props, destino, valor)) {
-      faltas.push(
-        `${slug} e${b.beat}: «${b.kind}» lee ${campo} en \`${destino}\` y ese ` +
-        `sitio no existe en lo declarado, así que la cifra sale sin ${campo}.`,
-      );
-    }
-  };
+  const deDato = { rotulo: txt(r?.rotulo), condiciones: txt(r?.condiciones) };
+  const linea = txt(props[DESTINO]) ||
+    unaLinea([fuente || deDato.rotulo, condicion || deDato.condiciones]);
+  if (!linea) return props;
 
-  pega("fuente", r.rotulo ? String(r.rotulo) : "");
-  if (r.condiciones) {
-    const entera = String(r.condiciones);
-    const cabe = condicionEnPantalla(entera);
-    pega("condicion", cabe);
-    // Lo que no cabe NO se tira: viaja en el spec para el copy del vídeo.
-    if (cabe !== entera) props.condicion_completa = entera;
+  // Lo que no cabe NO se tira: viaja en el spec para el copy del vídeo.
+  const entera = unaLinea([fuente || deDato.rotulo, condicion || deDato.condiciones]);
+  if (entera && entera !== linea) props.condicion_completa = entera;
+
+  props[DESTINO] = linea;
+  if (linea.length > PIE.max_caracteres) {
+    faltas.push(
+      `${slug} e${b.beat}: el pie mide ${linea.length} caracteres y en una ` +
+      `línea caben ${PIE.max_caracteres} (${PIE.suelo} px, el cuerpo por debajo ` +
+      `del cual no se lee ni parando la pieza). Se reescribe en afirmativo y ` +
+      `más corto en \`escena_desc.tablero.props.pie\` — «basado en X datos bajo ` +
+      `X condiciones», con la cifra y el tramo exactos. Abreviarlo aquí sería ` +
+      `dejarlo diciendo nada.`,
+    );
   }
-  return { props, faltas };
+  return props;
 }
 
 /**

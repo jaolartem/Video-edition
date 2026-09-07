@@ -37,7 +37,6 @@ export const TwoPaths: React.FC<TwoPathsProps> = ({
   horizon,
   byDefault,
   deliberate,
-  condition,
   difference,
   mode = "evidence",
   title,
@@ -175,23 +174,15 @@ export const TwoPaths: React.FC<TwoPathsProps> = ({
           >
             <Etiqueta tinta={t.textSecondary}>Diferencia acumulada</Etiqueta>
             <Cifra tinta={t.accent}>{difference.figure}</Cifra>
-            <Fuente tinta={t.textSecondary}>{difference.source}</Fuente>
           </div>
         ) : null}
 
-        <div
-          style={{
-            marginTop: 24,
-            paddingTop: 20,
-            borderTop: `1px solid ${t.rule}`,
-            fontFamily: fontFamily.body,
-            fontSize: size.source,
-            lineHeight: lineHeight.body,
-            color: t.textSecondary,
-          }}
-        >
-          {assertShort(condition, "legal", "TwoPaths.condition")}
-        </div>
+        {/* **La condición y la fuente van al pie, y el pie ya no es de esta
+            forma.** Fuera de la zona segura y en una línea, montado por
+            `dibujaTablero`. Ver `PieTablero.tsx`. `condition` y `horizon` siguen
+            siendo obligatorias en el tipo: el playbook exige declarar el mismo
+            horizonte y las condiciones, y eso no cambia porque cambie quién las
+            dibuja. */}
       </Marco>
 
       {/**

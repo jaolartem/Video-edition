@@ -20,6 +20,15 @@ import { Tramos } from "./tramos.mjs";
 import { COLGANTE, partirFrase, ultimaPalabra } from "./texto.mjs";
 
 /**
+ * **Y la quinta: cómo se resuelve el suelo de la letra** — caja, limpio o
+ * negativo, según lo que haya detrás en esa escena (T-04). Vive en `cc.mjs`
+ * porque lleva su propia medida y sus umbrales, y sale por esta puerta porque es
+ * una decisión sobre el subtítulo como las otras cuatro: quien arma el spec pide
+ * aquí lo que se le pone al cc, y no tiene que saber en qué fichero está.
+ */
+export { trataElCc } from "./cc.mjs";
+
+/**
  * **Las ideas fuerza.** Es el tratamiento de los beats que **afirman, provocan o
  * prometen**: ahi la fuerza esta en la voz y el texto solo marca donde cae el
  * golpe. Frente a un tablero es mas barato —no roba el plano— y frente a nada,

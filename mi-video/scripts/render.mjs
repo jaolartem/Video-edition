@@ -26,6 +26,7 @@ import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
 import path from 'node:path';
 import {rutas} from './rutas.mjs';
+import {aplicar} from './temporal.mjs';
 
 const piezas = process.argv.slice(2).filter((x) => /^\d+$/.test(x));
 if (piezas.length === 0) {
@@ -47,13 +48,15 @@ if (piezas.length === 0) {
  *
  * Y de paso lo saca de C:, que es el gotcha 1 del proyecto: el disco de
  * arranque lo llena un render a 1080x1920 y el aviso que da entonces habla de
- * Chrome, no del disco. `rutas.temporal` ya vive en F:.
+ * Chrome, no del disco.
+ *
+ * **Quien lo pone es `temporal.mjs`, y aqui hace falta llamarlo.** Este camino
+ * entra por la API de Node, y `remotion.config.ts` —donde la regla vive para
+ * todo lo que entra por el CLI— **no aplica a la API**: lo dice su propia
+ * cabecera. Escrito a mano aqui, la comprobacion de «sin espacios» y el aviso
+ * de sitio libre existian en un sitio y no en el otro.
  */
-const TMP = path.join(rutas.temporal, `render-${process.pid}`);
-fs.mkdirSync(TMP, {recursive: true});
-process.env.TMPDIR = TMP;
-process.env.TEMP = TMP;
-process.env.TMP = TMP;
+const TMP = aplicar(`render-${process.pid}`);
 
 const t0 = Date.now();
 console.log('empaquetando una vez para todas…');
@@ -76,8 +79,10 @@ console.log('empaquetando una vez para todas…');
 // piezas a la vez y dos procesos empaquetando en la misma carpeta se pisan los
 // ficheros. Con la cache apagada eso deja de ser lentitud y pasa a ser un
 // bundle a medias, que es de lo que veniamos.
-const dirBundle = path.join(rutas.temporal ?? 'F:/tmp-video',
-                            `bundle-${process.pid}`);
+// La carpeta sale del temporal ya aplicado y comprobado, no de `rutas.temporal`
+// con una ruta escrita a mano de reserva: esa reserva era la sexta copia de una
+// decision que solo vive en `rutas.json`.
+const dirBundle = path.join(TMP, 'bundle');
 const servedUrl = await bundle({
   entryPoint: path.resolve('src/index.ts'),
   outDir: dirBundle,

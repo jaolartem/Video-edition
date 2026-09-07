@@ -23,9 +23,18 @@ import { franja } from "../brand/franja";
  * cortado en el render —un fallo visible— en vez de irse a una zona donde el
  * fallo es invisible, que es lo caro.
  *
- * El fondo NO va aquí dentro: la placa y el color de la superficie siguen
- * ocupando el cuadro entero. Lo que se recorta es **el contenido**, que es lo
- * que hay que leer.
+ * ## Qué se queda fuera: la placa, y sólo la placa
+ *
+ * El fondo sigue a sangre — está detrás de todo y no compite con nadie. Lo
+ * demás entra, **incluido lo que un tablero dibuja como superficie**:
+ * `PanelDentro` dejaba fuera sus masas negras y su recorte por ser «superficie,
+ * como la placa», y el fotograma de reel-02 e2 enseñó las dos maneras que eso
+ * tiene de romperse — el subtítulo cayendo encima de su silueta, y la cola de
+ * una masa colgando 300 px por debajo de todo lo que sostenía.
+ *
+ * La raya no es «fondo o contenido»: es **quién lo dibuja**. La placa es del
+ * fondo; las masas, la figura y el texto son del tablero, y el tablero acaba en
+ * el techo de la franja.
  */
 export const ZonaTablero: React.FC<{ children: React.ReactNode }> = ({
   children,

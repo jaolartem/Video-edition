@@ -230,8 +230,8 @@ export function cortinillasDe(slug, reloj, marco) {
     // Nunca en el frame 0: la pieza abre con el gancho, no con una placa.
     if (at <= 0) continue;
     const etapa = marco?.beats?.[beat - 1]?.etapa ?? "";
-    const placa = placaDe(slug, beat);
-    const por = !placa ? "no hay placa para esa etapa en ads/fondos.json"
+    const placa = placaDe(slug);
+    const por = !placa ? "la pieza no tiene placa declarada en ads/fondos.json"
       : etapa.length > TOPE.label ? `«${etapa}» pasa de ${TOPE.label} caracteres`
       : null;
     if (por) {
@@ -286,7 +286,7 @@ export function glitchesDe(edl, reloj, cubren) {
  * en el mismo sitio en todos los encuadres, y una figura en el lado ocupado tapa
  * justo lo que el camino `cercano` protege.
  */
-export function caminosDe({ slug, plan, edl, desc }) {
+export function caminosDe({ slug, plan, edl, desc, lineas }) {
   const detPorBeat = new Map();
   for (let i = 0; i < edl.segmentos.length; i++) {
     const det = edl.detalle[i] ?? {};
@@ -310,7 +310,12 @@ export function caminosDe({ slug, plan, edl, desc }) {
   for (const { at, duration, det, i } of porBeat.values()) {
     const e = plan.escenas[i] ?? plan.escenas[0];
     const cx = e?.crop ? (e.crop.x + e.crop.w / 2) / 2160 : 0.5;
-    const r = construir({ at, duration, desc: desc[det.beat], det,
+    // `slug` y `lineas` viajan porque el gancho los necesita: el nombre del
+    // recorte con alfa se deriva de la pieza y del beat, y el rótulo que va
+    // detrás de su cabeza es el de la pieza — el mismo que ya resolvió quien
+    // monta, no una segunda copia leída otra vez aquí.
+    const r = construir({ at, duration, desc: desc[det.beat], det, slug,
+                          lineas: lineas ?? [],
                           lado: cx < 0.5 ? "der" : "izq" });
     out.push(...r.capas);
     for (const f of r.faltas) faltas.push(`${slug}: ${f}`);

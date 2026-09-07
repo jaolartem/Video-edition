@@ -5,22 +5,27 @@
  * Esta puerta existe para no gastarla en una pieza que ya sabemos que no está —
  * *«renderizamos, pero sólo lo que ya sabemos que está bien»*.
  *
- * Cuatro motivos paran una pieza, y los cuatro tienen un vídeo detrás:
+ * Cinco motivos paran una pieza, y los cinco tienen un vídeo detrás:
  *
  * 1. **Jaime no aparece** en alguno de los tres tercios (y sale poco en total).
  * 2. **Un tablero se come más de un tercio** de la pieza.
  * 3. **Una etapa obligatoria se quedó sin fragmento** y sin copy que la ejecute.
  * 4. **Un hueco largo sin subtítulo** — el argumento tiene que funcionar sin
  *    audio, así que eso no es un detalle de acabado, es la pieza rota.
+ * 5. **Una capa que no cumple lo suyo**: un panel que es sólo texto
+ *    (`paneles.mjs`), más de una placa de fondo (`fondo.mjs`), o un gancho
+ *    fuera del canon (`portada.mjs`) — ése no pasaba por ninguna puerta.
  *
  * Lo demás que este fichero imprime **no para nada**: es el informe por pieza,
  * que existe para que un defecto no haga falta buscarlo.
  */
 import { FPS } from "./reloj.mjs";
 import { Tramos } from "./tramos.mjs";
-import { DICE } from "./texto.mjs";
-import { marcoDe } from "./material.mjs";
-import { sinTrato } from "./escenas.mjs";
+import { informe } from "./informe.mjs";
+import { faltasDePaneles } from "./paneles.mjs";
+import { faltasDeFondo } from "./fondo.mjs";
+import { faltasDelGancho } from "./portada.mjs";
+import { sinRespaldo } from "./cifras.mjs";
 
 /**
  * Cuánto metraje con Jaime en cuadro basta por sí solo.
@@ -41,20 +46,6 @@ const MINIMO_CARA = 0.60;
  * una pieza de 75,2— sin un solo aviso.
  */
 const MUDO_MAX = 10 * FPS;
-
-/**
- * Suelo de encaje de un segmento en su etapa: por debajo, lo grabado no cabe
- * dentro de lo que el guion espera ahí. Es el mismo umbral con que
- * `seleccionar.py` admite una candidata, y por eso significa lo mismo en los dos
- * sitios.
- */
-const ENCAJE = 0.14;
-/**
- * Y cuánto de lo ALCANZABLE hay que cubrir. Es el mismo criterio relativo con
- * que `beats.py` deja competir a una candidata: lo que importa no es el valor
- * absoluto, es la distancia al mejor posible.
- */
-const RELATIVO = 0.5;
 
 /**
  * **Una pieza rota no para el lote.** `reels-spec` genera las seis siempre
@@ -182,95 +173,45 @@ function presencia(r) {
 }
 
 /**
- * **Un segmento encaja si hace su trabajo, no si repite el libreto.**
- *
- * La cobertura sola mide literalidad: comparada contra un párrafo largo, decir
- * sólo lo esencial puntúa bajo aunque la etapa quede cumplida. En el reel 2 la
- * etapa 2 dice «por cada 100 dólares se quedan con 67» —que es exactamente lo
- * que el libreto pide ahí— y sacaba 0,10 porque el párrafo además habla de la
- * mansión, el yate y Muskoka.
- *
- * Así que se mira contra **lo alcanzable en esa etapa** (`cubre_max`), y además
- * se acepta el segmento que trae el dato que la etapa declara.
- */
-const encaja = (u) =>
-  u.dice ||
-  (u.cobertura ?? 0) >= Math.max(ENCAJE, RELATIVO * (u.cubre_max ?? 0));
-
-/** La línea de cada pieza y lo que hay que mirar en ella. No para nada. */
-function informe(r, m) {
-  console.log(
-    `${r.id}  ${r.duracion.toFixed(1)}s  ${m.visibles}/${r.captions.length} cc (${r.compuestos} compuestos)  mudo max ${(m.dur / FPS).toFixed(1)}s  ` +
-    `rotulo entra en ${(r.entra / FPS).toFixed(1)}s  ` +
-    `${r.paneles.length} panel(es) · ${r.boards.length} tablero(s)${r.boards.length ? " en " + r.boards.map((b) => (b.at / FPS).toFixed(1) + "s").join(",") : ""}  ` +
-    `CTA ${r.cta ? "en " + r.cta.at.toFixed(1) + "s" : "NO HAY (falta el copy del cierre)"}`,
-  );
-  /**
-   * **La cifra es secundaria respecto al segmento.** Jaime: *«no creo que las
-   * cifras sean el parámetro para medir; lo que tenemos que encontrar son los
-   * segmentos específicos de lo grabado que caben dentro de los segmentos
-   * esperados por el guion. Acá hay falsos positivos»*.
-   *
-   * Medido: «estructura. 30.000 dolares no de ventas de estructura» **contiene
-   * el 30** y es un tropiezo de cuatro segundos con cobertura -0,07. Así que la
-   * cifra es aviso y la puerta baja a donde está la unidad de análisis.
-   */
-  const exige = marcoDe(`reel-0${r.id.slice(-1)}`)?.debe_decir ?? [];
-  const dicho = DICE(r.captions.map((c) => c.text).join(" "));
-  // Mismo criterio que en `beats.py`: el termino admite alternativas con `|`,
-  // porque lo que se comprueba es la intencion comunicativa y no la letra.
-  const faltan = exige.filter(
-    (t) => !String(t).split("|").some((x) => dicho.includes(DICE(x))),
-  );
-  if (faltan.length) {
-    console.log(
-      `    aviso: no suena ${faltan.map((x) => `«${x}»`).join(", ")}.` +
-      ` Es un dato declarado, no el criterio: lo que decide es si cada segmento` +
-      ` encaja en su etapa.`,
-    );
-  }
-  const det = r.edl?.detalle ?? [];
-  if (det.length) {
-    const flojas = det.filter((u) => !encaja(u));
-    /**
-     * **Parecerse poco al libreto no es un defecto.** Jaime separó tres cosas:
-     * *«una cosa el libreto o el mensaje esperado, otra el mensaje entregado,
-     * otra la intención comunicativa; se respeta la última»*. La cobertura mide
-     * el parecido con el mensaje ESPERADO, que es la preferencia, no el
-     * criterio. Llamarlo «flojo» hacía perseguir el parecido y no el sentido.
-     */
-    console.log(
-      `    encaje por segmento: ` +
-      det.map((u) => `${u.beat}:${(u.cobertura ?? 0).toFixed(2)}`).join(" ") +
-      (flojas.length
-        ? `  · mas lejos del libreto: ${flojas.map((u) => u.beat).join(",")}`
-        + ` (no es defecto: lo que decide es la integridad)`
-        : ""),
-    );
-  }
-  const secas = (r.escenas ?? []).filter((e) => e.trato === "—");
-  if (secas.length) {
-    console.log(
-      `    escenas a plano seco: ${secas.map((e) => `${e.n} (${(e.a / FPS).toFixed(1)}-${(e.b / FPS).toFixed(1)}s)`).join(", ")}` +
-      ` — cada escena tiene que llevar tablero, animacion o texto animado.`,
-    );
-  }
-  const pelados = sinTrato(r);
-  if (pelados.length) {
-    console.log(
-      `    beats sin tratamiento: ${pelados.join(", ")} - ni tablero, ni panel, ` +
-      `ni idea fuerza, ni marca. Plano seco todo el beat.`,
-    );
-  }
-}
-
-/**
  * Las dos vueltas, y en este orden a propósito: **primero lo que para y después
  * lo que informa**. Un motivo de bloqueo enterrado bajo veinte líneas de datos
  * es un motivo que no se lee.
  */
 export function revisar(spec) {
   for (const r of spec) presencia(r);
+  // Un panel de solo texto no se monta, una pieza pinta UN fondo y el gancho
+  // tiene puerta propia. Lo que se exige vive en `paneles.mjs`, `fondo.mjs` y
+  // `portada.mjs`; aqui solo se para.
+  const suyo = (r) => [...faltasDePaneles(r), ...faltasDeFondo(r), ...faltasDelGancho(r)];
+  for (const r of spec) for (const m of suyo(r)) para(r, m);
+  /**
+   * **Una cifra en pantalla sin fila en `dato` para la pieza.**
+   *
+   * El contrato de diseño lo daba por hecho —«una cifra en pantalla sin fila en
+   * `dato` la para la puerta»— y **no lo comprobaba nadie**: `sinRespaldo` está
+   * escrito en `cifras.mjs` desde el día que se escribió ese fichero y no lo
+   * importaba nadie, así que la única guarda que quedaba era la 6a de
+   * `verificar.py`, que lee la PROSA de la escena, sólo ve importes con
+   * separador de miles y corre DESPUÉS del render.
+   *
+   * Para de verdad porque **el cumplimiento es la prioridad 1** y no cede ante
+   * el calendario: una pieza que rotula un número que la fuente no respalda es
+   * un problema legal, no un defecto de acabado. Con `REELS_VER=1` sale igual y
+   * con el motivo escrito, que es como este proyecto deja que decida Jaime.
+   */
+  for (const r of spec) {
+    const slug = String(r.video ?? "").replace(/\.mp4$/, "");
+    const piezas = [...(r.boards ?? []), ...(r.paneles ?? [])]
+      .filter((b) => b.beat !== undefined);
+    for (const { beat, cifra } of sinRespaldo(slug, piezas)) {
+      para(r,
+        `${r.id}: el beat ${beat} rotula «${cifra}» y la etapa no declara esa ` +
+        `cifra en \`dato\`. Toda cifra en pantalla lleva su fuente: sin fila no ` +
+        `hay respaldo que enseñar, y lo que se afirma en pantalla se afirma en ` +
+        `nombre de Jaime.`,
+      );
+    }
+  }
   for (const r of spec) {
     const m = mudo(r);
     informe(r, m);

@@ -23,6 +23,7 @@ import fs from "fs";
 import { DatabaseSync } from "node:sqlite";
 import { bruto } from "./rutas.mjs";
 import { camaraDe, movimientoDe } from "./camara.mjs";
+import { esDeclarado, fijosDe, pausasDe } from "./reels/declarado.mjs";
 
 /**
  * Silencio interno que se quita. Por debajo de esto es respiración y se queda:
@@ -94,9 +95,36 @@ const tomaDe = (sl) =>
   JSON.parse(fs.readFileSync("rutas.json", "utf8")).tomas[sl];
 const edl = JSON.parse(fs.readFileSync(`ads/${slug}/edl-sell.json`, "utf8"));
 
-const runs = JSON.parse(
-  fs.readFileSync(`work/cuts/${edl.toma ?? tomaDe(slug)}.json`, "utf8"),
-).segmentos;
+/**
+ * **Los tramos de habla de LA CINTA DE CADA ESCENA, no los de la pieza.**
+ *
+ * Esto leia un solo fichero —el de la toma del reel— y se lo pasaba a
+ * `conHabla` para TODOS los segmentos, incluidos los que el EDL declara de otra
+ * cinta. Intersecar un tramo de una cinta con el mapa de silencios de otra no
+ * da un error: da trozos, y los recorta donde la otra callaba.
+ *
+ * Es el gemelo del fallo que ya se arreglo para `fuente` —render-hook abria un
+ * `-i` por escena y este productor no emitia de que cinta salia— y quedo a
+ * medias: la escena decia su cinta y el recorte seguia preguntandole a la del
+ * reel. Medido en reel-02 el 5-9-2026: el EDL declaraba 85,4 s y el corte salia
+ * de 80,7 s. Los 4,7 s que faltaban eran las dos etapas de `20260825_224414`
+ * —b8 y b10—, y ahi dentro iba «este bootcamp es para usted, si no no», el
+ * cierre que Jaime aprobo y que llevaba tres entregas sin sonar.
+ *
+ * Sin fichero de cortes no se recorta: pasar el mapa de otra cinta es el fallo.
+ */
+const runsDe = ((cache) => (toma) => {
+  const t = toma || edl.toma || tomaDe(slug);
+  if (!cache.has(t)) {
+    try {
+      cache.set(t, JSON.parse(
+        fs.readFileSync(`work/cuts/${t}.json`, "utf8")).segmentos);
+    } catch {
+      cache.set(t, null);
+    }
+  }
+  return cache.get(t);
+})(new Map());
 
 /**
  * **Lo que el diseñador pidió de cámara, etapa por etapa.**
@@ -115,9 +143,24 @@ const camaraPorBeat = () => {
   try {
     const db = new DatabaseSync("ads/decisiones.db", { readOnly: true });
     for (const f of db
-      .prepare("select etapa_orden, camara from escena_desc where video_slug = ?")
-      .all(slug))
-      m.set(Number(f.etapa_orden), camaraDe(f.camara));
+      .prepare("select etapa_orden, camara, tablero from escena_desc" +
+               " where video_slug = ?")
+      .all(slug)) {
+      const cam = camaraDe(f.camara);
+      // **Un tablero que lo lleva DENTRO también pide el recorte.** El panel
+      // declara `sujeto` —de qué lado va— y eso ya es la petición: exigir
+      // además `camara.detras` sería la misma decisión en dos sitios, y el día
+      // que no coincidan el recorte se produce de una etapa y se dibuja en
+      // otra. Aquí sólo se marca el beat para que la pasada de MediaPipe lo
+      // cubra; la capa que pasa POR DETRÁS no se emite (`reels/imagen.mjs`),
+      // porque bajo un tablero a pleno no se ve. Un tablero ilegible no es
+      // asunto de este paso: lo dice `base.mjs`.
+      try {
+        if (!cam.detras && JSON.parse(f.tablero ?? "null")?.props?.sujeto)
+          cam.detras = "sujeto";
+      } catch { /* vacío a propósito: ver arriba */ }
+      m.set(Number(f.etapa_orden), cam);
+    }
     db.close();
   } catch {
     // Sin base no hay composición declarada, que es el estado de una pieza
@@ -128,6 +171,8 @@ const camaraPorBeat = () => {
 const CAMARA = camaraPorBeat();
 
 const escenas = [];
+const PAUSAS = pausasDe(slug);
+const declarado = esDeclarado(fijosDe(slug));
 let montado = 0;
 let aireQuitado = 0;
 // Cada segmento del EDL se parte en los trozos que SÍ tienen voz.
@@ -146,28 +191,6 @@ let aireQuitado = 0;
  * La etapa sale del `detalle` del EDL **por el corte del que nace la escena**,
  * no por tiempo: el reparto puede ir fuera de orden (aprendizaje 35).
  */
-/**
- * **Las pausas que se conservan, declaradas en el libreto.**
- *
- * Jaime: *«lo de los silencios tambien puede ser aritmetico… excepto cuando
- * aporta: antes de una revelacion o de una afirmacion importante, siempre y
- * cuando el silencio sea mirando a camara»*. Quitar aire es aritmetica y corre
- * sola; **conservarlo es una decision**, y por eso se declara — con `[pausa]`
- * en el texto del libreto de esa etapa.
- *
- * Aqui eso significa una cosa concreta: en la etapa marcada **no se recorta el
- * silencio de entrada**. El resto del aire de la pieza se sigue yendo.
- */
-const PAUSAS = (() => {
-  try {
-    return JSON.parse(
-      execFileSync("python", ["scripts/consulta.py", "pausas",
-                              JSON.stringify([slug])], { encoding: "utf8" }),
-    );
-  } catch {
-    return {};
-  }
-})();
 
 const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
   const d0 = (edl.detalle || [])[iSeg] || {};
@@ -175,13 +198,33 @@ const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
   if (PAUSAS[String(d0.beat)]) {
     return [[a, b, d0.beat ?? iSeg + 1, d0.etapa || "", d0.texto || "", d0.toma]];
   }
-  const t = conHabla(a, b, runs);
+  const t = conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]);
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
   const d = (edl.detalle || [])[iSeg] || {};
-  return t.map(([x, y]) => [x, y, d.beat ?? iSeg + 1, d.etapa || "", d.texto || "", d.toma]);
+  /**
+   * **Dentro de un tramo declarado, el empalme no cambia de plano.**
+   *
+   * Jaime lo describió como la operación que es: *«es literalmente cortar un
+   * segmento y pegarlo al lado de donde va, y adelantar el otro segmento para
+   * que empiece donde empezaba el anterior»*. Eso es quitar el silencio sin
+   * cortar: `conHabla` ya hace lo primero y `render-hook` concatena, así que lo
+   * único que delataba el empalme era el ENCUADRE — `punch-ins` le daba a cada
+   * trozo un recorte distinto y el salto se veía.
+   *
+   * Con `hereda_encuadre` los trozos de un mismo tramo declarado comparten
+   * recorte: el corte deja de existir para el ojo y la frase suena seguida.
+   *
+   * Las dos formas anteriores fallaban por lados opuestos, y las dos las oyó él:
+   * partir en escenas dejaba «semanales» detrás de un cambio de plano; dejar el
+   * tramo entero conservaba **1,10 s** de pausa y lo dejaba igual de suelto.
+   */
+  const junto = declarado(a, b);
+  return t.map(([x, y], k) =>
+    [x, y, d.beat ?? iSeg + 1, d.etapa || "", d.texto || "", d.toma,
+     junto && k > 0]);
 });
 
-for (const [a, b, beat, etapa, dicho, toma] of conVoz) {
+for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
   const dur = b - a;
   /** Lo declarado para esta etapa; si no hay nada, los valores de siempre. */
   const cam = CAMARA.get(Number(beat)) ?? camaraDe(null);
@@ -226,7 +269,7 @@ for (const [a, b, beat, etapa, dicho, toma] of conVoz) {
       origen_hasta: Number(fin.toFixed(3)),
       duracion: Number((fin - ini).toFixed(3)),
       modo: k === 0 ? "cut" : "chain",
-      hereda_encuadre: false,
+      hereda_encuadre: Boolean(hereda) && k === 0,
       /**
        * **El encuadre que pidió quien compuso**, o `null` para que
        * `punch-ins.py` siga repartiendo por rueda.
@@ -247,6 +290,11 @@ for (const [a, b, beat, etapa, dicho, toma] of conVoz) {
       // primera, el plano volvería a su color a mitad de la etapa y eso no lo
       // pidió nadie. `null` = el plano sale como se grabó.
       virado: cam.virado,
+      // **Y lo que pasa por detrás de él**, también en todas las escenas del
+      // beat: el recorte del sujeto se produce por ETAPA, no por trozo, porque
+      // una silueta que aparece y desaparece dentro de la misma etapa lee como
+      // un fallo de máscara. `null` = nada detrás, que es como salía todo.
+      detras: cam.detras,
       /**
        * **El movimiento dentro de la escena.** `punch-ins.py` calcula el
        * recorte final con los OJOS como punto fijo (aprendizaje 27), así que

@@ -4,6 +4,22 @@ export type Tramo = {
   etiqueta: string;
   /** Cuánto ocupa, en fracción de la altura total del gráfico (0–1). */
   alto: number;
+  /**
+   * **Cuánto es, en la unidad de la raya. Obligatorio cuando hay `umbral`.**
+   *
+   * `alto` es un número libre: nada lo ata a nada, y con `umbral` eso deja de
+   * ser inocente. Una raya rotulada «$50,000 AL AÑO» convierte la columna en
+   * una escala en dólares, así que cada `alto` afirma cuánto puso ese tramo y
+   * el cruce afirma en cuál se pasó. Son mediciones, y **una cantidad dibujada
+   * afirma igual que una cifra rotulada** — es la regla que `Recuento.cuantos`
+   * ya aplica a las marcas.
+   *
+   * Declarado, se rotula debajo de la etiqueta y entra en `sinRespaldo`, que
+   * pide su fila en `dato`. Sin declarar y con raya, el render muere: cuatro
+   * fracciones inventadas que suman 1 dibujan un cruce que ninguna fuente
+   * sostiene (tiquet #217, reel-05 e6).
+   */
+  valor?: string;
 };
 
 /**
@@ -43,6 +59,17 @@ export type AcumulacionProps = {
   umbral?: { etiqueta: string; en: number };
   /** Lo que la acumulación produce. Cifra Y fuente, o ninguna de las dos. */
   resultado?: { figure: string; source: string };
+  /**
+   * **De qué datos sale lo que se dibuja, cuando no hay `resultado`.**
+   *
+   * `pieDe` escribe el respaldo de un `acumulacion` en `resultado.source`, así
+   * que una acumulación sin resultado —la de R3, la de R5— se quedaba sin sitio
+   * donde ponerlo: el diseño declaraba `fuente` en el spec, el componente lo
+   * destructuraba por nombre sin `rest` y **el valor se evaporaba sin error**.
+   * Es la avería de la casa —declarar sin poder aplicar— y se cerraba dando el
+   * prop, no discutiendo el pie.
+   */
+  fuente?: string;
   /** Qué cambiaría el cálculo. **Obligatorio.** */
   condicion: string;
   /**

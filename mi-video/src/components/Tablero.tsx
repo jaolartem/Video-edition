@@ -5,9 +5,13 @@ import { Compuerta, type CompuertaProps } from "./Compuerta";
 import { Acumulacion, type AcumulacionProps } from "./Acumulacion";
 import { TwoPaths, type TwoPathsProps } from "./TwoPaths";
 import { Anidado, type AnidadoProps } from "./Anidado";
+import { Recuento, type RecuentoProps } from "./Recuento";
 import { Fusion, type FusionProps } from "./Fusion";
 import { Desvio, type DesvioProps } from "./Desvio";
 import { Fichas } from "./Fichas";
+import { Techo, type TechoProps } from "./Techo";
+import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
+import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
 import type { Mode } from "../brand/tokens";
 
@@ -39,7 +43,32 @@ export type CueDeTablero = {
   props: Record<string, unknown> | unknown;
 };
 
+/**
+ * **El tablero y su pie, que ya no son cosa de cada forma.**
+ *
+ * El pie de fuente estaba escrito cinco veces —una por forma que lo necesitó— y
+ * las cinco divergieron: banda clara en tres, banda oscura en dos, el `1262`
+ * escrito a mano en dos, y en cinco tableros del lote acabó siendo un párrafo
+ * de tres y cuatro renglones dentro de la lámina. Aquí se monta **una vez para
+ * las 24**, así que una forma nueva nace con su pie puesto y ninguna puede
+ * volver a dibujarlo a su manera. Ver [`PieTablero`](./PieTablero.tsx).
+ *
+ * La línea la compone `scripts/reels/cifras.mjs :: pieDe` y viaja en el único
+ * prop `pie`: **un destino, no uno por forma**. El mapa `PIE_POR_KIND` que había
+ * allí —`fuente` en unos, `resultado.source` en otros, `limitation` en los de
+ * más allá— existía justo porque cada componente lo leía por su cuenta.
+ */
 export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
+  const props = cue.props as Record<string, unknown>;
+  return (
+    <>
+      {laForma(cue, mode)}
+      <PieTablero linea={props?.pie as string | undefined} />
+    </>
+  );
+};
+
+const laForma = (cue: CueDeTablero, mode: Mode) => {
   const props = cue.props as Record<string, unknown>;
   if (cue.kind === "causal")
     return <CausalChain {...(cue.props as CausalChainProps)} mode={mode} />;
@@ -55,10 +84,33 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
     return <Compuerta {...(cue.props as CompuertaProps)} />;
   if (cue.kind === "Anidado")
     return <Anidado {...(cue.props as AnidadoProps)} />;
+  /**
+   * **Cuántos hay de un lado y cuántos del otro, contados en marcas.** No es
+   * una comparación de cifras: la asimetría se ve sin leer nada, que es lo que
+   * pidió Jaime para reel-02 e7 — *«hay muchos y hay un curso en español»*.
+   */
+  if (cue.kind === "Recuento")
+    return <Recuento {...(cue.props as RecuentoProps)} />;
   if (cue.kind === "fusion")
     return <Fusion {...(cue.props as FusionProps)} />;
+  /**
+   * **Una cifra sola, con la condición que la produce y el tramo donde vale.**
+   * Es la mitad de «gráficos y palabras» que no dibuja nada: cuando el dato es
+   * una tasa y un umbral —y no un reparto—, la proporción no existe y dibujarla
+   * afirma lo que ninguna fuente sostiene. Ver `Techo.tsx` y el tiquet #215.
+   */
+  if (cue.kind === "Techo")
+    return <Techo {...(cue.props as TechoProps)} />;
   if (cue.kind === "desvio")
     return <Desvio {...(cue.props as DesvioProps)} />;
+  /**
+   * **El panel con él dentro.** No es una lámina de reel-02: es el tipo que
+   * Jaime aprobó el 6-9-2026, con su placa, sus masas negras, su recorte y la
+   * figura que argumenta. Los grados de libertad —de qué lado va él y con qué
+   * tratamiento— viajan en los props y salen del arco, no del gusto.
+   */
+  if (cue.kind === "PanelDentro")
+    return <PanelDentro {...(cue.props as PanelDentroProps)} />;
   /**
    * **Las cuatro que son la misma forma.** `ListaNumerada` es la única que
    * lleva el número delante, y eso lo dice la forma —no un prop suelto que

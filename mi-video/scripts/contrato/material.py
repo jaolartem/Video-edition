@@ -157,7 +157,7 @@ Clave("corrige",
 #: viaja la instruccion y no hay donde declararla, es media herramienta.
 CAMPOS = (
     Campo("placas",
-          manda=Aguja("scripts/servicios/disenar.py", '"placas": placas_que_existen(),'),
+          manda=Aguja("scripts/servicios/disenar.py", '"placas": placas_que_existen('),
           exige=(Prompt("scripts/disenar.prompt.md", "no es reinventar la rueda"),),
           nota="Las CATORCE placas de `public/fondos/` con lo que dibuja cada"
                " una y lo que provoca. Llevaban semanas en el repositorio y el"

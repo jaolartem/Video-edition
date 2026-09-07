@@ -96,7 +96,7 @@ def _con():
 
 
 def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
-           pasada=1, ancla=None, cual=1):
+           pasada=1, ancla=None, cual=1, reabre=False):
     """Guarda una nota de revisión. `que` va literal, siempre.
 
     `ancla` es **el texto** que hay que cortar. Los segundos sirven para
@@ -169,6 +169,23 @@ def anotar(slug, accion, desde, hasta, que, regla=None, estado="pendiente",
             if fila and fila["estado"] == "huerfana":
                 Nota(con.execute("select * from revision where id = ?",
                                  (ya,)).fetchone()).resucitar(con)
+            # **Y si Jaime se vuelve a quejar del mismo sitio, se REABRE.**
+            #
+            # El deduplicado sobre el ancla es lo que impide que 482 notas
+            # entierren las cuatro que importan. Pero tenia un agujero por el que
+            # se cuela justo lo mas caro: una nota ya cerrada como «aplicada»
+            # absorbia la queja nueva sin cambiar de estado. Paso con el
+            # «semanales huerfano» de reel-01, ancla `semanales`, la tercera vez
+            # que lo pedia: la nota #749 estaba en «aplicada» —honestamente, por
+            # su propia medida lo estaba— y la cuarta queja se sumo a ella y
+            # desaparecio de los pendientes.
+            #
+            # Que el vuelva a verlo ES la prueba de que no estaba hecho. Se
+            # reabre y se deja escrito cuantas vueltas lleva; `reabre` es
+            # explicito para que una pasada automatica no resucite lo cerrado.
+            if fila and reabre and fila["estado"] in ("aplicada", "automatizada"):
+                con.execute("update revision set estado = 'pendiente' where id = ?",
+                            (ya,))
         elif estado == "sube":
             clave = " ".join(contenido(que or "")[:14])
             for i, otro in con.execute(
@@ -227,11 +244,25 @@ def cerrar(ids, estado="aplicada", regla=None):
     con = _con()
     hechos = []
     for i in ids:
-        fila = con.execute("select id, estado, accion, video_slug from revision"
-                           " where id = ?", (int(i),)).fetchone()
+        fila = con.execute("select id, estado, accion, video_slug, quien"
+                           " from revision where id = ?", (int(i),)).fetchone()
         if not fila:
             print(f"  nota {i}: no está en la tabla")
             continue
+        # **Un tiquet que nunca estuvo «en curso» se cierra sin haberlo mirado.**
+        #
+        # Jaime, 6-9-2026: *«cada tiquet debe tener 3 estados —activo, en proceso
+        # y resuelto— y un agente resuelve un tiquet a la vez»*. El estado de en
+        # medio existía en las consultas y **no lo había usado nadie**: cero
+        # tiquets habían pasado por él, así que saltaban de activo a resuelto sin
+        # que constara quién los trabajó.
+        #
+        # Y eso ya se cobró una: el paso de diseño cerraba todos los de su fase,
+        # así que una respuesta sobre dos paneles de reel-07 cerró el tiquet del
+        # gancho sin haberlo abierto.
+        if fila["estado"] != "en curso":
+            print(f"  ojo: la nota {i} se cierra sin haber pasado por «en curso»"
+                  f" — nadie la tomó. Se anota, no se bloquea.")
         con.execute("update revision set estado = ?,"
                     " regla = coalesce(?, regla), fecha = ? where id = ?",
                     (estado, regla, datetime.datetime.now().isoformat(
@@ -246,6 +277,53 @@ def cerrar(ids, estado="aplicada", regla=None):
     if hechos:
         registro.nota("revision", f"nota(s) cerradas como {estado}",
                       detalle=", ".join(str(i) for i in hechos))
+    return hechos
+
+
+def reabrir(ids, por_que):
+    """Devuelve a `pendiente` una nota que se cerró **sin haberla atendido**.
+
+    Hacía falta y no existía. Un paso puede cerrar de más —`abierto.cerrar`
+    cerraba todos los tiquets de su fase, y una respuesta que arreglaba dos
+    paneles de reel-07 se llevó por delante el tiquet del gancho— y la única
+    forma de deshacerlo era un `update` a mano contra la base, que es
+    exactamente la manera de perder el estado que este proyecto persigue.
+
+    Es el reverso de `cerrar` y pide lo mismo: **por qué**. Una nota que vuelve
+    a pendiente sin decirlo es indistinguible de una que nunca se cerró, y
+    entonces no se puede saber si el paso que la cerró de más está arreglado.
+
+    No resucita lo `automatizada`: eso dice que la regla vive en código, y si
+    volvió a pasar lo que falla es la guarda, no la nota.
+    """
+    con = _con()
+    hechos = []
+    for i in ids:
+        fila = con.execute("select id, estado, accion, video_slug from revision"
+                           " where id = ?", (int(i),)).fetchone()
+        if not fila:
+            print(f"  nota {i}: no está en la tabla")
+            continue
+        if fila["estado"] == "automatizada":
+            print(f"  nota {i}: está automatizada — si volvió a pasar, lo que"
+                  f" falla es su guarda, no la nota")
+            continue
+        if fila["estado"] == "pendiente":
+            print(f"  nota {i}: ya estaba pendiente")
+            continue
+        con.execute("update revision set estado = 'pendiente', regla = ?,"
+                    " fecha = ? where id = ?",
+                    (f"reabierta: {por_que}"[:400],
+                     datetime.datetime.now().isoformat(timespec="seconds"),
+                     int(i)))
+        print(f"  nota {i} ({fila['video_slug']} · {fila['accion']}):"
+              f" {fila['estado']} → pendiente")
+        hechos.append(int(i))
+    con.commit()
+    con.close()
+    if hechos:
+        registro.nota("revision", "nota(s) reabiertas",
+                      detalle=f"{', '.join(str(i) for i in hechos)} — {por_que}")
     return hechos
 
 
@@ -478,6 +556,32 @@ def _segundo(v):
         return v                       # texto: `sanear` lo pone en el ancla
 
 
+def tomar(ids, quien):
+    """Pasa esas notas a «en curso» y deja escrito quién las tiene.
+
+    Es el estado que faltaba. Jaime: *«un agente resuelve un tiquet a la vez»*,
+    y para que eso se pueda comprobar el tiquet tiene que decir quién lo tomó y
+    cuándo. Tomar una que ya tiene dueño avisa: dos a la vez sobre el mismo
+    sitio es como se pisan.
+    """
+    con = _con()
+    ahora = datetime.datetime.now().isoformat(timespec="seconds")
+    for i in ids:
+        f = con.execute("select estado, quien, video_slug, accion from revision"
+                        " where id = ?", (int(i),)).fetchone()
+        if not f:
+            print(f"  nota {i}: no está en la tabla")
+            continue
+        if f["estado"] == "en curso" and (f["quien"] or "") != quien:
+            print(f"  ojo: la nota {i} ya la tiene «{f['quien']}»")
+        con.execute("update revision set estado = 'en curso', quien = ?,"
+                    " tomado = ? where id = ?", (quien, ahora, int(i)))
+        print(f"  nota {i} ({f['video_slug']} · {f['accion']}):"
+              f" {f['estado']} → en curso · {quien}")
+    con.commit()
+    con.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ver", action="store_true")
@@ -487,15 +591,36 @@ def main():
                     help="slug accion desde hasta «texto»; en desde/hasta vale"
                          " `-`, un segundo o el ANCLA, que es lo que sobrevive"
                          " a re-montar")
+    ap.add_argument("--tomar", nargs="+", type=int, metavar="ID",
+                    help="pasa esas notas a «en curso»; exige --quien")
+    ap.add_argument("--quien", help="quién toma la nota")
     ap.add_argument("--cerrar", nargs="+", type=int, metavar="ID",
                     help="cierra esas notas (las que no son un tramo)")
     ap.add_argument("--como", default="aplicada", choices=CIERRES,
                     help="con qué se cierran; automatizada exige --regla")
     ap.add_argument("--regla", default=None,
                     help="la versión general: dónde vive ahora, en código")
+    ap.add_argument("--reabrir", nargs="+", type=int, metavar="ID",
+                    help="devuelve a pendiente una nota que un paso cerró sin"
+                         " atenderla; exige --por-que")
+    ap.add_argument("--por-que", dest="por_que", default=None,
+                    help="por qué vuelve a estar pendiente")
     ap.add_argument("reels", nargs="*", type=int)
     a = ap.parse_args()
 
+    if a.reabrir:
+        if not (a.por_que or "").strip():
+            raise SystemExit("--reabrir sin --por-que: una nota que vuelve a"
+                             " pendiente sin decir por qué es indistinguible de"
+                             " una que nunca se cerró")
+        reabrir(a.reabrir, a.por_que)
+        return
+    if a.tomar:
+        if not (a.quien or "").strip():
+            raise SystemExit("--tomar exige --quien: un tiquet en curso sin"
+                             " dueño no es un estado, es una etiqueta")
+        tomar(a.tomar, a.quien.strip())
+        return 0
     if a.cerrar:
         cerrar(a.cerrar, a.como, a.regla)
         return

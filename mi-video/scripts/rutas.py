@@ -34,6 +34,12 @@ TEMPORAL = _barras(_de_arg("tmp") or os.environ.get("VIDEO_TMP")
                    or _cfg.get("temporal", "tmp"))
 os.makedirs(TEMPORAL, exist_ok=True)
 TRABAJO = _cfg.get("trabajo", "work")
+#: Donde se dejan las voces para limpiar y de donde se recogen. Va en F:
+#: porque es la memoria de trabajo; G: guarda solo lo final. `RECOGER`
+#: incluye ademas las carpetas donde el pueda haber dejado algo ya.
+LIMPIAR = _barras(_cfg.get("limpiar", "F:/Edicion de video/Audio para limpiar"))
+RECOGER = [LIMPIAR, "out/audio-puro",
+           "G:/My Drive/Creación de videos/Audio para limpiar"]
 PUBLICO = _cfg.get("publico", "public")
 FUENTES = _cfg.get("fuentes", {})
 TOMAS = _cfg.get("tomas", {})

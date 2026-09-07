@@ -53,8 +53,19 @@ const NO_ES_TEXTO = new Set([
   "condicion_completa", "numerada", "ventana",
 ]);
 
-/** Lo que se dice al pie: fuente y condición, que son cumplimiento. */
-const AL_PIE = new Set(["source", "fuente", "condicion", "condition", "legal"]);
+/**
+ * **Lo que se dice al pie, y que este tablero ya no dibuja.**
+ *
+ * Fuente y condición son cumplimiento, pero desde la instrucción de Jaime del
+ * 6-9-2026 van **fuera de la zona segura y en una línea**, así que las monta
+ * `dibujaTablero` con `PieTablero` para las 24 láminas. Aquí sólo hay que
+ * saber cuáles son para **no rotularlas como copy**: `TableroDeclarado` pinta
+ * lo que no reconoce, y sin esta lista una nota de método de cien palabras
+ * entraba en el cuerpo del tablero.
+ */
+const AL_PIE = new Set([
+  "pie", "source", "fuente", "condicion", "condition", "limitation", "legal",
+]);
 
 export type Linea = {
   texto: string;
@@ -64,7 +75,7 @@ export type Linea = {
   oro: boolean;
 };
 
-export type Declarado = { cuerpo: Linea[]; pie: string[] };
+export type Declarado = { cuerpo: Linea[] };
 
 /** Aplana un valor declarado a las líneas de texto que lleva dentro. */
 export const aLineas = (v: unknown, prof = 0): string[] => {
@@ -98,7 +109,6 @@ const esFila = (v: unknown): v is { etiqueta?: string; texto: string } =>
 
 export const leerDeclarado = (props: Record<string, unknown>): Declarado => {
   const cuerpo: Linea[] = [];
-  const pie: string[] = [];
   const quiereOro = String(props.oro ?? "").toLowerCase();
 
   const mete = (texto: string, etiqueta?: string) => {
@@ -107,10 +117,7 @@ export const leerDeclarado = (props: Record<string, unknown>): Declarado => {
   };
 
   for (const [k, v] of Object.entries(props)) {
-    if (AL_PIE.has(k)) {
-      pie.push(...aLineas(v));
-      continue;
-    }
+    if (AL_PIE.has(k)) continue;
     if (Array.isArray(v) && v.some(esFila)) {
       for (const f of v) if (esFila(f)) mete(f.texto.trim(), f.etiqueta?.trim());
       continue;
@@ -144,21 +151,51 @@ export const leerDeclarado = (props: Record<string, unknown>): Declarado => {
   // que aparezca el dato. Sin esta salida, el respaldo doraba la primera ficha
   // y el tablero decía «mira aquí» donde el diseño dijo que no.
   //
-  // **Y un `oro` declarado que no aparece deja el tablero sin oro.** El respaldo
+  // **Y un `oro` declarado que no aparece NO se resuelve solo.** El respaldo
   // —dorar la primera línea corta— es para el que no declaró nada. Con él
   // corriendo siempre, el `oro: "fecha"` de reel-05 e9 no encontraba ninguna
   // fecha —el diseño no la escribe: la fecha se deriva (C-184)— y el oro caía
   // sobre «EN ESPAÑOL», que es oro decorativo, prohibido por nombre en el canon.
-  // Si lo que hay que mirar no está en pantalla, no hay nada que mirar.
+  //
+  // Quitar el respaldo arregló eso y abrió el fallo por el otro lado: la lámina
+  // salía **sin un solo acento**. Ahora no se elige por él ni se calla — se
+  // lanza. Ver el bloque de abajo.
   const iOro = (() => {
     if (props.oro === false || quiereOro === "ninguno") return -1;
     if (quiereOro) {
-      return unicas.findIndex((l) =>
+      const i = unicas.findIndex((l) =>
         limpio(l.texto).includes(limpio(quiereOro).slice(0, 14)));
+      /**
+       * **Un `oro` que no apunta a ninguna línea deja el tablero sin acento, y
+       * eso falla el render.**
+       *
+       * Hasta aquí caía en silencio —«si lo que hay que mirar no está en
+       * pantalla, no hay nada que mirar»—, y el silencio produjo la lámina de
+       * reel-05 e9: `oro: "fecha"` contra una única línea que decía «EN
+       * ESPAÑOL», o sea **cero acentos** en una tarjeta de tres datos. El canon
+       * lo dice por los dos lados: *«si en un tablero hay tres cosas en oro, dos
+       * sobran»* y *«un tablero sin acento incumple la regla por el otro lado,
+       * porque el ojo entra por donde puede»*.
+       *
+       * No hay respaldo a propósito: dorar la primera línea corta sería el
+       * código eligiendo qué demuestra la lámina, que es editorial. Quien
+       * compone escribe el texto exacto, o escribe `oro: false` —que es una
+       * declaración y sigue pasando—.
+       */
+      if (i < 0 && unicas.length) {
+        throw new Error(
+          `Tablero declarado: \`oro: "${String(props.oro)}"\` no casa con ` +
+            `ninguna de sus líneas (${unicas.map((l) => `«${l.texto}»`).join(", ")}), ` +
+            `así que la lámina saldría sin un solo acento. El oro apunta al ` +
+            `TEXTO exacto de la línea que el tablero demuestra; si esta lámina ` +
+            `no tiene nada que señalar, decláralo \`oro: false\`.`,
+        );
+      }
+      return i;
     }
     return unicas.findIndex((l) => l.grande);
   })();
   if (iOro >= 0) unicas[iOro].oro = true;
 
-  return { cuerpo: unicas, pie };
+  return { cuerpo: unicas };
 };

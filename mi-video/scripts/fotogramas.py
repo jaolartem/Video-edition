@@ -85,6 +85,52 @@ def cuando(escena, cuantos=CUANTOS):
     return [a + (b - a) * k / (cuantos - 1) for k in range(cuantos)]
 
 
+def de_la_cinta(toma, desde, hasta, cuantos=CUANTOS, etiqueta=""):
+    """Cinco fotogramas de un tramo de CINTA, para verlo antes de elegirlo.
+
+    Jaime, despues de que la deteccion por texto fallara: *«no, esos ojos no
+    sirven, ya han fallado. Que tome cinco fotogramas repartidos por toda la
+    escena y mire la foto»*.
+
+    La diferencia con `sacar()` es cuando: aquella saca del render —lo que ya
+    salio— y esta saca de la cinta, **antes de elegir**. El que compone escoge
+    entre tomas que todavia no existen como montaje, asi que la unica manera de
+    que vea si esta leyendo es enseñarle el bruto en esos segundos.
+
+    Y por que la foto y no la medida: leer se ve —los ojos bajan— y no se
+    deduce. La literalidad del texto decia que si lo hacia, y fallo: una toma
+    puede repetir el libreto de memoria y otra improvisar leyendo a ratos.
+    """
+    import rutas
+
+    # `rutas.cinta()` sabe resolver los dos casos: la cinta suelta y la carpeta
+    # con angulos, donde el principal es el primero por orden alfabetico. No se
+    # arma la ruta aqui: es la clase de literal que este proyecto cobra caro.
+    mp4 = rutas.cinta(toma)
+    if not mp4 or not os.path.exists(mp4):
+        return []
+    fuera = os.path.join("work", "fotogramas", "cinta", toma)
+    os.makedirs(fuera, exist_ok=True)
+    dura = max(0.0, hasta - desde)
+    if dura <= 0:
+        return []
+    borde = dura * MARGEN
+    a, b = desde + borde, hasta - borde
+    if b <= a:
+        a = b = (desde + hasta) / 2
+    tiros = []
+    for k in range(cuantos):
+        t = a if cuantos < 2 else a + (b - a) * k / (cuantos - 1)
+        jpg = os.path.join(fuera, f"{etiqueta or 'x'}-{t:.1f}.jpg")
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.3f}", "-i", mp4,
+             "-frames:v", "1", "-q:v", "4", "-vf", "scale=640:-2", jpg],
+            capture_output=True)
+        if r.returncode == 0 and os.path.exists(jpg):
+            tiros.append({"en": round(t, 2), "fichero": jpg.replace("\\", "/")})
+    return tiros
+
+
 def sacar(n, cuantos=CUANTOS):
     """Deja los fotogramas en disco y devuelve qué sacó, escena por escena."""
     slug = f"reel-{n:02d}"

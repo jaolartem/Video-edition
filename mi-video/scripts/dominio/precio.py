@@ -78,6 +78,11 @@ def vigente(fecha=None):
     `vale` viene escrito —«$20 hasta el 4 sep · luego $30 y $40»— porque quien lo
     consume lo rotula, y un rótulo compuesto en dos sitios se separa en cuanto
     uno cambia.
+
+    Y `escalones` es esa misma línea **partida en peldaños**, para el tablero que
+    los enseña uno debajo de otro en vez de en un renglón. Se redacta aquí y no
+    allí por lo mismo que `vale`: dos formas de escribir el mismo escalón son dos
+    escalones en cuanto alguien toque una. Ver `scripts/reels/tableros.mjs`.
     """
     hoy = fecha or datetime.datetime.now().isoformat(timespec="seconds")
     con = basedatos.abrir()
@@ -90,8 +95,12 @@ def vigente(fecha=None):
         return None
     luego = [f["importe"] for f in filas if f["hasta"] > escalon["hasta"]]
     d = escalon["hasta"][:10].split("-")
-    vale = f"${escalon['importe']} hasta el {int(d[2])} {MESES[int(d[1]) - 1]}"
+    escalones = [f"${escalon['importe']} hasta el {int(d[2])} {MESES[int(d[1]) - 1]}"]
     if luego:
-        vale += " · luego " + " y ".join(f"${x}" for x in luego)
+        escalones.append("luego " + " y ".join(f"${x}" for x in luego))
+    # **`vale` se compone de los peldaños, no al revés.** Escritos por separado
+    # serían dos redacciones del mismo escalón, que es como se separan dos
+    # rótulos del mismo dato.
+    vale = " · ".join(escalones)
     return {"importe": escalon["importe"], "hasta": escalon["hasta"],
-            "vale": vale, "luego": luego}
+            "vale": vale, "luego": luego, "escalones": escalones}

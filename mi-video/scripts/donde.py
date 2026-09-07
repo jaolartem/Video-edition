@@ -82,7 +82,12 @@ def estado(slug):
         "aprobada": ap["veredicto"] if ap else None,
         "audio_virgen": bool(au and au["virgen"]),
         "audio_limpio": bool(au and au["limpio"]),
-        "audio_integrado": bool(au and au["integrado"]),
+        # **Y se compara, no se pregunta por la verdad del valor.** La columna
+        # tiene afinidad TEXT, asi que un `0` vuelve como `"0"` y `bool("0")` es
+        # cierto: esta fila decia «integrado» aunque el paso que la escribe
+        # hubiera medido que no. O sea que arreglar quien mide no bastaba —
+        # quien lee no podia ver la diferencia.
+        "audio_integrado": bool(au) and str(au["integrado"] or "0") == "1",
         "publicada": pu["destino"] if pu else None,
         "cortes_pendientes": pend,
         "pedidos_ia": [p for p, sl, _ in servicio.pendientes() if sl == slug],
@@ -101,8 +106,12 @@ def main():
         if not e:
             continue
         corte = "al dia" if e["al_dia"] else "CAMBIO"
+        # **«Sin integrar» se dice con las palabras que tiene.** Hay una
+        # devolucion de Adobe y no entro en la mezcla: eso no es un paso
+        # pendiente, es que lo entregado suena crudo. Con la etiqueta blanda la
+        # fila se leia como «ya llegara» — y asi salieron cinco de siete.
         audio = ("integrado" if e["audio_integrado"]
-                 else "limpio, sin integrar" if e["audio_limpio"]
+                 else "CRUDA: stem no cuadra" if e["audio_limpio"]
                  else "virgen entregado" if e["audio_virgen"]
                  else "—")
         pend = []

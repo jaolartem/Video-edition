@@ -95,6 +95,26 @@ DISENO = Contrato(
     ),
     campos=(
         # ── el encargo, que viene del paso anterior ──────────────────────────
+        # **La intencion del gancho es un campo del contrato, no una nota.**
+        #
+        # Jaime: *«con el hook dejalo en el contrato: ese segmento del video
+        # tiene esa intencion, tanto en composicion como en diseno»*. O sea que
+        # no es una preferencia que se recuerda al componer — es lo que ese
+        # tramo ESTA PARA HACER, y sale exigido igual que el libreto.
+        #
+        # Y tiene numero detras: el objetivo es **10 dolares por adquisicion**,
+        # y en trafico frio un webinar de bajo ticket cuesta entre 15 y 50. A 10
+        # solo se llega si el creativo hace la mitad del trabajo — o sea si el
+        # gancho para el scroll. No es ambicion estetica, es la aritmetica de la
+        # campana.
+        Campo("intencion_del_gancho",
+              manda=Aguja("scripts/servicios/disenar.py", "ENTRADA_GANCHO = {"),
+              exige=(Prompt("scripts/disenar.prompt.md", "parar el scroll"),),
+              nota="Jaime: «que todos los hooks se revisen y se hagan animados"
+                   " de verdad, que paren scroll». El gancho no compite contra"
+                   " otro video, compite contra el pulgar, y pierde en tres"
+                   " segundos. «De verdad» excluye lo que hay hoy: una entrada"
+                   " de opacidad, un texto que aparece, una placa que cruza."),
         Campo("encargo",
               manda=Aguja("scripts/servicios/disenar.py", '"encargo": f["grafico"],'),
               exige=(Prompt("scripts/disenar.prompt.md", "el encargo no se reinterpreta"),),
@@ -188,14 +208,21 @@ DISENO = Contrato(
                    " diseñador miraba. Jaime tuvo que mirarlo por él."),
         Campo("figuras",
               manda=Aguja("scripts/servicios/disenar.py", '"figuras": figuras_que_se_trazan(),'),
-              exige=(Prompt("scripts/disenar.prompt.md", "descrita con tus palabras no se dibuja"),),
-              nota="Los diez nombres que `Pictograma` sabe trazar, leídos de"
-                   " `escena.mjs`. Sin esto el diseñador escribe la figura en"
-                   " prosa —«dos caminos: quien usa la estructura y quien no»— y"
-                   " la escena **se monta sin figura y sin aviso** hasta el final"
-                   " de la corrida. Pasó tres veces en la última pasada. La"
-                   " lista existía desde el principio y el pedido no la"
-                   " llevaba: no se elige de un catálogo que no se ve."),
+              exige=(Prompt("scripts/disenar.prompt.md", "La biblioteca está cerrada"),),
+              nota="Los nombres que `Pictograma` sabe trazar, leídos de"
+                   " `escena.mjs`. Sin esto el diseñador la escribe en prosa y"
+                   " la escena **se monta sin figura y sin aviso**: pasó tres"
+                   " veces. Y desde el 6-9-2026 **la lista puede venir vacía**"
+                   " —la biblioteca está cerrada—, y el pedido tiene que"
+                   " DECIRLO: vacía y sin explicar se lee como un fallo."),
+        Campo("volumenes",
+              manda=Aguja("scripts/servicios/disenar.py", '"volumenes": volumenes_que_se_animan(),'),
+              exige=(Prompt("scripts/disenar.prompt.md", "no declares `props.figura` ni `props.volumen`"),),
+              nota="Las animaciones de panel de `src/brand/volumenes.json`, hoy"
+                   " vacías: la biblioteca se cerró el 6-9-2026. Y el prompt"
+                   " seguía pidiendo `props.volumen` **mientras la puerta"
+                   " paraba la pieza por declararlo**: la máquina mandaba una"
+                   " cosa y comprobaba la contraria."),
         Campo("ya_en_pantalla",
               manda=Aguja("scripts/servicios/disenar.py", '"ya_en_pantalla": hay.get(int(f["etapa_orden"]),'),
               exige=(Prompt("scripts/disenar.prompt.md", "el material B sobre una línea A cerrada"),),
@@ -269,8 +296,20 @@ DISENO = Contrato(
                    " la cara.\n\n"
                    "                   `cc` es la opción por defecto del resto, no"
                    " un hueco: el subtítulo dinámico ya lleva la idea."),
+        Clave("tablero.volumen",
+              dispara=(Aguja("scripts/reels/paneles.mjs", "export function faltaDelPanel(p) {"),
+                       Aguja("src/components/SidePanel.tsx",
+                             "<Escena3D nombre={volumen} lado={ladoVolumen ?? lado} hueco={hueco} />"),),
+              efecto="la animación del panel: qué se mueve y con qué luz",
+              obligatoria=True,
+              nota="**Obligatoria cuando `cubre` es `panel`**; la banda queda"
+                   " fuera. Jaime: *«las animaciones de bolitas y palitos y ultra"
+                   " sencillas se acaban, quitan más de lo que dan; ahora sólo"
+                   " complejas, con luz o movimiento, ojalá 3D, y en consonancia"
+                   " con la idea del panel»*. Lo que la hace cumplible es que ya"
+                   " hay dónde elegir y quién mire: `faltaDelPanel` para."),
         Clave("tablero.props",
-              dispara=(Aguja("scripts/reels-spec.mjs", "...pieDe(slug, b.beat, b.props)"),
+              dispara=(Aguja("scripts/reels-spec.mjs", "props: pieDe(slug, b, faltas)"),
                        Aguja("scripts/escena.mjs", "export const copyDeclarado = (desc) => {"),),
               efecto="el copy que sale en pantalla, incluido el del gancho"
                      " tipográfico",
@@ -308,7 +347,12 @@ DISENO = Contrato(
                    " revés: prohibido inventarle sonido a un movimiento que la"
                    " escena no describió."),
         Clave("plano",
-              dispara=(Aguja("scripts/gancho.mjs", "const tipo = esTipografico(desc?.grafico);"),),
+              # Apuntaba a la rama tipográfica del gancho, que era un proxy
+              # flojo: aquella miraba `grafico`, no `plano`. Desde que el gancho
+              # coloca su rótulo DESDE la coronilla que midió la pasada del
+              # recorte, «dónde cae respecto a la cara» tiene un consumidor
+              # literal, y es éste.
+              dispara=(Aguja("scripts/reels/rotulo.mjs", "export function colocar("),),
               efecto="dónde cae el gráfico respecto a la cara",
               lista=("en cuadro", "cerrado", "fuera"),
               nota="Es lo que decide si él sale en pantalla en ese beat, así que"
@@ -317,12 +361,12 @@ DISENO = Contrato(
         *VOZ,
         *LO_DICHO,
         Clave("tablero.fuente",
-              dispara=(Aguja("scripts/reels/base.mjs", "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d"),),
-              efecto="el pie del tablero cuando rotula una cifra",
-              sin_valor="sin cifra",
-              nota="Cumplimiento: una cifra en pantalla sin fila en `dato` la para"
-                   " la puerta. `sin_valor` distingue «no lleva cifra» de «lleva y"
-                   " no dijo de dónde sale»."),
+              dispara=(Aguja("scripts/servicios/disenar.py", '"pie": t["fuente"]'),
+                       Aguja("scripts/reels/puerta.mjs", "sinRespaldo(slug,"),),
+              efecto="LA LÍNEA DEL PIE en pantalla", sin_valor="sin cifra",
+              nota="**Ya no es un rótulo: es el texto que se dibuja** — fuera de"
+                   " la zona segura, una línea, mono, afirmativo, tope 97 en"
+                   " `src/brand/pie.json`; pasarse no abrevia: sale falta."),
         # ── nivel PIEZA: lo que sólo se ve mirándolos todos ──────────────────
         Clave("pieza.alternancia",
               dispara=(Aguja("scripts/reels/capas.mjs", "export function repartirPorCubre(declarados) {",

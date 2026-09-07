@@ -2,6 +2,7 @@ import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { Marco } from "./Canon";
 import { Fondo, Cinta } from "./Fondo";
+import { Remate } from "./Remate";
 import type { Recorte } from "./Fondo";
 import { fontFamily } from "./../brand/fonts";
 import { assertShort } from "../brand/copy";
@@ -68,7 +69,6 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
   verdad,
   placa,
   recorte = "cuna",
-  condicion,
   duracion,
 }) => {
   const frame = useCurrentFrame();
@@ -152,25 +152,17 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
           transform: `translateY(${((1 - pVerdad) * 22).toFixed(1)}px)`,
         }}
       >
-        <Cinta tinte={color.gold} giro={1.9} cuerpo={68}>
+        {/* **`acento` porque aquí no hay otro oro.** Dos bloques planos y la
+            conclusión: si ésta va en claro, el tablero se queda sin sitio por
+            donde entrar. La regla es un acento, no ninguno. Ver `Remate.tsx`. */}
+        <Remate acento giro={1.9} cuerpo={68}>
           <span style={{ fontFamily: fontFamily.bloque }}>{verdad}</span>
-        </Cinta>
+        </Remate>
       </div>
 
-      {condicion ? (
-        <div
-          style={{
-            marginTop: 20,
-            opacity: entra(tVerdad + duration.standard),
-            color: color.secondaryBlue,
-            fontFamily: fontFamily.video,
-            fontSize: 26,
-            lineHeight: 1.25,
-          }}
-        >
-          {condicion}
-        </div>
-      ) : null}
+      {/* **La condición ya no se rotula dentro.** Va al pie, fuera de la zona
+          segura y en una línea: la monta `dibujaTablero`. Ver
+          `PieTablero.tsx`. */}
     </Marco>
   );
 };

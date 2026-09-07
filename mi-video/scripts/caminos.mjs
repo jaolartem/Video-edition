@@ -42,10 +42,18 @@
  * La superficie pública no se movió: lo que `reels-spec.mjs` importaba de aquí
  * se sigue importando de aquí.
  */
+import { cerrada } from "./biblioteca.mjs";
 import { FPS, sonar } from "./capa.mjs";
 import { desaturaDe, dibujable, donde, figuraDe, rotuloDe, sonidoDe }
   from "./escena.mjs";
 import { portada } from "./gancho.mjs";
+
+/**
+ * **¿Está cerrada la biblioteca de figuras?** La pregunta la contesta
+ * `biblioteca.mjs`, que es el único sitio que lee el JSON. Aquí decide qué se le
+ * puede exigir a una metáfora.
+ */
+const FIGURA_CERRADA = cerrada("figuras.json");
 
 export { GANCHO_S, GANCHO_CLAVE_S } from "./gancho.mjs";
 export { copyDeclarado, esTipografico, faltasDeclaradas, figuraDe, rotuloDe,
@@ -210,20 +218,42 @@ export const CAMINOS = {
       //
       // Es C-168 por la puerta contraria: allí una figura equivocada se aprobaba
       // porque nadie la miraba; aquí se exigía una figura que nadie iba a ver.
-      const cubre = ctx.desc?.tablero
+      const props = ctx.desc?.tablero
         ? (JSON.parse(
             typeof ctx.desc.tablero === "string"
               ? ctx.desc.tablero
               : JSON.stringify(ctx.desc.tablero),
-          )?.props?.cubre ?? "pleno")
+          )?.props ?? {})
         : null;
-      if (cubre === "pleno") return [];
-      return capas.some((c) => c.tipo === "figura")
-        ? []
-        : [
-            `el beat ${ctx.det.beat} va por metáfora y no hay figura que dibujar:` +
-              ` «${ctx.desc?.grafico ?? "sin descripción"}»`,
-          ];
+      if ((props?.cubre ?? (props ? "pleno" : null)) === "pleno") return [];
+      // **Y un panel con volumen tampoco necesita figura: ES la metáfora.**
+      // Jaime acabó con los pictogramas de palitos en los paneles (C-254) y el
+      // `Volumen` los sustituye: seguir pidiendo figura aquí sería exigir justo
+      // lo que se retiró, y la falta mandaría a reponer los palitos.
+      if (props?.volumen) return [];
+      // **Y con la biblioteca de figuras CERRADA, el tablero compuesto ES la
+      // metáfora.** Jaime, 6-9-2026: *«hasta que no tengamos una biblioteca de
+      // figuras decentes no las vamos a utilizar. Gráficos y palabras, como
+      // tablero de clase, por el momento»*.
+      //
+      // Es la otra mitad de la inversión que `reels/paneles.mjs` hizo ese mismo
+      // día, y sin ella la etapa no se podía montar ni haciéndolo bien ni
+      // haciéndolo mal: allí un `volumen` declarado pasó a ser lo que PARA la
+      // pieza, y aquí se seguía exigiendo una figura dibujada — o sea que la
+      // falta mandaba a reponer exactamente lo que se acababa de retirar.
+      //
+      // Lo que la exigencia protegía —que una metáfora no se quede en nada—
+      // sigue en pie: se excusa el beat que trae tablero compuesto, no el que
+      // no trae nada.
+      if (FIGURA_CERRADA && props) return [];
+      if (capas.some((c) => c.tipo === "figura")) return [];
+      return [
+        `el beat ${ctx.det.beat} va por metáfora y no lleva nada compuesto que` +
+          ` lo diga —${FIGURA_CERRADA
+            ? "con la biblioteca cerrada, un gráfico de datos o tipografía"
+            : "una figura dibujable"}—:` +
+          ` «${ctx.desc?.grafico ?? "sin descripción"}»`,
+      ];
     },
   },
 

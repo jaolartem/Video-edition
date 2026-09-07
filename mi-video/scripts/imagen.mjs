@@ -96,6 +96,53 @@ export const viradoDe = (nombre) => {
   return v ? { virado: nombre, css: v.css } : null;
 };
 
+/**
+ * **El tratamiento del RECORTE**, que no es el virado del plano.
+ *
+ * Es la tercera cosa que se le hace a la imagen y vive aquí por lo mismo que las
+ * otras dos: el nombre y el filtro se declaran juntos o se separan el día que
+ * alguien añada uno. Lo consume `src/components/Recorte.tsx`, que le pone encima
+ * los doce escalones.
+ *
+ * **Y no se elige a mano.** Jaime, fijando el grado de libertad: *«en color o en
+ * sepia, depende de la composición, del arco emocional y del arco narrativo»* —
+ * del arco, que ya vive en `escena_desc.color`. Por eso la entrada es ese campo
+ * y no un nombre de tratamiento.
+ *
+ * El blanco y negro **sí es elegible aquí**, al revés que en `NO_ENTRAN`: allí
+ * está prohibido sobre el PLANO porque es la marca de humanidad y tendría dos
+ * fuentes. Sobre el recorte es lo contrario — es el valor por defecto del tipo,
+ * *«todo el color lo llevan las formas»* — y no colisiona con nada: la marca
+ * tiñe el plano, esto tiñe una figura recortada dentro de un tablero.
+ */
+export const TRATOS = {
+  bn: {
+    de: "dejar",
+    que: "blanco y negro. Es el valor por defecto del panel con él dentro: el"
+      + " color lo llevan las formas y él es material del collage",
+    css: "grayscale(1) contrast(1.06)",
+  },
+  color: {
+    de: "avivar",
+    que: "se queda en color, un punto por encima. Para la etapa que abre, la"
+      + " que promete o la que devuelve algo",
+    css: "saturate(1.08) contrast(1.04)",
+  },
+  sepia: {
+    de: "apagar",
+    que: "cálido apagado, el mismo del virado `sepia`. Para la etapa que"
+      + " retira, la que pesa o la que habla de lo que ya pasó",
+    css: VIRADOS.sepia.css,
+  },
+};
+
+/** El tratamiento del recorte, resuelto desde `escena_desc.color`. */
+export const tratoDelSujeto = (color) => {
+  const nombre =
+    Object.keys(TRATOS).find((k) => TRATOS[k].de === color) ?? "bn";
+  return { tratamiento: nombre, css: TRATOS[nombre].css };
+};
+
 /** El bloque del menú, para que `camara.mjs` lo empalme sin repetirlo. */
 export const bloqueVirado = () => ({
   que: "un tratamiento de color sobre el PLANO de esa etapa. No es una capa"
@@ -109,6 +156,43 @@ export const bloqueVirado = () => ({
     + " pediste.",
   si_no_dices: "el plano sale como se grabó, que es lo normal y lo que se"
     + " espera de una etapa que no necesita comentario",
+});
+
+/**
+ * **Lo que pasa POR DETRÁS de él**, la tercera familia de esta caja.
+ *
+ * Jaime: *«y ojalá jueguen con mi cara, es decir que se pasen por arriba, por
+ * abajo, que se escondan detrás»*. Es tratamiento de la imagen igual que el
+ * virado: el sujeto se recorta del propio plano y se vuelve a apilar delante,
+ * así que lo que cambia es la imagen, no una capa puesta encima.
+ */
+export const DETRAS = {
+  columna: {
+    que: "una columna de bloques planos que sube desde la altura del pecho hasta"
+      + " por encima de su cabeza, escalón a escalón, pasándole POR DETRÁS del"
+      + " hombro y del pelo. El último aterriza más alto que él y se enciende en"
+      + " oro, con un barrido de luz de borde duro que recorre la columna",
+    para: "la etapa donde algo CRECE por encima de quien lo mira: una cuenta que"
+      + " sube, una carga que se acumula, un año que se repite. El movimiento"
+      + " apila porque el beat apila",
+  },
+};
+
+/** El bloque del menú, igual que `bloqueVirado`: `camara.mjs` lo empalma. */
+export const bloqueDetras = () => ({
+  que: "qué ELEMENTO cruza por detrás de él en esa etapa. El sujeto se recorta"
+    + " con MediaPipe y se vuelve a apilar encima, así que el elemento queda"
+    + " entre el plano y su figura: se le esconde detrás del hombro y le sale"
+    + " por arriba.",
+  valores: Object.fromEntries(
+    Object.entries(DETRAS).map(([k, v]) => [k, `${v.que} — para ${v.para}`])),
+  el_limite: "Nunca copy. Se probó el TEXTO detrás y el sujeto tapaba la mayor"
+    + " parte: «el efecto se lucía a costa del mensaje». Lo que pasa por detrás"
+    + " es el elemento; el rótulo y el subtítulo siguen delante.",
+  lo_que_cuesta: "una pasada de MediaPipe sobre esa ventana del corte, ~6 s de"
+    + " CPU por segundo de etapa. Pídelo donde el movimiento DIGA lo que dice la"
+    + " etapa, no por tenerlo.",
+  si_no_dices: "nada por detrás, que es como han salido todas hasta hoy",
 });
 
 /**

@@ -6,6 +6,12 @@ mi-video/out/
 mi-video/public/*.mp4
 mi-video/public/musica/
 mi-video/public/sfx/
+# Los recortes son 47 MB de webm que `text-behind.py` saca del bruto cada vez
+# que cambia el encuadre. Faltaban en esta lista y por eso entraban: pesan como
+# el material y se regeneran como el material.
+mi-video/public/recorte/
+# Y las tomas de voz sin limpiar, 52 MB: material de entrada, no fuente.
+Audio para limpiar/
 mi-video/work/
 mi-video/node_modules/
 # El bytecode no es codigo fuente: 25 .pyc comprometidos hacian que un cambio

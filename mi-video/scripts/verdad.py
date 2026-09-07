@@ -90,15 +90,17 @@ VERDADES = (
               " caduca el 22 de septiembre al reutilizarse.",
     ),
     Verdad(
-        decision="Qué placas de fondo existen y qué dibuja cada una",
+        decision="Qué placas de fondo existen, qué dibuja cada una y cuál va en"
+                 " cada pieza",
         vive_en="`ads/fondos.json`",
-        lee=(Aguja("scripts/servicios/caja.py", "def placas_que_existen():"),
-             Aguja("scripts/reels/material.mjs", "const PLACAS = JSON.parse"),),
+        lee=(Aguja("scripts/servicios/caja.py", "def placas_que_existen(slug"),
+             Aguja("scripts/reels/material.mjs", "const PIEZAS = JSON.parse"),
+             Aguja("scripts/reels/fondo.mjs", "export function faltasDeFondo("),),
         prohibido=(),
         copia="Las tablas `placa` y `placa_etapa` son una IMPORTACIÓN del JSON"
-              " que hace `db.py` y **no las lee nadie**: 14 y 39 filas que se"
-              " regeneran solas y no alimentan ningún paso. Redundancia del"
-              " modelo, sin consumidor.",
+              " que hace `db.py` y **no las lee nadie**: 14 filas y una por"
+              " etapa que se regeneran solas y no alimentan ningún paso."
+              " Redundancia del modelo, sin consumidor.",
         costo="Las catorce placas llevaban semanas en el repositorio, con su"
               " `dice` y su `siente` escritos, y el pedido del diseñador no las"
               " mandaba: iban las 26 láminas del canon, que son para mirar, y"
@@ -107,7 +109,10 @@ VERDADES = (
               " `r1-mecanismo` —«un canal que lleva bloques hacia el punto de"
               " fuga y una derivación que se los lleva fuera del cuadro»—"
               " esperando. Jaime: *«no es reinventar la rueda, es seguir la"
-              " identidad gráfica»*.",
+              " identidad gráfica»*. Y el mapa era **por beat**, así que cada"
+              " tablero pedía la suya: R6 salió con cuatro placas, R2 y R5 con"
+              " tres, y sólo R7 con una. *«Es un FONDO de tablero por reel»* —"
+              " la asignación es de pieza y `fondo.mjs` para la que pinte dos.",
     ),
     Verdad(
         decision="El libreto de una pieza",
@@ -133,6 +138,29 @@ VERDADES = (
         costo="Cuatro entregas idénticas. La descripción de reel-01 e3 se"
               " reescribió a las 12:42 del 31 de agosto y el tablero seguía"
               " saliendo del literal: re-describir no cambiaba el vídeo.",
+    ),
+    Verdad(
+        decision="Cuánto separa la música de la voz",
+        vive_en="`src/brand/cama.json` — `por_defecto` es el nivel al que entra"
+                " la cama y `objetivo_db` la separación que ese nivel produce",
+        lee=(Aguja("scripts/cama.py", "def nivel(slug):"),
+             Aguja("scripts/musica.sh", "python scripts/cama.py --nivel"),
+             Aguja("scripts/remezclar.py",
+                   'OBJETIVO = float(cama.leer()["objetivo_db"])'),),
+        prohibido=(Aguja("scripts/remezclar.py", "OBJETIVO = 14.0"),
+                   Aguja("scripts/musica.sh",
+                         "json.load(open('src/brand/cama.json'"),),
+        copia="Ninguna. El mapa `piezas` está vacío a propósito: los siete"
+              " números por pieza se midieron sobre mezclas apiladas y se"
+              " tiraron (C-233). Si una obra vuelve a necesitar el suyo, se"
+              " anota ahí con su motivo.",
+        costo="`cama.json` declaraba `objetivo_db: 16` y **no lo leía nadie**:"
+              " `remezclar.py` llevaba 14 escrito a mano y `musica.sh` abría el"
+              " JSON con dos `python -c` propios. Corregir la separación en el"
+              " único sitio que el fichero anuncia como suyo no cambiaba la"
+              " mezcla — dos decibelios que existían sólo en el documento. Es"
+              " la avería del tablero (C-142) en el paso de audio: la decisión"
+              " escrita en un sitio y aplicada desde otro.",
     ),
     Verdad(
         decision="Cómo suena la voz en el remate de una etapa",
@@ -170,7 +198,7 @@ VERDADES = (
         decision="Una cifra que sale en pantalla",
         vive_en="tabla `dato`, con su fuente y su condición",
         lee=(Aguja("scripts/verificar.py", "y ninguna fila de"),
-             Aguja("scripts/reels/base.mjs", "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d"),),
+             Aguja("scripts/reels/cifras.mjs", "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d"),),
         copia="La descripción puede nombrarla en prosa, pero **no puede"
               " rotular un importe que `dato` no declare**: la puerta lo para.",
         costo="Jaime cerró $14.000 —«los 300 los quité porque complica las"
@@ -215,6 +243,23 @@ VERDADES = (
         costo="El umbral vivía sólo en `trato.py` y el que compone no lo veía:"
               " cinco tramos leídos salieron en cámara limpia, uno al 97% de"
               " secuencia literal.",
+    ),
+    Verdad(
+        decision="Con qué fondo se dibuja el subtítulo",
+        vive_en="`src/brand/cc.json` los umbrales y"
+                " `work/scenes/<slug>/trasfondo.json` la medida de cada escena",
+        lee=(Aguja("src/brand/cc.ts", 'import ccJson from "./cc.json"'),
+             Aguja("scripts/reels/cc.mjs", 'readFileSync("src/brand/cc.json"'),
+             Aguja("scripts/dominio/trasfondo.py", '"cc.json"'),
+             Aguja("scripts/reels/material.mjs", "export const trasfondoDe = (slug) => {"),),
+        prohibido=(Aguja("src/components/captionBand/Plana.tsx",
+                         "backgroundColor: color.richBlack"),),
+        copia="Ninguna. El componente no elige: recibe `trato` y pinta lo que"
+              " `pintaDelCc` diga. Y el negativo no es un color elegido — es"
+              " `difference`, que lo calcula contra lo de debajo.",
+        costo="El cuadro negro era el tratamiento único en las 142 escenas del"
+              " lote, escrito a pelo dentro de `Plana`: la zona de pantalla que"
+              " más tiempo está ocupada, resuelta sin componer (C-274).",
     ),
     Verdad(
         decision="Que una pieza esté montada",

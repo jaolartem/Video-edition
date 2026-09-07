@@ -5,9 +5,9 @@ import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
 import { color, layout, readingFrames, size, tracking } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
+import { Remate } from "./Remate";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
-import { PieTablero } from "./PieTablero";
 import { FileteFicha } from "./fichas/Ficha";
 
 /**
@@ -67,9 +67,6 @@ export const Fusion: React.FC<FusionProps> = ({
   expuesto,
   expone = [],
   veredicto,
-  fuente,
-  source,
-  condicion,
   placa,
   recorte = "lleno",
   sound = false,
@@ -86,7 +83,6 @@ export const Fusion: React.FC<FusionProps> = ({
   );
   const tVeredicto = (tsExpone[tsExpone.length - 1] ?? tFusion) + 34;
   const pFusion = entra(tFusion);
-  const pie = [source ?? fuente, condicion].filter(Boolean) as string[];
 
   const mitad = (texto: string, lado: "izq" | "der") => {
     const p = entra(tDos);
@@ -285,13 +281,18 @@ export const Fusion: React.FC<FusionProps> = ({
               fontFamily: fontFamily.bloque,
             }}
           >
-            <Cinta tinte={color.gold} giro={1.7} cuerpo={62}>
-              {veredicto}
-            </Cinta>
+            {/* **Un acento por tablero, y aquí es el bloque que se funde.**
+                Lo que este tablero demuestra es que cuatro cosas distintas
+                acaban siendo una sola, y eso lo dice el bloque al pasar a oro.
+                Con el veredicto también en oro son dos masas gritando a la vez.
+                Ver `Remate.tsx`. */}
+            <Remate giro={1.7} cuerpo={62}>{veredicto}</Remate>
           </div>
         ) : null}
 
-        <PieTablero lineas={pie} opacidad={entra(tVeredicto + 10)} />
+        {/* **El pie ya no lo dibuja cada forma.** Va fuera de la zona segura,
+            en una línea, y lo monta `dibujaTablero` para las 24 láminas del
+            lote. Ver `PieTablero.tsx`. */}
 
       </ZonaTablero>
     </AbsoluteFill>

@@ -23,6 +23,27 @@ COMPONE = Contrato(
               exige=(Prompt("scripts/describir.prompt.md", "el contexto es el video en general"),),
               nota="La unidad de la llamada es la pieza porque la segunda variable"
                    " —lo que la pieza necesita— no existe a nivel de etapa."),
+        # **La intencion del gancho es un campo del contrato, no una nota.**
+        #
+        # Jaime: *«con el hook dejalo en el contrato: ese segmento del video
+        # tiene esa intencion, tanto en composicion como en diseno»*. O sea que
+        # no es una preferencia que se recuerda al componer — es lo que ese
+        # tramo ESTA PARA HACER, y sale exigido igual que el libreto.
+        #
+        # Y tiene numero detras: el objetivo es **10 dolares por adquisicion**,
+        # y en trafico frio un webinar de bajo ticket cuesta entre 15 y 50. A 10
+        # solo se llega si el creativo hace la mitad del trabajo — o sea si el
+        # gancho para el scroll. No es ambicion estetica, es la aritmetica de la
+        # campana.
+        Campo("intencion_del_gancho",
+              manda=Aguja("scripts/describir-pedido.mjs",
+                          "es la PORTADA (el gancho)"),
+              exige=(Prompt("scripts/describir.prompt.md", "parar el scroll"),),
+              nota="Jaime: «que todos los hooks se revisen y se hagan animados"
+                   " de verdad, que paren scroll». El gancho no compite contra"
+                   " otro video, compite contra el pulgar, y pierde en tres"
+                   " segundos. «De verdad» excluye lo que hay hoy: una entrada"
+                   " de opacidad, un texto que aparece, una placa que cruza."),
         Campo("portada",
               manda=Aguja("scripts/describir-pedido.mjs", 'portada = edl.detalle?.find((d) => d.trato === "portada")?.beat'),
               exige=(Prompt("scripts/describir.prompt.md", "el gancho"),),

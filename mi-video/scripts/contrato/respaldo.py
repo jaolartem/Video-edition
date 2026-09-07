@@ -80,7 +80,7 @@ RESPALDO = Contrato(
     ),
     claves=(
         Clave("etapa",
-              dispara=(Aguja("scripts/reels/base.mjs", "d.etapa_orden = ?"),),
+              dispara=(Aguja("scripts/reels/cifras.mjs", "where v.slug = ? and d.etapa_orden = ?"),),
               efecto="engancha el pie al beat",
               obligatoria=True,
               nota="Si falta o no es número entra como 0: la fila se guarda, no"
@@ -93,8 +93,8 @@ RESPALDO = Contrato(
                    " del bucle y se pierde la carga entera porque el commit es al"
                    " final."),
         Clave("principal",
-              dispara=(Aguja("scripts/reels/base.mjs",
-                             "const suya = filas.find((x) => {"),),
+              dispara=(Aguja("scripts/reels/cifras.mjs",
+                             "const casan = filas.filter((f) => f.tokens.some((t) => pintadas.includes(t)));"),),
               efecto="cuál de las cifras de la etapa lleva el pie del tablero",
               nota="**La deuda que declaraba esta clave está pagada.** Decía"
                    " «ordenar por `principal` y no por longitud de la cadena», y"
@@ -106,18 +106,18 @@ RESPALDO = Contrato(
                    " puede saber manda la que más necesita el pie: una proyección"
                    " (`respalda='parcial'`) tiene condiciones que hay que decir."),
         Clave("fuente",
-              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {"),),
+              dispara=(Aguja("scripts/reels/cifras.mjs", "export function pieDe(slug, b, faltas) {"),),
               efecto="el pie del tablero en pantalla, sólo si `respalda='si'`",
               nota="El upsert es por `rotulo` UNIQUE: dos fuentes distintas con el"
                    " mismo rótulo se funden en una fila."),
         Clave("condiciones",
-              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {"),),
+              dispara=(Aguja("scripts/reels/cifras.mjs", "export function pieDe(slug, b, faltas) {"),),
               efecto="`props.condicion` del tablero",
               nota="Prosa larga de comprobación entrando directa a un pie: en la"
                    " base hay `condiciones` de 400+ caracteres. O se corta aquí"
                    " con su límite declarado, o llega a pantalla."),
         Clave("respalda",
-              dispara=(Aguja("scripts/reels/base.mjs", "d.respalda in ('si','parcial')"),
+              dispara=(Aguja("scripts/reels/cifras.mjs", '.filter((f) => f.respalda === "si" || f.respalda === "parcial")'),
                        Aguja("scripts/fuentes.py", "def sin_respaldo(slug):")),
               efecto="enciende el pie y alimenta el listado de sin respaldo",
               obligatoria=True,
@@ -130,7 +130,7 @@ RESPALDO = Contrato(
                    " escrito a mano sin que nadie lo vea. Por eso `respalda`"
                    " exige `sube`."),
         Clave("marcar_como",
-              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {",
+              dispara=(Aguja("scripts/reels/cifras.mjs", "export function pieDe(slug, b, faltas) {",
                              pendiente="rotular HIPOTÉTICO / EJEMPLO en el tablero"
                                        " cuando el caso no está documentado"),),
               efecto="marca el caso en pantalla",
@@ -146,7 +146,7 @@ RESPALDO = Contrato(
                    " tarifa de gestión anual. La cifra se sostiene y el rótulo"
                    " miente, y no había clave para decirlo."),
         Clave("deriva_de",
-              dispara=(Aguja("scripts/reels/base.mjs", "export const pieDe = (slug, beat, props) => {",
+              dispara=(Aguja("scripts/reels/cifras.mjs", "export function pieDe(slug, b, faltas) {",
                              pendiente="una cifra derivada hereda el pie de la"
                                        " cifra de la que sale"),),
               efecto="la cifra derivada comparte el pie de su origen",

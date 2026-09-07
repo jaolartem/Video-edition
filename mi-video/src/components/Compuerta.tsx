@@ -1,6 +1,7 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { Marco } from "./Canon";
+import { MotionSound } from "./MotionSound";
 import { Fondo, Cinta } from "./Fondo";
 import type { Recorte } from "./Fondo";
 import { fontFamily } from "../brand/fonts";
@@ -34,6 +35,12 @@ export type CompuertaProps = {
   placa?: string;
   condicion?: string;
   duracion?: number;
+  /**
+   * **El sonido de los tres bloques.** `armarTableros` pone `sound: true` en
+   * todos los tableros del lote, y esta forma no lo leía: declarado y sin
+   * aplicar, que es la avería de la casa. Requiere `public/sfx/`.
+   */
+  sound?: boolean;
 };
 
 /**
@@ -74,8 +81,8 @@ export const Compuerta: React.FC<CompuertaProps> = ({
   sale,
   placa,
   recorte = "columna",
-  condicion,
   duracion,
+  sound = false,
 }) => {
   const frame = useCurrentFrame();
   assertShort(entra, "outcome", "Compuerta.entra");
@@ -86,7 +93,15 @@ export const Compuerta: React.FC<CompuertaProps> = ({
     duracion ?? readingFrames(entra) + readingFrames(sale) + 72;
   const tEntra = 0;
   const tCompuerta = tEntra + readingFrames(entra);
-  const tSale = tCompuerta + duration.entry * 2;
+  /**
+   * **La consecuencia entra cuando la compuerta ya se pudo leer**, no medio
+   * segundo después. Eran `duration.entry * 2` —16 frames— y con eso el bloque
+   * de oro, que es el único que explica, aparecía y ya estaba tapado por el
+   * siguiente: la lámina entera se construía en 2,6 s y se quedaba quieta el
+   * resto del beat. Es la regla de la casa, la de `Reloj.lee`: cada bloque
+   * espera a que el anterior se haya podido leer.
+   */
+  const tSale = tCompuerta + readingFrames(compuerta);
 
   const p = (at: number) =>
     interpolate(frame, [at, at + duration.entry], [0, 1], {
@@ -156,24 +171,26 @@ export const Compuerta: React.FC<CompuertaProps> = ({
         }}
       />
 
+      {/* **Cada bloque suena en el frame en que aterriza**, y el de la
+          compuerta con el golpe grave: es el que explica, y el orden de entrada
+          es el argumento. Nada suena por el raíl — se traza continuo, sin un
+          frame que lo justifique, y el canon prohíbe el sonido sin movimiento
+          que lo pida. */}
+      {sound ? (
+        <>
+          <MotionSound motion="mark" at={tEntra} />
+          <MotionSound motion="land" at={tCompuerta} />
+          <MotionSound motion="mark" at={tSale} />
+        </>
+      ) : null}
+
       {bloque(entra, tEntra, false, -1.6)}
       {bloque(compuerta, tCompuerta, true, 2.1)}
       {bloque(sale, tSale, false, -1.2)}
 
-      {condicion ? (
-        <div
-          style={{
-            marginTop: 22,
-            opacity: p(tSale + duration.standard * 2),
-            color: color.secondaryBlue,
-            fontFamily: fontFamily.video,
-            fontSize: 26,
-            lineHeight: 1.25,
-          }}
-        >
-          {condicion}
-        </div>
-      ) : null}
+      {/* **La condición ya no se rotula dentro.** Va al pie, fuera de la zona
+          segura y en una línea: la monta `dibujaTablero`. Ver
+          `PieTablero.tsx`. */}
     </Marco>
   );
 };

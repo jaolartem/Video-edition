@@ -72,6 +72,25 @@ def _camara(fila):
         return {}
 
 
+def _enSegundos(anclas):
+    """El ancla si va en segundos; `None` si va en texto o no hay.
+
+    Las dos formas existen y son distintas: un número se queda clavado donde el
+    corte de ayer lo dejó —eso es lo que la guarda 3b audita— y un texto se
+    resuelve contra el subtítulo de hoy, así que no puede caducar. Distinguirlas
+    aquí evita además el `float("septiembre")` que tumbaba la auditoría entera.
+    """
+    s = anclas[0] if isinstance(anclas, list) and anclas else anclas
+    if isinstance(s, dict):
+        s = s.get("segundo", s.get("en"))
+    if isinstance(s, bool) or s is None:
+        return None
+    try:
+        return float(str(s).replace(",", "."))
+    except ValueError:
+        return None
+
+
 def _pisa(capa, ventana):
     """¿Cae esa capa dentro de la ventana del beat? Sin ventana, vale igual."""
     if not ventana:
@@ -188,14 +207,21 @@ def revisar(piezas=None):
             # disenador contra el montaje que habia. Si el corte se acorta, el
             # tablero se queda clavado donde estaba y se separa de la palabra que
             # ilustra — o se sale de su propia etapa.
-            if d and (d.get("props") or {}).get("anclas") is not None:
-                anc = (d.get("props") or {})["anclas"]
+            #
+            # **Y sólo se audita la que va en SEGUNDOS.** Un ancla en TEXTO
+            # —`anclas: "septiembre"`— la resuelve `reels/tableros.mjs` contra el
+            # subtítulo de hoy, así que no puede quedarse clavada: es la cura de
+            # este defecto, no un caso suyo. Comprobarla aquí era además
+            # `float("septiembre")`, o sea **reventar la auditoría entera** el día
+            # que alguien la usara — y con ella las cinco guardas de abajo.
+            anc = _enSegundos((d.get("props") or {}).get("anclas") if d else None)
+            if anc is not None:
                 puesto = puestos.get(b) or next(
                     (x for x in (p.get("paneles") or [])
-                     if abs(x["at"] / 30 - float(anc)) < 3), None)
+                     if abs(x["at"] / 30 - anc) < 3), None)
                 if puesto is not None:
                     real = puesto["at"] / 30
-                    if abs(real - float(anc)) > 2.0:
+                    if abs(real - anc) > 2.0:
                         faltas.append(
                             f"{slug} e{b}: anclado a {anc}s y sale en"
                             f" {real:.1f}s — el corte se movio y el ancla no")

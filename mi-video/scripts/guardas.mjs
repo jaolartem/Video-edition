@@ -233,6 +233,62 @@ for (const e of entradas) {
 }
 
 /**
+ * **El rebote, que estaba prohibido por escrito y no lo miraba nadie.**
+ *
+ * *«Nada de rebote, confeti, wiggle ni micro-animación juguetona»* lleva en el
+ * canon desde el principio, con su nombre, y es de las cinco que el proyecto
+ * declara innegociables. Como todas las que sólo están escritas, se cumplía de
+ * media: la comprobación no existía, así que un `Easing.back` en un componente
+ * nuevo habría entrado sin que nadie se enterara hasta verlo en la entrega — y
+ * el gancho ya enseñó lo que cuesta eso, cuatro instrucciones sobre la misma
+ * lámina.
+ *
+ * Se busca por nombre y en el código, no en la prosa: los comentarios de
+ * `Capas.tsx` y `Reparto.tsx` citan `Easing.back` **para prohibirlo**, y un
+ * guarda que no distingue una cita de una llamada obliga a dejar de escribir el
+ * porqué, que es lo contrario de lo que hace falta.
+ *
+ * `spring` no está prohibido: lo que rebota es un `spring` que se pasa de su
+ * destino. Así que se admite con `overshootClamping: true` declarado, y sin eso
+ * se dice — porque el valor por defecto es el que rebota.
+ */
+{
+  const REBOTES = ["Easing.back", "Easing.elastic", "overshootClamping: false"];
+  const sinProsa = (t) =>
+    t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, " ");
+  const anda = (d) => {
+    for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, f.name);
+      if (f.isDirectory()) {
+        anda(p);
+        continue;
+      }
+      if (!/\.(tsx?|mjs)$/.test(f.name)) continue;
+      const codigo = sinProsa(fs.readFileSync(p, "utf8"));
+      const rel = path.relative(RAIZ, p).replace(/\\/g, "/");
+      for (const r of REBOTES) {
+        if (codigo.includes(r))
+          fallos.push(
+            `${rel} usa «${r}»: es rebote, y el canon lo prohíbe por nombre —` +
+              ` «nada de rebote, confeti ni micro-animación juguetona». Esto es` +
+              ` un asesor financiero hablando a dueños de negocio.`,
+          );
+      }
+      for (const m of codigo.matchAll(/\bspring\s*\(/g)) {
+        const trozo = codigo.slice(m.index, m.index + 320);
+        if (!trozo.includes("overshootClamping: true"))
+          fallos.push(
+            `${rel} llama a \`spring(\` sin \`overshootClamping: true\`: por` +
+              ` defecto se pasa de su destino y vuelve, que es rebote. Declara` +
+              ` el tope o usa \`Easing.out\`, que es masa frenando.`,
+          );
+      }
+    }
+  };
+  anda(path.join(process.cwd(), "src"));
+}
+
+/**
  * Y lo que se le OFRECE al diseñador también tiene que existir.
  *
  * Jaime: *« que no quede otra vez el mismo error de declarar sin implementar,

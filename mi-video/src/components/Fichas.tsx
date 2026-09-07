@@ -6,7 +6,6 @@ import { color, layout, readingFrames } from "../brand/tokens";
 import { Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
-import { PieTablero } from "./PieTablero";
 import { leerDeclarado } from "./declarado/lineas";
 import { Ficha, FileteFicha } from "./fichas/Ficha";
 
@@ -47,12 +46,9 @@ export type FichasProps = {
   numerada?: boolean;
 };
 
-/** Alto que se reserva al pie de fuente y condición, si lo hay. */
-const PIE = 150;
-
 export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
   const entra = useEntrada();
-  const { cuerpo, pie } = leerDeclarado(props);
+  const { cuerpo } = leerDeclarado(props);
   if (!cuerpo.length) return null;
 
   const placa = typeof props.placa === "string" ? props.placa : undefined;
@@ -80,7 +76,10 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
   }
 
   const ancho = layout.width - layout.safe.left - layout.safe.right;
-  const alto = franja.techoPx - 150 - (pie.length ? PIE : 0);
+  // **Sin reserva de pie.** Se guardaban 150 px al fondo de la lámina para la
+  // banda de fuente y condición; desde que el pie vive fuera de la zona segura
+  // (`PieTablero.tsx`) ese hueco es de las fichas, que es lo que hay que leer.
+  const alto = franja.techoPx - 150;
   const oro = cuerpo.findIndex((l) => l.oro);
   const fila = enFila ? cuerpo.filter((_l, i) => i !== oro) : [];
   const apiladas = enFila ? cuerpo.filter((_l, i) => i === oro) : cuerpo;
@@ -170,8 +169,6 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
           ))}
         </div>
 
-        {/* El pie: fuente y condición. Es cumplimiento, no adorno. */}
-        <PieTablero lineas={pie} opacidad={entra(t)} />
       </ZonaTablero>
     </AbsoluteFill>
   );

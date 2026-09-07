@@ -46,7 +46,7 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
   props,
 }) => {
   const frame = useCurrentFrame();
-  const { cuerpo, pie } = leerDeclarado(props);
+  const { cuerpo } = leerDeclarado(props);
 
   if (!cuerpo.length) return null;
 
@@ -61,7 +61,23 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
    * `banda` acompañan al plano sin taparle la cara.
    */
   const cubre = String(props.cubre ?? "pleno");
+  /**
+   * **Y `zona` dice dónde cae dentro del cuadro, que no es lo mismo.**
+   *
+   * `acompana` sólo puede ser cierto para un tablero que `repartirPorCubre`
+   * mande aquí, y esa función manda `panel` y `banda` al `SidePanel`: la rama de
+   * abajo estaba escrita y era **inalcanzable**. `zona` lleva declarada en el
+   * cromo de `formas.mjs` desde que existe —*«dónde cae en el cuadro, sin tapar
+   * la cara»*— y no la leía nadie, que es la avería de la casa.
+   *
+   * Con una sola línea, centrar la deja **sobre la boca**: medido en reel-05 e11,
+   * el bloque de «EL LINK ESTÁ ABAJO» caía en el 29–35% de altura, que en un
+   * primerísimo es la cara. `zona: "pie"` lo apoya en el suelo de la zona del
+   * tablero —justo encima de la franja del subtítulo, nunca dentro— que es donde
+   * el encargo lo pedía: *«al pie, el filete y EL LINK ESTÁ ABAJO»*.
+   */
   const acompana = cubre === "panel" || cubre === "banda";
+  const alPie = acompana || String(props.zona ?? "") === "pie";
 
   return (
     <AbsoluteFill
@@ -89,9 +105,9 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
             inset: 0,
             display: "flex",
             flexDirection: "column",
-            justifyContent: acompana ? "flex-end" : "center",
+            justifyContent: alPie ? "flex-end" : "center",
             padding: `${layout.safe.top}px ${layout.safe.right}px ` +
-              `${acompana ? 40 : 24}px ${layout.safe.left}px`,
+              `${alPie ? 40 : 24}px ${layout.safe.left}px`,
             boxSizing: "border-box",
           }}
         >
@@ -114,8 +130,24 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
                   opacity: o,
                   transform: `translateX(${dx}px)`,
                   marginBottom: l.grande ? 18 : 10,
-                  padding: l.oro ? "6px 16px" : 0,
-                  background: l.oro ? color.gold : "transparent",
+                  /**
+                   * **Ninguna línea se pinta sin su bloque plano detrás.**
+                   *
+                   * Sólo la de oro llevaba superficie; las demás iban en
+                   * `lightNeutral` sobre `transparent`, o sea sobre el plano. Y
+                   * el plano es lo que sea: en reel-05 e11 «SI PAGÓ DE MÁS SIN
+                   * SABERLO» caía sobre la pared clara y el tablero blanco del
+                   * fondo, y no se leía **nada** — texto claro sobre claro, que
+                   * el canon prohíbe por su nombre.
+                   *
+                   * La legibilidad es criterio de diseño y no acabado, así que
+                   * no puede depender de dónde cayera el encuadre. El negro va
+                   * **sólo bajo lo que hay que leer** —el bloque abraza su
+                   * texto, no hay faja de borde a borde— que es la lámina que
+                   * Jaime aprobó.
+                   */
+                  padding: "6px 16px",
+                  background: l.oro ? color.gold : color.richBlack,
                   alignSelf: "flex-start",
                   maxWidth: "100%",
                 }}
@@ -137,25 +169,8 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
             );
           })}
 
-          {/* El pie lleva la fuente y la condición: cumplimiento, no adorno. */}
-          {pie.length ? (
-            <div style={{ marginTop: 24 }}>
-              {pie.map((p) => (
-                <div
-                  key={p}
-                  style={{
-                    fontFamily: fontFamily.video,
-                    fontWeight: 700,
-                    fontSize: 30,
-                    color: color.secondaryBlue,
-                    lineHeight: 1.25,
-                  }}
-                >
-                  {p}
-                </div>
-              ))}
-            </div>
-          ) : null}
+          {/* **El pie ya no va aquí.** Fuera de la zona segura y en una
+              línea, montado por `dibujaTablero`. Ver `PieTablero.tsx`. */}
         </div>
       </ZonaTablero>
 

@@ -4,10 +4,12 @@ import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
 import { color, ease, layout, readingFrames } from "../brand/tokens";
-import { Cinta, Fondo, type Recorte } from "./Fondo";
+import { franja } from "../brand/franja";
+import { Fondo, type Recorte } from "./Fondo";
+import { Remate } from "./Remate";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
-import { PieTablero } from "./PieTablero";
+import { Corredor } from "./desvio/Corredor";
 
 /**
  * **La vía de siempre choca; la otra rodea el bloque y sale.**
@@ -53,19 +55,41 @@ export type DesvioProps = {
   sound?: boolean;
 };
 
-/** La geometría del choque, dentro de lo que el tablero puede ocupar. */
-const VIA = { y: 340, alto: 132 } as const;
-const BLOQUE = { x: 790, y: 292, w: 230, h: 228 } as const;
+/**
+ * La geometría del choque, dentro de lo que el tablero puede ocupar.
+ *
+ * **Y ocupa lo que puede, no el tercio de arriba.** Jaime, sobre R-07 e2: *«15,9
+ * s con el 75% del cuadro en negro vacío»*. Estaba medido y era cierto: el
+ * choque acababa en 520, el remate en 730, y de ahí al techo de la franja —1048—
+ * no había nada, con el subtítulo flotando en el medio. Los números vivían
+ * escritos a mano y ninguno miraba cuánto sitio hay.
+ */
+const ZONA = franja.techoPx;
+const VIA = { y: Math.round(ZONA * 0.4), alto: 132 } as const;
+const BLOQUE = { x: 790, y: VIA.y - 48, w: 230, h: 228 } as const;
 /** La banda que rodea: sube por aquí y sale por arriba. */
-const RODEO = { x: 636, y: 148, alto: 112 } as const;
+const RODEO = { x: 636, y: Math.round(ZONA * 0.14), alto: 112 } as const;
+/**
+ * **El corredor de fuga: adónde va la que se desvía.**
+ *
+ * Es lo que llena la mitad de abajo, y no es relleno — es el canon: *«punto de
+ * fuga, geometría rota, líneas»*, y el elemento conceptual dice lo que dice el
+ * beat. Aquí el beat es *hay otra manera y alguien la encuentra*, así que las
+ * líneas se abren desde el bloque que paró a la primera vía hacia un punto que
+ * está fuera, y la luz recorre la que sale.
+ *
+ * Sustituye a lo que el canon acaba de retirar —*«las animaciones de bolitas y
+ * palitos se acaban, quitan más de lo que dan»*—: no es una viñeta que aparece,
+ * es profundidad que se abre mientras la banda escapa.
+ */
+const FUGA = { x: 300, y: ZONA - 40 } as const;
+/** Impar, para que haya una central: es la que sale. */
+const LINEAS_FUGA = 9;
 
 export const Desvio: React.FC<DesvioProps> = ({
   premisa,
   desvio,
   remate,
-  fuente,
-  source,
-  condicion,
   placa,
   recorte = "lleno",
   duracion,
@@ -73,7 +97,6 @@ export const Desvio: React.FC<DesvioProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const entra = useEntrada();
-  const pie = [source ?? fuente, condicion].filter(Boolean) as string[];
 
   const total = Math.max(
     duracion ?? 0,
@@ -95,6 +118,20 @@ export const Desvio: React.FC<DesvioProps> = ({
   const corre = traza(0, tChoque);
   const sube = traza(tRodeo, tRodeo + 14);
   const sale = traza(tRodeo + 14, Math.round(total * 0.46));
+  /** El corredor se abre detrás de la banda que sale, no antes. */
+  const abre = traza(tRodeo + 14, Math.round(total * 0.58));
+  /**
+   * **La luz que recorre la salida.** Recorre la banda de arriba abajo una vez
+   * por cada tercio de lo que queda, con borde duro: es un plano de luz
+   * constructivista, no un degradado. Se apaga cuando entra el remate para no
+   * competir con lo que hay que leer.
+   */
+  const barrido = interpolate(
+    frame,
+    [tRodeo + 20, tRemate],
+    [-0.35, 1.35],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease.linear },
+  );
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
@@ -225,25 +262,49 @@ export const Desvio: React.FC<DesvioProps> = ({
           >
             {desvio}
           </div>
+          {/* La luz que recorre la salida: plano de borde duro, no degradado. */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: `${barrido * 100}%`,
+              width: 120,
+              backgroundColor: color.gold,
+              opacity: 0.34,
+              transform: "skewX(-18deg)",
+            }}
+          />
         </div>
+
+        <Corredor
+          desdeY={VIA.y + VIA.alto}
+          fuga={FUGA}
+          lineas={LINEAS_FUGA}
+          abre={abre}
+        />
 
         {remate ? (
           <div
             style={{
               position: "absolute",
               left: layout.safe.left,
-              top: 640,
+              top: Math.round(ZONA * 0.78),
               opacity: entra(tRemate),
               fontFamily: fontFamily.bloque,
             }}
           >
-            <Cinta tinte={color.gold} giro={-1.9} cuerpo={68}>
-              {remate}
-            </Cinta>
+            {/* **Un acento por tablero, y aquí es la señal de desvío.** El
+                cuadrado a 45° marca dónde se bifurca el camino, que es lo que
+                el tablero demuestra; el remate lo dice con palabras y va en
+                claro. Ver `Remate.tsx`. */}
+            <Remate giro={-1.9} cuerpo={68}>{remate}</Remate>
           </div>
         ) : null}
 
-        <PieTablero lineas={pie} opacidad={entra(tRemate + 12)} />
+        {/* **El pie ya no lo dibuja cada forma.** Va fuera de la zona segura,
+            en una línea, y lo monta `dibujaTablero` para las 24 láminas del
+            lote. Ver `PieTablero.tsx`. */}
       </ZonaTablero>
     </AbsoluteFill>
   );

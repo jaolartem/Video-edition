@@ -34,7 +34,8 @@ import fs from "node:fs";
 import path from "node:path";
 // El tratamiento de la imagen —virado y costura animada— se declara y se
 // resuelve en `imagen.mjs`; aqui solo se empalma al menu, que es uno solo.
-import { ANIMADAS, POR_HACER, VIRADOS, bloqueVirado } from "./imagen.mjs";
+import { ANIMADAS, DETRAS, POR_HACER, VIRADOS, bloqueDetras, bloqueVirado }
+  from "./imagen.mjs";
 
 /**
  * Los encuadres, **leídos de quien los recorta**.
@@ -148,12 +149,6 @@ export const POR_CONSTRUIR = {
     cuesta: "scripts/punch-ins.py — el rectángulo final se deriva del zoom;"
       + " haría falta un desplazamiento declarado del ancla",
   },
-  letras_detras: {
-    que: "el rótulo nace POR DETRÁS del plano y se acomoda delante",
-    cuesta: "`scripts/text-behind.py` saca el recorte del sujeto con MediaPipe y"
-      + " funciona, pero nada del render lo consume: haría falta una capa en"
-      + " Remotion que reciba la máscara por fotograma",
-  },
   segunda_camara: {
     que: "una escena grabada con dos cámaras a la vez, para cortar entre"
       + " ÁNGULOS en vez de entre encuadres del mismo plano",
@@ -189,6 +184,14 @@ export const LO_HACE = {
     ["scripts/reels/imagen.mjs", "export function viradosDe(reloj) {"],
     ["src/Ad.tsx", "const virado = virados.find("],
   ],
+  // Quién lo declara, lo produce, lo coloca, lo dibuja y lo apila.
+  detras: [
+    ["scripts/plan-reel.mjs", "detras: cam.detras,"],
+    ["scripts/dominio/sujeto.py", "def recortes_de_la_pieza(n):"],
+    ["scripts/reels/imagen.mjs", "export function recortesDe(reloj, slug) {"],
+    ["src/components/Detras.tsx", "export const Detras: React.FC<DetrasProps> = ({"],
+    ["src/Ad.tsx", "<Recortes lista={recortes} filtro={filtro} />"],
+  ],
 };
 
 /**
@@ -216,15 +219,17 @@ export const camaraDe = (crudo) => {
     transicion: d.transicion in TRANSICIONES ? d.transicion : "corte",
     // Sin virado el plano sale como se grabo, que es lo normal.
     virado: d.virado in VIRADOS ? d.virado : null,
+    // Sin `detras` no hay recorte: la pasada de MediaPipe se paga donde se pide.
+    detras: d.detras in DETRAS ? d.detras : null,
   };
 };
 
 /** El vocabulario entero, para el contrato. */
 export const vocabulario = () => ({
   como_se_pide: "Un objeto `camara` por etapa: `{encuadre, movimiento,"
-    + " transicion, virado}`. Los cuatro son opcionales; lo que no declares sale"
-    + " como salía — encuadre por rueda, acercamiento lento, corte seco y el"
-    + " plano sin teñir. Declarar es elegir, no rellenar.",
+    + " transicion, virado, detras}`. Los cinco son opcionales; lo que no"
+    + " declares sale como salía — encuadre por rueda, acercamiento lento, corte"
+    + " seco, plano sin teñir y nada por detrás. Declarar es elegir, no rellenar.",
   encuadre: {
     que: "de qué habla el plano. El bruto es 4K y la salida 1080, así que"
       + " recortar no cuesta nitidez: los cinco son el mismo plano visto de más"
@@ -252,6 +257,7 @@ export const vocabulario = () => ({
     si_no_dices: "corte",
   },
   virado: bloqueVirado(),
+  detras: bloqueDetras(),
   retiradas: Object.fromEntries(
     Object.entries(RETIRADAS).map(([k, v]) => [k, `${v.que} — RETIRADA:`
       + ` ${v.por_que}. En su lugar: ${v.en_su_lugar}`])),
@@ -300,7 +306,7 @@ if (_directo) {
     console.log(JSON.stringify(vocabulario(), null, 1));
   } else {
     const v = vocabulario();
-    for (const k of ["encuadre", "movimiento", "transicion", "virado"]) {
+    for (const k of ["encuadre", "movimiento", "transicion", "virado", "detras"]) {
       console.log(`\n${k.toUpperCase()} — ${v[k].que}`);
       for (const [n, q] of Object.entries(v[k].valores))
         console.log(`  ${n.padEnd(14)} ${q}`);

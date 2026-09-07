@@ -133,19 +133,84 @@ def sellar(n, carpeta=ENTREGA):
 
 
 def _audio(cx, version_id, slug):
-    """La voz de la que salió esa versión. No se duplica si ya está."""
+    """La voz de la que salió esa versión. No se duplica si ya está.
+
+    **«Integrado» se le pregunta a quien integra.** Esto marcaba integrado si
+    EXISTÍA una devolución de Adobe para la pieza, y la mezcla usa otra vara:
+    `remezclar.voz_de` sólo mete el stem limpio si su duración cuadra con la del
+    export crudo —si es de otro montaje entra desfasada—, y si no cuadra pone la
+    voz cruda **sin decirlo**.
+
+    Dos varas para el mismo hecho, y por eso el estado mentía justo donde más
+    caro sale. Medido el 5-9-2026 sobre las siete entregas: cinco tenían el stem
+    de un corte anterior —reel-01 iba 3,0 s corrido, reel-02 13,8 s— y `donde.py`
+    decía «integrado» en las siete. Jaime lo oyó antes de que nadie lo midiera:
+    *«este reel no tuvo cambios y se escucha feo; no pasó por Adobe Podcast y se
+    nota»*.
+
+    Así que se pregunta a la función que decide la mezcla, y se guarda **el
+    fichero que de verdad entró**. Es C-101 otra vez: cuando dos medidas del
+    mismo hecho discrepan, gana la que mide el hecho.
+    """
     if cx.execute("select 1 from audio_version where version_id = ?",
                   (version_id,)).fetchone():
         return
     virgen = f"out/audio-puro/{slug}-voz.wav"
-    limpio = next(iter(_limpios(slug)), None)
+    limpio, limpio_s, integrada = _medida(slug)
     cx.execute(
         "insert into audio_version (version_id, virgen, virgen_s, limpio,"
         " limpio_s, integrado, fecha) values (?,?,?,?,?,?,?)",
         (version_id, virgen if os.path.exists(virgen) else None,
          _dura(virgen) if os.path.exists(virgen) else None,
-         limpio, _dura(limpio) if limpio else None,
-         1 if limpio else 0, datetime.datetime.now().isoformat()))
+         limpio, limpio_s,
+         1 if integrada else 0, datetime.datetime.now().isoformat()))
+
+
+def _medida(slug):
+    """Qué voz entró en la mezcla, preguntándoselo a quien la elige.
+
+    Si no entró la limpia se anota igual cuál había: el paso siguiente es
+    mandarla a rehacer, y para eso hace falta saber contra qué no cuadró.
+    """
+    import remezclar
+
+    usada, integrada = remezclar.voz_de(slug)
+    limpio = usada if integrada else next(iter(_limpios(slug)), None)
+    return limpio, (_dura(limpio) if limpio else None), integrada
+
+
+def remedir(n):
+    """Vuelve a medir el audio de la última versión con la vara de hoy.
+
+    **Arreglar el instrumento no arregla lo ya medido.** La fila de
+    `audio_version` la escribe `_audio` una sola vez, así que las que se
+    escribieron con la vara vieja —«existe un fichero de Adobe» en vez de «entró
+    en la mezcla»— siguen diciendo `integrado` hasta que esa pieza se vuelva a
+    renderizar. Y `donde.py` lee esa fila: seis piezas etiquetadas «integrado»
+    sonando crudas, que es justo lo que C-244 existe para que no pase.
+
+    No reescribe una decisión: **repite una medida**. La distinción es la del
+    proyecto — lo aprobado no se vuelve a discutir, se comprueba— y por eso esto
+    es un paso de la línea y no una edición a mano de la base.
+    """
+    slug = f"reel-{n:02d}"
+    cx = basedatos.abrir(BASE)
+    fila = cx.execute(
+        "select v.id, v.n from version v join video vi on vi.id = v.video_id"
+        " where vi.slug = ? order by v.n desc limit 1", (slug,)).fetchone()
+    if not fila:
+        cx.close()
+        return f"{slug}: sin versiones que medir"
+    limpio, limpio_s, integrada = _medida(slug)
+    cx.execute("update audio_version set limpio = ?, limpio_s = ?,"
+               " integrado = ?, fecha = ? where version_id = ?",
+               (limpio, limpio_s, 1 if integrada else 0,
+                datetime.datetime.now().isoformat(), fila[0]))
+    cx.commit()
+    cx.close()
+    return (f"{slug} v{fila[1]}: "
+            + ("voz de Adobe integrada" if integrada
+               else "VOZ CRUDA — el stem limpio no cuadra con este corte"))
 
 
 def _limpios(slug):
@@ -179,8 +244,13 @@ def main():
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--de", default=ENTREGA, help="de qué carpeta se sella")
     ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--remedir", action="store_true",
+                    help="vuelve a medir el audio de la ultima version")
     a = ap.parse_args()
     for n in (a.reels or range(1, 8)):
+        if a.remedir:
+            print("  " + remedir(n))
+            continue
         if a.ver:
             for v in versiones(n):
                 print(f"  R{n} v{v[0]}  {v[1]}s  {str(v[2])[:16]}"

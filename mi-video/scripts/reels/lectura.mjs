@@ -53,6 +53,17 @@ const RESPIRO = 20;
 const ENTRADA = 8;
 
 /**
+ * El silencio antes del remate y lo que tarda el barrido en cruzar.
+ *
+ * Espejo de `beat.hold` y de `BARRE` en `src/components/acumulacion/horario.ts`:
+ * la pila se sostiene entera un momento y entonces el barrido se la lleva y deja
+ * la cifra sola. Si esto no estuviera aqui, el spec reservaria el hueco de un
+ * tablero que acaba con el ultimo tramo y el barrido saldria cortado.
+ */
+const HOLD = 22;
+const BARRE = 16;
+
+/**
  * **Lo que se entrega va a 1,15x, y hasta ahora nadie lo restaba.**
  *
  * Jaime, viendo reel-05: *«todo tablero tiene que tener tiempo suficiente de
@@ -89,8 +100,27 @@ const textos = (p) => {
     // ponerlo en todo tablero a pleno: valia «lleno», se contaba como un
     // bloque de texto, y con eso aparecieron dos faltas de lectura que nadie
     // habia disenado y dos recortes buenos siguieron dando falta.
-    if (["placa", "sound", "sfx", "cubre", "familia", "oro", "figura",
-         "source", "anclas", "recorte", "ventana",
+    //
+    // `sujeto`, `sujeto_src` y `sujeto_css` entran por esa misma puerta: son de
+    // que lado va el, que fichero lo trae y con que filtro. Tres instrucciones
+    // de composicion que, contadas como texto, sumarian tres bloques de lectura
+    // a un tablero donde no se lee ni una palabra de ellas.
+    // Y **el pie tampoco es un bloque de la lamina**: desde que va fuera de la
+    // zona segura (`src/components/PieTablero.tsx`) no le disputa sitio a
+    // nada, asi que contarlo aqui pedia medio segundo de lectura por una linea
+    // que ya no esta dentro del tablero. `condicion` y `fuente` estaban
+    // contadas y `source` no, que es la misma linea con dos nombres.
+    // `zona` entra por la misma puerta que `figura` y `recorte`: dice DONDE cae
+    // la lamina —«pie»— y quien la lee es `TableroDeclarado`, no el espectador.
+    // Contada como bloque, un `zona: "pie"` sumaba 0,75 s de lectura a un
+    // tablero de una sola linea, y la prosa de composicion que otras piezas
+    // escriben ahi —300 caracteres en reel-07 e1— habria pedido diez segundos
+    // por un texto que no se dibuja. `declarado/lineas.ts` ya no la rotula; esto
+    // es la otra mitad de la misma lista.
+    if (["placa", "sound", "sfx", "cubre", "familia", "oro", "figura", "zona",
+         "source", "anclas", "recorte", "ventana", "signo", "total",
+         "sujeto", "sujeto_src", "sujeto_css",
+         "pie", "fuente", "condicion", "condition", "limitation",
          "condicion_completa"].includes(k)) continue;
     mete(v);
   }
@@ -101,7 +131,13 @@ const _tablero = (kind, p) => {
   if (kind === "acumulacion") {
     const tramos = p.tramos.reduce(
       (n, tr) => n + Math.max(ENTRADA + 4, lectura(tr.etiqueta)), 0);
-    return ENTRADA * 3 + tramos + lectura(p.condicion) + RESPIRO + 24;
+    const fin = ENTRADA * 3 + tramos;
+    // **Con resultado el tablero no acaba con el ultimo tramo: acaba con el
+    // barrido.** La pila se sostiene, el barrido cruza y la cifra se queda sola
+    // el tiempo de leerla. Sin resultado no hay barrido y manda la condicion.
+    return p.resultado
+      ? fin + HOLD + BARRE + lectura(p.resultado.figure) + RESPIRO + 24
+      : fin + lectura(p.condicion) + RESPIRO + 24;
   }
   if (kind === "comparacion") {
     return ENTRADA * 2 + Math.max(20, lectura(p.izquierda.cifra)) +
@@ -219,11 +255,24 @@ export const ADELANTO = (bloques) =>
  */
 export const CONDICION_PALABRAS = 25;
 
+/**
+ * **El punto del separador de miles no acaba una frase.**
+ *
+ * Es el arreglo que `cifras.mjs` dejo declarado y puso en su propia copia: aqui
+ * sirve para TODOS los lectores, que era la condicion de que fuera el
+ * definitivo. Sin el, el corte por frases partia el importe y el pie del
+ * tablero de reel-02 e3 salia diciendo «Caso hipotetico. Ontario, ano fiscal
+ * 2026. Los $180.» — el importe mutilado y la frase diciendo otra cosa que la
+ * condicion, justo en la linea que responde por la cifra.
+ */
+const MILES = " ";
+
 export const enPantalla = (t) => {
   const limpio = String(t).trim().replace(/\s+/g, " ");
   const palabras = limpio.split(" ");
   if (palabras.length <= CONDICION_PALABRAS) return limpio;
-  const frases = limpio.match(/[^.!?]+[.!?]*/g) ?? [limpio];
+  const protegido = limpio.replace(/(?<=\d)\.(?=\d)/g, MILES);
+  const frases = protegido.match(/[^.!?]+[.!?]*/g) ?? [protegido];
   let salida = "";
   for (const f of frases) {
     const cand = (salida + f).trim();
@@ -244,5 +293,6 @@ export const enPantalla = (t) => {
     salida = cand;
   }
   // Si la primera frase ya se pasa, se corta por palabra y se dice que sigue.
-  return salida || `${palabras.slice(0, CONDICION_PALABRAS).join(" ")}…`;
+  return (salida || `${palabras.slice(0, CONDICION_PALABRAS).join(" ")}…`)
+    .split(MILES).join(".");
 };

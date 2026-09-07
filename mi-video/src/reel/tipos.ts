@@ -1,8 +1,13 @@
 import type { BoardCue, CaptionCue } from "../Ad";
 import type { Capa } from "../components/Capas";
+import type { Casilla } from "../components/Casillas";
+import type { Motion } from "../brand/sfx";
+import type { Porcion } from "../components/Reparto";
+import type { Recorte } from "../components/Detras";
 import type { ContrasteProps } from "../components/Contraste";
 import type { CortinillaProps } from "../components/Cortinilla";
 import type { TarjetaProps } from "../components/Tarjeta";
+import type { Volumen } from "../components/Volumen";
 
 /**
  * **Lo que una pieza declara**, aparte de cómo se dibuja.
@@ -94,6 +99,20 @@ export type ReelSpec = {
    */
   virados: { at: number; duration: number; virado: string; css: string }[];
   /**
+   * Etapas donde un ELEMENTO le pasa por detrás. Ver `Recorte` en `Ad`.
+   *
+   * Jaime: *«y ojalá jueguen con mi cara… que se escondan detrás»*. Se pide en
+   * `escena_desc.camara.detras` y el recorte del sujeto lo produce
+   * `scripts/dominio/sujeto.py` sobre el corte de hoy. Vacío es lo normal: la
+   * pasada de MediaPipe cuesta, así que sólo corre donde se pidió.
+   *
+   * Y el `titular` es uno de ellos: **el rótulo del gancho detrás de su
+   * cabeza**. Cuando está, `BigTitle` no se dibuja — decir el mismo rótulo dos
+   * veces sería devolverlo al tercio de abajo, que es la lámina que esto vino a
+   * quitar. Lo emite el camino `portada` y lo comprueba `reels/portada.mjs`.
+   */
+  recortes?: Recorte[];
+  /**
    * Costuras cruzadas por la transición animada. Ver `Filete`.
    *
    * Jaime: *«que haga una animación en esa transición»*. Es la tercera vía —el
@@ -135,7 +154,49 @@ export type ReelSpec = {
    * espacio disponible. El cambio deja de verse porque no hay corte — cambia lo
    * que ocupa el cuadro.
    */
-  paneles: { at: number; duration: number; bloques: { texto: string; fuerte?: boolean }[] }[];
+  paneles: {
+    at: number;
+    duration: number;
+    bloques: { texto: string; fuerte?: boolean; placa?: string }[];
+    /**
+     * La animación del panel, del catálogo de `src/brand/volumenes.json`. Un
+     * panel sin ella es sólo texto, y eso lo para `scripts/reels/puerta.mjs`.
+     */
+    volumen?: Volumen;
+    /**
+     * **La lámina de datos y palabras del panel.** Es lo que dibuja un panel
+     * desde que la biblioteca de figuras está cerrada —*«gráficos y palabras,
+     * como tablero de clase»*—: casillas iguales de las que una se sella y las
+     * demás se tachan o se quedan. Ver `components/Casillas`.
+     */
+    casillas?: Casilla[];
+    /**
+     * **La otra mitad de esa instrucción: el gráfico de datos.** Un reparto de
+     * un total en porciones, con el oro en la que importa. Ver
+     * `components/Reparto`, que es la misma figura del tablero aprobado.
+     */
+    reparto?: {
+      total: number;
+      porciones: Porcion[];
+      signo?: string;
+      etiqueta?: string;
+    };
+    /** Si la serie se apila o va de lado. Ver `Casillas`. */
+    eje?: "columna" | "fila";
+    /** El movimiento con el que entra cada casilla: `escena_desc.tablero.sfx`. */
+    sfx?: Motion | null;
+    /**
+     * **A qué lado deja sitio su cuerpo en ESA escena**, medido con la silueta
+     * por `scripts/dominio/hueco.py`. Manda sobre el `lado` de la pieza, que
+     * sale del recorte de la primera escena y con la cámara fija da casi
+     * siempre el mismo — así doce de trece volúmenes cayeron sobre su cara.
+     */
+    lado?: "izq" | "der";
+    /** Cuánto ancho libre deja de ese lado, en fracción del cuadro. */
+    hueco?: number;
+    /** El pie de cumplimiento. Obligatorio si el panel enseña una cifra. */
+    fuente?: string;
+  }[];
   /**
    * Tarjetas: los beats del libreto que no tienen plano utilizable.
    *

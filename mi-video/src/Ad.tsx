@@ -17,8 +17,10 @@ import type { AcumulacionProps } from "./components/Acumulacion";
 import type { TwoPathsProps } from "./components/TwoPaths";
 import { CaptionBand, type Compuesto } from "./components/CaptionBand";
 import { CaptionDiscreta } from "./components/CaptionDiscreta";
-import { color } from "./brand/tokens";
-import { mode as modes, type Mode } from "./brand/tokens";
+import { Recortes, type Recorte } from "./components/Detras";
+import type { Trato } from "./brand/cc";
+// Una sola entrada por módulo: eran dos líneas del mismo `./brand/tokens`.
+import { color, mode as modes, type Mode } from "./brand/tokens";
 
 /**
  * Un tablero programado sobre el vídeo.
@@ -63,6 +65,9 @@ export type CaptionCue = {
   realza?: string;
   /** Dos renglones con dos fuentes. Ver `Compuesto` en `CaptionBand`. */
   compuesto?: Compuesto;
+  /** Que se quede abajo. Ver `abajo` en `CaptionBand`. */
+  abajo?: boolean;
+  /** Cómo se resuelve su fondo. Ver `trato` en `CaptionBand`. */ trato?: Trato;
 };
 
 /**
@@ -109,12 +114,8 @@ export type Glitch = { at: number; duration: number };
  * No es una capa encima: cambia la propia imagen, así que el subtítulo, el
  * tablero y el rótulo van por delante sin enterarse.
  */
-export type Virado = {
-  at: number;
-  duration: number;
-  virado: string;
-  css: string;
-};
+export type Virado =
+  { at: number; duration: number; virado: string; css: string };
 
 export type AdProps = {
   /**
@@ -143,6 +144,7 @@ export type AdProps = {
   desatura?: Desatura[];
   glitch?: Glitch[];
   virados?: Virado[];
+  recortes?: Recorte[];
 };
 
 export const Ad: React.FC<AdProps> = ({
@@ -156,6 +158,7 @@ export const Ad: React.FC<AdProps> = ({
   desatura = [],
   glitch = [],
   virados = [],
+  recortes = [],
 }) => {
   const frame = useCurrentFrame();
   const t = modes[mode];
@@ -232,6 +235,12 @@ export const Ad: React.FC<AdProps> = ({
         }}
       />
 
+      {/* Lo que le pasa POR DETRÁS: encima del plano —tiene que taparlo— y
+          debajo de todo lo demás, porque el mensaje nunca se esconde. El
+          filtro viaja con la capa o la silueta saldría sin virar. Ver
+          `components/Detras.tsx`. */}
+      <Recortes lista={recortes} filtro={filtro} />
+
       {boards.map((cue, i) => (
         <Sequence
           key={`${cue.at}-${i}`}
@@ -306,6 +315,8 @@ export const Ad: React.FC<AdProps> = ({
             realza={caption.realza}
             compuesto={caption.compuesto}
             desde={caption.at}
+            abajo={caption.abajo}
+            trato={caption.trato}
           />
         )
       ) : null}

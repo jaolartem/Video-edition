@@ -88,9 +88,11 @@ def _limpia_de(n):
     """La pista optimizada de la pieza, si la hay."""
     import glob
 
+    import rutas
+
     base = f"reel-{n:02d}-voz"
     fuera = []
-    for d in ("out/audio-puro", "G:/My Drive/Creación de videos/Audio para limpiar"):
+    for d in rutas.RECOGER:
         if not os.path.isdir(d):
             continue
         for f in glob.glob(os.path.join(d, "*.wav")):

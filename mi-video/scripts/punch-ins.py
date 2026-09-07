@@ -227,6 +227,28 @@ ENCUADRES = [
 #: ampliar es interpolar: `scale` de 875 a 1080 no inventa detalle.
 SALIDA_W, SALIDA_H = 1080, 1920
 
+
+def _gancho_s():
+    """Lo que dura el gancho, **leido de donde vive**: `src/brand/gancho.json`.
+
+    No se teclea aqui por lo mismo que `dominio/sujeto.py` tampoco lo teclea: es
+    el numero que decide que ventana recorta la silueta y que ventana dibuja el
+    rotulo. Escrito dos veces son dos ganchos el dia que uno se mueva.
+    """
+    import json as _json
+    try:
+        with open(os.path.join("src", "brand", "gancho.json"),
+                  encoding="utf-8") as f:
+            return float(_json.load(f)["dura"])
+    except (OSError, KeyError, ValueError):
+        return 5.0
+
+
+#: Segundos de apertura que cuentan como gancho. Una escena que empieza dentro
+#: de esa ventana lleva el rotulo encima, asi que su encuadre no es un plano
+#: mas: es donde tiene que caber su cabeza.
+GANCHO = _gancho_s()
+
 #: Cuanto se admite ampliar, y **lo fijo Jaime**: *«si hay un plano que pierde
 #: calidad asegurate de que menos o maximo un 10%, todavia es poco notable»*.
 #:
@@ -437,6 +459,26 @@ if __name__ == "__main__":
         if global_ancla is not None:
             ax, ay = global_ancla
             dx, dy = dxg, dyg
+            # **El gancho se encuadra con el ancla DE SU PROPIA CINTA.**
+            #
+            # `--ancla-global` ya lo decia arriba —*«para el gancho medir cada
+            # una es barato y mas preciso»*— y ademas mide un ancla por fuente,
+            # las imprime… y luego usa UNA para todo el plan. En reel-06 esa una
+            # era la de la cinta de tarde (`anclas.get(args.source)` falla porque
+            # `os.path.join` mete `\` y la ruta pedida trae `/`), asi que la
+            # apertura, que es de noche, se recorto con la coronilla de otra
+            # sesion: 0,242 en vez de 0,394. Medido en el render — su coronilla
+            # caia en el 0,436 del cuadro y el rotulo del gancho le pasaba muy
+            # por encima, flotando sobre la cortina (C-266).
+            #
+            # Se corrige **solo en el gancho** a proposito: es el tramo que Jaime
+            # autorizo re-encuadrar («cierra el encuadre de R6 y R7») y el unico
+            # donde el rotulo depende de donde esta su cabeza. El resto del plan
+            # sigue como salio, que es lo que pidio — *«lo que ya esta
+            # funcionando y aprobado no se toca»*.
+            suya = anclas.get(fuente_de(e)) if e["montado_desde"] < GANCHO else None
+            if suya:
+                (ax, ay), dx, dy = suya
         else:
             ax, ay = ancla_en(t0, t1)
             dx, dy = recorrido(t0, t1)

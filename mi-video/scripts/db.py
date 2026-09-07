@@ -168,17 +168,26 @@ def migrar():
                             m.get("maximo_s", 1.6), m.get("por_que", "")))
 
     # ── placas ───────────────────────────────────────────────────────────
+    # **La asignación es de PIEZA.** Jaime, 6-9-2026: *«es un FONDO de tablero
+    # por reel»*. Esto leía `sirve` —una lista de `reel-NN:beat` dentro de cada
+    # placa— y llenaba `placa_etapa` con una placa distinta por etapa, que es
+    # exactamente el reparto que él paró. Ahora la placa de la pieza se aplica a
+    # todas sus etapas: la tabla sigue estando por etapa porque el modelo lo
+    # está, pero lo que declara es una sola placa repetida, no un mosaico.
     fondos = json.load(open("ads/fondos.json", encoding="utf-8"))
+    ids = {}
     for nombre, p in fondos["placas"].items():
-        pid = _id(cx, "placa", nombre, dice=p["dice"], siente=p.get("siente", ""))
-        for ref in p.get("sirve", []):
-            slug, n = ref.split(":")
-            e = cx.execute(
+        ids[nombre] = _id(cx, "placa", nombre, dice=p["dice"],
+                          siente=p.get("siente", ""))
+    for slug, asignada in fondos.get("pieza", {}).items():
+        pid = ids.get(asignada.get("placa")) if isinstance(asignada, dict) else None
+        if pid is None:
+            continue
+        for e in cx.execute(
                 "SELECT e.id FROM etapa e JOIN video v ON v.id = e.video_id "
-                "WHERE v.slug = ? AND e.orden = ?", (slug, int(n))).fetchone()
-            if e:
-                cx.execute("INSERT OR IGNORE INTO placa_etapa (placa_id, "
-                           "etapa_id, elegida) VALUES (?,?,1)", (pid, e["id"]))
+                "WHERE v.slug = ?", (slug,)).fetchall():
+            cx.execute("INSERT OR IGNORE INTO placa_etapa (placa_id, "
+                       "etapa_id, elegida) VALUES (?,?,1)", (pid, e["id"]))
 
     # ── el log de correcciones ───────────────────────────────────────────
     log = "../docs/correcciones.md"

@@ -107,6 +107,30 @@ def pausas(slug):
     return Guion(slug).pausas()
 
 
+def fijos(slug):
+    """Los tramos que alguien DECLARO para esta pieza, en tiempo de cinta.
+
+    **Un tramo declarado no se vuelve a partir.** `conHabla` recorta el silencio
+    interno de cada segmento y devuelve trozos; cada trozo acaba siendo una
+    escena, o sea un CORTE DE PLANO. Eso esta bien cuando el segmento lo eligio
+    el automatismo, y esta mal cuando alguien dijo «esta frase va entera»: la
+    declaracion existia justo para quitar ese corte, y el recorte la deshacia.
+
+    Paso tres veces con el mismo sitio de reel-01. La tercera, el tramo se
+    declaro entero —562,932-571,050— y el plan salio con dos escenas, 562,852-
+    568,490 y 568,857-571,050: un cambio de plano entre «550 dolares» y
+    «semanales». Jaime, otra vez: *«al final queda un semanales huerfano»*.
+    """
+    import basedatos
+    cx = basedatos.abrir()
+    v = cx.execute("select id from video where slug = ?", (slug,)).fetchone()
+    if not v:
+        return []
+    return [[a, b] for a, b in cx.execute(
+        "select desde, hasta from corte_fijo where video_id = ?"
+        " and desde is not null and hasta is not null", (v[0],))]
+
+
 def precio_vigente(fecha=None):
     """El escalón de hoy y cómo se rotula. `None` si ya cerró todo."""
     return _vigente(fecha)
@@ -165,6 +189,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "abanico": abanico,
           "brolls": brolls,
           "pausas": pausas,
+          "fijos": fijos,
           "precio_vigente": precio_vigente,
           "evento": evento,
           "guardar_escena": guardar_escena,

@@ -197,8 +197,15 @@ for r in "${REELS[@]}"; do
   # consumidor no se entera de que su fuente cambio.
   #
   # Se compara por fecha de modificacion, que es la unica senal que hay.
-  if [ "ads/reel-$r/edl-sell.json" -nt "work/scenes/reel-$r/plan-full.json" ]; then
-    echo "  (el EDL es mas nuevo que el plan: regenerando escenas)"
+  #
+  # **Y el productor cuenta como fuente, no solo el EDL.** C-233 arreglo
+  # `plan-reel.mjs` —recortaba cada escena con los silencios de otra cinta— y
+  # este `if` siguio diciendo que el plan estaba al dia, porque el EDL no se
+  # habia movido. O sea que `montar.sh 6` corria entero, salia con exito, y
+  # entregaba la pieza construida con el productor de antes de la correccion.
+  # Un eslabon tiene dos fuentes: lo que come y quien lo cocina (C-234).
+  if [ "ads/reel-$r/edl-sell.json" -nt "work/scenes/reel-$r/plan-full.json" ]      || [ "scripts/plan-reel.mjs" -nt "work/scenes/reel-$r/plan-full.json" ]; then
+    echo "  (el EDL o plan-reel.mjs son mas nuevos que el plan: regenerando escenas)"
     node scripts/plan-reel.mjs --reel "$r" 2>&1 | tail -1
   fi
   # `plan-reel.mjs` regenera el plan SIN encuadres —los calcula `punch-ins.py`—
@@ -211,6 +218,24 @@ for r in "${REELS[@]}"; do
   node scripts/render-hook.mjs --source "$SRC" \
     --plan "work/scenes/reel-$r/plan-full.json" \
     --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
+  # **Donde esta su cara se mide sobre ESTE corte, no sobre el de antes.**
+  # `cadena.py` declara `cara` colgando de `corte` desde el principio, y sin
+  # embargo `montar.sh` no corria `sujeto.py` en ningun sitio: cada re-corte
+  # dejaba `cara.json` de la version anterior y el render colocaba la banda de
+  # subtitulos, la ventana de las placas y los paneles con la coronilla en otro
+  # sitio. Es de lo que Jaime se quejo —*«y esas guardas de que protegen, si lo
+  # que hacen es poner mi cara debajo de los titulos?»*— y la respuesta era que
+  # median bien un corte que ya no existia.
+  #
+  # **Y corre SIEMPRE, no solo cuando el corte es mas nuevo que `cara.json`.**
+  # El mismo paso produce los recortes con alfa, y esos no dependen del corte
+  # sino de lo que se DECLARA: un tablero nuevo que lo lleva dentro (`sujeto`)
+  # pide un recorte que antes no existia, con el corte sin tocar. Con la
+  # condicion puesta el paso se saltaba, el recorte no se producia y la pieza
+  # salia sin el — declarado y no producido, la averia de la casa (C-256).
+  # No cuesta: `de_la_pieza` son cuatro fotogramas de MediaPipe y
+  # `recortes_de_la_pieza` ya salta por si solo lo que esta al dia.
+  PYTHONIOENCODING=utf-8 python scripts/dominio/sujeto.py "$((10#$r))" 2>&1 | tail -1
   python scripts/subtitular.py "$r"
   # **Y el subtitulo, cruzado con el libreto. Aqui, no cuando alguien se acuerde.**
   #
@@ -232,7 +257,17 @@ for r in "${REELS[@]}"; do
   PYTHONIOENCODING=utf-8 python scripts/oido.py "$((10#$r))" || true
 done
 
-REELS_PEDIDOS="${REELS[*]}" node scripts/reels-spec.mjs
+# **El spec se puede saltar, y hace falta para montar en paralelo.**
+#
+# `reels-spec.mjs` escribe UN fichero para las siete —`src/reels.json`—, asi que
+# dos montajes a la vez se lo pisan: es lo unico compartido de toda la linea.
+# Corriendolo una sola vez ANTES y saltandolo aqui, las piezas se pueden montar
+# en paralelo sin tocarse, porque todo lo demas es de su pieza.
+if [ -z "${SALTA_SPEC:-}" ]; then
+  REELS_PEDIDOS="${REELS[*]}" node scripts/reels-spec.mjs
+else
+  echo "  (spec ya hecho para el lote: no se regenera)"
+fi
 
 # ── ¿llega al render lo que se declaro? ──────────────────────────────────────
 #
@@ -407,7 +442,38 @@ for r in "${REELS[@]}"; do
   # musica si no lo esta, y masteriza la voz igual —lo dice su propio
   # comentario, *«sin musica tambien hay que masterizar»*—. La rama duplicaba
   # la pregunta y se llevaba por delante la mitad que no duplicaba.
-  bash scripts/musica.sh "$n"
+  # **Y los efectos se sacan de ESTE render, no del de ayer.**
+  #
+  # `voz-limpia` sustituye la pista entera por la voz de Adobe, asi que los
+  # efectos —que viven dentro del render— hay que recuperarlos de una pista
+  # aparte. Esa pista la produce `efectos.mjs` y **`montar.sh` no lo llamaba en
+  # ningun sitio**: reel-06 se entregaba con el `-efectos.wav` del 4 de
+  # septiembre mezclado sobre el corte de hoy, o sea cada golpe sonando donde ya
+  # no pasa nada. `cadena.py` lo declaraba colgando de `render` desde el
+  # principio; lo que faltaba era que alguien lo corriera.
+  if [ ! -f "out/audio-voz/reel-R$n-efectos.wav" ] || [ "out/reels/reel-R$n.mp4" -nt "out/audio-voz/reel-R$n-efectos.wav" ]; then
+    echo "  (el render es nuevo: rehaciendo la pista de efectos)"
+    node scripts/efectos.mjs "$n" 2>&1 | tail -1
+  fi
+  # **Y la copia sin musica caduca con el render.**
+  #
+  # `musica.sh` mezcla sobre `out/entrega/.sin-musica/`, y eso es lo que hace la
+  # mezcla idempotente (C-233). El precio es que esa copia, mientras exista, ES
+  # la fuente: el paso deja de mirar el render. Medido el 6-9-2026, cuatro
+  # entregas salian de una copia vieja — reel-01 a 1x con el corte a 1,15x, y
+  # reel-04 nueve segundos y medio mas corta que su propio render.
+  #
+  # Una cache que hace idempotente un paso lo hace tambien inmune a las
+  # correcciones. Toda cache tiene que saber de que cuelga.
+  if [ -f "out/entrega/.sin-musica/reel-R$n.mp4" ] && [ "out/reels/reel-R$n.mp4" -nt "out/entrega/.sin-musica/reel-R$n.mp4" ]; then
+    echo "  (el render es nuevo: la copia sin musica se rehace)"
+    rm -f "out/entrega/.sin-musica/reel-R$n.mp4"
+    python scripts/voz-limpia.py "$n" 2>&1 | grep -E "acelerada|sincronia" || true
+  fi
+  # El interprete se pregunta, no se nombra: el antivirus se llevo
+  # `usr/bin/bash.exe` de la instalacion de Git y no deja reponerlo. `sh.exe` es
+  # el mismo binario y estaba al lado, asi que la linea moria por el nombre.
+  "$(command -v bash || command -v sh)" scripts/musica.sh "$n"
   # **Y la entrega se sella: el montaje entero queda guardado.**
   #
   # Jaime, cuando su entrega aprobada no se pudo rehacer: *«no se trata de

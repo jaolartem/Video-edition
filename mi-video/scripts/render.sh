@@ -34,4 +34,6 @@ echo "  dura ${DUR}s (el plan dice ${PLAN}s)"
 awk -v d="$DUR" -v p="$PLAN" 'BEGIN{ if (p>0 && (d-p>3 || p-d>3)) { print "  OJO: el render no cuadra con el plan — puede ser el fichero anterior"; exit 1 } }'
 
 [ "${2:-}" = "--solo-render" ] && exit 0
-bash scripts/musica.sh "$n"
+# El interprete se pregunta, no se nombra: `bash.exe` puede no estar (el
+# antivirus se lo llevo de la instalacion de Git) y `sh.exe` es el mismo binario.
+"$(command -v bash || command -v sh)" scripts/musica.sh "$n"

@@ -95,6 +95,30 @@ def _laminas():
                             " aunque cumpla la paleta."}
 
 
+def _canon_escrito():
+    """`docs/canon.md` ENTERO, que es donde vive lo que no cabe en un token.
+
+    **Y no viajaba.** El pedido llevaba la paleta, la tipografia y las
+    prohibiciones —`_canon()`— y las 26 laminas, pero no el documento donde estan
+    escritas las reglas de composicion. Asi que todo lo que Jaime fijo el
+    6-9-2026 mirando siete referencias —como se mueve el texto, como se llena el
+    fondo sin competir con el, la trama frente al grano pintado, la traduccion
+    del registro de Veritasium a nuestros tokens, y la receta del recorte con sus
+    doce grises y su canto de fibra— existia en el repositorio y **no llegaba a
+    quien compone**.
+
+    Es la averia numero uno de este proyecto contada otra vez: la regla escrita y
+    el paso siguiente sin verla. Lo dice el docstring de `figuras_que_se_trazan`
+    con otras palabras — *«no se puede elegir de un catalogo que no se ve»*— y
+    aqui pasaba con el documento entero.
+    """
+    ruta = os.path.join(os.path.dirname(RAIZ), "docs", "canon.md")
+    try:
+        return open(ruta, encoding="utf-8").read()
+    except OSError:
+        return "(no se pudo leer docs/canon.md)"
+
+
 def _canon():
     """La paleta y las prohibiciones, del repositorio y no de memoria.
 

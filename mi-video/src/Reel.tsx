@@ -78,9 +78,26 @@ export const Reel: React.FC<{ spec: ReelSpec }> = ({ spec: r }) => {
         desatura={r.desatura}
         glitch={r.glitch}
         virados={r.virados}
+        recortes={r.recortes}
       />
     </PunchIn>
-    <BigTitle lineas={r.lineas} entraEn={r.entra} sostiene={r.sostiene} />
+    {/**
+     * **El rótulo del gancho lo dice el gancho, o lo dice `BigTitle`. Nunca los
+     * dos.**
+     *
+     * `BigTitle` vive en el 62-76% de la altura, que es el tercio donde la
+     * interfaz de Meta pone nombre, caption y botones — y era la mitad de la
+     * lámina que los siete compartían. Con el gancho puesto, esas mismas
+     * `lineas` ya están arriba y detrás de su cabeza: dibujarlas otra vez abajo
+     * sería decir lo mismo dos veces y devolver el rótulo justo al sitio del que
+     * se lo sacó.
+     *
+     * Se queda para las piezas que no traen gancho —una portada sin recorte no
+     * puede tener texto detrás de nadie— y ahí sigue siendo lo que era.
+     */}
+    {r.recortes?.some((x) => x.elemento === "titular") ? null : (
+      <BigTitle lineas={r.lineas} entraEn={r.entra} sostiene={r.sostiene} />
+    )}
     {/**
      * Las ilustraciones y los movimientos que el camino de cada segmento pide.
      *
@@ -145,7 +162,27 @@ export const Reel: React.FC<{ spec: ReelSpec }> = ({ spec: r }) => {
     ) : null}
     {r.paneles.map((p) => (
       <Sequence key={p.at} from={p.at} durationInFrames={p.duration}>
-        <SidePanel bloques={p.bloques} lado={r.lado} />
+        {/* **Dos lados, y uno solo está medido.** Los bloques siguen en el de
+            la pieza —caben en cualquier margen y ahí llevan desde el principio—
+            y el volumen va al que midió `hueco.py` sobre la escena en la que
+            cae el panel, porque el volumen pide el 30% del ancho y el de la
+            pieza sale del recorte de la primera escena.
+
+            Mandar también el texto al lado medido costó una vuelta: los dos
+            paneles de reel-06 se fueron al margen del subtítulo y quedaron
+            encima de la línea. */}
+        <SidePanel
+          bloques={p.bloques}
+          lado={r.lado}
+          ladoVolumen={p.lado}
+          volumen={p.volumen}
+          casillas={p.casillas}
+          reparto={p.reparto}
+          eje={p.eje}
+          sfx={p.sfx}
+          hueco={p.hueco}
+          fuente={p.fuente}
+        />
       </Sequence>
     ))}
     {r.cta ? (

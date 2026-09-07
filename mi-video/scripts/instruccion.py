@@ -104,6 +104,65 @@ INSTRUCCIONES = (
             Aguja("src/Ad.tsx", "bajoTablero"),
         ),
     ),
+    Instruccion(
+        codigo="T-03",
+        paso="disenar",
+        clase="tablero",
+        enunciado=(
+            "El pie de fuente va FUERA de la zona segura, pegado por debajo de"
+            " su suelo (65% de la altura, 1248 px) y no al fondo del cuadro, que"
+            " es donde la interfaz de Meta lo tapa. UNA linea, JetBrains Mono,"
+            " azul secundario sobre banda propia, y redactada en AFIRMATIVO"
+            " -«basado en X datos bajo X condiciones»- con la cifra y el tramo"
+            " exactos. Jaime: «no me interesa que lo lean, solo que sepan que"
+            " existe», y «ahora que si lo leen, pues que este bien leido»: no se"
+            " abrevia hasta que deje de decir nada, lo que no cabe sale como"
+            " falta. Y un ACENTO por tablero: si hay tres cosas en oro, dos"
+            " sobran."
+        ),
+        agujas=(
+            Aguja("src/brand/pie.json", '"max_caracteres": 97'),
+            Aguja("src/brand/franja.ts",
+                  "sueloPx: Math.round(SUELO * layout.height),"),
+            Aguja("src/components/PieTablero.tsx",
+                  "top: franja.sueloPx + PIE.hueco,"),
+            Aguja("src/components/Tablero.tsx", "<PieTablero linea="),
+            Aguja("scripts/reels/cifras.mjs", 'const DESTINO = "pie";'),
+            Aguja("src/components/Remate.tsx",
+                  "acento ? color.gold : color.lightNeutral"),
+        ),
+    ),
+    Instruccion(
+        codigo="T-04",
+        paso="disenar",
+        clase="subtitulo",
+        enunciado=(
+            "El cuadro negro del subtitulo deja de ser el tratamiento UNICO:"
+            " «los CC estan feos; pueden ser a negativo solamente para variar el"
+            " cuadro negro, unos CC que se compongan mejor respecto a la"
+            " composicion», «hay varios que quedarian bien sin el cuadro, otras"
+            " a las que le queda bien y otras a las que le quedaria mejor"
+            " negativo», y el limite: «no te cierres a un solo sistema, pero"
+            " debe ser coherente con el resto del video». Cual toca lo decide lo"
+            " que hay DETRAS en esa escena y se MIDE, no se opina: la luz, el"
+            " grano y el movimiento de la banda que el cc ocupa. Y el negativo"
+            " solo entra donde de verdad da contraste — `difference` con blanco"
+            " devuelve 1-fondo, asi que muere en el gris medio. La coherencia"
+            " manda sobre la variedad: el tratamiento es de la escena, con"
+            " histeresis, y una escena corta hereda."
+        ),
+        agujas=(
+            Aguja("src/brand/cc.json", '"contraste": 0.35'),
+            Aguja("src/brand/cc.ts", 'mixBlendMode: "difference"'),
+            Aguja("scripts/dominio/trasfondo.py",
+                  "np.abs(1.0 - 2.0 * porFrame).mean()"),
+            Aguja("scripts/reels/cc.mjs",
+                  "export const trato = (m, anterior, oro = false) => {"),
+            Aguja("src/components/captionBand/Plana.tsx", "...pintaDelCc(trato),"),
+            Aguja("scripts/reels-spec.mjs",
+                  "pieza.captions = trataElCc(pieza, slug, bajarEnElGancho("),
+        ),
+    ),
 )
 
 

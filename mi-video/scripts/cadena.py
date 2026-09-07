@@ -58,7 +58,20 @@ ESLABONES = [
     ("subtitulos",  "work/subs/todos.json",               "subtitular.py",      "corte"),
     # De `corte`, no de `subtitulos`: se mide la cara sobre el vídeo cortado.
     ("cara",        "work/scenes/{s}/cara.json",          "sujeto.py",          "corte"),
-    ("spec",        "src/reels.json",                     "reels-spec.mjs",     "cara"),
+    # La otra mitad de `cara`, y del mismo corte: a qué lado deja sitio su
+    # cuerpo, escena por escena. Sin esto el volumen de un panel se coloca a
+    # ojo, que es como doce de trece acabaron dibujados encima de él.
+    ("huecos",      "work/scenes/{s}/huecos.json",        "hueco.py",           "corte"),
+    # Qué hay DETRÁS del subtítulo, escena por escena: con eso se decide si el
+    # cc lleva caja, va limpio o va en negativo. Del corte, como las otras dos
+    # medidas de imagen — se mide sobre el cuadro que ve el espectador. Si el
+    # corte cambia, el fondo del cc cambia y hay que volver a medir.
+    ("trasfondo",   "work/scenes/{s}/trasfondo.json",     "trasfondo.py",       "corte"),
+    # **Dos entradas, y las dos se declaran.** El spec come de las dos medidas
+    # que cuelgan del corte, y dejar sólo una habría sido perder la otra en
+    # silencio — que es justo el parentesco deducido contra el que avisa la nota
+    # de arriba, con el signo cambiado.
+    ("spec",        "src/reels.json",                     "reels-spec.mjs",     ("huecos", "trasfondo")),
     ("render",      "out/reels/reel-R{n}.mp4",            "render.mjs",         "spec"),
     ("efectos",     "out/audio-voz/reel-R{n}-efectos.wav", "efectos.mjs",       "render"),
     ("entrega",     "out/entrega/reel-R{n}.mp4",          "voz-limpia.py · musica.sh", "efectos"),
@@ -67,6 +80,38 @@ ESLABONES = [
 
 def _cuando(ruta):
     return os.path.getmtime(ruta) if os.path.exists(ruta) else None
+
+
+def _codigo(quien):
+    """Cuándo se tocó por última vez el código que produce ese eslabón.
+
+    **El agujero que tapa.** La cadena comparaba cada artefacto con su *entrada*
+    y con nada más. Así que arreglar el productor no caducaba nada: el plan de
+    reel-06 seguía «al día» con el `plan-reel.mjs` de antes de C-233, y la pieza
+    se volvía a entregar arrastrando 2,88 s de aire muerto que el fallo le metía
+    desde el mapa de silencios de otra cinta.
+
+    Es la avería de siempre en su forma más cara: la corrección existe, está
+    probada, y la entrega sale con el código viejo porque nadie declaró que el
+    código también es una entrada.
+
+    La columna `quien` ya decía qué script produce cada eslabón; sólo era un
+    apunte para leer. Aquí se convierte en dependencia de verdad.
+    """
+    ts = []
+    for parte in quien.split("·"):
+        nombre = parte.strip().split()[0]
+        if "." not in nombre:
+            continue
+        aqui = os.path.dirname(os.path.abspath(__file__))
+        # `sujeto.py` vive en `dominio/`, y buscarlo solo en `scripts/`
+        # dejaba ese eslabon sin productor: la comprobacion se saltaba en
+        # silencio, que es la forma de fallar que este proyecto ya conoce.
+        t = _cuando(os.path.join(aqui, nombre)) or _cuando(
+            os.path.join(aqui, "dominio", nombre))
+        if t is not None:
+            ts.append((t, nombre))
+    return max(ts) if ts else None
 
 
 def desde(n):
@@ -78,11 +123,17 @@ def desde(n):
         t = _cuando(ruta)
         if t is None:
             return (i, nombre, quien, f"no existe {ruta}")
-        padre = cuando.get(come_de)
-        # `encuadres` comparte fichero con `plan`: no se compara consigo mismo.
-        if padre is not None and ruta != donde[come_de] and t < padre:
-            return (i, nombre, quien,
-                    f"{ruta} es mas viejo que {donde[come_de]}")
+        # Un eslabón puede comer de varios: el spec come del hueco y del
+        # trasfondo, y comparar sólo con uno deja al otro sin caducar.
+        for come in (come_de,) if isinstance(come_de, str) else (come_de or ()):
+            padre = cuando.get(come)
+            # `encuadres` comparte fichero con `plan`: no se compara consigo mismo.
+            if padre is not None and ruta != donde[come] and t < padre:
+                return (i, nombre, quien,
+                        f"{ruta} es mas viejo que {donde[come]}")
+        cod = _codigo(quien)
+        if cod and t < cod[0]:
+            return (i, nombre, quien, f"{ruta} se hizo con el {cod[1]} de antes")
         cuando[nombre], donde[nombre] = t, ruta
     return None
 

@@ -7,8 +7,16 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
+import { assertShort } from "../brand/copy";
+import { franja } from "../brand/franja";
 import { fontFamily } from "../brand/fonts";
 import { color, layout, videoText, tracking } from "../brand/tokens";
+import { Casillas } from "./Casillas";
+// El contrato del panel vive aparte, como el de las otras seis formas: ver
+// `panel/tipos.ts`.
+import type { SidePanelProps } from "./panel/tipos";
+import { Reparto } from "./Reparto";
+import { Volumen as Escena3D } from "./Volumen";
 
 /**
  * Bloques que se construyen **en el espacio libre del plano abierto**.
@@ -25,17 +33,29 @@ import { color, layout, videoText, tracking } from "../brand/tokens";
  * Cada bloque entra por su lado y se queda: la pila se construye, no aparece.
   * @clase capa
 */
-export const SidePanel: React.FC<{
-  /** Líneas del panel, de arriba abajo. Cortas: es un ancla, no un párrafo. */
-  bloques: { texto: string; fuerte?: boolean; placa?: string }[];
-  /** Lado libre del cuadro. Sale del ancla del sujeto, no se elige a ojo. */
-  lado: "izq" | "der";
-  /** Frames entre la entrada de un bloque y el siguiente. */
-  escalon?: number;
-  /** Frames que tarda un bloque en entrar. */
-  paso?: number;
-}> = ({ bloques, lado, escalon = 7, paso = 8 }) => {
+export const SidePanel: React.FC<SidePanelProps> = ({
+  bloques, lado, ladoVolumen, volumen, hueco, fuente,
+  casillas, reparto, eje, sfx = null, escalon = LEE, paso = 8,
+}) => {
   const frame = useCurrentFrame();
+  // **El bloque que no cabe falla, no se recorta.** El `overflow: hidden` de
+  // abajo es correcto —impide que una tercera línea se coma la cara— pero
+  // callaba: reel-04 e5 rotulaba «NO PUEDE / PROBAR EL» y la palabra que hacía
+  // significar la frase no llegaba a la pantalla. El tope está medido sobre
+  // render y vive en `copy.ts` con los demás.
+  for (const b of bloques) assertShort(b.texto, "panel", "SidePanel.bloque");
+  // **El pie va en UNA línea, y eso es un tope, no un deseo.**
+  //
+  // Medido sobre el ancho útil —1080 menos las dos zonas seguras, 950 px— con
+  // JetBrains Mono a 18 px y el tracking de `data`: el avance es de 11,9 px por
+  // carácter, o sea 79 caben. Se cortan en 78 para no jugarse el último. Por
+  // encima de eso el pie se parte en dos líneas y deja de ser un pie: es un
+  // párrafo debajo del panel, que es justo lo que había que quitar.
+  if (fuente && fuente.length > PIE_MAX)
+    throw new Error(
+      `SidePanel.fuente: ${fuente.length} caracteres y el pie va en una línea` +
+      ` (máx. ${PIE_MAX}). Recórtalo dejando la cifra y el tramo: «${fuente}»`,
+    );
   /**
    * El panel ocupa el 42% del ancho. Con el sujeto descentrado —el ancla cae
    * hacia un lado en las seis tomas— ese hueco existe de verdad; medirlo es lo
@@ -66,8 +86,51 @@ export const SidePanel: React.FC<{
       ...bloques.filter((b) => !!b.fuerte === fuerte).map((b) => b.texto.length),
       1,
     );
-    return Math.min(tope, ancho / (largo * AVANCE));
+    // **Y un suelo, porque encoger no es una solucion infinita.**
+    //
+    // Esta cuenta supone UNA linea, asi que con un bloque de 22 caracteres da
+    // 475/22 = 21 px. Medido en el render de reel-07: los dos paneles salian a
+    // ~21 px arriba a la derecha, ilegibles — y no era de esa pieza, le pasa a
+    // cualquier bloque de mas de ~10 caracteres, en todas.
+    //
+    // Un tablero que no se lee no esta en el video aunque este en el frame. Asi
+    // que por debajo del minimo el texto **se reparte en lineas** en vez de
+    // seguir encogiendo, y si aun asi no cabe, eso es texto de mas y se ve —
+    // que es un fallo visible, mejor que uno invisible.
+    return Math.max(MINIMO, Math.min(tope, ancho / (largo * AVANCE)));
   };
+
+  //: Por debajo de esto no se lee a distancia de brazo. Es el mismo suelo
+  //: medido que usa la franja del subtitulo (`src/brand/franja.json`), y por el
+  //: mismo motivo: el limite no es geometrico, es de vista.
+  const MINIMO = 34;
+
+  //: Cuantas lineas puede ocupar un bloque antes de que sobre texto. Dos: una
+  //: etiqueta de panel que necesita tres ya no es una etiqueta.
+  const LINEAS_MAX = 2;
+
+  /**
+   * **El oro sale UNA vez por panel, y con volumen el oro es del volumen.**
+   *
+   * El bloque `fuerte` ya dejó de repartir oro a los demás; faltaba la otra
+   * mitad, que sólo se ve con la lámina delante: **el volumen también lleva
+   * oro** —lo lleva por diseño, es su único tono vivo—, así que un panel con
+   * volumen y bloque fuerte ponía dos acentos a 200 px uno del otro. Se vio en
+   * reel-05 e7: la losa dorada del umbral y la cinta dorada de «SE ACTIVÓ SOLO»
+   * peleando en la misma esquina. Jaime: *«si hay tres cosas en oro, dos
+   * sobran; el oro dice mira aquí y con tres no lo dice nadie»*.
+   *
+   * Quién se queda con él no es arbitrario: **el volumen es lo que argumenta** y
+   * el bloque es su rótulo. Y el bloque no se queda sin jerarquía — invierte la
+   * cinta, clara con texto negro, que es el contraste que el canon ya reserva
+   * para eso y no gasta el acento.
+   */
+  // **Y con lámina, el oro es de la lámina**, por lo mismo: la casilla sellada
+  // es lo que argumenta y el bloque de al lado es su rótulo. Dos acentos en la
+  // misma esquina y el oro deja de decir «mira aquí».
+  // Y con reparto el oro es de la porción con `foco`, por lo mismo: la cifra que
+  // queda es lo que argumenta y el bloque de al lado es su premisa.
+  const oroEnTexto = !volumen && !casillas?.some((c) => c.sella) && !reparto;
 
   return (
     <AbsoluteFill
@@ -86,6 +149,24 @@ export const SidePanel: React.FC<{
         paddingBottom: layout.height * 0.42,
       }}
     >
+      {/* Va primero, y por eso queda DEBAJO de los bloques: el volumen es lo
+          que el ancla significa, no lo que se lee. Está fuera del flujo —lleva
+          su propio `position: absolute`— así que no empuja la pila. */}
+      {volumen ? (
+        <Escena3D nombre={volumen} lado={ladoVolumen ?? lado} hueco={hueco} />
+      ) : null}
+      {/* **La lámina, ARRIBA de los bloques y en el flujo**: los bloques que la
+          acompañan son su pie —«virtual · en vivo · en español» bajo la tira de
+          días—, no un rótulo aparte. Ver `Casillas`. */}
+      {casillas?.length ? (
+        <Casillas
+          casillas={casillas}
+          eje={eje}
+          ancho={ancho}
+          sfx={sfx}
+          alinea={lado}
+        />
+      ) : null}
       {bloques.map((b, i) => {
         const t = frame - i * escalon;
         const p = interpolate(t, [0, paso], [0, 1], {
@@ -100,16 +181,26 @@ export const SidePanel: React.FC<{
             key={b.texto}
             style={{
               maxWidth: ancho,
-              // Sin esto el texto en versales no partia linea y el bloque se
-              // salia del cuadro por la derecha. Verificado en render.
-              // Una linea por bloque: el corte lo decide quien escribe.
-              whiteSpace: "nowrap",
+              // **Parte linea en vez de encogerse hasta no leerse.**
+              //
+              // Estaba en `nowrap` para que no se saliera por la derecha, y la
+              // otra mitad de esa decision era encoger el cuerpo sin suelo: con
+              // 22 caracteres salia a 21 px. Con el suelo puesto, lo que hace
+              // falta es dejarle repartirse — el `maxWidth` sigue impidiendo
+              // que se salga, y `LINEAS_MAX` acota cuanto puede crecer hacia
+              // abajo antes de que sea texto de mas.
+              whiteSpace: "normal",
+              maxHeight: `${LINEAS_MAX * 1.05}em`,
               textAlign: lado === "der" ? "right" : "left",
               marginBottom: 10,
               padding: "0.12em 0.3em",
               position: "relative",
               overflow: "hidden",
-              backgroundColor: b.fuerte ? color.gold : color.richBlack,
+              backgroundColor: !b.fuerte
+                ? color.richBlack
+                : oroEnTexto
+                  ? color.gold
+                  : color.lightNeutral,
               // **El oro sale una vez por panel: en el bloque `fuerte`.**
               //
               // Esto pintaba en oro el texto de TODOS los bloques que no fueran
@@ -151,6 +242,106 @@ export const SidePanel: React.FC<{
           </div>
         );
       })}
+      {/**
+       * **El reparto, DEBAJO de los bloques y empezando cuando ya se leyeron.**
+       *
+       * Los dos detalles son la misma regla —el orden de lectura lo manda lo que
+       * la lámina afirma— y salieron de mirar el fotograma, no de deducirlos:
+       * puesto arriba, la barra daba la respuesta antes de que nadie hubiera
+       * dicho de qué era; puesto abajo pero entrando en el frame 0, la premisa y
+       * el reparto se construían a la vez y no se leía ninguno.
+       *
+       * `pie={false}` porque el panel ya imprime la fuente abajo, fuera de la
+       * zona segura: repetirla aquí son 92 px más de figura, y en el hueco del
+       * plano esos 92 px caen sobre su cabeza.
+       */}
+      {reparto ? (
+        <Reparto
+          total={reparto.total}
+          porciones={reparto.porciones}
+          signo={reparto.signo}
+          etiqueta={reparto.etiqueta}
+          ancho={ancho}
+          desde={bloques.length * escalon}
+          source={fuente ?? ""}
+          pie={false}
+        />
+      ) : null}
+      {/**
+       * **El pie, FUERA de la zona segura y en una línea.**
+       *
+       * Mismo sitio y mismo trato que el de `PanelDentro`, que es el que Jaime
+       * aprobó: pegado por debajo de `franja.sueloPx` —no al fondo del cuadro,
+       * que ahí lo tapa la interfaz de Meta— y con su banda propia, porque sobre
+       * el plano no se lee ni parando la pieza. *«No me interesa que lo lean,
+       * sólo que sepan que existe»*, y acto seguido *«ahora que si lo leen, pues
+       * que esté bien leído»*.
+       *
+       * Entra con el último bloque y no antes: es el pie de lo que se acaba de
+       * decir, no un rótulo que espera al texto.
+       */}
+      {fuente ? (
+        <div
+          style={{
+            position: "absolute",
+            left: layout.safe.left,
+            top: franja.sueloPx + 14,
+            width: layout.width - layout.safe.left - layout.safe.right,
+            padding: "10px 14px",
+            backgroundColor: color.richBlack,
+            fontFamily: fontFamily.data,
+            fontSize: PIE_CUERPO,
+            lineHeight: 1.4,
+            letterSpacing: "0.06em",
+            // En una línea de verdad: si algún día el tope de arriba se relaja,
+            // esto lo deja en evidencia en vez de dejarlo caer a dos líneas.
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textTransform: "uppercase",
+            color: color.secondaryBlue,
+            opacity: interpolate(
+              frame - bloques.length * escalon,
+              [0, 12],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+            ),
+          }}
+        >
+          {fuente}
+        </div>
+      ) : null}
     </AbsoluteFill>
   );
 };
+
+/**
+ * **El cuerpo del pie y lo que cabe en su línea**, y el segundo sale del
+ * primero medido, no estimado.
+ *
+ * Ancho útil: 1080 menos las dos zonas seguras de 65 px = 950. JetBrains Mono
+ * a 18 px avanza 0,6 em por carácter y el tracking de `data` añade 0,06 em, o
+ * sea 11,88 px: caben 79. Se corta en 78 para no jugarse el último.
+ */
+const PIE_CUERPO = 18;
+const PIE_MAX = 78;
+
+/**
+ * **Lo que cuesta leer un bloque, y por eso es lo que se espera antes de meter
+ * el siguiente.**
+ *
+ * 0,75 s, que es la misma cifra con la que `scripts/reels/lectura.mjs ::
+ * ADELANTO` **ya reservaba** el hueco del panel —*«0,75 s por bloque más medio
+ * segundo de respiro»*—. Estaba reservada y no la usaba el que dibuja: con 7
+ * frames los tres bloques de reel-01 e2 entraban en 0,7 s y el panel se quedaba
+ * quieto los cinco segundos siguientes. Eso es literalmente lo que Jaime llamó
+ * «tres rótulos quietos» (C-254) — el tiempo estaba comprado y no se gastaba.
+ *
+ * Con la biblioteca de figuras cerrada pesa el doble: lo único que puede
+ * construirse mientras él habla es la tipografía, y si entra de golpe no
+ * construye nada.
+ *
+ * **Cabe siempre, por construcción**: el spec le reserva al panel
+ * `(0,75 n + 0,5) s` como mínimo y el último bloque entra en
+ * `0,75 (n−1) s + paso`.
+ */
+const LEE = 22;

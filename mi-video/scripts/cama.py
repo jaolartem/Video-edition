@@ -33,9 +33,38 @@ sobre ése la misma regla del techo deja también un suelo alto. No se procesa
 nada; se decide de dónde se corta.
 
     python scripts/cama.py public/musica/reel-01.mp3 81 "equalizer=..."
+    python scripts/cama.py --nivel reel-06     # a qué LUFS entra su cama
+    python scripts/cama.py --objetivo          # cuántos dB bajo la voz
+    python scripts/cama.py --cola              # el silencio del final
+
+## Y quién lee el fichero
+
+`src/brand/cama.json` se lee **aquí y sólo aquí**. Estaba abierto a mano desde
+tres sitios —dos `python -c` dentro de `musica.sh` y un número escrito a pelo en
+`remezclar.py`— y por eso `objetivo_db` podía decir 16 mientras el bucle que
+mezcla apuntaba a 14: la decisión vivía en el fichero y el que mezcla no la
+leía. Ahora la pregunta «¿a qué nivel entra la cama?» tiene una respuesta.
 """
+import json
+import os
 import subprocess
 import sys
+
+#: Donde vive la decisión: nivel de la cama, separación objetivo y cola.
+FICHERO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "src", "brand", "cama.json")
+
+
+def leer():
+    """Lo declarado en `src/brand/cama.json`."""
+    with open(FICHERO, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def nivel(slug):
+    """A qué LUFS entra la cama de esa pieza: el suyo si lo tiene, o el de lote."""
+    d = leer()
+    return d["piezas"].get(slug, d["por_defecto"])
 
 #: Ventana de análisis, en segundos. Tres es lo que la norma de sonoridad llama
 #: «corto plazo»: por debajo persigue notas sueltas y por encima difumina el
@@ -47,11 +76,17 @@ VENTANA = 3.0
 #: la cuenta en unas decenas de candidatos en vez de miles.
 PASO = 5.0
 
-#: Lo que puede moverse el tramo elegido, de su reposo a su clímax. Ocho
-#: decibelios: por debajo de eso ya no hay obra clásica que valga —el Poco
-#: allegretto de Brahms entero se mueve 11,8— y por encima vuelve el problema
-#: que esto viene a resolver.
-RANGO_MAX = 8.0
+#: Lo que puede moverse el tramo elegido, de su reposo a su clímax.
+#:
+#: Estaba en 8 y **medido en la entrega no bastaba**: reel-05 salió con 16,4 dB
+#: de recorrido y su pico 1,6 dB POR ENCIMA de la voz. Jaime, sobre las siete:
+#: *«la música ya no interrumpe, pero ahora el volumen alto sobresale por encima
+#: de la voz y no la acompaña»*.
+#:
+#: **5, que es lo que mide reel-04** —la única de la que nunca se quejó: 3,2 dB
+#: de recorrido en la entrega—. Por encima de eso deja de acompañar y empieza a
+#: competir, y una cama que compite no es una cama.
+RANGO_MAX = 5.0
 
 SR = 1000
 
@@ -90,7 +125,7 @@ def donde(mp3, dura, talla=""):
     if len(v) <= ancho:
         return 0.0
     salto = max(1, int(PASO / VENTANA))
-    mejor, cual = None, 0.0
+    mejor, cual, ancho_elegido = None, 0.0, 0.0
     for i in range(0, len(v) - ancho + 1, salto):
         t = v[i:i + ancho]
         alto, tipico = np.percentile(t, 95), np.percentile(t, 50)
@@ -100,11 +135,43 @@ def donde(mp3, dura, talla=""):
         # obra que se mueve entera —y entonces gana el que menos se mueva.
         nota = tipico - max(0.0, rango - RANGO_MAX)
         if mejor is None or nota > mejor:
-            mejor, cual = nota, i * VENTANA
+            mejor, cual, ancho_elegido = nota, i * VENTANA, rango
+    # **Y si ni el mejor se esta quieto, se dice.**
+    #
+    # Penalizar el rango sin rechazarlo evita quedarse sin candidatos, pero
+    # tambien deja pasar en SILENCIO una obra que se mueve entera — y entonces
+    # el pasaje elegido sigue teniendo un climax que se planta sobre la voz.
+    # Jaime lo oyo en las siete: *«la musica ya no interrumpe, pero ahora el
+    # volumen alto sobresale por encima de la voz y no la acompana»*.
+    #
+    # Medido en la entrega, la cama de reel-05 se movia **16,4 dB** y su pico
+    # quedaba 1,6 dB POR ENCIMA de su voz; reel-04, la unica de la que nunca se
+    # quejo, se mueve 3,2. La respuesta a una obra que no se queda quieta no es
+    # bajarla mas —desaparece— sino **otra obra**, y eso lo decide el, no esto.
+    if ancho_elegido > RANGO_MAX:
+        print(f"cama: el tramo mas quieto de esta obra se mueve"
+              f" {ancho_elegido:.1f} dB, y el tope son {RANGO_MAX:.0f}."
+              f" Va a sobresalir sobre la voz: no es una cama, es una pieza.",
+              file=sys.stderr)
     return round(cual, 1)
 
 
 def main():
+    # Las tres preguntas que el fichero contesta, para quien no es Python
+    # —`musica.sh`—. Van aquí y no como otro `python -c` suelto: un `json.load`
+    # escrito en la línea de órdenes es una segunda lectura del fichero, y dos
+    # lecturas es como `objetivo_db` acabó diciendo una cosa y la mezcla otra.
+    if len(sys.argv) > 1 and sys.argv[1].startswith("--"):
+        que = sys.argv[1][2:]
+        if que == "nivel":
+            print(nivel(sys.argv[2]))
+        elif que == "objetivo":
+            print(leer()["objetivo_db"])
+        elif que == "cola":
+            print(leer().get("cola_s", 0.6))
+        else:
+            return 2
+        return 0
     if len(sys.argv) < 3:
         return 2
     mp3, dura = sys.argv[1], float(sys.argv[2])

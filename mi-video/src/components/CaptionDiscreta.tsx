@@ -2,7 +2,7 @@ import React from "react";
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { franja } from "../brand/franja";
-import { layout, videoText, type ModeTokens } from "../brand/tokens";
+import { color, layout, videoText, type ModeTokens } from "../brand/tokens";
 
 /**
  * **El subtítulo mientras manda el tablero.**
@@ -23,9 +23,19 @@ import { layout, videoText, type ModeTokens } from "../brand/tokens";
  *   de en la barbilla. Pegado a la barbilla es la regla cuando hay una cara en
  *   cuadro; con un tablero no hay cara, y el sitio bueno es el que no roba
  *   composición.
- * - **Sin caja y sin contorno.** Los dos existen para sobrevivir sobre imagen —
- *   pared clara, camisa azul—. Sobre un tablero el fondo lo pone el tablero, y
- *   una caja negra encima de una composición plana es un parche.
+ * - **El contraste va en la letra, no en el cuadro.** Aquí no había ni caja ni
+ *   contorno, con el argumento de que *«sobre un tablero el fondo lo pone el
+ *   tablero»*, y es falso justo donde escribe: la franja empieza en el 54,58%,
+ *   que es donde el tablero **deja** de dibujar, así que detrás de esta letra
+ *   está la placa — y las placas del canon tienen discos de hueso. Blanco sobre
+ *   hueso no se lee.
+ *
+ *   Se resolvió una vez apagando 872 px del cuadro, y Jaime lo devolvió
+ *   (C-253): *«era más fácil poner las letras en oro que tapar la mitad»*. Así
+ *   que el contraste lo lleva la línea: **oro sobre el negro del canon**, en un
+ *   bloque plano que mide lo que mide el texto. `boxDecorationBreak: clone` lo
+ *   recorta renglón a renglón, así que no es un rectángulo alrededor del
+ *   párrafo: es la cinta del canon a tamaño de letra.
  * - **Cuerpo pequeño**, 55 px. Es el mínimo práctico medido, no un número
  *   suelto: por debajo el subtítulo se pierde a distancia de brazo. Pequeño
  *   frente a los 62 de la capa portante, y legible.
@@ -73,16 +83,31 @@ export const CaptionDiscreta: React.FC<{
         alignItems: "flex-start",
         fontFamily: fontFamily.body,
         fontSize: franja.cuerpo,
-        // Peso medio: sobre una superficie plana el 800 de la banda portante se
-        // lee como titular, y esto acompaña.
-        fontWeight: 600,
-        lineHeight: 1.24,
+        // **Peso 900.** Sobre vídeo el peso pesa más que el cuerpo, y esta capa
+        // no puede crecer: es la que acompaña. Lo que se paga en cuerpo se cobra
+        // aquí.
+        fontWeight: 900,
+        lineHeight: 1.28,
         letterSpacing: videoText.tracking,
-        color: tokens.text,
         opacity: p,
       }}
     >
-      <span>
+      {/* El envoltorio de bloque hace falta para que el `<span>` de dentro siga
+          siendo INLINE: como hijo directo del flex se blockifica, y entonces
+          `clone` pinta un solo rectángulo del ancho de la columna en vez de
+          recortarse renglón a renglón. */}
+      <div style={{ maxWidth: "100%" }}>
+      <span
+        style={{
+          backgroundColor: color.richBlack,
+          color: color.gold,
+          // Renglón a renglón: sin esto el bloque sale como un rectángulo que
+          // abraza el párrafo entero, incluido el hueco de la última línea.
+          boxDecorationBreak: "clone",
+          WebkitBoxDecorationBreak: "clone",
+          padding: "0.06em 0.28em",
+        }}
+      >
         {partes.map((t, i) =>
           corrige && t.toLowerCase() === corrige.dice.toLowerCase() ? (
             <span key={i} style={{ color: tokens.accent }}>
@@ -93,6 +118,7 @@ export const CaptionDiscreta: React.FC<{
           ),
         )}
       </span>
+      </div>
     </div>
   );
 };

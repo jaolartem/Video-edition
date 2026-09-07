@@ -3,6 +3,8 @@ import { fontFamily } from "../brand/fonts";
 import { Compuesta } from "./captionBand/Compuesta";
 import { Corregida } from "./captionBand/Corregida";
 import { Plana } from "./captionBand/Plana";
+import { cabeElCcArriba, cc, type Trato } from "../brand/cc";
+import { franja } from "../brand/franja";
 import { layout, videoText, type ModeTokens } from "../brand/tokens";
 import type { Compuesto } from "./captionBand/Compuesta";
 
@@ -114,8 +116,39 @@ export const CaptionBand: React.FC<{
   compuesto?: Compuesto;
   /** Frame en que empieza este subtitulo, para poder animar dentro de el. */
   desde?: number;
+  /**
+   * **Abajo y punto: aquí manda otra capa.**
+   *
+   * Jaime, 6-9-2026, sobre el gancho: *«puedes mantener el subtítulo los
+   * primeros 5 segundos, con el cc abajo de mí»*. Mientras el rótulo del gancho
+   * está en cuadro, el hueco de encima de su cabeza **no está libre** —es
+   * justamente donde vive el rótulo—, así que subir ahí es lo contrario de lo
+   * que la subida venía a hacer. Medido en reel-06: con 544 px de hueco el cc se
+   * subía y tapaba «NADA HA» de «NADA HA PASADO».
+   *
+   * Se apoya en el suelo de la franja, que es la geometría que ya estaba
+   * declarada en `franja.json` y que ningún tablero invade.
+   *
+   * Lo decide el montaje —`reels/portada.mjs :: bajarEnElGancho`— y no este
+   * componente: aquí no se sabe qué más hay en cuadro.
+   */
+  abajo?: boolean;
+  /**
+   * **Cómo se resuelve su fondo**, que hasta hoy no se resolvía: era el cuadro
+   * negro en los 90 segundos de las siete piezas.
+   *
+   * Jaime, 6-9-2026: *«los CC están feos; pueden ser a negativo solamente para
+   * variar el cuadro negro, es decir, unos CC que se compongan mejor respecto a
+   * la composición»*, *«hay varios que quedarían bien sin el cuadro, otras a las
+   * que le queda bien y otras a las que le quedaría mejor negativo»*.
+   *
+   * No se elige aquí: lo mide `scripts/dominio/trasfondo.py` sobre la banda que
+   * este componente ocupa en esa escena y lo decide `scripts/reels/cc.mjs`.
+   * Los tres tratamientos y lo que comparten viven en `src/brand/cc.ts`.
+   */
+  trato?: Trato;
 }> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0,
-        coronilla, lado }) => (
+        coronilla, lado, abajo, trato = cc.porDefecto }) => (
   <div
     style={{
       position: "absolute",
@@ -145,9 +178,13 @@ export const CaptionBand: React.FC<{
        * era falso —predicho desde el ancla de movimiento, que devolvía siempre
        * 0,32— y con él todas parecían tener 340 px libres. Ahora se mide.
        */
-      ...(coronilla && coronilla * layout.height - layout.safe.top - 24 >= 260
+      // `abajo` gana siempre: es la única que sabe que arriba hay otra capa.
+      // Si cabe o no lo dice `cabeElCcArriba`, con los números de `cc.json`:
+      // estaban aquí sueltos —un 260 y un 24— y hacían falta en tres sitios más,
+      // el que mide el fondo de esa banda, el que decide el tratamiento y éste.
+      ...(!abajo && cabeElCcArriba(coronilla)
         ? {
-            top: layout.safe.top,
+            top: cc.cabeza.desde,
             // Arriba se comparte con el panel: el cc se queda con su mitad.
             ...(lado === "der"
               ? { right: layout.width * 0.44 }
@@ -155,10 +192,16 @@ export const CaptionBand: React.FC<{
             // Acaba un pelo antes de la coronilla, para no morderla. Sin
             // `Math.max`: aquí ya se sabe que hay 260 px o más, y un suelo
             // artificial era lo que la metía sobre su cara cuando no cabía.
-            maxHeight: coronilla * layout.height - layout.safe.top - 24,
+            maxHeight:
+              (coronilla ?? 0) * layout.height -
+              cc.cabeza.desde -
+              cc.cabeza.margen,
             justifyContent: "flex-end" as const,
           }
-        : { bottom: layout.captionBottom }),
+        : // Bajo el gancho se apoya en el suelo de la franja —672 px, el borde
+          // inferior de la zona segura— y no en la barbilla: ahí es donde el
+          // rótulo tiene garantizado no llegar. Ver `abajo`.
+          { bottom: abajo ? franja.desdeAbajo : layout.captionBottom }),
       minHeight: layout.captionBand,
       display: "flex",
       flexDirection: "column",
@@ -181,7 +224,7 @@ export const CaptionBand: React.FC<{
     {compuesto ? (
       <Compuesta c={compuesto} desde={desde} />
     ) : (
-      <Plana desde={desde}>
+      <Plana desde={desde} trato={trato}>
         {corrige ? (
           <Corregida texto={text} corrige={corrige} desde={desde} palpita={palpita} />
         ) : realza ? (

@@ -5,10 +5,11 @@ import { assertShort } from "../brand/copy";
 import { useEntrada } from "../brand/horario";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo } from "./Fondo";
+import { Remate } from "./Remate";
 import { ZonaTablero } from "./ZonaTablero";
 import { Columna } from "./comparacion/Columna";
 import { horarioDe } from "./comparacion/horario";
-import { color, layout, size, tracking } from "../brand/tokens";
+import { color, layout } from "../brand/tokens";
 import type { ComparacionProps } from "./comparacion/tipos";
 
 export type { Columna, ComparacionProps } from "./comparacion/tipos";
@@ -53,8 +54,6 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   izquierda,
   derecha,
   remate,
-  fuente,
-  condicion,
   placa, recorte = "esquina",
   duracion,
   sound = false,
@@ -62,7 +61,6 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   const entra = useEntrada();
 
   assertShort(premisa, "title", "Comparacion.premisa");
-  assertShort(condicion, "legal", "Comparacion.condicion");
   for (const [k, c] of [["izquierda", izquierda], ["derecha", derecha]] as const) {
     assertShort(c.titulo, "label", `Comparacion.${k}.titulo`);
     assertShort(c.cifra, "outcome", `Comparacion.${k}.cifra`);
@@ -153,69 +151,63 @@ export const Comparacion: React.FC<ComparacionProps> = ({
         progreso={entra(t.entraDer)}
       />
 
-      {remate ? (
-        <div
-          style={{
-            position: "absolute",
-            top: 790,
-            left: layout.safe.left,
-            right: layout.safe.right,
-            display: "flex",
-            justifyContent: "center",
-            opacity: entra(t.remateAt),
-            fontFamily: fontFamily.bloque,
-          }}
-        >
-          <Cinta tinte={color.gold} giro={1.8} cuerpo={50}>
-            {remate}
-          </Cinta>
-        </div>
-      ) : null}
-
       {/**
-       * **Fuente y condición en la misma banda clara.**
+       * **El remate y el pie, apilados desde abajo. No cada uno por su lado.**
        *
-       * La fuente iba suelta sobre el fondo y caía justo encima de la trama de
-       * la placa: ilegible. En el canon el pie va sobre plano —«FUENTE: CRA
-       * 2026»— y por eso aquí comparte la banda con la condición: las dos son
-       * letra pequeña que tiene que poder leerse, y ninguna compite con el dato.
+       * Jaime, sobre R-07 e3: *«el pie de fuente se dibuja encima de la cinta»*.
+       * Y era inevitable por construcción: el remate iba en `top: 790` —un
+       * número escrito a mano— y el pie en `bottom: 0`, así que quién tapaba a
+       * quién dependía de **cuánto texto trajera la condición**. Con dos líneas
+       * de condición la banda mide 140 px y no se tocan; con cuatro mide 200 y
+       * se comen la cinta, que es lo que salió en pantalla desde 36,6 s.
+       *
+       * Apilados en una sola columna anclada abajo, el solape deja de ser
+       * posible: el pie ocupa lo que necesita y el remate se apoya encima. Es la
+       * misma corrección que T-02 hizo con la franja — sustituir un número
+       * escrito a mano por una relación que no se puede incumplir.
        */}
       <div
         style={{
           position: "absolute",
           left: 0,
           right: 0,
-          // Apoyado en el techo de la franja, no en un 1570 escrito a mano.
           bottom: 0,
-          backgroundColor: color.lightNeutral,
-          transform: "rotate(0.8deg)",
-          padding: "18px 74px 22px",
-          opacity: entra(t.pieAt),
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "stretch",
         }}
       >
-        <div
-          style={{
-            fontFamily: fontFamily.data,
-            fontSize: size.source,
-            letterSpacing: tracking.labelMono,
-            textTransform: "uppercase",
-            color: color.navy,
-            marginBottom: 12,
-          }}
-        >
-          {fuente}
-        </div>
-        <div
-          style={{
-            fontFamily: fontFamily.video,
-            fontSize: 26,
-            fontWeight: 700,
-            lineHeight: 1.34,
-            color: color.richBlack,
-          }}
-        >
-          {condicion}
-        </div>
+        {remate ? (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              paddingLeft: layout.safe.left,
+              paddingRight: layout.safe.right,
+              marginBottom: 34,
+              opacity: entra(t.remateAt),
+              fontFamily: fontFamily.bloque,
+            }}
+          >
+            {/* **Un acento por tablero, y aquí es la columna de oro.** Lo que
+                demuestra una comparación es el contraste entre los dos bloques,
+                así que el remate va en claro: con los dos en oro el ojo no sabe
+                por dónde entrar. Ver `Remate.tsx`. */}
+            <Remate giro={1.8} cuerpo={50}>{remate}</Remate>
+          </div>
+        ) : null}
+
+        {/**
+         * **El pie ya no vive aquí.**
+         *
+         * Esta banda de `lightNeutral` con la condición en Montserrat a 26 px
+         * era la masa más clara del cuadro puesta en lo que menos hay que
+         * mirar, y dentro de la lámina: en `Reel-R1 e3` ocupaba más sitio que
+         * el dato al que venía a respaldar. Instrucción de Jaime (6-9-2026): el
+         * pie va **fuera de la zona segura, en una línea**. Lo dibuja
+         * [`PieTablero`](./PieTablero.tsx), montado por `dibujaTablero` para las
+         * 24 láminas del lote — aquí ya no hay pie que apilar, sólo el remate.
+         */}
       </div>
       </ZonaTablero>
     </AbsoluteFill>

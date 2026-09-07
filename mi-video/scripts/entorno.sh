@@ -23,12 +23,28 @@
 #
 #   source scripts/entorno.sh     # desde la raíz de mi-video
 
-_TMP_PROY=$(node -e "console.log(JSON.parse(require('fs').readFileSync('rutas.json','utf8')).temporal)" 2>/dev/null)
-: "${_TMP_PROY:=F:/tmp-video}"
-
-export TMPDIR="$_TMP_PROY"
-export TEMP="$_TMP_PROY"
-export TMP="$_TMP_PROY"
+# **Y la pone `scripts/temporal.mjs`, no este fichero.**
+#
+# Aqui se leia `rutas.json` a mano con un `node -e`, con `F:/tmp-video` escrito
+# de reserva y **sin mirar `VIDEO_TMP`**: la variable que las dos copias de
+# `rutas` declaran como la que gana sobre todo se perdia justo en el guion que
+# monta. Y la comprobacion de «sin espacios» y de «no en el disco de arranque»
+# vivia SOLO aqui — o sea, solo para lo que se lanza desde un guion. Asi es como
+# `C:` llego a 0 bytes dos veces el 6 de septiembre con un `npx remotion still`
+# escrito a mano: 119 directorios y 27 GB en el TEMP del sistema.
+#
+# Ahora la regla vive en un modulo y la llaman los tres caminos: este fichero
+# —para ffmpeg, python y el perfil de Chrome—, `remotion.config.ts` —todo lo que
+# entra por el CLI— y `scripts/render.mjs` —la API de Node, donde el fichero de
+# configuracion no aplica—.
+#
+# Se para si no se pudo: sin temporal declarado no se empieza a producir.
+_EXPORTA=$(node scripts/temporal.mjs --exportar) || {
+  echo "entorno.sh: el temporal no se pudo aplicar (el motivo, arriba)." >&2
+  return 1 2>/dev/null || exit 1
+}
+eval "$_EXPORTA"
+_TMP_PROY="$TMPDIR"
 
 # **Y el perfil de Chrome, que TEMP no mueve.**
 #
@@ -65,7 +81,6 @@ export APPDATA="$_TMP_PROY/appdata/roaming"
 mkdir -p "$LOCALAPPDATA" "$APPDATA"
 # Python imprime en UTF-8 aunque la consola sea cp1252 (gotcha 1, otra puerta).
 export PYTHONIOENCODING=utf-8
-mkdir -p "$_TMP_PROY"
 
 # **Ninguna ruta del proyecto vive en C:, y se comprueba TODAS.**
 #
@@ -89,33 +104,43 @@ if [ -n "$_EN_C" ]; then
   echo "  Se corrigen en rutas.json. Todo el proyecto vive en F:." >&2
   return 1 2>/dev/null || exit 1
 fi
-case "$_TMP_PROY" in
-  [Cc]:*|/c/*)
-    echo "entorno.sh: el temporal apunta a C: ($_TMP_PROY) y todo se produce" \
-         "en el disco del proyecto. Corrige 'temporal' en rutas.json." >&2
-    return 1 2>/dev/null || exit 1
-    ;;
-esac
+# **Que el temporal no apunte a C: y que quede sitio, lo comprueba
+# `temporal.mjs`** — y ya se ha ejecutado arriba, asi que aqui no se repite.
+#
+# Estaba escrito dos veces, en dos idiomas: un `case` de shell para la ruta y un
+# `df -m /c` para el sitio. Las dos comprobaciones son buenas y por eso importa
+# donde viven: escritas aqui protegian solo a quien pasara por este fichero, que
+# es exactamente el hueco por el que `C:` se lleno con un `npx remotion still`
+# suelto. En el modulo protegen a los tres caminos, y el que no para —el sitio
+# libre— sigue sin parar, por el mismo motivo de siempre: de seis piezas con 21
+# GB libres renderizaron cuatro, y parar ahi seria bloquear la linea por un
+# diagnostico sin probar.
 
-# **Y se mira el espacio de C:, aunque no produzcamos ahi.**
+# **Y el interprete tambien se declara aqui, por el mismo motivo que las rutas.**
 #
-# La guarda de arriba comprueba que el temporal APUNTE a F:, y eso ya estaba
-# puesto y pasaba. Aun asi el montaje murio: dos piezas de seis se cayeron con
-# «Chrome rejecting the request because the disk space is low» con 252 GB libres
-# en F: y **21 GB en C:, al 96%**. Chrome escribe su perfil y sus cachés en
-# `%LOCALAPPDATA%`, que no lo mueve `TEMP`, asi que el disco del sistema sigue
-# siendo un limite aunque el proyecto no produzca ahi.
+# `npm` en Git Bash no es un binario: es un guion con `#!/usr/bin/env bash`. El
+# antivirus se llevo `usr/bin/bash.exe` de la instalacion y no deja reponerlo ni
+# con permisos, asi que **cualquier `npm run` moria** con
+# `/usr/bin/env: 'bash': No such file or directory`. El lote entero se caia en el
+# `npm run lint` de `montar.sh`, con las cinco puertas en verde y el render sin
+# empezar — y desde PowerShell el mismo comando pasaba, porque alli npm usa
+# `cmd`. O sea que el fallo solo aparecia por el camino que importa.
 #
-# Jaime lo ha dicho treinta veces —*«todo debe guardar en F:, C: no se toca»*— y
-# la guarda comprobaba la mitad: la ruta, no el sitio. Un render tarda veinte
-# minutos en fallar por esto, asi que se mide ANTES de empezar.
-_LIBRE_C=$(df -m /c 2>/dev/null | awk 'NR==2 {print $4}')
-if [ -n "$_LIBRE_C" ] && [ "$_LIBRE_C" -lt 30000 ]; then
-  echo "entorno.sh: quedan $((_LIBRE_C / 1024)) GB en C: y Chrome escribe su" \
-       "perfil ahi pase lo que pase con TEMP. Por debajo de 30 GB el render" \
-       "muere a mitad con un error que habla de disco sin decir cual." >&2
-  echo "  AVISA, no para. De seis piezas con 21 GB libres renderizaron cuatro," \
-       "y las dos que cayeron eran las dos mas largas: el mensaje de disco" \
-       "puede estar tapando otra cosa. Parar aqui seria bloquear la linea por" \
-       "un diagnostico sin probar — y ya lo hizo una vez." >&2
+# `sh.exe` es el mismo binario de 2,4 MB con otro nombre, asi que aqui se pone
+# una copia llamada `bash` en el temporal del proyecto —en F:, nunca en C:— y se
+# antepone al PATH. Es una muleta, no el arreglo: el arreglo es sacar `bash.exe`
+# de la cuarentena o reinstalar Git. Se rehace sola si el temporal se vacia.
+if ! command -v bash >/dev/null 2>&1; then
+  _SH=$(command -v sh)
+  _BIN="${TMPDIR:-/tmp}/bin"
+  _BIN=$(cygpath -u "$_BIN" 2>/dev/null || echo "$_BIN")
+  mkdir -p "$_BIN"
+  [ -x "$_BIN/bash.exe" ] || cp "$_SH" "$_BIN/bash.exe"
+  PATH="$_BIN:$PATH"
+  export PATH
+  echo "entorno.sh: no hay bash; se usa una copia de sh en $_BIN (el antivirus se llevo el original)" >&2
 fi
+# npm arranca cada script con `$SHELL`, y Git Bash lo deja apuntando al fichero
+# que ya no esta.
+SHELL=$(command -v bash || command -v sh)
+export SHELL

@@ -30,6 +30,7 @@ import argparse
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -41,6 +42,7 @@ import registro  # noqa: E402
 # renderizar las siete: un import escondido en una rama solo existe en esa rama.
 import rutas  # noqa: E402
 import sincronia  # noqa: E402
+from acelerar import _acelerar  # noqa: E402,F401
 
 # **F: es la memoria de trabajo; G: es donde queda lo terminado.**
 #
@@ -55,9 +57,12 @@ import sincronia  # noqa: E402
 #
 # G: se sigue mirando al RECOGER —si el deja ahi el limpiado, vale igual—, pero
 # ya no es donde se deja.
+# **Y ahora si sale a F:.** El comentario de arriba decia que la regla
+# estaba puesta y la lista seguia llevando G: — declarado y no hecho, otra
+# vez. Jaime, al ver los exports de hoy: *«dejalos en F por favor»*.
 CARPETAS = [
     "out/audio-puro",
-    "G:/My Drive/Creación de videos/Audio para limpiar",
+    rutas.LIMPIAR,
 ]
 
 # Cuanto puede diferir la duracion antes de considerarlo otro audio. Cuarenta
@@ -93,6 +98,39 @@ MIGAJA = 0.12
 # mas largo**: no hay que obligarle a renombrar seis ficheros ni adivinar que
 # sufijo pone cada herramienta.
 BASE_VOZ = "{slug}-voz"
+
+
+def _con_tiquets(piezas):
+    """Las de esa lista con la composicion abierta, y cuantas notas. Vacia = congeladas.
+
+    Se le pregunta a `dominio.abierto.suyas`, que es quien sabe cuales son SUS
+    correcciones: contar filas de `revision` a pelo metia tambien las notas de
+    maquina —esquema muerto, una medida que no se puede tomar— y esas no dicen
+    nada de si la composicion esta cerrada. Con reel-01 pasaba: su unica nota
+    abierta era de maquina y bloqueaba el export de la pieza entera.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "dominio"))
+    from dominio import abierto
+
+    # **Lo que bloquea es lo que cambia el CORTE, no cualquier tiquet.**
+    #
+    # La regla de Jaime —la voz se manda a Adobe una vez y al final— existe por un
+    # motivo mecanico y uno solo: si el corte cambia, el stem que Adobe devuelve
+    # deja de corresponder y la mezcla cae a la voz cruda sin avisar. Un tiquet
+    # GRAFICO no toca el corte: el tablero, la placa y el gancho se dibujan sobre
+    # el mismo audio.
+    #
+    # Bloquear por cualquier tiquet abierto retenia las siete voces por catorce
+    # correcciones de dibujo, y eso no protege nada: retrasa. Se mira `accion`.
+    CAMBIAN_EL_CORTE = {"cortar", "subtitulo"}
+    fuera = []
+    for n in piezas:
+        s = f"reel-{n:02d}"
+        k = sum(1 for t in abierto.suyas(s) if t[1] in CAMBIAN_EL_CORTE)
+        if k:
+            fuera.append((s, k))
+    return fuera
 
 
 def exportar(n):
@@ -218,11 +256,14 @@ def exportar(n):
 
 def _repartir(out):
     """Cabecera y copia a TODAS las carpetas donde Jaime la recoge."""
-    import shutil
     _con_cabecera(out)
     for carpeta in CARPETAS:
-        if not os.path.isdir(carpeta):
-            continue
+        # **La carpeta se crea, no se salta.** Esto hacia `continue` si no
+        # existia, asi que al mover el destino a F: los tres exports salieron
+        # diciendo «hecho» y no habia nada donde el iba a mirar. `CARPETAS` es
+        # la lista de sitios DONDE SE DEJA, no un espejo opcional: si no existe,
+        # el que falta es el directorio, no el fichero.
+        os.makedirs(carpeta, exist_ok=True)
         shutil.copy2(out, carpeta)
         print('    -> ' + carpeta)
     return out
@@ -612,73 +653,33 @@ def _con_cola_muda(wav: str, objetivo: float):
 from beats import VELOCIDAD  # noqa: E402,F401
 
 
-def _acelerar(n) -> bool:
-    """Acelera la pieza y su voz a `VELOCIDAD`, sin tocar el tono."""
-    v = f"out/reels/reel-R{n}.mp4"
-    if not os.path.exists(v) or VELOCIDAD == 1.0:
-        return False
-    # **Y no se acelera dos veces.** Esto sobreescribe el render EN SU SITIO,
-    # asi que una segunda pasada de `voz-limpia` lo vuelve a estirar: reel-01
-    # paso de 93,4 s a 81,2 s y el render original se perdio — no hay vuelta
-    # atras, hay que rehacerlo.
-    #
-    # La senal es la duracion: el spec dice cuanto mide la pieza SIN acelerar,
-    # asi que un fichero que ya mide eso partido por la velocidad ya paso por
-    # aqui. Media decima de tolerancia, que es lo que mueve el recodificado.
-    try:
-        import json as _json
-        with open('src/reels.json', encoding='utf-8') as f:
-            _sp = next((x for x in _json.load(f)
-                        if x.get("id") == f"Reel-R{n}"), None)
-        if _sp:
-            _esperado = _sp["duracion"] / VELOCIDAD
-            if abs(duracion(v) - _esperado) < 0.5:  # ya acelerado
-                print(f"R{n}: ya iba a {VELOCIDAD}x, no se toca")
-                return False
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    tmp = v.replace(".mp4", "-acelerado.mp4")
-    try:
-        subprocess.run(
-            ["ffmpeg", "-y", "-v", "error", "-i", v,
-             "-filter_complex",
-             f"[0:v]setpts=PTS/{VELOCIDAD}[v];[0:a]atempo={VELOCIDAD}[a]",
-             "-map", "[v]", "-map", "[a]", "-c:v", "h264_amf",
-             "-quality", "quality", "-rc", "cqp", "-qp_i", "20",
-             "-qp_p", "20", "-pix_fmt", "yuv420p", "-c:a", "aac",
-             "-b:a", "192k", tmp],
-            capture_output=True, check=True)
-        # **Y NO se escribe encima del render.** Este mismo comentario lleva
-        # semanas diciendo que sobreescribir en su sitio pierde el original, y
-        # el codigo lo seguia haciendo con una guarda contra la segunda pasada.
-        # La guarda no basta: con el render convertido en entrega, `out/reels/`
-        # deja de contener lo que su nombre dice, y todo lo que compara contra
-        # el —la sincronia de la voz, la huella, el chequeo de montada— compara
-        # contra otra cosa. Medido: `reel-R1.mp4` duraba 83,48 s en vez de 96,4,
-        # y con eso la guarda de voz informaba de «sobran 12 s» en las siete.
-        #
-        # El acelerado es la ENTREGA y va a la bandeja de salida. El render se
-        # queda intacto, que es lo que permite rehacer el audio sin re-renderizar.
-        import rutas as _ru
-        final = _ru.salida("entrega", f"reel-R{n}.mp4")
-        os.replace(tmp, final)
-    except (OSError, subprocess.SubprocessError) as e:
-        registro.aviso("voz-limpia", "no se pudo acelerar",
-                       detalle=f"R{n}: {type(e).__name__}", eco=True)
-        return False
-    print(f"R{n}: acelerada a {VELOCIDAD}x  ({duracion(final):.2f}s)"
-          f"  ->  {final}")
-    return True
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--igual", action="store_true",
+                    help="exporta aunque la composicion siga abierta")
     ap.add_argument("--exportar", action="store_true",
                     help="paso 1: saca la voz sin modificar a la carpeta")
     a = ap.parse_args()
     if a.exportar:
+        # **El export es el ULTIMO paso, y con el corte congelado.**
+        #
+        # Jaime: *«antes de pasarlos quiero ver la composicion completa; con eso
+        # lo dejamos como paso final una sola vez»*. No es preferencia: cada vez
+        # que cambia el corte, el stem que Adobe devuelve deja de corresponder y
+        # la mezcla cae a la voz cruda sin avisar — medido hoy en seis de las
+        # siete. Exportar antes de congelar es tirar su trabajo y el de Adobe.
+        #
+        # Se avisa y se para; `--igual` lo salta para tantear una pieza.
+        abiertos = _con_tiquets(a.reels or rutas.piezas())
+        if abiertos and not a.igual:
+            print("  NO se exporta: estas piezas tienen la composicion abierta")
+            for s_, k in abiertos:
+                print(f"    {s_}: {k} tiquet(s) sin cerrar")
+            print("  La voz va DESPUES de que Jaime vea la composicion, y para"
+                  " las siete de una vez. Con --igual se exporta igualmente.")
+            return
         for n in (a.reels or rutas.piezas()):
             f = exportar(n)
             if f:

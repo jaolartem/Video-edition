@@ -139,6 +139,17 @@ class Habla:
         for p in self.palabras:
             if not p.empieza < x < p.acaba:
                 continue
+            # **Y «dentro de una palabra» lo dice la onda, no el reparto.** El
+            # alineador estira la ultima palabra de una frase sobre lo que viene
+            # detras: «semanales» figura acabando en 571,209 y deja de sonar en
+            # 571,00, asi que esos 0,2 s son el «por» siguiente. Alargar hasta
+            # `p.acaba` no cerraba la palabra —ya estaba cerrada—: ponia el corte
+            # encima de la de al lado, y deshacia en cada corrida el borde que
+            # `fijar` habia medido sobre la cinta (C-236). Si en el corte ya no
+            # suena, la palabra acabo y no hay nada que sacar.
+            from . import bordes as _bo
+            if hacia == "fin" and _bo.callado(self.cinta, x):
+                return x
             if hacia == "ini":
                 # **Un respiro no es un corte a medias.** El ataque retrocede 80
                 # ms para que se oiga la consonante inicial, y ese retroceso cae

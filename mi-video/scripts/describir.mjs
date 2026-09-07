@@ -116,7 +116,27 @@ function describePieza(slug, filas) {
       && fs.readFileSync(`work/escucha/${slug}/revision.json`, "utf8"),
     );
   } catch { escucha = null; }
-  const entrada = { ...pedidoDe(slug, filas), franja: criterioDeFranja(),
+  // **Y los cinco fotogramas de cada toma, sacados de la cinta.**
+  //
+  // Jaime, tras rechazar la deteccion por texto: *«no, esos ojos no sirven, ya
+  // han fallado. Que tome cinco fotogramas repartidos por toda la escena y mire
+  // la foto»*. Salen de la CINTA porque cuando el que compone elige, el montaje
+  // todavia no existe — y sin esto el bloque que los pide en el prompt seria
+  // otra cosa declarada y no implementada, que es la averia de la casa.
+  const conFotos = filas.map((f) => {
+    const d = (f.toma && f.start != null && f.end != null) ? f : null;
+    if (!d) return f;
+    try {
+      const j = execFileSync("python", ["-c",
+        "import sys,json;sys.path.insert(0,'scripts');import fotogramas as F;"
+        + "print(json.dumps(F.de_la_cinta(sys.argv[1],float(sys.argv[2]),"
+        + "float(sys.argv[3]),etiqueta=sys.argv[4])))",
+        d.toma, String(d.start), String(d.end), `b${f.orden}`],
+        { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
+      return { ...f, fotogramas: JSON.parse(j) };
+    } catch { return f; }
+  });
+  const entrada = { ...pedidoDe(slug, conFotos), franja: criterioDeFranja(),
                     revisa_oyendo: escucha };
   const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));

@@ -38,6 +38,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import cama  # noqa: E402
 from beats import VELOCIDAD  # noqa: E402
 
 #: El máster aprobado: la copia de lo que Jaime miró, traída de Drive.
@@ -50,9 +51,14 @@ MUSICA = "public/musica/{s}.mp3"
 SALIDA = "out/entrega/reel-R{n}.mp4"
 
 #: Cuántos dB por debajo de su voz tiene que quedar la cama, medido en la
-#: entrega. 14 son los de reel-04, la única que no ha levantado queja: a 5 le
-#: «lastima» y a 19 «no se escucha».
-OBJETIVO = 14.0
+#: entrega. **Se lee de `src/brand/cama.json`, que es donde vive.**
+#:
+#: Estaba escrito aquí a mano y ésa es la avería de siempre: `cama.json`
+#: declaraba `objetivo_db` y **no lo leía nadie**, así que corregir la
+#: separación en el sitio que el propio fichero anuncia como único no cambiaba
+#: la mezcla. Medido el 5 de septiembre: el fichero decía 16 y este bucle seguía
+#: apuntando a 14 — dos decibelios que existían sólo en el documento.
+OBJETIVO = float(cama.leer()["objetivo_db"])
 
 #: Cuánto puede desviarse antes de volver a intentarlo. **0,8, no 1,5**: con
 #: margen ancho el bucle se conformaba con 14,9 y el fichero entregado medía
@@ -97,9 +103,47 @@ def voz_de(slug):
         return crudo, False
     d = dura(crudo)
     for f in sorted(hay, key=os.path.getmtime, reverse=True):
-        if abs(dura(f) - d) < TOLERA:
+        if abs(dura(f) - d) < TOLERA and _mismo_corte(crudo, f):
             return f, True
     return crudo, False
+
+
+def _mismo_corte(a, b):
+    """¿Los dos wav dicen lo mismo? Se compara la FORMA, no la duración.
+
+    **Durar igual no es ser el mismo.** El stem limpio de reel-02 medía 85,85 s,
+    exactamente lo que el crudo de hoy, y era de otro corte: dos montajes de la
+    misma pieza pueden coincidir al segundo sin parecerse en nada. Con él la
+    separación de la cama salía **2,3 dB y no se movía al cambiar el nivel** —el
+    síntoma de C-243 por dentro—, mientras que con el crudo daba 34,2.
+
+    Y no es sólo la medida: `mezclar()` usa esta misma función para elegir qué
+    voz entra en la pieza, así que un falso positivo aquí entrega la voz de otro
+    montaje encima del vídeo de hoy.
+
+    Se comparan las envolventes en tramos de 0,3 s. Donde uno calla el otro
+    calla: si la correlación no llega a 0,8, son montajes distintos.
+    """
+    import numpy as np
+
+    def env(f):
+        crudo = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", f, "-vn", "-ac", "1", "-ar", "8000",
+             "-f", "s16le", "-"], capture_output=True).stdout
+        x = np.frombuffer(crudo, dtype=np.int16).astype(float) / 32768
+        m = len(x) // 2400 * 2400
+        return np.sqrt((x[:m].reshape(-1, 2400) ** 2).mean(1)) if m else None
+
+    ea, eb = env(a), env(b)
+    if ea is None or eb is None:
+        return False
+    k = min(len(ea), len(eb))
+    if k < 20:
+        return False
+    ea, eb = ea[:k], eb[:k]
+    if ea.std() < 1e-6 or eb.std() < 1e-6:
+        return False
+    return float(np.corrcoef(ea, eb)[0, 1]) > 0.8
 
 
 def _correr(cmd):
@@ -131,6 +175,26 @@ def distancia(mp4, voz):
             return np.array([])
         return 20 * np.log10(np.sqrt((x[:m].reshape(-1, n) ** 2).mean(1)) + 1e-9)
 
+    # **Los dos ficheros tienen que ser del MISMO montaje, o no se mide.**
+    #
+    # El metodo busca los huecos en la voz y lee ahi el nivel de la entrega, por
+    # indice. Si la voz es de otro corte, esos indices caen donde el esta
+    # hablando y sale un numero plausible que no describe nada. Medido en
+    # reel-07 el 5-9-2026: el stem duraba 88,51 s contra los 80,96 equivalentes
+    # de la entrega —siete segundos y medio— y la medida daba 2,4 dB de
+    # separacion **con la musica a -60 LUFS**, o sea sin musica ninguna. Bajar
+    # el nivel no movia el numero, y la guarda gritaba «FUERA» en cada corrida.
+    #
+    # Es C-233 otra vez: intersecar dos medidas de cosas distintas no falla, da
+    # un resultado plausible. Aqui se prefiere no contestar.
+    # La comparacion es por EXCESO, no por diferencia. La entrega puede durar
+    # mas que la voz sin que pase nada —lleva la tarjeta del CTA y la cola muda,
+    # y ahi no habla nadie: en reel-01 son catorce segundos legitimos—, pero la
+    # voz NO puede durar mas que la pieza: si sobra, es de otro corte. Medir la
+    # diferencia en los dos sentidos hacia que la guarda se negara en cuatro de
+    # las siete por llevar CTA, que es justo lo contrario de lo que hace falta.
+    if dura(voz) > dura(mp4) * VELOCIDAD + 0.5:
+        return None
     a, b = marco(voz), marco(mp4, tempo=1 / VELOCIDAD)
     k = min(len(a), len(b))
     if k < 20:

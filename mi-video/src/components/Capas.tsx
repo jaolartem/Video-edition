@@ -27,7 +27,15 @@ import type { Motion } from "../brand/sfx";
 */
 
 export type Capa = {
-  tipo: "punch" | "rotulo" | "figura" | "remate" | "bloque" | "subtitulo" | "sonido";
+  tipo:
+    | "punch"
+    | "rotulo"
+    | "titular"
+    | "figura"
+    | "remate"
+    | "bloque"
+    | "subtitulo"
+    | "sonido";
   at: number;
   duration?: number;
   camino: string;
@@ -47,6 +55,12 @@ export type Capa = {
  * percibe como cámara, que es de donde tiene que parecer que viene. Y la rampa
  * es lineal-suave y sin rebote: `Easing.back` está prohibido en este proyecto
  * porque convierte a un asesor financiero en un anuncio de refrescos.
+ *
+ * **Y la curva la pide el camino.** Por defecto entra y sale suave, que es lo
+ * que quiere un empuje dentro de una escena. El gancho pide `lineal` por un
+ * motivo medido: con `inOut` el encuadre **arranca parado** —a los 15 frames
+ * todavía no se ha movido—, y eso es medio segundo quieto justo donde el pulgar
+ * decide. Lineal es un travelling: no acelera, no frena y **no para**.
  */
 export const PunchIn: React.FC<{
   capas: Capa[];
@@ -67,7 +81,10 @@ export const PunchIn: React.FC<{
         {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
-          easing: Easing.inOut(Easing.quad),
+          easing:
+            activa.props.curva === "lineal"
+              ? Easing.linear
+              : Easing.inOut(Easing.quad),
         },
       )
     : 1;
@@ -247,7 +264,16 @@ export const Capas: React.FC<{
       // El punch lo aplica `PunchIn` alrededor del video, no aquí.
       // El rótulo y el subtítulo los llevan `BigTitle` y `CaptionBand`, que ya
       // existen: el camino les fija el frame de entrada, no los duplica.
-      if (c.tipo === "punch" || c.tipo === "rotulo" || c.tipo === "subtitulo")
+      //
+      // Y el `titular` del gancho lo dibuja `Gancho.tsx` **dentro de `Ad`**, no
+      // aquí: tiene que quedar entre el plano y el recorte del sujeto para que
+      // le pase por detrás de la cabeza, y esta pila va por encima de los dos.
+      if (
+        c.tipo === "punch" ||
+        c.tipo === "rotulo" ||
+        c.tipo === "titular" ||
+        c.tipo === "subtitulo"
+      )
         return null;
       const dura = c.duration ?? 1;
       return (

@@ -42,6 +42,25 @@ SEGURO = 0.6
 #: Cuantas filas seguidas tienen que dar sujeto para llamarlo coronilla. Un pixel
 #: suelto en el techo es un artefacto; doce filas son una cabeza.
 FILAS = 12
+#: Lo que un tablero se estira por encima de la costura, en segundos. Es el
+#: `SOLAPE` de `scripts/reels/lectura.mjs` (24 frames a 30 fps) y aqui hace falta
+#: para que el recorte no se acabe antes que la capa que lo dibuja.
+SOLAPE = 0.8
+
+
+def _canon_gancho():
+    """Los numeros del gancho, leidos de donde viven: `src/brand/gancho.json`.
+
+    No se copian aqui. Es la leccion de `franja.json` y la que documenta C-259:
+    un numero escrito en dos sitios son dos numeros el dia que uno se mueve, y
+    este en concreto —cuanto dura el gancho— ya estaba escrito en `gancho.mjs`
+    mientras el recorte se hacia a mano con el numero tecleado en la linea.
+    """
+    import json
+
+    with open(os.path.join("src", "brand", "gancho.json"), encoding="utf-8") as f:
+        j = json.load(f)
+    return float(j["dura"]), float(j["margen"])
 
 
 def _fotograma(video, t, ancho=270):
@@ -142,6 +161,90 @@ def de_la_pieza(n, muestras=4):
     return m
 
 
+def _ventanas_detras(n):
+    """Que etapas pidieron algo POR DETRAS, y donde caen en el corte.
+
+    Sale del PLAN y no de la base a proposito: `plan-reel.mjs` ya copio
+    `camara.detras` a cada escena, y el plan es el mismo reloj que luego usa
+    `reels/imagen.mjs` para colocar la capa. Preguntarselo a `escena_desc` seria
+    la segunda copia de la misma decision, y el dia que las dos no coincidan la
+    silueta saldria recortada de un tramo y apilada sobre otro.
+    """
+    import json
+
+    plan = os.path.join("work", "scenes", f"reel-{n:02d}", "plan-full.json")
+    if not os.path.exists(plan):
+        return {}
+    escenas = json.load(open(plan, encoding="utf-8"))["escenas"]
+    t, ventanas = 0.0, {}
+    for e in escenas:
+        dura = float(e.get("duracion") or 0)
+        if e.get("detras"):
+            v = ventanas.setdefault(int(e["beat"]), [t, t, "papel"])
+            # **Y se pasa el SOLAPE.** Un tablero se estira 0,8 s por encima de
+            # la costura para taparla (`reels/lectura.mjs`), asi que la capa
+            # sigue en pantalla cuando la ventana del beat ya acabo. Sin este
+            # margen el recorte se queda sin fotogramas justo ahi y el sujeto se
+            # congela en el ultimo, que es lo que se ve.
+            v[1] = t + dura + SOLAPE
+        t += dura
+    # **Y el gancho pide el suyo aunque el plan no diga `detras`.** El rotulo le
+    # pasa por detras de la cabeza en TODAS las piezas —es el camino, no una
+    # decision de escena—, asi que su recorte es del proceso y no de una lista.
+    # Estaba fuera: `portada.mjs` sabia decir que faltaba y la unica forma de
+    # producirlo era teclear la linea a mano, o sea un paso que hay que acordarse
+    # de correr (C-242). Y va con canto LIMPIO: se compone sobre el mismo plano
+    # del que salio, y ahi la orla de fibra dibuja una pegatina (C-259).
+    dura, margen = _canon_gancho()
+    beat = int(escenas[0]["beat"]) if escenas else 1
+    ventanas[beat] = [0.0, dura + margen, "limpio"]
+    return ventanas
+
+
+def recortes_de_la_pieza(n):
+    """El recorte del sujeto, con alfa, para las etapas que lo pidieron.
+
+    Es lo que faltaba para que `text-behind.py` sirviera de algo: sabia sacar la
+    silueta y **nadie del render la consumia**, asi que «letras detras» llevaba
+    meses en la lista de lo que no se puede pedir. Aqui se produce por etapa y
+    queda en `public/`, que es de donde Remotion sirve sus ficheros.
+
+    Va pegado a `de_la_pieza` y no en un paso aparte por la razon de siempre: un
+    paso que hay que acordarse de correr no es un paso del proceso (C-242). El
+    que mide donde esta su cara sobre el corte nuevo es el mismo que tiene que
+    volver a recortarlo, y se llama en el mismo sitio.
+
+    Se rehace solo si el corte es mas nuevo que el recorte: la pasada cuesta
+    ~6 s de CPU por segundo de etapa y el montaje se lanza muchas veces.
+    """
+    video = f"public/reel-{n:02d}.mp4"
+    hechos = []
+    if not os.path.exists(video):
+        return hechos
+    for beat, (a, b, canto) in sorted(_ventanas_detras(n).items()):
+        dest = os.path.join("public", "recorte", f"reel-{n:02d}-e{beat}.webm")
+        ficha = os.path.splitext(dest)[0] + ".json"
+        # **Y la ficha cuenta tanto como el recorte.** Ahi viven la coronilla y
+        # la cabeza, que son de donde el gancho saca el sitio y el lado del
+        # bloque: un recorte al dia con la ficha vieja coloca el rotulo con la
+        # medida de otro corte, y eso no se ve hasta mirar el fotograma. Solo la
+        # pasada de canto `limpio` la escribe, asi que solo esa la exige — con
+        # la condicion a secas, el recorte del panel se rehacia SIEMPRE.
+        hechos_al_dia = [dest] + ([ficha] if canto == "limpio" else [])
+        if (all(os.path.exists(f) for f in hechos_al_dia)
+                and min(os.path.getmtime(f) for f in hechos_al_dia)
+                >= os.path.getmtime(video)):
+            hechos.append(f"e{beat} al dia")
+            continue
+        r = subprocess.run(
+            [sys.executable, os.path.join("scripts", "text-behind.py"),
+             "--video", video, "--desde", f"{a:.3f}", "--hasta", f"{b:.3f}",
+             "--canto", canto, "--out", dest])
+        hechos.append(f"e{beat} {a:.1f}-{b:.1f}s"
+                      + ("" if r.returncode == 0 else " FALLO"))
+    return hechos
+
+
 def main():
     import argparse
     import json
@@ -157,7 +260,9 @@ def main():
         return
     for n in a.piezas or range(1, 8):
         m = de_la_pieza(n)
-        print(f"R{n}: {json.dumps(m, ensure_ascii=False) if m else 'sin corte'}")
+        r = recortes_de_la_pieza(n)
+        print(f"R{n}: {json.dumps(m, ensure_ascii=False) if m else 'sin corte'}"
+              + (f" · recortes: {', '.join(r)}" if r else ""))
 
 
 if __name__ == "__main__":

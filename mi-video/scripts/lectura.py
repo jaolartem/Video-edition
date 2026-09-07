@@ -53,17 +53,65 @@ def tramos(ruta):
     return out
 
 
+def cubrir(ruta):
+    """Escribe en el EDL el `trato` que hoy decide T-01. Devuelve los beats.
+
+    **Medir no basta cuando la regla llega despues del corte.** T-01 es
+    mecanica —se lee o no se lee, lo dice el audio— y por eso `trato.decidir`
+    la resuelve por encima de lo que decidiera nadie. Pero el `trato` se
+    escribe UNA vez, cuando `dominio/seleccion/edl.py` arma el EDL, y los EDL
+    de este lote son anteriores a la regla: reel-04 b4 lee al 97% y salia a
+    camara limpia, que es justo lo que Jaime vio —*«me veo leyendo, y me sigo
+    viendo leyendo en varias partes»*—.
+
+    Esto no decide nada nuevo: aplica lo que la funcion de arriba ya mide, y
+    solo cuando el EDL discrepa. La aguja es que el render lee `detalle.trato`
+    (`caminos.mjs :: construir`), asi que sin escribirlo ahi la regla existe y
+    no llega a la pantalla.
+    """
+    edl = json.load(open(ruta, encoding="utf-8"))
+    cambia = {f["beat"]: f for f in tramos(ruta)
+              if f["ahora"] in CUBRE and f["antes"] not in CUBRE}
+    tocados = []
+    for d in edl.get("detalle") or []:
+        f = cambia.get(d.get("beat"))
+        if not f:
+            continue
+        d["trato"], d["trato_porque"] = f["ahora"], f["porque"]
+        tocados.append(d["beat"])
+    if tocados:
+        json.dump(edl, open(ruta, "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=1)
+    return sorted(set(tocados))
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--detalle", action="store_true")
+    ap.add_argument("--aplicar", action="store_true",
+                    help="escribe el trato de T-01 en el EDL de esos reels")
     a = ap.parse_args()
+
+    rutas = [os.path.join("ads", f"reel-{n:02d}", "edl-sell.json")
+             for n in a.reels] or sorted(
+                 glob.glob(os.path.join("ads", "reel-*", "edl-sell.json")))
+    if a.aplicar:
+        if not a.reels:
+            print("lectura: --aplicar pide los reels que se tocan")
+            return 1
+        for ruta in rutas:
+            hechos = cubrir(ruta)
+            print(f"  {os.path.basename(os.path.dirname(ruta))}:"
+                  f" {len(hechos)} tramo(s) leidos pasados a tablero {hechos}")
+        return 0
 
     # **La unidad es el beat, no el corte.** `depurar.py` parte una etapa en
     # varios trozos al quitar el aire y todos heredan el mismo detalle, asi que
     # contando segmentos el mismo tramo leido sale dos y tres veces. Es la misma
     # razon por la que `reels-spec.mjs` agrupa por beat antes de componer.
     vistos, filas = set(), []
-    for ruta in sorted(glob.glob(os.path.join("ads", "reel-*", "edl-sell.json"))):
+    for ruta in rutas:
         for f in tramos(ruta):
             if (f["slug"], f["beat"]) in vistos:
                 continue
@@ -87,7 +135,10 @@ def main():
         # gancho nunca es un tablero y el remedio es elegir otra apertura.
         for f in ahora:
             print(f"   · {f['slug']} b{f['beat']}: {f['porque']}")
+    if antes and len(antes) > len(ahora):
+        print("  se aplica con: python scripts/lectura.py --aplicar N")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -244,8 +244,30 @@ for n in "${REELS[@]}"; do
   #
   # `MUSI` desde fuera sigue mandando: sirve para tantear una pieza sin tocar el
   # fichero. Lo que ya no vale es el numero escrito aqui dentro.
-  MUSI="${MUSI_FIJO:-$(python -c "import json,sys;d=json.load(open('src/brand/cama.json',encoding='utf-8'));print(d['piezas'].get('reel-%02d'%int(sys.argv[1]),d['por_defecto']))" "$n" 2>/dev/null || echo -15)}"
-  SRC="out/entrega/reel-R$n.mp4"
+  # **Y se le pregunta a `cama.py`, no se abre el JSON aqui.** Un `json.load`
+  # escrito en la linea de ordenes es una segunda lectura del mismo fichero, y
+  # dos lecturas es como `objetivo_db` pudo decir 16 mientras el bucle que
+  # mezcla apuntaba a 14.
+  MUSI="${MUSI_FIJO:-$(python scripts/cama.py --nivel "$(printf 'reel-%02d' "$n")" 2>/dev/null || echo -15)}"
+  # **Y se mezcla sobre el ACELERADO SIN MUSICA, nunca sobre la entrega.**
+  #
+  # Esto tomaba `out/entrega` —que ya lleva musica— asi que cada corrida le
+  # sumaba otra capa, y `loudnorm` devolvia la voz a -14 mientras la cama se
+  # acumulaba debajo. Medido en reel-06 con el MISMO valor declarado: **27,1 dB
+  # de separacion con una capa y 13,6 en la entrega que Jaime oyo**. Trece
+  # decibelios y medio sin tocar el numero — esa es la causa real de «la musica
+  # sigue muy fuerte», y no el nivel.
+  #
+  # Peor: invalidaba la medida. Los siete valores de `cama.json` se calibraron
+  # sobre mezclas apiladas, o sea contra un fantasma.
+  #
+  # `voz-limpia` deja aqui la pieza acelerada y todavia muda de musica. Si no
+  # esta, se guarda ahora desde la entrega — es la unica vez que se puede dar
+  # por buena, y a partir de ahi mezclar es idempotente.
+  SINMUS="out/entrega/.sin-musica"
+  mkdir -p "$SINMUS"
+  [ -f "$SINMUS/reel-R$n.mp4" ] || cp "out/entrega/reel-R$n.mp4" "$SINMUS/reel-R$n.mp4"
+  SRC="$SINMUS/reel-R$n.mp4"
   fi
   MP3="public/musica/reel-0$n.mp3"
   [ -f "$SRC" ] || { echo "R$n: falta $SRC"; continue; }
@@ -593,6 +615,43 @@ for n in "${REELS[@]}"; do
     if (st != 999 && st > i + 5)
       print "    ojo: corto plazo " st " LUFS, " st - i " LU por encima del objetivo. R 128 s1 admite +5."
   }'
+  # ── la cola: la pieza no se corta encima de la ultima palabra ───────────
+  #
+  # Jaime, sobre reel-06: *«al final dice el link esta a...»*. No era el corte:
+  # era que **la pieza se acaba mientras el todavia habla**. Medido sobre las
+  # siete entregas, el ultimo sonido estaba a **0,02 s del final** en seis de
+  # ellas y a 0,26 en la otra. Cero cola.
+  #
+  # Y no es de una pieza: le pasa a cualquiera cuyo ultimo tramo acabe donde
+  # acaba la voz, que es siempre — el corte se hace pegado a la palabra a
+  # proposito. Asi que se arregla aqui, para todas.
+  #
+  # Se congela el ultimo frame y se anade silencio: la imagen no parpadea y la
+  # frase termina de sonar. Es lo que hace cualquier montaje, y lo que faltaba.
+  COLA=$(python scripts/cama.py --cola 2>/dev/null || echo 0.6)
+  ffmpeg -y -v error -i "out/entrega/reel-R$n.mp4"     -filter_complex "[0:v]tpad=stop_mode=clone:stop_duration=${COLA}[v];[0:a]apad=pad_dur=${COLA}[a]"     -map "[v]" -map "[a]" -c:v h264_amf -b:v 12M -c:a aac -b:a 192k     "$TMPDIR/r$n-cola.mp4" 2>/dev/null     && mv -f "$TMPDIR/r$n-cola.mp4" "out/entrega/reel-R$n.mp4"     && echo "R$n  cola de ${COLA}s: la ultima palabra termina de sonar"
+
+  # ── y la separacion de la cama, que es la decision que se declara ───────
+  #
+  # **`objetivo_db` se declaraba y no se comprobaba nunca.** El fichero decia 16
+  # y la entrega media otra cosa, porque `MUSI` es un NIVEL y la separacion es
+  # un RESULTADO: la ganancia lleva el pasaje mas fuerte de la obra al numero
+  # declarado sin mirar la voz, asi que dos obras con el mismo `MUSI` salen a
+  # distancias distintas. Medido hoy con -19 para las dos: reel-04 a 15,8 dB y
+  # reel-06 a 28,8. Doce decibelios de diferencia con el mismo numero puesto.
+  #
+  # Es la averia de siempre —lo declarado en un sitio y lo entregado en otro—, y
+  # la unica forma de que no vuelva es medir la ENTREGA y decirlo. No para el
+  # lote: una pieza fuera es una pieza que hay que oir, no un fallo de build.
+  OBJ=$(python scripts/cama.py --objetivo 2>/dev/null || echo "")
+  SEP=$(python -c "import sys;sys.path.insert(0,'scripts');import remezclar as R;d=R.distancia('out/entrega/reel-R$n.mp4',R.voz_de('reel-%02d'%$n)[0]);print('' if d is None else round(d,1))" 2>/dev/null || echo "")
+  awk -v s="${SEP:-}" -v o="${OBJ:-}" -v n="$n" 'BEGIN{
+    if (s == "" || o == "") { print "    ojo: NO SE PUDO MEDIR la separacion de la cama — casi siempre es que el stem de voz es de otro corte, y entonces la medida se niega a contestar en vez de dar un numero falso (C-243). Mira las duraciones antes de tocar el nivel."; exit }
+    d = s - o; if (d < 0) d = -d
+    printf "R%s  cama a %s dB de la voz (objetivo %s)%s\n", n, s, o,
+      (d > 1.5 ? "  · FUERA: sube o baja su MUSI en src/brand/cama.json" : "")
+  }'
+
   awk -v c="${CLIP:-0}" 'BEGIN{
     if (c > 5000) {
       print "    ojo: " c " muestras pegadas a 0 dB. Es RECORTE DE GRABACION."

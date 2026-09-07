@@ -44,6 +44,7 @@
  */
 
 import fs from "node:fs";
+import { cerrada } from "./biblioteca.mjs";
 
 const DIR_C = "src/components";
 
@@ -61,6 +62,10 @@ const CROMO = {
   familia: "cargada | tranquila — la alterna la pieza, no el tablero",
   zona: "dónde cae en el cuadro, sin tapar la cara",
   cubre: "si el tablero toma el cuadro entero o acompaña al plano",
+  volumen: "la animación 3D del panel. **RETIRADA desde el 6-9-2026**: la"
+    + " biblioteca está cerrada —«hasta que no tengamos una biblioteca de"
+    + " figuras decentes no las vamos a utilizar»— y declararla es lo que ahora"
+    + " para la pieza. El panel lleva el dato o la letra",
   oro: "QUÉ va en oro, y es uno solo: si hay tres, dos sobran",
   sound: "el movimiento que suena, en el frame en que se mueve",
   fondo: "la placa o el plano de color de debajo",
@@ -240,13 +245,52 @@ export const FORMAS = [
             { entra: "outcome", compuerta: "label", sale: "outcome",
               condicion: "legal" },
             ["entra", "compuerta", "sale"]),
+  // **Cuantas hay de un lado y cuantas del otro, contadas en marcas.** No es
+  // `comparacion`: alli hay dos cifras que leer y restar, y aqui la asimetria se
+  // ve sin contar nada. Tampoco `acumulacion`, que apila hacia un total.
+  //
+  // **Y `cuantos` se exige.** Hasta el 6-9-2026 el componente dibujaba las que
+  // cupieran —63— y eso AFIRMABA una abundancia que nadie habia declarado. Jaime:
+  // *«en ingles no hay tantos, hay como cinco o seis»*. Una cantidad dibujada es
+  // una cifra rotulada con otra forma, asi que la escribe quien compone.
+  new Forma("Recuento", "cuantas marcas hay de un lado y cuantas del otro",
+            { titulo: "title", muchos: "label", uno: "label",
+              cuantos: "cuantas marcas van bajo `muchos`. Una cantidad dibujada AFIRMA igual que una cifra: se declara, y sin ella falla el render",
+              condicion: "para quien esta hecho lo que hay: va bajo las marcas, un renglon por linea",
+              cierre: "el contraste con el que se cierra el tramo: va abajo, un renglon por linea",
+              entrada: "el movimiento, para quien compone; no se dibuja" },
+            ["muchos", "uno", "cuantos"]),
+  // **Una cifra sola, cuando el dato NO tiene forma.** Es la otra mitad de
+  // «graficos y palabras»: una tasa marginal es un numero, la condicion que lo
+  // produce y el tramo donde vale — tres textos, ninguna proporcion. Dibujarla
+  // como barras obliga a inventar el reparto, que es afirmar una cantidad que
+  // ninguna fuente sostiene (tiquet #215).
+  //
+  // `alcance` se EXIGE, y es cumplimiento y no estilo: «53,53 %» sin «marginal,
+  // solo sobre el ultimo tramo» se lee como lo que se paga sobre todo lo que se
+  // gana, que es otra afirmacion.
+  new Forma("Techo", "una cifra sola, con su condicion arriba y su alcance debajo",
+            { titulo: "label", cifra: "outcome", alcance: "statement" },
+            ["titulo", "cifra", "alcance"]),
   new Forma("comparacion", "dos cantidades enfrentadas sobre la misma reticula",
             { premisa: "title", izquierda: "statement", derecha: "statement",
               remate: "outcome", condicion: "legal" },
             ["izquierda", "derecha"]),
+  // **Con `umbral`, cada tramo trae su `valor`.** Una raya rotulada con una
+  // cifra convierte la columna en una escala en esa unidad: cada `alto` afirma
+  // cuanto puso ese tramo y el cruce afirma en cual se paso. Son mediciones, y
+  // una cantidad dibujada afirma igual que una cifra rotulada — la misma regla
+  // que `Recuento.cuantos`. Sin `valor` el render muere: cuatro fracciones
+  // inventadas que suman 1 dibujaron en reel-05 e6 un cruce que ninguna fila de
+  // `dato` sostiene (tiquet #217). Sin `umbral` la barra solo reparte un total,
+  // y el total es el `resultado` rotulado con su fuente.
   new Forma("acumulacion", "algo que se apila por tramos hasta un total",
             { title: "title", concepto: "statement", resultado: "outcome",
-              horizonte: "label", condicion: "legal" },
+              horizonte: "label", condicion: "legal",
+              tramos: "los escalones, `{etiqueta, alto}`. Con `umbral` cada uno"
+                + " lleva ademas `valor` —cuanto es, en la unidad de la raya—:"
+                + " sin el, las alturas afirman una medida que nadie declaro y"
+                + " falla el render" },
             ["tramos"]),
   new Forma("twopaths", "dos trayectorias desde la misma linea de salida",
             { title: "title", start: "statement", byDefault: "statement",
@@ -255,6 +299,26 @@ export const FORMAS = [
             ["byDefault", "deliberate", "horizon", "condition"]),
   new Forma("causal", "cadena institucion -> consecuencia",
             { title: "title", condicion: "legal" }, []),
+  // **El panel con el dentro.** Es la unica forma que mete a Jaime DENTRO del
+  // tablero, asi que declara dos props que ninguna otra tiene: `sujeto` —de que
+  // lado va— y `repartos`, la figura que argumenta. Lo demas —el fichero del
+  // recorte y el filtro del tratamiento— lo pone el spec: ver `armarTableros`.
+  new Forma("PanelDentro",
+            "la placa, las masas negras, el recortado y la figura que reparte"
+            + " un total",
+            { premisa: "title", cifra: "outcome", remate: "label",
+              pregunta: "label", condicion: "legal",
+              sujeto: "izquierda | derecha | abajo: donde va el",
+              repartos: "las barras que argumentan, con su etiqueta y sus"
+                + " porciones",
+              total: "el todo del que se reparte. 100 salvo que la escena diga"
+                + " otra cosa",
+              signo: "que se antepone a cada cifra: «$», «%», o nada",
+              sujeto_src: "el recorte con alfa. **Lo pone el spec**, no se"
+                + " escribe a mano",
+              sujeto_css: "el filtro del tratamiento. Lo pone el spec desde"
+                + " `escena_desc.color`" },
+            ["repartos", "fuente"]),
 ];
 
 
@@ -269,6 +333,41 @@ export const forma = (nombre) => POR_NOMBRE.get(nombre) ?? null;
  * forma nueva que hay que declarar aquí. Se dice así para que no se confunda
  * con un tablero mal montado.
  */
+/**
+ * **La biblioteca de figuras, cerrada.** Jaime, 6-9-2026.
+ *
+ * Se comprueba aqui —y no solo en `escena.mjs`— porque son dos puertas
+ * distintas: alli se rechaza la figura al ir a trazarla, y **la escena sale
+ * igual, sin figura**; aqui se dice al recibir el tablero, que es cuando
+ * todavia se puede componer otra cosa. Una lamina a la que se le cae la figura
+ * en silencio es media lamina, y eso es lo que produjo `desvio` en reel-07 e2:
+ * un encargo que decia «sin figura» dibujado como diagrama.
+ */
+const FIGURA_CERRADA = cerrada("figuras.json");
+
+/** Los props con los que un tablero pide una figura dibujada. */
+const PIDEN_FIGURA = ["figura", "silueta", "volumen"];
+
+/**
+ * Lo que un tablero declara y la biblioteca cerrada no deja dibujar.
+ *
+ * Va aparte de `Forma.revisar` a proposito: aquello comprueba una forma contra
+ * SU contrato —props que faltan, textos que se pasan del tope— y esto es una
+ * regla de lote que vale para las 24, tengan forma en el catalogo o no. Metida
+ * dentro de `revisar` solo alcanzaria a las ocho declaradas.
+ */
+export const figurasCerradas = (kind, props) => {
+  if (!FIGURA_CERRADA) return [];
+  const p = props ?? {};
+  return PIDEN_FIGURA
+    .filter((k) => typeof p[k] === "string" && p[k].trim())
+    .map((k) =>
+      `«${kind}» declara \`${k}: "${p[k]}"\` y la biblioteca de figuras esta` +
+      ` CERRADA desde el ${FIGURA_CERRADA.desde}: «${FIGURA_CERRADA.jaime}».` +
+      ` Sale ${FIGURA_CERRADA.que_sale}; entra ${FIGURA_CERRADA.que_entra}.` +
+      ` Este tablero se compone con el dato o con la letra`);
+};
+
 export const revisarTablero = (kind, props) => {
   // **Una forma que no está en este catálogo NO es un error.** Se dibuja con
   // `TableroDeclarado` y punto. Esto devolvía una falta por cada una —42 en el
@@ -278,9 +377,9 @@ export const revisarTablero = (kind, props) => {
   // Sólo se revisa lo que tiene componente propio, porque ahí sí hay un
   // contrato de código que respetar: esos componentes llaman a `assertShort` y
   // **tumban el render** si un texto se pasa de su tope.
+  const cerradas = figurasCerradas(kind, props);
   const f = forma(kind);
-  if (!f) return [];
-  return f.revisar(props);
+  return f ? [...cerradas, ...f.revisar(props)] : cerradas;
 };
 
 const main = () => {

@@ -23,6 +23,8 @@
  * escrita que no produce nada es peor que una que falla.
  */
 
+import { cerrada } from "./biblioteca.mjs";
+
 /**
  * De la prosa de `grafico` a la figura que existe.
  */
@@ -82,10 +84,27 @@ export const DIBUJAN = new Set(["persona", "dos-personas", "alto", "ceda", "desv
  */
 export const figurasSinDibujo = [];
 
+/**
+ * **La biblioteca de figuras puede estar CERRADA.** Jaime, 6-9-2026: *«hasta que
+ * no tengamos una biblioteca de figuras decentes no las vamos a utilizar;
+ * graficos y palabras, como tablero de clase»*. La pregunta la contesta
+ * `scripts/biblioteca.mjs`, que es el unico sitio que la lee.
+ */
+const CERRADA = cerrada("figuras.json");
+
 /** ¿Es un nombre que `Pictograma` traza, o es prosa que caeria en la flecha? */
 export const dibujable = (fig, desc) => {
   if (typeof fig !== "string" || !fig.trim()) return null;
   const f = fig.trim();
+  // **Y con la biblioteca cerrada no traza ninguna, ni las que existen.** No se
+  // calla: cae por el mismo sitio que una figura inventada, asi que sale como
+  // falta declarada con su reel y su etapa. Es la diferencia entre retirar una
+  // decision y perderla.
+  if (CERRADA) {
+    figurasSinDibujo.push({ donde: donde(desc), dice: f.slice(0, 90),
+                            cerrada: true });
+    return null;
+  }
   if (DIBUJAN.has(f)) return f;
   figurasSinDibujo.push({ donde: donde(desc), dice: f.slice(0, 90) });
   return null;
@@ -247,8 +266,14 @@ export const desaturaDe = (color) =>
  * El rotulo del gancho, **declarado por quien compone**. `null` si no lo declara.
  *
  * Misma regla que la figura y que el sfx, y por el mismo motivo: el copy que
- * sale en pantalla es editorial. Vuelve como lista de lineas, que es lo que el
- * render espera.
+ * sale en pantalla es editorial. Vuelve `{lineas, oro}`.
+ *
+ * **Y `oro` es la otra mitad de la declaracion**, no un extra: el canon dice
+ * desde el 6-9-2026 que *«cual lleva el oro no es siempre la ultima: va en la
+ * mitad que golpea»*, y no habia por donde decirlo — el render lo clavaba al
+ * ultimo renglon. Se nombra por su texto o por su indice, y `null` es «la de
+ * siempre». Es declarar sin implementar, que es la averia constante del
+ * proyecto, cazada en el sitio donde vive la decision.
  */
 export const rotuloDe = (desc) => {
   try {
@@ -256,11 +281,14 @@ export const rotuloDe = (desc) => {
       ? JSON.parse(desc.tablero)
       : desc?.tablero;
     const r = d?.props?.rotulo ?? d?.rotulo;
-    const ls = Array.isArray(r)
-      ? r
-      : (typeof r === "string" ? r.split(String.fromCharCode(10)) : null);
-    const limpio = (ls ?? []).map((x) => String(x).trim()).filter(Boolean);
-    return limpio.length ? limpio : null;
+    const suelto = Array.isArray(r) || typeof r === "string";
+    const c = suelto ? r : r?.lineas;
+    const ls = Array.isArray(c) ? c
+      : (typeof c === "string" ? c.split(String.fromCharCode(10)) : []);
+    const lineas = ls.map((x) => String(x).trim()).filter(Boolean);
+    const o = suelto ? null : r?.oro;
+    const i = typeof o === "number" ? o : lineas.indexOf(String(o ?? "").trim());
+    return lineas.length ? { lineas, oro: i >= 0 && i < lineas.length ? i : null } : null;
   } catch {
     return null;
   }
@@ -282,9 +310,14 @@ export const rotuloDe = (desc) => {
  * declararlo donde vive, en `escena_desc.tablero`.
  */
 export const faltasDeclaradas = () => [
-  ...figurasSinDibujo.map((f) =>
-    `${f.donde}: declara una figura que no se traza — «${f.dice}». No es un ` +
-    `nombre del catalogo de \`Pictograma\`, asi que la escena se monta sin figura.`),
+  ...figurasSinDibujo.map((f) => f.cerrada
+    ? `${f.donde}: declara la figura «${f.dice}» y la biblioteca esta CERRADA ` +
+      `desde el 6-9-2026 — «hasta que no tengamos una biblioteca de figuras ` +
+      `decentes no las vamos a utilizar; graficos y palabras, como tablero de ` +
+      `clase». Lo que dibuja esa etapa tiene que ser un dato —barras, reparto, ` +
+      `acumulado, columnas comparadas— o tipografia. Ver src/brand/figuras.json.`
+    : `${f.donde}: declara una figura que no se traza — «${f.dice}». No es un ` +
+      `nombre del catalogo de \`Pictograma\`, asi que la escena se monta sin figura.`),
   ...sonidosMudos.map((s) =>
     `${s.donde}: describe un sonido que no suena — «${s.dice}». Ninguna ` +
     `expresion de SONIDOS lo reconoce, asi que la capa se monta muda.`),

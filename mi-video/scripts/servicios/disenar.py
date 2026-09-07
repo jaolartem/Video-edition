@@ -46,12 +46,16 @@ import fotogramas as _fotogramas  # noqa: E402
 from dominio import remate as _remate  # noqa: E402
 from dominio.mudo import sin_copy as _sin_copy  # noqa: E402
 from dominio.arco import arco  # noqa: E402
+from dominio.encargo import (guardar_tablero as _guardar,  # noqa: E402
+                             tablero_desfasado as _desfasado)
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
-from .marca import _canon, _laminas, _sonidos, _topes  # noqa: E402
+from .marca import (_canon, _canon_escrito, _laminas, _sonidos,  # noqa: E402
+                    _topes)
 from .caja import (COMO_COMBINAR, CORRECCION, VERSE, catalogo_de_piezas,  # noqa: E402
                    placas_que_existen, tres_dimensiones,
-                   figuras_que_se_trazan, mando_de_camara,
+                   figuras_que_se_trazan, volumenes_que_se_animan,
+                   mando_de_camara,
                    que_leer_para_componer, voz_en_el_remate, ya_en_pantalla)
 
 # **Tres niveles, no dos.** Este fichero vive en `scripts/servicios/`, así que
@@ -226,7 +230,7 @@ def encargos(slug):
         " order by etapa_orden", (slug,))]
     con.close()
     return [f for f in filas if _pide_tablero(f)
-            and (not f["tablero"] or _sin_copy(f)
+            and (not f["tablero"] or _sin_copy(f) or _desfasado(f)
                  or _abierto.abre(slug, "disenado", f))]
 
 
@@ -304,8 +308,11 @@ class ServicioDisenar(Servicio):
             "arco": arco(pieza.slug),
             "otras_etapas": resumen,
             "canon": _canon(),
+            # El documento entero, no solo los tokens: las reglas de
+            # composicion viven ahi y no viajaban.
+            "canon_escrito": _canon_escrito(),
             "laminas": _laminas(),
-            "placas": placas_que_existen(),
+            "placas": placas_que_existen(pieza.slug),
             "estilo": ESTILO,
             "antes_de_dibujar": ANTES_DE_DIBUJAR,
             "sonidos": _sonidos(),
@@ -314,6 +321,11 @@ class ServicioDisenar(Servicio):
             "piezas": catalogo_de_piezas(),
             "como_combinar": COMO_COMBINAR,
             "figuras": figuras_que_se_trazan(),
+            # **Y las animaciones de panel que existen.** Sin la lista, el que
+            # compone no puede elegir: es lo mismo que paso con las diez figuras
+            # y con las catorce placas. La regla del 5-9 estaba escrita y los
+            # tres paneles de reel-01 salieron siendo tres rotulos quietos.
+            "volumenes": volumenes_que_se_animan(),
             "correccion": CORRECCION,
             "verse": VERSE,
             "tres_d": tres_dimensiones(),
@@ -390,6 +402,26 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     if isinstance(respuesta, dict):
         tableros = respuesta.get("tableros") or []
         veredicto = (respuesta.get("pieza") or {}).get("veredicto")
+    # **Y sin haber MIRADO no se aprueba.** Jaime: *«el tablero no se puede leer
+    # bien y el fondo blanco no se entiende; parece que el disenador no reviso
+    # esto antes de salir. La revision es parte del proceso normal y debe ser
+    # antes de cada aprobacion»*.
+    #
+    # Los fotogramas ya viajaban en su pedido, y mirarlos era voluntario: la
+    # respuesta se aceptaba igual sin haberlos abierto. Un requisito que se pide
+    # en la prosa y no se comprueba en la puerta es una sugerencia.
+    #
+    # No se comprueba que mire —eso no se puede—: se le exige **decir que vio en
+    # cada escena**. Escribirlo obliga a haberlo mirado, y ademas deja el dato
+    # donde se puede releer cuando algo salga mal.
+    visto = (respuesta.get("mirado") if isinstance(respuesta, dict) else None)
+    if not visto:
+        return Resultado(
+            False,
+            motivo="la respuesta no trae «mirado»: hay que revisar los"
+                   " fotogramas de cada escena ANTES de aprobar y decir que se"
+                   " vio — letras que no se leen, colores que no se ven,"
+                   " composicion rota. Es parte del proceso, no un extra.")
     if veredicto == "rota":
         por_que = (respuesta.get("pieza") or {}).get("por_que") or "sin motivo"
         return Resultado(False, motivo=f"el diseno para la pieza: {por_que}")
@@ -500,13 +532,23 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
         if not kind or not isinstance(props, dict) or not props:
             sin_copy.append(beat)
             continue
+        # **`fuente` ES la linea del pie, y por eso entra como `pie`.**
+        #
+        # Entraba como `props.source` y cada componente decidia si la dibujaba y
+        # como: cinco pies distintos en la misma pieza, y en cinco tableros del
+        # lote un parrafo de tres y cuatro renglones dentro de la lamina. Desde
+        # la instruccion de Jaime del 6-9-2026 el pie va **fuera de la zona
+        # segura y en UNA linea**, la dibuja `PieTablero` y el destino es uno.
+        #
+        # `source` se sigue escribiendo porque es lo declarado y hay filas
+        # antiguas que solo lo tienen; `scripts/reels/cifras.mjs` lee los dos.
         if t.get("fuente") and t["fuente"] != "sin cifra":
-            props = {**props, "source": t["fuente"]}
-        con.execute(
-            "update escena_desc set tablero = ?, fecha = ?"
-            " where video_slug = ? and etapa_orden = ?",
-            (json.dumps({"kind": kind, "props": props}, ensure_ascii=False),
-             ahora, pieza.slug, int(beat)))
+            props = {**props, "source": t["fuente"], "pie": t["fuente"]}
+        # **Y se guarda CONTRA QUÉ encargo se compuso.** La huella va dentro de
+        # la misma escritura —`guardar_tablero`— porque separarlas es cómo se
+        # olvida: un tablero sin huella es un tablero que nadie puede saber si
+        # está desfasado. Ver `dominio/encargo.py`.
+        _guardar(con, pieza.slug, int(beat), kind, props, ahora)
         puestos += 1
     con.commit()
     con.close()
@@ -536,7 +578,12 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     # forma de sacarla de ahi era cerrarla a mano contra la base, que es
     # exactamente como se pierde el estado. El porque del cierre es la respuesta
     # que acaba de aplicarse, no una opinion.
-    cerrados = _abierto.cerrar(pieza.slug, "disenado", f"lo compuso: {hecho}")
+    # **Y sólo los que la respuesta dice haber atendido.** Ver `abierto.cerrar`:
+    # cerrarlos todos hizo desaparecer el tiquet del gancho de reel-07 dentro de
+    # una respuesta que sólo tocaba dos paneles.
+    cerrados = _abierto.cerrar(
+        pieza.slug, "disenado", f"lo compuso: {hecho}",
+        (respuesta.get("tiquets") if isinstance(respuesta, dict) else None))
     return Resultado(True, salida=hecho + (f" · tiquets {cerrados} cerrados"
                                            if cerrados else ""))
 

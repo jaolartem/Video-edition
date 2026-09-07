@@ -80,7 +80,7 @@ export function ctaDe(slug, marco, duracion) {
     // mueve, la tarjeta se mueve con ella.
     fecha: EVENTO?.dice ?? "",
     duracion: Math.round(CTA_DUR * FPS),
-    placa: placaDe(slug, marco.beats.length),
+    placa: placaDe(slug),
   };
 }
 
@@ -146,21 +146,23 @@ export function acotarAlCta(tableros, cta) {
 /**
  * Cierres que salen sobre negro plano.
  *
- * `placaDe` busca una placa cuya lista `sirve` incluya `pieza:beat`, y la
- * tabla de `ads/fondos.json` no llega al cierre de cinco de las siete piezas:
- * R1 y R2 cierran con su composicion y las demas sobre negro. La diferencia se
+ * `placaDe` buscaba una placa cuya lista `sirve` incluyera `pieza:beat`, y la
+ * tabla de `ads/fondos.json` no llegaba al cierre de cinco de las siete piezas:
+ * R1 y R2 cerraban con su composicion y las demas sobre negro. La diferencia se
  * ve a simple vista y no la decia nadie — un hueco en una tabla de asignacion
- * no es un error, asi que no fallaba; simplemente entregaba peor.
+ * no es un error, asi que no fallaba; simplemente entregaba peor. Desde que la
+ * placa es **de la pieza** el hueco no puede existir por beats: o la pieza
+ * declara la suya y el cierre la hereda, o no la declara y falla aqui.
  *
- * **Aqui no se elige placa.** Cual va en cada beat es diseno y se declara en
+ * **Aqui no se elige placa.** Cual va en cada pieza es diseno y se declara en
  * `ads/fondos.json`. Esto solo agota el catalogo diciendo que se agoto (C-168).
  */
 export function cierreSinPlaca(spec, faltas) {
   for (const r of spec) {
     if (r.cta && !r.cta.placa) {
-      faltas.push(`${r.id}: el CTA cierra SIN PLACA de fondo — ninguna de ` +
-        "`ads/fondos.json` declara servir a su beat de cierre, asi que sale " +
-        "sobre negro plano.");
+      faltas.push(`${r.id}: el CTA cierra SIN PLACA de fondo — la pieza no ` +
+        "tiene placa declarada en `ads/fondos.json`, asi que sale sobre negro " +
+        "plano.");
     }
   }
 }

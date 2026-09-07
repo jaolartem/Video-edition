@@ -112,6 +112,26 @@ const RECORTE: Record<Recorte, string | undefined> = {
   esquina: "polygon(38% 0%, 100% 0%, 100% 100%, 78% 100%)",
 };
 
+/**
+ * **Aquí hubo una banda opaca del techo de la franja al borde de abajo, y se
+ * quitó: la placa vuelve a ir a sangre.**
+ *
+ * Se puso para que el subtítulo discreto se leyera —*«la letra es blanca y no
+ * contrasta con el tablero»*— y funcionó, al precio de **872 px de negro liso,
+ * el 45% del cuadro**, en todos los tableros a `pleno`. Jaime, viéndolo en
+ * reel-01 (C-253): *«el cambio del tablero ahora rompe con la mitad; era más
+ * fácil poner las letras en oro que tapar la mitad. Ahora la mitad del panel
+ * está inutilizado»*.
+ *
+ * Y tenía razón por el canon: en las 26 láminas **el fotomontaje va a sangre** y
+ * lo que sostiene el texto es un bloque que abraza su texto —panel o cinta—,
+ * nunca media lámina apagada. La legibilidad se resuelve **en la letra**: peso,
+ * cuerpo y el oro contra la placa. Ver `CaptionDiscreta`.
+ *
+ * La regla que deja para el lote, y vale para cualquier problema de lectura:
+ * **antes de tapar, probar color.**
+ */
+
 export const Fondo: React.FC<FondoProps> = ({
   placa,
   suelo = color.richBlack,
@@ -168,14 +188,16 @@ export const Fondo: React.FC<FondoProps> = ({
     );
   }
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: suelo,
-        overflow: "hidden",
-        clipPath: RECORTE[recorte],
-      }}
-    >
-      {lamina}
+    <AbsoluteFill style={{ overflow: "hidden" }}>
+      <AbsoluteFill
+        style={{
+          backgroundColor: suelo,
+          overflow: "hidden",
+          clipPath: RECORTE[recorte],
+        }}
+      >
+        {lamina}
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };
