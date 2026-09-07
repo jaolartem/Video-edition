@@ -50,6 +50,7 @@ from dominio.encargo import (guardar_tablero as _guardar,  # noqa: E402
                              tablero_desfasado as _desfasado)
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
+from escucha import bordes_medidos as _oye_los_cortes  # noqa: E402
 from .marca import (_canon, _canon_escrito, _laminas, _sonidos,  # noqa: E402
                     _topes)
 from .caja import (COMO_COMBINAR, CORRECCION, VERSE, catalogo_de_piezas,  # noqa: E402
@@ -303,6 +304,17 @@ class ServicioDisenar(Servicio):
         payload = {
             "pieza": pieza.slug,
             "mira_estos_fotogramas": mirar,
+            # **Y como suena cada corte.** Jaime, 7-9-2026: *«ambos que vean y
+            # oigan; con eso el compositor sabe si estoy leyendo en una toma»*.
+            # Vale para los dos oficios y por el mismo motivo: leer se ve en la
+            # mirada baja Y se oye en la entrega plana, y con media senal cada
+            # uno decide con la mitad. El que dibuja tambien lo necesita —una
+            # etapa leida lleva tablero obligatorio, porque su cara no sale a
+            # camara limpia mientras lee.
+            #
+            # Va medido, no en wav: el oficio lee texto e imagenes. Ver
+            # `escucha.py :: envolvente`.
+            "oye_los_cortes": _oye_los_cortes(pieza.slug),
             # **El arco, que es lo que deja hacer un gancho de verdad.** Sin el,
             # el que monta disena tableros correctos que no saben donde caen.
             "arco": arco(pieza.slug),
@@ -384,6 +396,7 @@ class ServicioDisenar(Servicio):
                 motivo="espera diseno -> "
                        + contrato.ruta_pedido("disenar", pieza.slug))
         return aplicar(pieza, r)
+
 
 
 def aplicar(pieza: Pieza, respuesta) -> Resultado:

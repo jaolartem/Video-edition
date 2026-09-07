@@ -66,6 +66,88 @@ def _cortes(slug):
     return fuera
 
 
+#: Cada cuanto se mide la envolvente del borde. 25 ms es medio fonema: mas fino
+#: no dice nada nuevo y mas grueso se salta una consonante cortada.
+PASO = 0.025
+
+#: Por debajo de esto no hay voz. Medido sobre las siete piezas: los huecos
+#: reales caen a -45 dB o menos y la voz mas floja se queda en -32.
+SUELO = -38.0
+
+
+def envolvente(wav, paso=PASO):
+    """El borde **en algo que se pueda mirar**: dBFS cada 25 ms, y lo que dicen.
+
+    Jaime, 7-9-2026, sobre que es de cada oficio: *«lo suyo es todo lo que les
+    ayude a tomar mejores decisiones, como el tema del sonido»*. Y este paso
+    existe justo para eso — *«el compositor tiene que escuchar los bordes»*.
+
+    Pero el compositor **no oye**: lee texto e imagenes. Se le mandaban 33 rutas
+    de wav y el de reel-05 lo dijo con todas las letras: *«no pude oir los 33
+    wav; no hay juicio de bordes de corte en esta respuesta»*. Contestó sin esa
+    mitad, y el pedido parecia completo.
+
+    Nombrar un fichero que el oficio no puede abrir es igual que no mandarselo,
+    con la diferencia de que parece que se lo mandaste. Asi que el wav se queda
+    —para quien si pueda oirlo— y ademas viaja medido: donde hay voz, donde no,
+    y si el corte cae dentro de una palabra o en el silencio de al lado.
+    """
+    import math
+    import wave
+    import contextlib
+    import struct
+
+    try:
+        with contextlib.closing(wave.open(wav)) as f:
+            sr, n = f.getframerate(), f.getnframes()
+            d = struct.unpack("<%dh" % n, f.readframes(n))
+    except Exception:                              # noqa: BLE001
+        return None
+    ancho = max(1, int(sr * paso))
+    db = []
+    for i in range(0, len(d) - ancho + 1, ancho):
+        tr = d[i:i + ancho]
+        rms = math.sqrt(sum(x * x for x in tr) / len(tr)) or 1
+        db.append(round(20 * math.log10(rms / 32768), 1))
+    if not db:
+        return None
+    # El corte esta en la mitad del recorte, que es como lo saca `bordes`.
+    medio = len(db) // 2
+    suena = [v > SUELO for v in db]
+    def _corrido(desde, paso_):
+        k, n_ = desde, 0
+        while 0 <= k < len(suena) and not suena[k]:
+            n_ += 1
+            k += paso_
+        return round(n_ * paso, 3)
+    return {"paso_s": paso, "dbfs": db, "corte_en": medio,
+            "voz_justo_antes": bool(medio and suena[medio - 1]),
+            "voz_justo_despues": bool(medio < len(suena) and suena[medio]),
+            "silencio_antes_s": _corrido(medio - 1, -1),
+            "silencio_despues_s": _corrido(medio, 1)}
+
+
+def bordes_medidos(slug):
+    """Cada empalme con su envolvente, para el que dibuja.
+
+    El mismo dato que ya recibe el compositor. Se calcula una vez —los wav ya
+    estan en disco si el paso de escucha corrio— y si no estan, se dice y no se
+    inventa.
+    """
+    import glob
+    import os
+
+    wavs = sorted(glob.glob(os.path.join("work", "escucha", slug, "*.wav")))
+    if not wavs:
+        return {"sin_medir": f"no hay recortes en work/escucha/{slug}:"
+                             f" corre `python scripts/escucha.py {slug}`"}
+    fuera = []
+    for w in wavs:
+        m = envolvente(w)
+        if m:
+            fuera.append({"corte": os.path.basename(w), **m})
+    return fuera
+
 def bordes(slug):
     """Deja un recorte de audio en cada empalme. Devuelve qué dejó."""
     mp4 = CORTE.format(slug=slug)
@@ -82,7 +164,8 @@ def bordes(slug):
              "-t", f"{BORDE * 2:.3f}", "-vn", "-ac", "1", "-ar", "16000", wav],
             capture_output=True)
         if r.returncode == 0 and os.path.exists(wav):
-            hechos.append({**c, "oye": wav.replace("\\", "/")})
+            hechos.append({**c, "oye": wav.replace("\\", "/"),
+                           "medido": envolvente(wav)})
     return hechos, None
 
 

@@ -136,6 +136,18 @@ function describePieza(slug, filas) {
       return { ...f, fotogramas: JSON.parse(j) };
     } catch { return f; }
   });
+  // **Y el DESPUES: como quedo esa escena ya montada.** Jaime, 7-9-2026: *«el
+  // compositor puede ver dos tipos de fotogramas, los del video base y las 3 o
+  // 5 que genera por escena, en un antes y un despues»*.
+  //
+  // Los de la cinta dicen que se grabo; estos dicen que salio. Con uno solo se
+  // juzga a ciegas la mitad del trabajo: si esta leyendo se ve en el bruto,
+  // pero si el corte se comio la frase o el tablero le tapa la cara solo se ve
+  // en el montaje. Si la pieza aun no esta montada, no hay despues y se calla.
+  let despues = [];
+  try {
+    despues = JSON.parse(sql("montada_en_fotogramas", [slug]) || "[]");
+  } catch { despues = []; }
   // **`pedidoDe` devuelve UN TEXTO, no un objeto.** Esto lo esparcia con `...`,
   // y esparcir una cadena en un objeto la parte caracter a caracter: el pedido
   // de reel-03 salia con 3.420 claves —`"0": "R", "1": "e", "2": "e"…`— que son
@@ -156,7 +168,8 @@ function describePieza(slug, filas) {
   // de cero. Una lista = sólo ésas; las demás van de contexto.
   const editables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
-                    revisa_oyendo: escucha, tiquets, editables };
+                    revisa_oyendo: escucha, tiquets, editables,
+                    ya_montada_asi: despues };
   const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que

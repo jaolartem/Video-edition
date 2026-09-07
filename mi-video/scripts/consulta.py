@@ -171,6 +171,27 @@ def evento(fecha=None):
 # quien lo llama desde Python—; el CLI necesita además código de salida y
 # mensaje, que es `SystemExit`. La traducción vive aquí, en el borde, y no dentro
 # del objeto: un dominio que lanza `SystemExit` mata al que lo importa.
+def montada_en_fotogramas(slug):
+    """Como quedo cada escena YA MONTADA: cinco fotogramas por escena.
+
+    El «despues» del par que pidio Jaime — *«los del video base y las 3 o 5 que
+    genera por escena, en un antes y un despues»*. Los de la cinta dicen que se
+    grabo; estos dicen que salio.
+
+    Con uno solo se juzga a ciegas la mitad del trabajo: si esta leyendo se ve
+    en el bruto, pero si el corte se comio la frase o el tablero le tapa la cara
+    eso solo se ve en el montaje.
+
+    Si la pieza todavia no esta montada devuelve la lista vacia — no hay
+    despues, y no se inventa.
+    """
+    import fotogramas
+
+    n = int(str(slug)[-2:])
+    hechas, _ = fotogramas.sacar(n)
+    return hechas or []
+
+
 def proponer(slug, etapa, quien, texto):
     """Lo que un paso ve mal **fuera de lo que le toca**: sube, no se aplica.
 
@@ -278,6 +299,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "fijos": fijos,
           "precio_vigente": precio_vigente,
           "evento": evento,
+          "montada_en_fotogramas": montada_en_fotogramas,
           "proponer": proponer,
           "tiquets_de": tiquets_de,
           "acotado": acotado,

@@ -79,6 +79,52 @@ class _DeLaPieza:
         self.bordes = m.bordes_sucios()
         self.repetido = repetido(m)
         self.quitadas = quitadas(slug)
+        self.en_la_cinta = _en_la_cinta(slug)
+
+
+def _en_la_cinta(slug):
+    """Donde vive cada etapa EN LA CINTA: `{beat: (toma, desde, hasta)}`.
+
+    Hace falta para sacarle los cinco fotogramas a la toma, y sin esto no se
+    sacaba ninguno. `describir.mjs` los pide fila a fila y se rinde en silencio
+    si la fila no trae `toma`, `start` y `end` — que era siempre, porque esta
+    consulta nunca los puso.
+
+    El efecto: **el bloque que pregunta si esta LEYENDO nunca se ejecuto.** Esta
+    escrito en `describir-pedido.mjs` con las palabras de Jaime dentro —«no, esos
+    ojos no sirven, ya han fallado; que tome cinco fotogramas repartidos por toda
+    la escena y mire la foto», «generalmente tengo el papel en las piernas,
+    entonces estoy mirando hacia abajo»— y el compositor no ha visto un
+    fotograma en su vida. Declarado, escrito, y sin el dato que lo enciende.
+
+    Se toma el primer tramo del beat y el ultimo: es la ventana de la etapa en
+    su cinta, que es lo que `fotogramas.de_la_cinta` necesita para repartir los
+    cinco.
+    """
+    import json
+    import os
+
+    ruta = os.path.join("ads", slug, "edl-sell.json")
+    if not os.path.exists(ruta):
+        return {}
+    try:
+        edl = json.load(open(ruta, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    fuera = {}
+    for (a, b), d in zip(edl.get("segmentos", []), edl.get("detalle", [])):
+        beat = d.get("beat")
+        if beat is None:
+            continue
+        toma = d.get("toma") or edl.get("toma")
+        if not toma:
+            continue
+        if beat in fuera:
+            t, x, y = fuera[beat]
+            fuera[beat] = (t, min(x, float(a)), max(y, float(b)))
+        else:
+            fuera[beat] = (toma, float(a), float(b))
+    return fuera
 
 
 def por_describir(reels=None, rehacer: bool = False) -> list:
@@ -166,6 +212,11 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
                              if k not in ("video_slug", "etapa_orden")}
         # La clave de `bordes_sucios` es texto, siempre: viaja por JSON y ahi
         # deja de ser numero. Ver `Montaje.bordes_sucios`.
+        # **Y donde esta esa etapa en la cinta**, que es lo unico que le
+        # faltaba a los cinco fotogramas para existir. Ver `_en_la_cinta`.
+        sitio = p.en_la_cinta.get(orden)
+        if sitio:
+            d["toma"], d["start"], d["end"] = sitio
         d["bordes"] = p.bordes.get(str(orden)) or []
         d["repetido"] = [r for r in p.repetido if r["etapa"] == orden]
         if not rehacer:
