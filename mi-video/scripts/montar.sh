@@ -87,13 +87,33 @@ TICKET
   }
   return 0
 }
-_guardas || exit 1
+# **Lo que es del lote se paga una vez, no una por pieza.**
+#
+# `dominio/fase.py` monta llamando `montar.sh {n}` **por pieza**, y
+# `montar-lote.sh` reparte tres a la vez: las comprobaciones de aqui abajo
+# —guardas, verdad, contratos, techo, la puerta de `verificar.py`, el lint, la
+# bitacora y la verificacion final— miran el proyecto entero y corrian **siete
+# veces** para mirar siete veces lo mismo. Solo el lint son 9,6 s por pieza.
+#
+# Es el mismo patron que ya existia con `SALTA_SPEC`, y por el mismo motivo:
+# quien reparte las piezas sabe lo que ya hizo para todas. Sin la variable
+# —`montar.sh 3` a mano, o la fase `montado` de una pieza suelta— no cambia
+# nada: se comprueba todo, como hasta hoy.
+del_lote() { [ -n "${EN_LOTE:-}" ]; }
+
+#: `--solo-lote`: solo la mitad que mira el proyecto entero. Ver la nota
+#: donde este fichero se parte, mas abajo.
+SOLO_LOTE=0
+case " $* " in *" --solo-lote "*) SOLO_LOTE=1 ;; esac
+solo_lote() { [ "$SOLO_LOTE" = 1 ]; }
+
+del_lote || _guardas || exit 1
 # **Y la fuente de verdad de cada decision, comprobada.** Jaime: *«deja clara
 # en codigo la fuente de verdad»*. Una correccion que se escribe en una copia y
 # un render que lee la otra no falla al corregir: falla al entregar, y calla.
 # Va aqui, al lado de las guardas, y por el mismo motivo — lee ficheros y es
 # barato, asi que se paga antes de gastar el peldano caro.
-python scripts/verdad.py
+del_lote || python scripts/verdad.py
 # **Y los contratos, que son el corazon de la maquina.** Declaran que dato
 # viaja a cada paso de IA, que frase del prompt no se puede contestar sin el, y
 # que linea de codigo ejecuta lo que se contesta. Sin comprobarlo, un contrato
@@ -103,7 +123,7 @@ python scripts/verdad.py
 # No corria en ninguna parte, y ademas resolvia mal todas sus rutas —asi que
 # las 83 agujas daban «no esta» y el parte no lo miraba—. Va aqui por lo mismo
 # que las otras dos: lee ficheros y es barato.
-python scripts/contratos.py
+del_lote || python scripts/contratos.py
 
 # **El techo de 300 lineas, y aqui porque es donde para.** Jaime: *«maximo 300
 # lineas; 1000 lineas es espagueti»*. Esto imprimia «33 ficheros pasan del
@@ -115,10 +135,14 @@ python scripts/contratos.py
 # encima del techo mataba el montaje sin decir una palabra: `set -e` y a callar.
 # Se pierden dos corridas averiguando que fue eso. Se guarda y se enseña solo
 # cuando falla, que es cuando hace falta leerlo.
-if ! _TECHO=$(python scripts/tamano.py 2>&1); then
-  echo "$_TECHO" | tail -5
-  exit 1
-fi
+_techo() {
+  local salida
+  if ! salida=$(python scripts/tamano.py 2>&1); then
+    echo "$salida" | tail -5
+    return 1
+  fi
+}
+del_lote || _techo || exit 1
 
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
@@ -126,8 +150,13 @@ echo "origen  $ORIGEN"
 echo "destino $DESTINO"
 
 REELS=()
+#: Los mismos numeros SIN las banderas. `verificar.py` los parsea con argparse y
+#: una bandera que no conoce lo mata con codigo 2 — o sea que la puerta daria
+#: «no pasa» por un `--solo-lote` que no habla de ninguna pieza.
+PIEZAS_ARG=()
 for a in "$@"; do
   [[ "$a" == --* ]] && continue
+  PIEZAS_ARG+=("$a")
   REELS+=("$(printf %02d "$a")")
 done
 [ ${#REELS[@]} -eq 0 ] && REELS=(01 02 03 04 05 06)
@@ -169,16 +198,27 @@ IDENTICAS=()
 #
 # Se repite el primer motivo real al final. Lo de arriba sigue entero para quien
 # mire la salida completa; la ultima linea deja de mentir por omision.
-_SALIDA=$(PYTHONIOENCODING=utf-8 python scripts/verificar.py "$@" 2>&1) || {
-  echo "$_SALIDA"
-  echo "montar.sh: $(printf '%s
-' "$_SALIDA" | grep -m1 '·' | sed 's/^ *· *//')"
-  exit 1
+_puerta() {
+  local salida
+  salida=$(PYTHONIOENCODING=utf-8 python scripts/verificar.py "$@" 2>&1) || {
+    echo "$salida"
+    echo "montar.sh: $(printf '%s
+' "$salida" | grep -m1 '·' | sed 's/^ *· *//')"
+    return 1
+  }
+  printf '%s
+' "$salida"
 }
-printf '%s
-' "$_SALIDA"
+del_lote || _puerta "${PIEZAS_ARG[@]}" || exit 1
 
-for r in "${REELS[@]}"; do
+# **Las dos vueltas de abajo son de la PIEZA, y en `--solo-lote` no corren.**
+# Se recorre una lista vacia en vez de meter cien lineas dentro de un `if`:
+# el diff de indentar es mas grande que el cambio, y lo que se lee peor se
+# rompe antes.
+PIEZAS_CORTE=("${REELS[@]}")
+solo_lote && PIEZAS_CORTE=()
+
+for r in "${PIEZAS_CORTE[@]}"; do
   TOMA=$(node -e "console.log(JSON.parse(require('fs').readFileSync('rutas.json','utf8')).tomas['reel-$r']||'')")
   if [ -n "$TOMA" ] && ! grep -q '"pasadas"' "work/transcripts/$TOMA.json" 2>/dev/null; then
     echo "══ subtitulos reel-$r ══ (varias pasadas; es el paso 1)"
@@ -186,7 +226,7 @@ for r in "${REELS[@]}"; do
   fi
 done
 
-for r in "${REELS[@]}"; do
+for r in "${PIEZAS_CORTE[@]}"; do
   SRC=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.bruto('reel-$r')))")
   # **Ya se puede cortar material de varias cintas.** Estuvo frenado porque el
   # corte abria un solo `-i` y `punch-ins.py` calculaba un ancla por fichero —
@@ -302,12 +342,22 @@ fi
 # Avisa y no para: hay faltas legitimas —una forma sin componente propio— y parar
 # el lote por ellas seria cambiar un problema por otro. Lo que no puede pasar es
 # que no se digan.
-if ! python scripts/llega.py 2>&1 | tail -20; then :; fi
+if ! del_lote && ! python scripts/llega.py 2>&1 | tail -20; then :; fi
 # El parte de trabajo se reescribe solo: los números de `docs/bitacora.md` salen
 # del spec recién generado. Un número copiado a mano se queda viejo en el primer
 # render, y entonces la bitácora miente justo cuando hace falta.
-node scripts/bitacora.mjs
-npm run lint
+del_lote || node scripts/bitacora.mjs
+del_lote || npm run lint
+
+# **Hasta aqui llega lo que es del lote.** `montar-lote.sh` corre esta mitad una
+# vez —con `--solo-lote`— y luego reparte las piezas con `EN_LOTE=1`, que salta
+# exactamente lo que acaba de correr. Ni se duplica el codigo ni se duplica el
+# trabajo: es el mismo fichero, cortado por donde el trabajo deja de ser del
+# proyecto y pasa a ser de la pieza.
+if solo_lote; then
+  echo "  (comprobaciones del lote: hechas)"
+  exit 0
+fi
 
 for r in "${REELS[@]}"; do
   n=$((10#$r))
@@ -527,7 +577,7 @@ done
 # fichero entregado duraba 101,4. Un documento de verificacion que no cuadra con
 # lo que se entrega es peor que no tenerlo, porque se firma igual. Es el
 # aprendizaje 24: arreglar el generador no arregla lo generado.
-node scripts/verificacion.mjs
+del_lote || node scripts/verificacion.mjs
 if [ ${#BLOQUEADAS[@]} -gt 0 ]; then
   echo "CON MOTIVOS ABIERTOS — ${#BLOQUEADAS[@]} pieza(s), renderizadas igual:"
   for b in "${BLOQUEADAS[@]}"; do echo "  · $b"; done
