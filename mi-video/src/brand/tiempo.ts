@@ -1,3 +1,4 @@
+import lecturaJson from "./lectura.json";
 import { Easing } from "remotion";
 
 /**
@@ -47,7 +48,10 @@ export const duration = {
  */
 export const readingFrames = (text: string): number => {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(36, Math.ceil((words / 2.8) * FPS));
+  return Math.max(
+    lecturaJson.sueloFrames,
+    Math.ceil((words / lecturaJson.palabrasPorSegundo) * FPS),
+  );
 };
 
 /**

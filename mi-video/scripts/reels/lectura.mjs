@@ -9,6 +9,8 @@
  * cuesta leer lo que lleva dentro.
  */
 import { FPS } from "./reloj.mjs";
+import { createRequire } from "node:module";
+const LEE = createRequire(import.meta.url)("../../src/brand/lectura.json");
 
 /**
  * Cuanto tiene que durar el hueco de un tablero, en frames.
@@ -25,7 +27,9 @@ import { FPS } from "./reloj.mjs";
  * que se te olvido es un tablero que aparece incompleto.
  */
 export const lectura = (t) =>
-  Math.max(36, Math.ceil((String(t).trim().split(/\s+/).length / 2.8) * FPS));
+  Math.max(LEE.sueloFrames,
+    Math.ceil((String(t).trim().split(/\s+/).filter(Boolean).length
+               / LEE.palabrasPorSegundo) * FPS));
 
 /**
  * Cuanto se estira un tablero por encima de la costura que sigue.
