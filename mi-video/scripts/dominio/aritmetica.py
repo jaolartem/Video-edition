@@ -36,6 +36,18 @@ from .tramo import Tramo
 SOLAPE_MIN = 0.05
 
 
+def _lado(pausas, beat):
+    """De qué lado se declaró la pausa de esa etapa, o `None` si no la hay.
+
+    Acepta las dos formas porque las dos existen: el libreto declara un lado
+    —`{beat: "salida"}`— y quien sólo sabe qué etapas están marcadas pasa el
+    conjunto, que sigue queriendo decir la etapa entera.
+    """
+    if isinstance(pausas, dict):
+        return pausas.get(beat)
+    return "ambas" if beat in pausas else None
+
+
 class Aritmetica:
     """Las garantías que el corte de `slug` tiene que cumplir, y se cumplen solas.
 
@@ -149,14 +161,25 @@ class Aritmetica:
         `pausas` son las etapas donde el silencio **está declarado**: quitar aire
         es aritmética, conservarlo es una decisión, y ahí el silencio es el
         trabajo del beat.
+
+        **Y se declara de un lado.** Una etapa puede llevar el silencio bueno a
+        la salida y aire muerto a la entrada —reel-01 e7—, así que proteger la
+        etapa entera conservaba los dos: se recorta el borde que nadie declaró.
         """
         ganado = []
 
         def propone(b, i, tij):
-            if tij.beat(i) in pausas:
+            lado = _lado(pausas, tij.beat(i))
+            if lado == "ambas":
                 return None
             nuevo = b.al_habla()
             if nuevo is None:
+                return None
+            if lado == "entrada":
+                nuevo = Tramo(b.t.desde, nuevo.hasta, nuevo.cinta)
+            elif lado == "salida":
+                nuevo = Tramo(nuevo.desde, b.t.hasta, nuevo.cinta)
+            if nuevo.dura >= b.t.dura:
                 return None
             ganado.append(b.t.dura - nuevo.dura)
             return nuevo, f"(-{ganado[-1]:.2f}s)"

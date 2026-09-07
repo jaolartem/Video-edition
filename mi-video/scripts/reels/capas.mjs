@@ -23,6 +23,9 @@ import { TOPE } from "../formas.mjs";
 import { TARJETAS } from "./copy.mjs";
 import { DICE } from "./texto.mjs";
 import { construir, revisarPieza } from "../caminos.mjs";
+// La senal rota vive en `estatica.mjs`; se re-exporta para que quien arma la
+// pieza siga pidiendo sus capas a un solo sitio.
+export { citasDe, distorsionDe } from "./estatica.mjs";
 
 /**
  * **`cubre` reparte en tres vías, y lo decide el diseñador.**
@@ -152,32 +155,6 @@ export function tarjetasDe(slug, { marco, edl, reloj }) {
     });
 }
 
-/**
- * **Un glitch en cada costura que no tape ya un tablero.**
- *
- * Jaime: *«hay cortes muy fuertes todavía… lo ideal es que no se note. Se puede
- * poner una transición discreta, un efecto glitch que distorsione la imagen y el
- * sonido como un TV antiguo cambiando de canal, durante poco tiempo»*.
- *
- * **Sólo donde la costura salta, no en todas.** Una máscara que se pone siempre
- * deja de ser máscara: se convierte en el efecto, y entonces el corte limpio y
- * el malo se ven igual de raros. `costuras.py` mueve lo que se puede mover **sin
- * perder voz** y deja en `costuras_duras` lo que no tuvo arreglo. Eso, y sólo
- * eso, se disimula.
- *
- * Va **centrado en la costura** —mitad antes, mitad después— para que el corte
- * caiga dentro de la distorsión y no en su borde. Y **donde está la costura en
- * la pieza, no en el EDL**: acumulando el EDL entraba hasta 6,8 s tarde, o sea
- * en mitad de una frase en vez de encima del salto que venía a tapar.
- */
-/**
- * Cuánto dura la distorsión que tapa una costura. 5 frames, 0,17 s.
- *
- * Muy corta a propósito: lo que tapa dura un frame, y un efecto más largo deja
- * de esconder el corte para pasar a ser el corte.
- */
-const DUR_GLITCH = 5;
-
 // Lo que dura la cortinilla: 21 frames, 0,7 s. Es lo que se desvanece dentro
 // del propio componente, asi que acortarla la corta a media salida.
 const DUR_CORTINILLA = 21;
@@ -248,24 +225,6 @@ export function cortinillasDe(slug, reloj, marco) {
   return out;
 }
 
-export function glitchesDe(edl, reloj, cubren) {
-  const duras = new Set(edl.costuras_duras ?? []);
-  const out = [];
-  for (let i = 0; i < edl.segmentos.length - 1; i++) {
-    if (!duras.has(i)) continue;
-    const fin = reloj.finDelCorte(edl, i);
-    if (fin === null) continue;
-    const at = enFrames(fin) - Math.round(DUR_GLITCH / 2);
-    if (at < 0) continue;
-    // Donde ya hay tablero o tarjeta el plano cambió: no hay salto que tapar.
-    const cubierto = cubren.some(
-      (b) => at < b.at + b.duration && at + DUR_GLITCH > b.at,
-    );
-    if (!cubierto) out.push({ at, duration: DUR_GLITCH });
-  }
-  return out;
-}
-
 /**
  * **Las capas de cada segmento salen de su camino, no de un literal.**
  *
@@ -285,13 +244,30 @@ export function glitchesDe(edl, reloj, cubren) {
  * El lado libre se calcula por escena y no una vez por pieza: el sujeto no está
  * en el mismo sitio en todos los encuadres, y una figura en el lado ocupado tapa
  * justo lo que el camino `cercano` protege.
+ *
+ * ## Y las capas no empiezan encima de una cita
+ *
+ * Jaime, 7-9-2026, sobre el alcance del diseñador en reel-03: *«es revisar que
+ * no haya dos ganchos en la estética del mismo video»*. La pieza abre con una
+ * frase traída de más adelante —en gris y con estática, ver `estaticaDe`— y el
+ * camino de portada abría **en el mismo frame** con el rótulo detrás de su
+ * cabeza: dos ganchos a la vez, y el adelanto dejando de leerse como lo que es
+ * —una frase que no va ahí— para leerse como el principio de la pieza.
+ *
+ * Así que la cita **no lleva capas**: el gancho gráfico empieza donde ella
+ * acaba. Se mueve, no se quita — es la misma regla que `apartaDelGancho` aplica
+ * al panel que caía dentro del rótulo, con los papeles cambiados.
+ *
+ * @param citas las ventanas de `eco()`, en frames. Sin ellas nada cambia.
  */
-export function caminosDe({ slug, plan, edl, desc, lineas }) {
+export function caminosDe({ slug, plan, edl, desc, lineas, citas = [] }) {
   const detPorBeat = new Map();
   for (let i = 0; i < edl.segmentos.length; i++) {
     const det = edl.detalle[i] ?? {};
     if (!detPorBeat.has(det.beat)) detPorBeat.set(det.beat, { det, i });
   }
+  const enCita = (f) =>
+    (citas ?? []).some((c) => f >= c.at && f < c.at + c.duration);
   const porBeat = new Map();
   for (const e of plan.escenas ?? []) {
     const beat = Number(e.beat);
@@ -301,6 +277,10 @@ export function caminosDe({ slug, plan, edl, desc, lineas }) {
       previo.duration += dur;
       continue;
     }
+    // La escena de la cita no abre el beat: si el beat entero fuera cita se
+    // queda sin capas, que es lo correcto —no hay etapa que vestir, hay una
+    // frase prestada.
+    if (enCita(enFrames(e.montado_desde))) continue;
     const d = detPorBeat.get(beat) ?? { det: {}, i: 0 };
     porBeat.set(beat, { at: enFrames(e.montado_desde), duration: dur,
                         det: d.det, i: d.i });

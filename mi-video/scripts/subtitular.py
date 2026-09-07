@@ -103,12 +103,21 @@ def agrupar(words):
     # un subtitulo. Se pega a la anterior aunque pase de `TOPE` —una palabra de
     # mas se lee; una palabra huerfana se nota— y si venia detras de un punto
     # que whisper invento, ese punto se va con ella.
+    #
+    # **Y se va SIEMPRE, no solo si la palabra venia en mayuscula.** La mayuscula
+    # era la prueba de que whisper habia cerrado frase ahi, y whisper no la pone
+    # siempre: el 7-9-2026, con el corte nuevo, escribio «dolares.» y «semanales.»
+    # —la segunda en minuscula— y el punto sobrevivio a la union. La linea quedo
+    # «costando hasta 550 dolares. semanales.», o sea la misma frase partida por
+    # un punto en medio, que es la cuarta forma que encuentra el mismo defecto
+    # que Jaime lleva denunciando tres vueltas. Si la palabra no era un
+    # subtitulo, tampoco era una frase: el punto de delante es invento.
     fuera = []
     for c in caps:
         if fuera and len(c["text"].split()) == 1:
             prev = fuera[-1]
             suelta = c["text"]
-            if prev["text"].endswith(".") and suelta[:1].isupper():
+            if prev["text"].endswith("."):
                 prev["text"] = prev["text"][:-1]
                 suelta = suelta[:1].lower() + suelta[1:]
             prev["text"] += " " + suelta

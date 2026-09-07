@@ -67,12 +67,14 @@ def colas(slug, ver=False):
     """Ningún trozo entra antes de hablar ni se queda después de callar.
 
     **La pausa declarada no se toca**, y eso lo sabe la base: se pregunta aquí.
+    Con su lado, que es lo que distingue el silencio bueno del aire de al lado.
     """
     try:
         import consulta
-        pausas = {int(k) for k in (consulta.pausas(slug) or {})}
+        pausas = {int(k): (v or {}).get("donde")
+                  for k, v in (consulta.pausas(slug) or {}).items()}
     except Exception:                              # noqa: BLE001
-        pausas = set()
+        pausas = {}
     return Aritmetica(slug, ver).colas(pausas)
 
 

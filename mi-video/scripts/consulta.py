@@ -103,8 +103,31 @@ def brolls(minimo=2.0, maximo=8.0, cintas=None):
 
 
 def pausas(slug):
-    """Las etapas cuyo silencio de entrada **no se recorta**: `{etapa: motivo}`."""
+    """Las etapas cuyo silencio **no se recorta**, y de qué lado.
+
+        {etapa: {"donde": "entrada" | "salida" | "ambas", "motivo": …}}
+    """
     return Guion(slug).pausas()
+
+
+def voz(toma):
+    """Donde de verdad SUENA la voz de una cinta, sin la holgura del detector.
+
+    `work/cuts/<toma>.json` no lleva tramos de habla: lleva los tramos que
+    sobreviven **con la pausa recortada dentro** —`cut-silence.build_segments`
+    conserva `PAUSA/2 + MARGEN` de silencio pegado a cada extremo—. Quien los
+    lea como «aquí suena» reintroduce esos 0,285 s por lado en el montaje.
+
+    Medido en reel-01 el 7-9-2026: trece silencios de 0,55 a 0,77 s dentro de la
+    pieza entregada, once segundos de aire, y Jaime oyéndolos uno a uno
+    —*«los demás sí están raros»*—. `Cinta.voz()` ya era la respuesta y sólo la
+    sabía Python; `plan-reel.mjs` leía el fichero por su cuenta.
+
+        python scripts/consulta.py voz '["20260825_135637"]'
+    """
+    from dominio.cinta import Cinta
+
+    return [[a, b] for a, b in Cinta(toma).voz()]
 
 
 def fijos(slug):
@@ -189,6 +212,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "abanico": abanico,
           "brolls": brolls,
           "pausas": pausas,
+          "voz": voz,
           "fijos": fijos,
           "precio_vigente": precio_vigente,
           "evento": evento,

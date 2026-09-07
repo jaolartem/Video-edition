@@ -120,6 +120,18 @@ if ! _TECHO=$(python scripts/tamano.py 2>&1); then
   exit 1
 fi
 
+# **Y el conducto es una guarda, igual que el techo.** Un tiquet que vuelve a
+# `descrito` o a `disenado` lo atiende un servicio, y ese servicio deja recibo:
+# el pedido que se le escribio y la respuesta que devolvio. Cerrarlo sin eso es
+# decir que hubo un paso que no corrio — y el 7-9-2026 fue exactamente asi como
+# reel-03 salio dos veces mal: sin pedido no hubo orden del compositor, y sin
+# respuesta el disenador no tuvo nada que revisar. La deuda vieja esta declarada
+# en `docs/recibo-deuda.txt` y solo baja; uno nuevo para el montaje.
+if ! _RECIBOS=$(PYTHONIOENCODING=utf-8 python scripts/recibos.py 2>&1); then
+  echo "$_RECIBOS" | tail -12
+  exit 1
+fi
+
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
 echo "origen  $ORIGEN"

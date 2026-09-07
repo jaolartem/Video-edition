@@ -17,6 +17,7 @@ que la unión sea un trabajo pendiente con nombre y no un descubrimiento.
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import sys
 
@@ -26,7 +27,17 @@ import basedatos  # noqa: E402
 
 #: Cómo se declara una pausa que hay que conservar. Va **en el libreto**, que es
 #: donde Jaime escribe: *«probablemente te deje aviso por libreto»*.
-MARCA_PAUSA = ("[pausa]", "(pausa)", "[silencio]", "(silencio)")
+#:
+#: **Y dice de qué lado.** `[pausa]` a secas conserva la etapa entera, y eso era
+#: todo lo que se podía decir: en reel-01 el beat 7 tiene el silencio que Jaime
+#: quiere —el de después de «semanales»— y otro de 1,0 s dentro de la frase que
+#: mandó quitar, así que declarar la etapa devolvía los dos. Un lado no es un
+#: matiz del otro: son dos decisiones distintas sobre el mismo trozo.
+MARCA_PAUSA = re.compile(
+    r"[\[(]\s*(?:pausa|silencio)(?:\s+(entrada|salida|ambas))?\s*[\])]", re.I)
+#: Dónde se conserva el silencio, y qué se entiende por una marca sin lado.
+LADOS = ("entrada", "salida", "ambas")
+POR_DEFECTO = "ambas"
 #: Cuánto del texto se guarda como motivo de la pausa: lo justo para reconocerla.
 MOTIVO = 90
 
@@ -57,7 +68,7 @@ class Guion:
         return self.textos().get(orden, "")
 
     def pausas(self) -> dict:
-        """Las etapas cuyo silencio de entrada **no se recorta**, con su motivo.
+        """Las etapas cuyo silencio **no se recorta**, con su lado y su motivo.
 
         Regla de Jaime, y cierra el tema del aire: *«lo de los silencios también
         puede ser aritmético, no hace falta criterio editorial — excepto cuando
@@ -69,16 +80,44 @@ class Guion:
         escribe —en el texto del libreto, con `[pausa]` delante de la frase que
         quiere que respire—, así no hace falta ni una tabla nueva ni acordarse de
         nada: la marca viaja con el guion.
+
+        **`donde` dice de qué lado**: `entrada`, `salida` o `ambas`. Una marca
+        sin lado vale por las dos, que es lo que significaba antes.
         """
         fuera = {}
         for orden, t in self.textos().items():
-            bajo = t.lower()
-            for m in MARCA_PAUSA:
-                if m in bajo:
-                    i = bajo.index(m)
-                    fuera[orden] = t[i:i + MOTIVO].strip()
-                    break
+            m = MARCA_PAUSA.search(t)
+            if m:
+                fuera[orden] = {"donde": (m.group(1) or POR_DEFECTO).lower(),
+                                "motivo": t[m.start():m.start() + MOTIVO].strip()}
         return fuera
+
+    def declarar_pausa(self, orden, donde=POR_DEFECTO, por_que="") -> str:
+        """Escribe la marca en el libreto de esa etapa. Sustituye la que hubiera.
+
+        Existe para que declarar una pausa **no sea editar la base a mano**, que
+        es por donde este proyecto pierde el estado: la decisión vive en la única
+        fuente del libreto (`verdad.py`) y la escribe quien la lee.
+
+        La marca va al final para `salida` —el silencio viene detrás de lo que
+        se dice— y delante en los otros dos casos.
+        """
+        donde = str(donde).lower()
+        if donde not in LADOS:
+            raise ValueError(f"pausa de lado desconocido: {donde!r}, no {LADOS}")
+        limpio = MARCA_PAUSA.sub("", self.texto(orden)).strip()
+        if not limpio:
+            raise ValueError(f"{self.slug} e{orden}: no hay libreto que marcar")
+        marca = " ".join(x for x in (f"[pausa {donde}]", por_que.strip()) if x)
+        nuevo = f"{limpio} {marca}" if donde == "salida" else f"{marca} {limpio}"
+        con = basedatos.abrir()
+        con.execute("update libreto set texto = ? where orden = ? and video_id ="
+                    " (select id from video where slug = ?)",
+                    (nuevo, orden, self.slug))
+        con.commit()
+        con.close()
+        self._textos = None
+        return nuevo
 
     def __str__(self) -> str:
         return f"libreto de {self.slug} ({len(self.textos())} etapas)"

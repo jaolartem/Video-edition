@@ -34,10 +34,33 @@ const leer = (verbo, slug, vacio) => {
  * sola; **conservarlo es una decision**, y por eso se declara — con `[pausa]`
  * en el texto del libreto de esa etapa.
  *
- * En la etapa marcada **no se recorta el silencio de entrada**. El resto del
- * aire de la pieza se sigue yendo.
+ * En la etapa marcada **no se recorta el silencio**. El resto del aire de la
+ * pieza se sigue yendo.
  */
 export const pausasDe = (slug) => leer("pausas", slug, {});
+
+/**
+ * **De que lado se conserva el silencio de esa etapa**, sobre los trozos que
+ * `conHabla` ya midio.
+ *
+ * La marca decia «esta etapa entera» y no habia forma de decir menos. En el
+ * beat 7 de reel-01 eso son dos silencios y solo uno es de Jaime: quiere el de
+ * despues de «semanales» —*«solo uno es intencional»*— y mando quitar el de
+ * 1,0 s de dentro de la frase. Declarar la etapa devolvia los dos, asi que la
+ * pausa que el pidio costaba la que no (tiquet #278).
+ *
+ * Con el lado declarado el aire de dentro se sigue yendo y **solo el borde
+ * declarado vuelve a donde el EDL dijo**: `entrada` estira el primer trozo
+ * hasta `a`, `salida` estira el ultimo hasta `b`, `ambas` es la etapa entera.
+ */
+export function conPausa(pausas, beat, a, b, trozos) {
+  const donde = pausas?.[String(beat)]?.donde;
+  if (!donde) return trozos;
+  if (donde === "ambas") return [[a, b]];
+  if (donde === "entrada") trozos[0][0] = a;
+  if (donde === "salida") trozos[trozos.length - 1][1] = b;
+  return trozos;
+}
 
 /**
  * **Los tramos que alguien declaro, y por que no se vuelven a partir.**

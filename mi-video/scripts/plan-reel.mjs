@@ -23,7 +23,9 @@ import fs from "fs";
 import { DatabaseSync } from "node:sqlite";
 import { bruto } from "./rutas.mjs";
 import { camaraDe, movimientoDe } from "./camara.mjs";
-import { esDeclarado, fijosDe, pausasDe } from "./reels/declarado.mjs";
+import { sql } from "./consulta.mjs";
+import { conPausa, esDeclarado, fijosDe,
+         pausasDe } from "./reels/declarado.mjs";
 
 /**
  * Silencio interno que se quita. Por debajo de esto es respiración y se queda:
@@ -112,13 +114,18 @@ const edl = JSON.parse(fs.readFileSync(`ads/${slug}/edl-sell.json`, "utf8"));
  * cierre que Jaime aprobo y que llevaba tres entregas sin sonar.
  *
  * Sin fichero de cortes no se recorta: pasar el mapa de otra cinta es el fallo.
+ *
+ * **Y se pregunta DONDE SUENA, no que conservo el detector.** `work/cuts` trae
+ * la pausa ya recortada dentro, asi que leerlo como «aqui suena» devuelve el
+ * silencio al montaje — trece huecos de 0,55 a 0,77 s en reel-01, once segundos
+ * de aire. El porque entero, con sus numeros, vive con el mecanismo:
+ * `consulta.py :: voz`, que es quien sabe restar la holgura.
  */
 const runsDe = ((cache) => (toma) => {
   const t = toma || edl.toma || tomaDe(slug);
   if (!cache.has(t)) {
     try {
-      cache.set(t, JSON.parse(
-        fs.readFileSync(`work/cuts/${t}.json`, "utf8")).segmentos);
+      cache.set(t, JSON.parse(sql("voz", [t])));
     } catch {
       cache.set(t, null);
     }
@@ -194,11 +201,10 @@ let aireQuitado = 0;
 
 const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
   const d0 = (edl.detalle || [])[iSeg] || {};
-  // Etapa con pausa declarada: entra tal cual, con su silencio.
-  if (PAUSAS[String(d0.beat)]) {
-    return [[a, b, d0.beat ?? iSeg + 1, d0.etapa || "", d0.texto || "", d0.toma]];
-  }
-  const t = conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]);
+  // La pausa declarada dice de QUE LADO se conserva el silencio, no sólo que
+  // esta etapa lo tiene: el criterio vive en `declarado.mjs :: conPausa`.
+  const t = conPausa(PAUSAS, d0.beat, a, b,
+                     conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]));
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
   const d = (edl.detalle || [])[iSeg] || {};
   /**

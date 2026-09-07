@@ -38,7 +38,6 @@ import { FPS, Reloj } from "./reels/reloj.mjs";
 import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
 import { colocaPaneles } from "./reels/paneles.mjs";
 import { pelado } from "./reels/pelado.mjs";
-import { eco } from "./reels/eco.mjs";
 import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
 // **El pie sale de `cifras.mjs`, que es su dueño y llevaba sin correr desde que
 // se escribió.** El que corría era una copia en `base.mjs` que casaba la fila de
@@ -47,7 +46,7 @@ import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
 import { pieDe } from "./reels/cifras.mjs";
 import { CONTRASTE, precioSinEscala, LINEAS, SOSTIENE, entraRotulo, literalesDe } from "./reels/copy.mjs";
 import { acotarAlCta, ctaDe, faltasDelCierre } from "./reels/cta.mjs";
-import { caminosDe, contrasteDe, cortinillasDe, cortinillasSinSitio, faltaMezcla, glitchesDe, repartirPorCubre, tarjetasDe } from "./reels/capas.mjs";
+import { caminosDe, citasDe, contrasteDe, cortinillasDe, cortinillasSinSitio, distorsionDe, faltaMezcla, repartirPorCubre, tarjetasDe } from "./reels/capas.mjs";
 import { armarPaneles, armarTableros } from "./reels/tableros.mjs";
 // Quién cede cuando dos capas toman el mismo tramo: ver `reels/ocupacion.mjs`.
 import { contrastePisado, empujaTablero } from "./reels/ocupacion.mjs";
@@ -81,6 +80,10 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   const duracion = duracionDelCorte(slug);
 
   reloj.cuadraCon(slug, duracion);
+
+  // La ventana que es cita: en gris, con estática y sin capas encima. Se calcula
+  // una vez y de ella cuelgan tres cosas — ver `reels/estatica.mjs :: citasDe`.
+  const citas = citasDe(edl, reloj.cortes);
 
   const captions = subsDe(slug);
   if (!captions.length) {
@@ -159,7 +162,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   if (marca.enCta && cta) cta.corrige = marca.enCta;
 
   const { capas: caminos, faltas: fCaminos } =
-    caminosDe({ slug, plan, edl, desc: descDe(slug), lineas });
+    caminosDe({ slug, plan, edl, desc: descDe(slug), lineas, citas });
   faltas.push(...fCaminos);
 
   // El virado del plano, la costura animada y el recorte del sujeto: lo que el
@@ -204,7 +207,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     cta,
     captions: marca.captions,
     // Y el plano que suena dos veces va en gris la primera: `reels/eco.mjs`.
-    desatura: [...marca.desatura, ...eco(edl, reloj.cortes)],
+    desatura: [...marca.desatura, ...citas],
     cortes: reloj.cortes,
     /**
      * Lado libre del cuadro: el contrario a donde está el sujeto. Sale del ancla
@@ -248,7 +251,11 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
     ...imagen,
     // Una costura con filete pedido ya está resuelta: el glitch encima serían
     // dos efectos en el mismo frame, que es ruido y no transición.
-    glitch: glitchesDe(edl, reloj, [...tableros, ...cartas, ...imagen.filetes]),
+    //
+    // Y el mismo mecanismo lleva la estática de la cita —`estaticaDe`—, que es
+    // el otro sitio donde la señal se rompe a propósito. Va detrás y mirando lo
+    // que ya hay: dos glitches en el mismo frame son uno más fuerte, no dos.
+    glitch: distorsionDe(edl, reloj, [...tableros, ...cartas, ...imagen.filetes], citas),
     tarjetas: cartas,
     boards: tableros,
     cara: caraDe(slug),

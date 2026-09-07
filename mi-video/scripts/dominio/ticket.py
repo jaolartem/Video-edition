@@ -100,6 +100,38 @@ RUTA = {
 }
 
 
+#: Las fases que son un SERVICIO —alguien fuera de la linea contesta— y la
+#: carpeta donde ese servicio deja su recibo: el pedido que se le escribio y la
+#: respuesta que devolvio.
+#:
+#: Existe porque el 7-9-2026 me salte el conducto entero. Cerre los tiquets de
+#: `descrito` y `disenado` de reel-01, reel-03 y reel-05 llamando a la API a
+#: mano, sin escribir un solo pedido y sin recoger una sola respuesta — y la
+#: linea no dijo nada. Jaime lo vio en la pieza: *«habia un compositor para
+#: arreglar el tramo que faltaba, y habia un disenador para recibir las ordenes
+#: del compositor y para revisar todo»*. Al ir por fuera, la orden del
+#: compositor nunca existio y el disenador nunca tuvo que mirar: reel-03 se
+#: entrego dos veces mal, la segunda con el oro cruzandole el pecho.
+#:
+#: El pedido y la respuesta no son papeleo: son **el sitio donde la decision de
+#: un paso se hace visible al siguiente**. Sin ellos los dos papeles se
+#: colapsan en uno y la revision deja de tener entrada.
+RECIBO = {"descrito": "describir", "disenado": "disenar"}
+
+
+class SinRecibo(Exception):
+    """Un tiquet de servicio que se cierra sin que el servicio haya contestado.
+
+    Es `CierreAjeno` un piso mas abajo. Aquel impide que una medida ajena cierre
+    un tiquet; este impide que lo cierre **nadie**: que quien lo cierra diga que
+    hubo un paso que en realidad no corrio.
+
+    Como alli, para el paso en vez de dejarlo pasar. Un tiquet cerrado sin que
+    su servicio contestara es indistinguible de uno atendido, y es la forma en
+    que una revision se salta sin que quede rastro.
+    """
+
+
 class CierreAjeno(Exception):
     """Una medida intenta cerrar un ticket que no declaro que la mide.
 
@@ -317,6 +349,53 @@ def caducar(pieza):
     return [v["id"] for v in viejos]
 
 
+def recibo(pieza, fase, desde):
+    """La respuesta de ese servicio para esa pieza, **posterior a `desde`**.
+
+    Devuelve el fichero o `None`. Lo que hace util a esta comprobacion es la
+    fecha: una respuesta vieja —la de la vuelta anterior— esta en disco siempre,
+    asi que sin comparar contra cuando se abrio el tiquet la guarda la pasaria
+    cualquiera con solo tener historia. El recibo tiene que ser DE ESTE tiquet.
+
+    Mira la carpeta del paso y su `usadas/`, que es donde el despachador archiva
+    lo que ya consumio: un pedido atendido y archivado sigue siendo un recibo.
+    """
+    paso = RECIBO.get(fase or "")
+    if not paso:
+        return ""
+    corte = datetime.datetime.fromisoformat(desde).timestamp() if desde else 0
+    for d in (os.path.join(RAIZ, "work", "servicio", paso),
+              os.path.join(RAIZ, "work", "servicio", paso, "usadas")):
+        if not os.path.isdir(d):
+            continue
+        for f in os.listdir(d):
+            if not (f.startswith(pieza + ".") and "respuesta" in f):
+                continue
+            if os.path.getmtime(os.path.join(d, f)) >= corte:
+                return os.path.join(d, f)
+    return None
+
+
+def sin_recibo(pieza=None):
+    """Los tiquets de servicio ya cerrados **sin que su servicio contestara**.
+
+    Es la otra direccion de la misma pregunta, y hace falta porque la guarda de
+    `contestar` solo puede impedir los proximos: los que ya se colaron siguen
+    ahi, diciendo que se atendio algo que nadie miro. Los lee `recibos.py`.
+    """
+    cx = _con()
+    q = ("select id, pieza, cuando, vuelve_a, cerrado from ticket"
+         " where estado <> 'abierto' and vuelve_a in (?, ?)")
+    args = list(RECIBO)
+    if pieza:
+        q += " and pieza = ?"
+        args.append(pieza)
+    filas = cx.execute(q + " order by id", args).fetchall()
+    cx.close()
+    return [dict(f) for f in filas
+            if not recibo(f["pieza"], f["vuelve_a"], f["cuando"])]
+
+
 def contestar(id_, respuesta, estado="contestado", quien="la linea", medida=""):
     """Cierra un ticket **diciendo qué se hizo, y con qué medida**.
 
@@ -341,6 +420,16 @@ def contestar(id_, respuesta, estado="contestado", quien="la linea", medida=""):
                 f"ticket #{id_} se cierra con «{suya or 'nadie'}» y lo intenta"
                 f" «{medida or 'una medida sin nombre'}»:"
                 f" {(fila['dijo'] if fila else '')[:80]}")
+        # **Y el servicio tiene que haber contestado.** Ver `SinRecibo`.
+        suyo = cx.execute("select pieza, cuando, vuelve_a from ticket"
+                          " where id = ?", (id_,)).fetchone()
+        if suyo and (suyo["vuelve_a"] or "") in RECIBO:
+            if not recibo(suyo["pieza"], suyo["vuelve_a"], suyo["cuando"]):
+                raise SinRecibo(
+                    f"ticket #{id_} vuelve a «{suyo['vuelve_a']}» y no hay"
+                    f" respuesta de ese servicio para {suyo['pieza']} posterior"
+                    f" a {suyo['cuando']}. Se cierra cuando el paso conteste,"
+                    f" no cuando alguien lo de por contestado.")
     cx.execute("update ticket set respuesta = ?, estado = ?, quien = ?,"
                " cerrado = ? where id = ?",
                (respuesta, estado, quien,

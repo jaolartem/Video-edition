@@ -57,9 +57,16 @@ export function armarGancho(capas, imagen, slug) {
   const faltas = [];
   if (!fs.existsSync(`public/${src}`)) {
     faltas.push(
+      // **`--desde` es el del gancho, no el 0 de la pieza.** El recorte se
+      // reproduce desde su propio frame 0 dentro de la ventana del rótulo, así
+      // que una silueta cortada del principio del vídeo puesta en un gancho que
+      // empieza más tarde va desfasada y no avisa: el bloque le pasa por delante
+      // de la cara en vez de por detrás. Pasa en cuanto el gancho no abre la
+      // pieza — reel-03, con el adelanto por delante (ver `capas.mjs`).
       `${slug}: el gancho pide su recorte con alfa y no hay public/${src} —` +
         ` falta \`python scripts/text-behind.py --video public/${slug}.mp4` +
-        ` --canto limpio --desde 0 --hasta ${(t.duration / FPS + 0.2).toFixed(1)}` +
+        ` --canto limpio --desde ${(t.at / FPS).toFixed(2)}` +
+        ` --hasta ${((t.at + t.duration) / FPS + 0.2).toFixed(1)}` +
         ` --out public/${src}\`. Sin él el rótulo se apoya encima de su cara en` +
         ` vez de pasarle por detrás.`,
     );
