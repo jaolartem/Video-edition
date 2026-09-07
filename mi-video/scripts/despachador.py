@@ -106,6 +106,20 @@ def despachar(a) -> None:
             print(f"  respuesta tardia -> {paso}/{slug}: vuelve a su paso")
             _devuelve(slug, paso)
 
+        # **Las dos puertas por las que entra trabajo nuevo.** Jaime: *«el
+        # tiquet abierto abre una puerta y un camino, y un video en bruto
+        # otra»*. Sin esto el despachador solo recorria lo que ya estaba en el
+        # camino: un tiquet recien abierto se quedaba quieto y una cinta nueva
+        # no despertaba a nadie. Ver `dominio/puertas.py`.
+        try:
+            from dominio import puertas
+
+            for linea in puertas.del_tiquet(piezas_de(a)) + puertas.del_bruto():
+                print(linea)
+        except Exception as e:                     # noqa: BLE001
+            registro.aviso("despachador", "una puerta no se pudo mirar",
+                           detalle=f"{type(e).__name__}: {e}"[:200], eco=False)
+
         movidos = _una_vuelta(a)
         # **Lo que espera a un agente se dice, porque es la senal de lanzarlo.**
         # Jaime: *«y lanzas el agente cuando el log sea por falta de agente»*.

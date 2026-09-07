@@ -243,8 +243,12 @@ def _beat(pieza, segundo):
     return None if b is SIN_EDL else b
 
 
+class SinEscena(Exception):
+    """Un tiquet que no dice a que escena va. Ver `abrir`."""
+
+
 def abrir(pieza, dijo, segundo=None, tipo="objecion",
-          vuelve_a=None, cierra_con=None):
+          vuelve_a=None, cierra_con=None, etapa=None):
     """Apunta una observación suya, **con quién la atiende y quién la cierra**.
 
     Los dos se declaran aquí y no se deducen después: un ticket sin paso al que
@@ -262,12 +266,31 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     por_defecto = RUTA.get(tipo, ("", ""))
     if cierra_con is None and not por_defecto[1]:
         cierra_con = tipo
+    # **Y no se abre un tiquet sin decir a que escena va.** Jaime, 7-9-2026:
+    # *«cada tiquet va ligado a la escena y el compositor solo ve esa escena»*.
+    # Sin escena nadie puede acotar: el #282 salio asi y el pedido pidio las
+    # ocho etapas de reel-01 para arreglar una palabra.
+    #
+    # Se admiten las tres formas de decirlo —el segundo, el numero en el texto,
+    # o «la pieza entera» a proposito— y **no se admite el silencio**, que era
+    # lo unico que no se distinguia de un descuido. La pieza entera es legitima:
+    # «no explica el mecanismo» no es de una escena.
+    beat = _beat(pieza, segundo)
+    if beat is None or beat is SIN_EDL:
+        from . import abierto as _ab
+        beat = _ab.etapa_de(dijo)
+    if beat is None and str(etapa).lower() not in ("pieza", "0", "todas"):
+        raise SinEscena(
+            f"{pieza}: un tiquet dice a que escena va. Pasa `segundo=`, nombra"
+            f" la etapa en el texto («e7», «etapa 7»), o declara"
+            f" `etapa=\"pieza\"` si de verdad es de la pieza entera.")
     cx = _con()
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     cur = cx.execute(
         "insert into ticket (cuando, pieza, segundo, beat, dijo, tipo,"
         " vuelve_a, cierra_con, huella) values (?,?,?,?,?,?,?,?,?)",
-        (ahora, pieza, segundo, _beat(pieza, segundo), dijo, tipo,
+        (ahora, pieza, segundo, beat if beat is not SIN_EDL else None,
+         dijo, tipo,
          por_defecto[0] if vuelve_a is None else vuelve_a,
          por_defecto[1] if cierra_con is None else cierra_con,
          _huella(pieza)))

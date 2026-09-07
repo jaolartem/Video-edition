@@ -129,10 +129,21 @@ def _tiquets(slug):
         # El beat que el tiquet ya trae vale mas que buscarlo en la prosa:
         # `abrir` lo derivo del segundo que Jaime dijo. Se antepone al texto
         # porque `etapa_de` lee ahi, y asi acotar no depende de como se redacto.
-        txt = " ".join((r["dijo"] or "").split())[:120]
+        # **Entero, no recortado a 120.** Ese tope viene de `revision`, donde
+        # una nota es una linea. Un tiquet es lo contrario —el esquema lo dice:
+        # «sus palabras, sin resumir»— y ahi dentro va la medida con la que se
+        # atiende. Cortado a 120 llega el titular y se pierde el encargo, y
+        # quien contesta tiene que ir a buscarlo a la base.
+        txt = " ".join((r["dijo"] or "").split())
         if r["beat"] is not None:
-            txt = f"e{r['beat']} · {txt}"[:120]
-        fuera.append((r["id"], "otro", r["vuelve_a"], txt))
+            txt = f"e{r['beat']} · {txt}"
+        # **Marcado, porque los dos numeros se pisan.** `revision` y `ticket`
+        # numeran cada una por su cuenta: la revision 279 existe y el tiquet
+        # 279 tambien, y son cosas distintas. `cerrar` escribe en `revision`,
+        # asi que un `tiquets: [279]` de una respuesta habria marcado como
+        # aplicada una correccion que nadie miro — el mismo defecto silencioso
+        # que `CierreAjeno` impide un piso mas arriba.
+        fuera.append((f"t{r['id']}", "otro", r["vuelve_a"], txt))
     return fuera
 
 
@@ -264,11 +275,22 @@ def cerrar(slug, fase, por_que, atendidos=None):
     de tiquets ya se lo pide a quien compone — *«si un tiquet ya está resuelto en
     el montaje de hoy, dilo también: cerrarlo vale tanto como aplicarlo»*.
     """
-    quiere = {int(i) for i in (atendidos or [])
-              if str(i).strip().isdigit()}
-    suyos = [t[0] for t in suyas(slug) if t[2] == fase and t[0] in quiere]
+    # Una respuesta nombra numeros sueltos; aqui se decide de que tabla es cada
+    # uno mirando lo que `suyas` declaro, no adivinando por el numero.
+    pedidos = {str(i).strip().lstrip("t") for i in (atendidos or [])}
+    mios = [t[0] for t in suyas(slug)
+            if t[2] == fase and str(t[0]).lstrip("t") in pedidos]
+    tiquets = [int(str(i)[1:]) for i in mios if str(i).startswith("t")]
+    suyos = [int(i) for i in mios if not str(i).startswith("t")]
+    for i in tiquets:
+        try:
+            from . import ticket as _t
+            _t.contestar(i, por_que[:400], "arreglado", "la linea",
+                         _t.RUTA.get("objecion", ("", ""))[1] or "objecion")
+        except Exception:                          # noqa: BLE001
+            pass
     if not suyos:
-        return []
+        return [f"t{i}" for i in tiquets]
     try:
         cx = basedatos.abrir(BASE)
         cx.executemany(

@@ -141,8 +141,22 @@ function describePieza(slug, filas) {
   // de reel-03 salia con 3.420 claves —`"0": "R", "1": "e", "2": "e"…`— que son
   // casi todo su peso. No falla: se escribe, se valida y se manda, y quien
   // contesta tiene que reconstruir el texto letra a letra antes de empezar.
+  // **Y las palabras de Jaime viajan DENTRO.** `acotado` dice que etapa mirar;
+  // esto dice por que. Sin las dos el pedido llega recortado y mudo, y quien
+  // contesta reconstruye el contexto por su cuenta antes de empezar.
+  const tiquets = JSON.parse(sql("tiquets_de", [slug, "descrito"]) || "[]");
+  // **Ve la pieza entera; toca sólo lo suyo.** Jaime, 7-9-2026: *«cada tiquet va
+  // ligado a la escena y el compositor sólo ve esa escena»*, y en cuanto lo dijo
+  // lo precisó: *«sí, pero que puedan ver el resto, aunque no editar»*. Las dos
+  // mitades hacen falta y por motivos distintos: la coherencia no cabe en una
+  // escena suelta —dos familias que se alternan, el oro que deja de señalar si
+  // está en todo—, y a la vez lo aprobado no se vuelve a componer.
+  //
+  // `null` = la pieza entera es editable, que es el modo normal, el de componer
+  // de cero. Una lista = sólo ésas; las demás van de contexto.
+  const editables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
-                    revisa_oyendo: escucha };
+                    revisa_oyendo: escucha, tiquets, editables };
   const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
@@ -194,17 +208,7 @@ function porPiezas(filas) {
 
 const rehacer = process.argv.includes("--rehacer");
 const reels = process.argv.slice(2).filter((x) => /^\d$/.test(x));
-let filas = JSON.parse(sql("escenas_por_describir", [reels, rehacer]));
-// **Y si hay tiquets, se pide SOLO lo que acotan.** `--rehacer` pedia la pieza
-// entera aunque la correccion nombrara una etapa: el 7-9-2026 el compositor de
-// reel-03 recibio las siete escenas —252 KB— para arreglar ocho segundos de
-// gancho, y estuvo veinte minutos redescribiendo lo que Jaime ya habia
-// aprobado. La medida vive en `dominio/abierto.py :: alcance`; aqui solo se
-// pregunta. `null` sigue siendo «la pieza entera», que es el modo normal.
-filas = filas.filter((f) => {
-  const solo = JSON.parse(sql("acotado", [f.slug, "descrito"]) || "null");
-  return !solo || solo.includes(Number(f.orden));
-});
+const filas = JSON.parse(sql("escenas_por_describir", [reels, rehacer]));
 if (!filas.length) {
   console.log("nada que describir (usa --rehacer para volver a pedirlo)");
   process.exit(0);
@@ -214,6 +218,7 @@ console.log(`${filas.length} escenas a describir`);
 let ok = 0;
 const esperan = [];
 for (const [slug, suyas] of porPiezas(filas)) {
+  const tocables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   try {
     const ds = describePieza(slug, suyas);
     if (!ds) {
@@ -225,6 +230,19 @@ for (const [slug, suyas] of porPiezas(filas)) {
       const d = porOrden.get(Number(f.orden));
       if (!d) {
         console.error(`  ${slug} e${f.orden}: no vino en la respuesta`);
+        continue;
+      }
+      // **Y lo que no era suyo no se guarda.** Ver `editables`: una respuesta
+      // que reescribe una etapa aprobada no es un error del que compone —tiene
+      // la pieza entera delante a proposito— pero tampoco entra.
+      if (tocables && !tocables.includes(Number(f.orden))) {
+        // **Sube, no se aplica.** Jaime: *«ver y proponer cambios, no
+        // generarlos»*. Tirarlo seria desperdiciar el unico par de ojos que
+        // estaba mirando esa etapa; aplicarlo seria recomponer lo aprobado.
+        sql("proponer", [slug, f.orden, "compositor",
+                         JSON.stringify(d).slice(0, 900)]);
+        console.log(`  ${slug} e${f.orden}: fuera de su encargo — SUBE como`
+          + ` propuesta, no se aplica`);
         continue;
       }
       sql("guardar_escena", [slug, f.orden, d]);

@@ -88,6 +88,23 @@ from dominio.nota import Nota, sanear  # noqa: E402
 BASE = "ads/decisiones.db"
 
 
+def situar(id_, etapa):
+    """Declara la escena de una correccion que se escribio sin ella.
+
+    Hermana de `ticket.situar`, y por lo mismo: sin escena nadie puede acotar
+    quien la atiende, asi que el paso siguiente abre la pieza entera. La #776 y
+    la #805 nombraban su etapa en la prosa —«la e2», «la e3»— y la columna
+    estaba vacia, que es tenerlo escrito donde nadie lo lee.
+
+    No decide nada: pone en la columna lo que la nota ya decia.
+    """
+    con = _con()
+    con.execute("update revision set etapa = ? where id = ?", (int(etapa), id_))
+    con.commit()
+    con.close()
+    return etapa
+
+
 def _con():
     import sqlite3
     c = basedatos.abrir(BASE)

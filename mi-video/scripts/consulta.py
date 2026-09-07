@@ -171,6 +171,51 @@ def evento(fecha=None):
 # quien lo llama desde Python—; el CLI necesita además código de salida y
 # mensaje, que es `SystemExit`. La traducción vive aquí, en el borde, y no dentro
 # del objeto: un dominio que lanza `SystemExit` mata al que lo importa.
+def proponer(slug, etapa, quien, texto):
+    """Lo que un paso ve mal **fuera de lo que le toca**: sube, no se aplica.
+
+    Jaime, 7-9-2026, afinando el reparto: *«que puedan ver el resto, aunque no
+    editar»*, y acto seguido *«ver y proponer cambios, no generarlos»*.
+
+    Las tres cosas son distintas y esta es la del medio. Al que compone se le da
+    la pieza entera porque la coherencia no cabe en una escena suelta; lo que ve
+    fuera de su encargo **no se tira** —seria desperdiciar el unico par de ojos
+    que estaba mirando— pero tampoco entra sola en una etapa aprobada. Queda
+    escrita con `estado='sube'`, que es el estado que este proyecto ya usa para
+    «esto lo decide el».
+
+    Y con su etapa, que es lo que Jaime pidio en la misma frase: *«cada tiquet va
+    ligado a la escena»*. Sin etapa nadie puede acotar quien la atiende.
+    """
+    con = _con()
+    con.execute(
+        "insert into revision (video_slug, accion, que, estado, fecha, etapa,"
+        " quien, pasada, cual) values (?,?,?,'sube',?,?,?,1,1)",
+        (slug, "otro", f"PROPUESTA de «{quien}», fuera de lo que le tocaba"
+                       f" editar (e{etapa}): {texto}"[:1200],
+         __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+         int(etapa), quien))
+    con.commit()
+    return "ok"
+
+
+def tiquets_de(slug, fase):
+    """Lo que Jaime dijo, tal cual, para que viaje DENTRO del pedido.
+
+    `acotado` ya decia que etapas mirar; esto dice **por que**. Sin las dos, el
+    pedido llega recortado y mudo: el que contesta ve una escena suelta y no
+    sabe que se le pide de ella, asi que reconstruye el contexto por su cuenta
+    —leyendo la base, el CLAUDE.md y los documentos— antes de escribir una
+    linea. Jaime, con el reloj: *«6 minutos es demasiado para 8 segundos»*.
+
+    El pedido esta hecho para contestarse sin reconstruir nada; esto es lo que
+    faltaba para que sea verdad.
+    """
+    from dominio import abierto
+    _, tiquets = abierto.encargo(slug, fase)
+    return tiquets or []
+
+
 def acotado(slug, fase):
     """Las etapas que los tiquets abiertos de esa fase acotan, o `null`.
 
@@ -233,6 +278,8 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "fijos": fijos,
           "precio_vigente": precio_vigente,
           "evento": evento,
+          "proponer": proponer,
+          "tiquets_de": tiquets_de,
           "acotado": acotado,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
