@@ -61,9 +61,56 @@ fi
 # sistema cual hay cuesta lo mismo y no se cae.
 SH=$(command -v bash || command -v sh)
 
-echo "== montando ${#PIEZAS[@]} pieza(s), $A_LA_VEZ a la vez =="
+# **Lo que mira el proyecto entero, una vez.** `montar.sh --solo-lote` corre su
+# primera mitad —guardas, verdad, contratos, techo, la puerta de `verificar.py`,
+# el spec, `llega` y el lint— y se para justo donde el trabajo deja de ser del
+# proyecto y pasa a ser de la pieza. Despues las piezas van con `EN_LOTE=1`, que
+# salta exactamente eso.
+#
+# Corria siete veces para mirar siete veces lo mismo: solo el lint son 9,6 s por
+# pieza. Y si la puerta dice que no, se sabe **antes** de repartir nada.
+echo "== comprobaciones del lote, una sola vez =="
+SALTA_SPEC="$SALTA" "$SH" scripts/montar.sh --solo-lote "${PIEZAS[@]}"
+
+# **Un bundle para todas, y solo cuando el spec ya no se mueve.**
+#
+# Empaquetar cuesta 22,5 s medidos y se pagaba una vez por pieza. Pero el bundle
+# lleva `src/reels.json` COMPILADO dentro —por eso la cache esta apagada—, asi
+# que compartirlo solo vale si el spec del lote es el definitivo. Es la misma
+# condicion que ya decide `SALTA`: cuando una pieza trae EDL nuevo, cada una
+# rehace su spec y entonces cada una tiene que empaquetar el suyo.
+BUNDLE_LOTE=""
+if [ "$SALTA" = "1" ]; then
+  BUNDLE_LOTE=$(node scripts/render.mjs --solo-bundle | tail -1)
+  export BUNDLE_LOTE
+  # Se borra pase lo que pase: hay 22 GB de bundles huerfanos en `F:/tmp-video`
+  # de corridas que murieron a medias, cada uno con su copia de `public/`.
+  trap 'rm -rf "$BUNDLE_LOTE"' EXIT
+fi
+
+# **La concurrencia del render la reparte quien reparte las piezas.**
+#
+# Estaba fijada en 4 dentro de `render.mjs`, y 4 era el numero de OTRO reparto:
+# tres piezas a la vez, doce pestanas. Cuando el lote va de una en una —porque
+# alguna trae EDL nuevo— esas doce siguen cabiendo y quedarse en cuatro es dejar
+# la maquina parada. El presupuesto es doce y se divide; nunca sube de ahi, que
+# es lo que tumbaba el render en el frame 1387. Y no baja de cuatro: por debajo
+# de ahi una pieza tarda mas de lo que el paralelismo le ahorra al lote.
+export RENDER_CONCURRENCIA=$(( 12 / A_LA_VEZ ))
+[ "$RENDER_CONCURRENCIA" -lt 4 ] && RENDER_CONCURRENCIA=4
+
+export EN_LOTE=1
+export SALTA
+echo "== montando ${#PIEZAS[@]} pieza(s), $A_LA_VEZ a la vez, concurrencia $RENDER_CONCURRENCIA =="
 printf '%s\n' "${PIEZAS[@]}" | SH="$SH" xargs -P "$A_LA_VEZ" -I{} \
   "$SH" -c 'SALTA_SPEC="$SALTA" "$SH" scripts/montar.sh {} > "work/montaje-{}.log" 2>&1 \
            && echo "  R{} listo" || echo "  R{} FALLO — mira work/montaje-{}.log"'
+
+# **Y el parte, cuando ya estan todas.** La bitacora y la verificacion hablan de
+# las siete: hacerlas por pieza era escribir seis veces un documento que la
+# septima iba a reescribir. Aqui ademas cuadran con lo entregado, que es lo que
+# se firma.
+node scripts/bitacora.mjs
+node scripts/verificacion.mjs
 
 echo "== hecho: los registros en work/montaje-N.log =="

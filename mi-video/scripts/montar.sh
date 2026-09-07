@@ -87,13 +87,33 @@ TICKET
   }
   return 0
 }
-_guardas || exit 1
+# **Lo que es del lote se paga una vez, no una por pieza.**
+#
+# `dominio/fase.py` monta llamando `montar.sh {n}` **por pieza**, y
+# `montar-lote.sh` reparte tres a la vez: las comprobaciones de aqui abajo
+# —guardas, verdad, contratos, techo, la puerta de `verificar.py`, el lint, la
+# bitacora y la verificacion final— miran el proyecto entero y corrian **siete
+# veces** para mirar siete veces lo mismo. Solo el lint son 9,6 s por pieza.
+#
+# Es el mismo patron que ya existia con `SALTA_SPEC`, y por el mismo motivo:
+# quien reparte las piezas sabe lo que ya hizo para todas. Sin la variable
+# —`montar.sh 3` a mano, o la fase `montado` de una pieza suelta— no cambia
+# nada: se comprueba todo, como hasta hoy.
+del_lote() { [ -n "${EN_LOTE:-}" ]; }
+
+#: `--solo-lote`: solo la mitad que mira el proyecto entero. Ver la nota
+#: donde este fichero se parte, mas abajo.
+SOLO_LOTE=0
+case " $* " in *" --solo-lote "*) SOLO_LOTE=1 ;; esac
+solo_lote() { [ "$SOLO_LOTE" = 1 ]; }
+
+del_lote || _guardas || exit 1
 # **Y la fuente de verdad de cada decision, comprobada.** Jaime: *«deja clara
 # en codigo la fuente de verdad»*. Una correccion que se escribe en una copia y
 # un render que lee la otra no falla al corregir: falla al entregar, y calla.
 # Va aqui, al lado de las guardas, y por el mismo motivo — lee ficheros y es
 # barato, asi que se paga antes de gastar el peldano caro.
-python scripts/verdad.py
+del_lote || python scripts/verdad.py
 # **Y los contratos, que son el corazon de la maquina.** Declaran que dato
 # viaja a cada paso de IA, que frase del prompt no se puede contestar sin el, y
 # que linea de codigo ejecuta lo que se contesta. Sin comprobarlo, un contrato
@@ -103,7 +123,7 @@ python scripts/verdad.py
 # No corria en ninguna parte, y ademas resolvia mal todas sus rutas —asi que
 # las 83 agujas daban «no esta» y el parte no lo miraba—. Va aqui por lo mismo
 # que las otras dos: lee ficheros y es barato.
-python scripts/contratos.py
+del_lote || python scripts/contratos.py
 
 # **El techo de 300 lineas, y aqui porque es donde para.** Jaime: *«maximo 300
 # lineas; 1000 lineas es espagueti»*. Esto imprimia «33 ficheros pasan del
@@ -115,10 +135,14 @@ python scripts/contratos.py
 # encima del techo mataba el montaje sin decir una palabra: `set -e` y a callar.
 # Se pierden dos corridas averiguando que fue eso. Se guarda y se enseña solo
 # cuando falla, que es cuando hace falta leerlo.
-if ! _TECHO=$(python scripts/tamano.py 2>&1); then
-  echo "$_TECHO" | tail -5
-  exit 1
-fi
+_techo() {
+  local salida
+  if ! salida=$(python scripts/tamano.py 2>&1); then
+    echo "$salida" | tail -5
+    return 1
+  fi
+}
+del_lote || _techo || exit 1
 
 # **Y el conducto es una guarda, igual que el techo.** Un tiquet que vuelve a
 # `descrito` o a `disenado` lo atiende un servicio, y ese servicio deja recibo:
@@ -127,10 +151,16 @@ fi
 # reel-03 salio dos veces mal: sin pedido no hubo orden del compositor, y sin
 # respuesta el disenador no tuvo nada que revisar. La deuda vieja esta declarada
 # en `docs/recibo-deuda.txt` y solo baja; uno nuevo para el montaje.
-if ! _RECIBOS=$(PYTHONIOENCODING=utf-8 python scripts/recibos.py 2>&1); then
-  echo "$_RECIBOS" | tail -12
-  exit 1
-fi
+# Va con la misma forma que el techo: mira los tiquets del proyecto entero, no
+# los de esta pieza, asi que el lote lo paga una vez (C-313).
+_recibos() {
+  local salida
+  if ! salida=$(PYTHONIOENCODING=utf-8 python scripts/recibos.py 2>&1); then
+    echo "$salida" | tail -12
+    return 1
+  fi
+}
+del_lote || _recibos || exit 1
 
 ORIGEN=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.origen))")
 DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.destino))")
@@ -138,8 +168,13 @@ echo "origen  $ORIGEN"
 echo "destino $DESTINO"
 
 REELS=()
+#: Los mismos numeros SIN las banderas. `verificar.py` los parsea con argparse y
+#: una bandera que no conoce lo mata con codigo 2 — o sea que la puerta daria
+#: «no pasa» por un `--solo-lote` que no habla de ninguna pieza.
+PIEZAS_ARG=()
 for a in "$@"; do
   [[ "$a" == --* ]] && continue
+  PIEZAS_ARG+=("$a")
   REELS+=("$(printf %02d "$a")")
 done
 [ ${#REELS[@]} -eq 0 ] && REELS=(01 02 03 04 05 06)
@@ -181,16 +216,27 @@ IDENTICAS=()
 #
 # Se repite el primer motivo real al final. Lo de arriba sigue entero para quien
 # mire la salida completa; la ultima linea deja de mentir por omision.
-_SALIDA=$(PYTHONIOENCODING=utf-8 python scripts/verificar.py "$@" 2>&1) || {
-  echo "$_SALIDA"
-  echo "montar.sh: $(printf '%s
-' "$_SALIDA" | grep -m1 '·' | sed 's/^ *· *//')"
-  exit 1
+_puerta() {
+  local salida
+  salida=$(PYTHONIOENCODING=utf-8 python scripts/verificar.py "$@" 2>&1) || {
+    echo "$salida"
+    echo "montar.sh: $(printf '%s
+' "$salida" | grep -m1 '·' | sed 's/^ *· *//')"
+    return 1
+  }
+  printf '%s
+' "$salida"
 }
-printf '%s
-' "$_SALIDA"
+del_lote || _puerta "${PIEZAS_ARG[@]}" || exit 1
 
-for r in "${REELS[@]}"; do
+# **Las dos vueltas de abajo son de la PIEZA, y en `--solo-lote` no corren.**
+# Se recorre una lista vacia en vez de meter cien lineas dentro de un `if`:
+# el diff de indentar es mas grande que el cambio, y lo que se lee peor se
+# rompe antes.
+PIEZAS_CORTE=("${REELS[@]}")
+solo_lote && PIEZAS_CORTE=()
+
+for r in "${PIEZAS_CORTE[@]}"; do
   TOMA=$(node -e "console.log(JSON.parse(require('fs').readFileSync('rutas.json','utf8')).tomas['reel-$r']||'')")
   if [ -n "$TOMA" ] && ! grep -q '"pasadas"' "work/transcripts/$TOMA.json" 2>/dev/null; then
     echo "══ subtitulos reel-$r ══ (varias pasadas; es el paso 1)"
@@ -198,7 +244,7 @@ for r in "${REELS[@]}"; do
   fi
 done
 
-for r in "${REELS[@]}"; do
+for r in "${PIEZAS_CORTE[@]}"; do
   SRC=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.bruto('reel-$r')))")
   # **Ya se puede cortar material de varias cintas.** Estuvo frenado porque el
   # corte abria un solo `-i` y `punch-ins.py` calculaba un ancla por fichero —
@@ -246,9 +292,19 @@ for r in "${REELS[@]}"; do
     echo "  (recalculando encuadres)"
     python scripts/punch-ins.py --source "$SRC"       --plan "work/scenes/reel-$r/plan-full.json" --ancla-global 2>&1 | grep -E "ancla global"
   fi
-  node scripts/render-hook.mjs --source "$SRC" \
-    --plan "work/scenes/reel-$r/plan-full.json" \
-    --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
+  # **El corte se rehace si hace falta, y lo dice `cadena.py`.**
+  #
+  # Corria SIEMPRE: 29 escenas del bruto 4K HEVC a 2,26 s cada una son 65 s
+  # medidos por pieza, en cada montaje, hubiera cambiado el plan o no. Y la
+  # respuesta ya estaba escrita: `cadena.py` declara los trece eslabones con
+  # lo que come cada uno y con su productor como fuente. Lo unico que le
+  # faltaba era que alguien le preguntara — se le citaba tres veces en este
+  # fichero, siempre dentro de un comentario.
+  if python scripts/cadena.py --hay-que corte "$((10#$r))"; then
+    node scripts/render-hook.mjs --source "$SRC" \
+      --plan "work/scenes/reel-$r/plan-full.json" \
+      --out "public/reel-$r.mp4" 2>&1 | grep -E "escenas ·|listo"
+  fi
   # **Donde esta su cara se mide sobre ESTE corte, no sobre el de antes.**
   # `cadena.py` declara `cara` colgando de `corte` desde el principio, y sin
   # embargo `montar.sh` no corria `sujeto.py` en ningun sitio: cada re-corte
@@ -267,6 +323,20 @@ for r in "${REELS[@]}"; do
   # No cuesta: `de_la_pieza` son cuatro fotogramas de MediaPipe y
   # `recortes_de_la_pieza` ya salta por si solo lo que esta al dia.
   PYTHONIOENCODING=utf-8 python scripts/dominio/sujeto.py "$((10#$r))" 2>&1 | tail -1
+  # **Las otras dos medidas del corte, declaradas y sin correr.** `cadena.py`
+  # cuelga `huecos` y `trasfondo` del corte y los declara como las DOS
+  # entradas del spec; ninguna linea los ejecutaba, asi que `reels-spec.mjs`
+  # se comia el fichero que hubiera en disco — de otro montaje o de ninguno.
+  # Declarado y no producido, la averia de la casa (C-256).
+  #
+  # A diferencia de `sujeto.py`, estas dos solo miran el video: si el corte no
+  # se movio la medida vale, y por eso van con la pregunta delante.
+  if python scripts/cadena.py --hay-que huecos "$((10#$r))"; then
+    PYTHONIOENCODING=utf-8 python scripts/dominio/hueco.py "$((10#$r))" 2>&1 | tail -1
+  fi
+  if python scripts/cadena.py --hay-que trasfondo "$((10#$r))"; then
+    PYTHONIOENCODING=utf-8 python scripts/dominio/trasfondo.py "$((10#$r))" 2>&1 | tail -1
+  fi
   python scripts/subtitular.py "$r"
   # **Y el subtitulo, cruzado con el libreto. Aqui, no cuando alguien se acuerde.**
   #
@@ -314,12 +384,22 @@ fi
 # Avisa y no para: hay faltas legitimas —una forma sin componente propio— y parar
 # el lote por ellas seria cambiar un problema por otro. Lo que no puede pasar es
 # que no se digan.
-if ! python scripts/llega.py 2>&1 | tail -20; then :; fi
+if ! del_lote && ! python scripts/llega.py 2>&1 | tail -20; then :; fi
 # El parte de trabajo se reescribe solo: los números de `docs/bitacora.md` salen
 # del spec recién generado. Un número copiado a mano se queda viejo en el primer
 # render, y entonces la bitácora miente justo cuando hace falta.
-node scripts/bitacora.mjs
-npm run lint
+del_lote || node scripts/bitacora.mjs
+del_lote || npm run lint
+
+# **Hasta aqui llega lo que es del lote.** `montar-lote.sh` corre esta mitad una
+# vez —con `--solo-lote`— y luego reparte las piezas con `EN_LOTE=1`, que salta
+# exactamente lo que acaba de correr. Ni se duplica el codigo ni se duplica el
+# trabajo: es el mismo fichero, cortado por donde el trabajo deja de ser del
+# proyecto y pasa a ser de la pieza.
+if solo_lote; then
+  echo "  (comprobaciones del lote: hechas)"
+  exit 0
+fi
 
 for r in "${REELS[@]}"; do
   n=$((10#$r))
@@ -374,7 +454,20 @@ for r in "${REELS[@]}"; do
   # Ahi dentro van tambien el bundle limpio —el CLI sirve un spec cacheado— y la
   # concurrencia 4. El reintento a 16 se disparaba siempre, asi que 4 no era el
   # plan B: era el valor bueno escrito en el sitio equivocado.
-  node scripts/render.mjs "$n"
+  # **Y solo si hace falta.** Igual que el corte: `cadena.py` sabe si el
+  # render de esta pieza corresponde al spec de ahora. Son 3,6 min medidos
+  # por pieza, y el aviso «salio IDENTICA al render anterior» era exactamente
+  # esto — la informacion correcta, cobrada despues de pagarla entera.
+  #
+  # **Y la huella tambien lo despierta.** Si el mp4 esta al dia pero le falta
+  # su `.huella`, la pieza sale caduca para siempre —la escribe `render.mjs`
+  # y no el CLI—, asi que rehacerla es la unica forma de que la linea
+  # converja.
+  RENDERIZADA=0
+  if python scripts/cadena.py --hay-que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
+    node scripts/render.mjs "$n"
+    RENDERIZADA=1
+  fi
   # **Y se comprueba que el render dejo su huella.**
   #
   # Aqui es donde se cerro la averia: `_render_caduco()` lleva dias exigiendo
@@ -436,14 +529,18 @@ for r in "${REELS[@]}"; do
   #
   # Se compara la huella del video, no la del fichero: los metadatos llevan
   # fecha y harian que dos renders identicos parecieran distintos.
-  HUELLA_ANTES=""
-  [ -f "$DESTINO/reels/reel-R$n.sha" ] && HUELLA_ANTES=$(cat "$DESTINO/reels/reel-R$n.sha")
-  HUELLA=$(ffmpeg -v error -i "$DESTINO/reels/reel-R$n.mp4" -map 0 -c copy -f hash -hash sha256 - 2>/dev/null | tail -1)
-  echo "$HUELLA" > "$DESTINO/reels/reel-R$n.sha"
-  if [ -n "$HUELLA_ANTES" ] && [ "$HUELLA" = "$HUELLA_ANTES" ]; then
-    echo "  OJO: Reel-R$n sale IDENTICO al render anterior."
-    echo "       Lo que se cambio no llega a la pantalla. No lo entregues como nuevo."
-    IDENTICAS+=("R$n")
+  # Sin render nuevo no hay nada que comparar: el fichero es el mismo de
+  # antes a proposito, y decir «IDENTICA» ahi seria una alarma falsa.
+  if [ "$RENDERIZADA" = 1 ]; then
+    HUELLA_ANTES=""
+    [ -f "$DESTINO/reels/reel-R$n.sha" ] && HUELLA_ANTES=$(cat "$DESTINO/reels/reel-R$n.sha")
+    HUELLA=$(ffmpeg -v error -i "$DESTINO/reels/reel-R$n.mp4" -map 0 -c copy -f hash -hash sha256 - 2>/dev/null | tail -1)
+    echo "$HUELLA" > "$DESTINO/reels/reel-R$n.sha"
+    if [ -n "$HUELLA_ANTES" ] && [ "$HUELLA" = "$HUELLA_ANTES" ]; then
+      echo "  OJO: Reel-R$n sale IDENTICO al render anterior."
+      echo "       Lo que se cambio no llega a la pantalla. No lo entregues como nuevo."
+      IDENTICAS+=("R$n")
+    fi
   fi
 
   # **Sin aprobar no lleva musica, igual que no lleva efectos.**
@@ -504,7 +601,14 @@ for r in "${REELS[@]}"; do
   # El interprete se pregunta, no se nombra: el antivirus se llevo
   # `usr/bin/bash.exe` de la instalacion de Git y no deja reponerlo. `sh.exe` es
   # el mismo binario y estaba al lado, asi que la linea moria por el nombre.
-  "$(command -v bash || command -v sh)" scripts/musica.sh "$n"
+  # **La mezcla tambien pregunta.** `cadena.py` declara la entrega colgando de
+  # los efectos, que cuelgan del render: si nada de eso se movio, remezclar
+  # produce el mismo fichero y cuesta las pasadas de `loudnorm` enteras.
+  ENTREGA_NUEVA=0
+  if python scripts/cadena.py --hay-que entrega "$n"; then
+    ENTREGA_NUEVA=1
+    "$(command -v bash || command -v sh)" scripts/musica.sh "$n"
+  fi
   # **Y la entrega se sella: el montaje entero queda guardado.**
   #
   # Jaime, cuando su entrega aprobada no se pudo rehacer: *«no se trata de
@@ -529,7 +633,11 @@ for r in "${REELS[@]}"; do
   # C-307: un aviso automático por pieza y por corrida entierra la lista. Se
   # imprime y se guarda en `medicion`, que es donde un número sobrevive a la
   # corrida.
-  python scripts/suena.py "$n" --guardar 2>&1 | sed 's/^/  /' || true
+  # Y solo cuando la entrega es nueva: medir dos veces el mismo fichero da el
+  # mismo numero y cuesta las pasadas de ffmpeg enteras.
+  if [ "$ENTREGA_NUEVA" = 1 ]; then
+    python scripts/suena.py "$n" --guardar 2>&1 | sed 's/^/  /' || true
+  fi
   python scripts/sellar.py "$n"
   echo "R$n $(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$DESTINO/entrega/reel-R$n.mp4")"
 done
@@ -539,7 +647,7 @@ done
 # fichero entregado duraba 101,4. Un documento de verificacion que no cuadra con
 # lo que se entrega es peor que no tenerlo, porque se firma igual. Es el
 # aprendizaje 24: arreglar el generador no arregla lo generado.
-node scripts/verificacion.mjs
+del_lote || node scripts/verificacion.mjs
 if [ ${#BLOQUEADAS[@]} -gt 0 ]; then
   echo "CON MOTIVOS ABIERTOS — ${#BLOQUEADAS[@]} pieza(s), renderizadas igual:"
   for b in "${BLOQUEADAS[@]}"; do echo "  · $b"; done

@@ -64,16 +64,36 @@ def _ffmpeg(args):
                           encoding="utf-8", errors="replace").stderr
 
 
-def onda(mp4):
-    """Sonoridad, pico y saturación del fichero, medidos sobre la onda."""
+#: Las tres medidas de la onda, **encadenadas en una sola pasada**.
+#:
+#: Cada una abria su propio ffmpeg y decodificaba los 185 MB de la entrega
+#: enteros: 6,9 s medidos por pasada, tres pasadas, para mirar tres veces el
+#: mismo fichero. Ninguno de los tres filtros toca las muestras —miden y dejan
+#: pasar— asi que en serie miden exactamente lo mismo que por separado.
+CADENA = ("ebur128=peak=true,astats=metadata=1:reset=0,"
+          "silencedetect=noise={umbral}dB:d={minimo}")
+
+
+def pasada(mp4, umbral=-40, minimo=0.6):
+    """Sonoridad, pico, saturación y aire del fichero. Una pasada, no tres.
+
+    Se llama `pasada` y no `medir` porque `medir(n)` ya existe aquí abajo y es
+    la entrada de la pieza entera. Dos funciones con el mismo nombre en el mismo
+    fichero no chocan: la de abajo tapa a la de arriba **en silencio**.
+    """
+    t = _ffmpeg(["-i", mp4, "-af",
+                 CADENA.format(umbral=umbral, minimo=minimo)])
+    return {**onda(t), **aire(t)}
+
+
+def onda(t):
+    """Sonoridad, pico y saturación, leídos de la salida de `medir`."""
     out = {}
-    t = _ffmpeg(["-i", mp4, "-af", "ebur128=peak=true"])
     for clave, patron in (("sonoridad", r"I:\s*(-?[\d.]+) LUFS"),
                           ("pico_real", r"Peak:\s*(-?[\d.]+) dBFS")):
         m = re.findall(patron, t)
         if m:
             out[clave] = float(m[-1])
-    t = _ffmpeg(["-i", mp4, "-af", "astats=metadata=1:reset=0"])
     m = re.findall(r"Number of samples exceeding 0dB:\s*(\d+)", t)
     if not m:
         m = re.findall(r"Flat factor:\s*([\d.]+)", t)
@@ -83,9 +103,8 @@ def onda(mp4):
     return out
 
 
-def aire(mp4, umbral=-40, minimo=0.6):
-    """Los silencios del fichero. Devuelve el más largo y cuántos hay."""
-    t = _ffmpeg(["-i", mp4, "-af", f"silencedetect=noise={umbral}dB:d={minimo}"])
+def aire(t):
+    """Los silencios, leídos de la salida de `medir`: el más largo y cuántos."""
     duras = [float(x) for x in re.findall(r"silence_duration: ([\d.]+)", t)]
     return {"huecos": len(duras),
             "aire_max": round(max(duras), 2) if duras else 0.0,
@@ -163,8 +182,7 @@ def medir(n):
     if not os.path.exists(mp4):
         return None
     d = {"slug": slug, "fichero": mp4}
-    d.update(onda(mp4))
-    d.update(aire(mp4))
+    d.update(pasada(mp4))
     d["costuras"] = costuras(slug)
     return d
 

@@ -21,8 +21,17 @@ DESTINO=$(node -e "import('./scripts/rutas.mjs').then(m=>console.log(m.rutas.des
 mkdir -p "$DESTINO/reels"
 
 echo "── render Reel-R$n → $DESTINO/reels ──"
-npx remotion render "Reel-R$n" "$DESTINO/reels/reel-R$n.mp4" \
-  --gl=angle --concurrency=8 --offthread-video-threads=4 --log=error
+# **Por `render.mjs`, no por el CLI. Una sola puerta al render.**
+#
+# Esto llamaba al CLI por su cuenta: otra concurrencia, otro bundle y —lo que
+# de verdad costaba— **sin escribir `reel-RN.mp4.huella`**, que es lo que
+# `_render_caduco()` exige para dar la pieza por montada. Una pieza
+# renderizada por esta puerta salia caduca para siempre y el montaje
+# siguiente la rehacia entera: una puerta produciendo trabajo para la otra.
+#
+# Aqui queda lo que esta entrada aporta y el motor no: comprobar el render
+# contra el plan y encadenar la mezcla.
+node scripts/render.mjs "$n"
 
 # **Se comprueba que salió, y que dura lo que el plan dice.** El render puede
 # fallar dejando el fichero anterior en su sitio: entonces la mezcla toma el

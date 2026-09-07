@@ -138,7 +138,47 @@ def desde(n):
     return None
 
 
+def hay_que(nombre, n):
+    """¿Hay que rehacer ese eslabón de esa pieza? `(sí/no, por qué)`.
+
+    **Es la pregunta que la línea nunca hacía.** Este fichero declaraba los trece
+    eslabones desde el principio y sólo se le citaba en comentarios: `montar.sh`
+    comprobaba tres a mano con `-nt` y los otros diez corrían siempre. El corte
+    del bruto 4K son 65 s medidos y el render 3,6 min, **cada montaje, hubiera
+    cambiado algo o no** — que es exactamente lo que produce el aviso «salió
+    IDÉNTICA al render anterior», sólo que cobrado después.
+
+    La regla sale de `desde()` y no se inventa otra: si la pieza caduca en el
+    eslabón *i*, hay que correr **de *i* en adelante**. Un eslabón anterior está
+    al día por definición, porque lo que come ya estaba bien.
+    """
+    orden = {e[0]: i for i, e in enumerate(ESLABONES)}
+    if nombre not in orden:
+        raise SystemExit(
+            f"cadena: no existe el eslabon «{nombre}». Los que hay: "
+            + ", ".join(orden))
+    d = desde(n)
+    if d is None:
+        return False, "la pieza esta al dia de punta a punta"
+    i, donde, _quien, por = d
+    if orden[nombre] < i:
+        return False, f"la cadena caduca mas adelante, en «{donde}»"
+    return True, por
+
+
 def main():
+    # `--hay-que <eslabon> <n>`: la pregunta de un paso concreto, para el shell.
+    # Sale con 0 si hay que rehacerlo —que es lo que un `if` de bash lee como
+    # «sí»— y con 1 si está al día.
+    if "--hay-que" in sys.argv:
+        i = sys.argv.index("--hay-que")
+        nombre = sys.argv[i + 1]
+        n = int(sys.argv[i + 2])
+        toca, por = hay_que(nombre, n)
+        print(f"  {nombre} R{n}: " + (f"se rehace — {por}" if toca
+                                      else f"al dia — {por}"))
+        return 0 if toca else 1
+
     ns = [int(x) for x in sys.argv[1:] if x.isdigit()] or list(range(1, 8))
     sucias = 0
     for n in ns:
