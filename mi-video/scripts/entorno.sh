@@ -46,6 +46,37 @@ _EXPORTA=$(node scripts/temporal.mjs --exportar) || {
 eval "$_EXPORTA"
 _TMP_PROY="$TMPDIR"
 
+# **Y lo que dejaron las corridas que murieron a medias, se barre.**
+#
+# El temporal llego a **51 GB**: quince bundles de Remotion de 1,6 GB —cada uno
+# con su copia entera de `public/`—, cuatro carpetas de `sfx` de 1,7 GB y una
+# cola de assets de Remotion. Todas son carpetas por PID, y todas se borran al
+# terminar; lo que no se borra es lo de la corrida que se interrumpio, y eso no
+# lo recoge nadie porque el que tenia que hacerlo es el que murio.
+#
+# Tres cinturones, porque esto borra:
+#
+#   - **Solo dentro del temporal declarado**, que las comprobaciones de mas
+#     abajo ya se encargan de que no sea C:.
+#   - **Solo los prefijos que produce la linea** — `render-`, `bundle-`, `sfx-`,
+#     `seg-` y los `remotion-*` que crea el propio renderer.
+#   - **Solo si llevan mas de dos dias sin tocarse.** Ninguna corrida dura dos
+#     dias, asi que no puede llevarse por delante nada vivo. Un montaje entero
+#     son cuarenta minutos.
+#
+# Y **una vez al dia, no en cada guion**: esto lo sourcean treinta scripts y
+# recorrer el temporal en cada uno seria pagar la limpieza treinta veces para no
+# encontrar nada. La marca es un fichero vacio con su fecha.
+_BARRIDO="$_TMP_PROY/.barrido"
+if [ -z "$(find "$_BARRIDO" -newermt '-1 day' 2>/dev/null)" ]; then
+  _VIEJAS=$(find "$_TMP_PROY" -maxdepth 1 -type d -mtime +2     \( -name 'render-*' -o -name 'bundle-*' -o -name 'sfx-*'        -o -name 'seg-*' -o -name 'remotion-*' \) 2>/dev/null | wc -l)
+  if [ "$_VIEJAS" -gt 0 ]; then
+    find "$_TMP_PROY" -maxdepth 1 -type d -mtime +2       \( -name 'render-*' -o -name 'bundle-*' -o -name 'sfx-*'          -o -name 'seg-*' -o -name 'remotion-*' \)       -exec rm -rf {} + 2>/dev/null
+    echo "entorno.sh: barridas $_VIEJAS carpeta(s) temporales de corridas muertas" >&2
+  fi
+  : > "$_BARRIDO"
+fi
+
 # **Y el perfil de Chrome, que TEMP no mueve.**
 #
 # Chrome escribe su perfil y sus caches en `%LOCALAPPDATA%`, no en `TEMP`: por
