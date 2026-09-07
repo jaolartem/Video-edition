@@ -39,6 +39,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import basedatos  # noqa: E402
+from dominio import ticket  # noqa: E402
 
 BASE = "ads/decisiones.db"
 ENTREGA = "out/entrega"
@@ -260,6 +261,18 @@ def main():
         print(f"  R{n}: {mal}" if mal and num is None
               else f"  R{n}: version {num}"
                    + (f" — {mal}" if mal else " sellada, se puede rehacer"))
+        # **Y los tickets del corte anterior se mueren aqui.** Regla de Jaime,
+        # 7-9-2026: *«los anteriores se mueren cuando la composicion se
+        # muere»*. Va pegado al sellado porque es exactamente el momento en que
+        # la composicion sobre la que se escribieron deja de existir; ponerlo en
+        # otro sitio seria acordarse, y acordarse no es un paso del proceso.
+        # Si el defecto sigue, vuelve a salir en la revision de la entrega
+        # nueva — que es lo que el hace en cada entrega.
+        if num is not None:
+            muertos = ticket.caducar(f"reel-{n:02d}")
+            if muertos:
+                print(f"     {len(muertos)} ticket(s) del corte anterior"
+                      f" caducados: {muertos[:8]}")
     return 0
 
 

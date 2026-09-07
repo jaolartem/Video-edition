@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS ticket (
 #: **Las columnas que hacen del ticket algo con dueno.** Se anaden en caliente
 #: porque la tabla ya existe con filas dentro; `CREATE TABLE IF NOT EXISTS` no
 #: las mete en una tabla vieja y quedarse sin ellas es quedarse sin mecanismo.
-NUEVAS = ("vuelve_a", "cierra_con", "devuelto")
+NUEVAS = ("vuelve_a", "cierra_con", "devuelto", "huella")
 
 #: **A que paso vuelve la pieza y que medida puede cerrar el ticket, por tipo.**
 #:
@@ -234,10 +234,11 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     cur = cx.execute(
         "insert into ticket (cuando, pieza, segundo, beat, dijo, tipo,"
-        " vuelve_a, cierra_con) values (?,?,?,?,?,?,?,?)",
+        " vuelve_a, cierra_con, huella) values (?,?,?,?,?,?,?,?,?)",
         (ahora, pieza, segundo, _beat(pieza, segundo), dijo, tipo,
          por_defecto[0] if vuelve_a is None else vuelve_a,
-         por_defecto[1] if cierra_con is None else cierra_con))
+         por_defecto[1] if cierra_con is None else cierra_con,
+         _huella(pieza)))
     cx.commit()
     return cur.lastrowid
 
@@ -260,6 +261,60 @@ def medir(id_, medida):
     cx.execute("update ticket set cierra_con = ? where id = ?", (medida, id_))
     cx.commit()
     return medida
+
+
+def _huella(pieza):
+    """La huella del corte sobre el que se abre el ticket. `None` si no se sabe."""
+    try:
+        from . import version
+        return version.huella_edl(pieza)
+    except Exception:
+        return None
+
+
+def caducar(pieza):
+    """**Un ticket se muere cuando se muere la composición sobre la que se hizo.**
+
+    Regla de Jaime, 7-9-2026, mirando los 31 que le quedaban de días anteriores:
+    *«sólo quedaban abiertos los últimos que te hice; los anteriores se mueren
+    cuando sí composición se muere»*.
+
+    Y es la regla correcta, no una amnistía. Una queja dice «en el segundo 38 no
+    termina la idea» **de un corte concreto**; cuando esa pieza se vuelve a
+    montar, el segundo 38 es otra cosa y la queja no se puede ni comprobar ni
+    aplicar. Dejarla abierta no la conserva: la convierte en un pendiente que
+    nadie puede quitar y que tapa a los que sí valen. Si el defecto sigue, él lo
+    vuelve a decir en la revisión siguiente — que es lo que hace en cada entrega.
+
+    **Y por eso los tickets se estampan con la huella del corte al abrirlos**,
+    como las notas de `revision` (C-238). Sin ese sello no había forma de saber
+    de qué montaje hablaba cada uno, y por eso 31 quejas de tres cortes atrás
+    seguían contándose como pendientes de hoy.
+
+    No caducan los de la corrida en curso: llevan la huella de este mismo corte.
+    """
+    h = _huella(pieza)
+    if not h:
+        return []
+    cx = _con()
+    viejos = [dict(r) for r in cx.execute(
+        "select id, dijo from ticket where pieza = ? and respuesta is null"
+        " and (huella is null or huella <> ?)", (pieza, h))]
+    if viejos:
+        ahora = datetime.datetime.now().isoformat(timespec="seconds")
+        cx.executemany(
+            # `descartado` y no `caducado`: el esquema declara los cuatro
+            # estados posibles y anadir uno pide migrar la tabla. Lo que
+            # distingue a estos lo dice su respuesta, que es donde se lee.
+            "update ticket set respuesta = ?, estado = 'descartado', quien ="
+            " 'la linea', cerrado = ? where id = ?",
+            [("Caducado con el corte: se abrio sobre un montaje que ya no existe"
+              f" (el de hoy es {h}). Regla de Jaime: «los anteriores se mueren"
+              " cuando la composicion se muere». Si el defecto sigue, vuelve a"
+              " salir en la revision de la entrega nueva.", ahora, v["id"])
+             for v in viejos])
+        cx.commit()
+    return [v["id"] for v in viejos]
 
 
 def contestar(id_, respuesta, estado="contestado", quien="la linea", medida=""):
