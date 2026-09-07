@@ -154,9 +154,12 @@ def hay_que(nombre, n):
     """
     orden = {e[0]: i for i, e in enumerate(ESLABONES)}
     if nombre not in orden:
-        raise SystemExit(
-            f"cadena: no existe el eslabon «{nombre}». Los que hay: "
-            + ", ".join(orden))
+        # **`ValueError`, no `SystemExit`.** `SystemExit` sale con 1, que es
+        # exactamente el codigo con el que esta funcion dice «esta al dia»: un
+        # eslabon mal escrito hacia que el `if` del shell saltara el paso en
+        # silencio. Una errata no puede leerse como «no hace falta».
+        raise ValueError(
+            f"no existe el eslabon «{nombre}». Los que hay: " + ", ".join(orden))
     d = desde(n)
     if d is None:
         return False, "la pieza esta al dia de punta a punta"
@@ -171,10 +174,20 @@ def main():
     # Sale con 0 si hay que rehacerlo —que es lo que un `if` de bash lee como
     # «sí»— y con 1 si está al día.
     if "--hay-que" in sys.argv:
-        i = sys.argv.index("--hay-que")
-        nombre = sys.argv[i + 1]
-        n = int(sys.argv[i + 2])
-        toca, por = hay_que(nombre, n)
+        # **Tres codigos, no dos.** 0 = hay que rehacerlo · 1 = esta al dia ·
+        # 2 = no se pudo contestar. Sin el tercero, quien pregunta desde el
+        # shell no puede distinguir «no hace falta» de «me equivoque al
+        # preguntar», y las dos cosas se leen igual: saltandose el paso.
+        try:
+            i = sys.argv.index("--hay-que")
+            nombre = sys.argv[i + 1]
+            n = int(sys.argv[i + 2])
+            toca, por = hay_que(nombre, n)
+        except (IndexError, ValueError) as e:
+            print(f"cadena: {e}", file=sys.stderr)
+            print("  uso: cadena.py --hay-que <eslabon> <numero de pieza>",
+                  file=sys.stderr)
+            return 2
         print(f"  {nombre} R{n}: " + (f"se rehace — {por}" if toca
                                       else f"al dia — {por}"))
         return 0 if toca else 1
