@@ -222,7 +222,14 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
 
     Quien no diga nada se queda con el valor de su tipo, que está en `RUTA`.
     """
+    # **Y no se abre un ticket que nadie pueda cerrar.** Con `cierra_con` vacio,
+    # `contestar` lo rechaza siempre: el defecto se arregla en la pieza y el
+    # ticket se queda abierto para siempre, diciendo que falta algo que ya esta.
+    # Paso con el #240. Si el tipo no trae medida por defecto, la medida es el
+    # nombre del tipo — que es peor que una buena y mucho mejor que ninguna.
     por_defecto = RUTA.get(tipo, ("", ""))
+    if cierra_con is None and not por_defecto[1]:
+        cierra_con = tipo
     cx = _con()
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     cur = cx.execute(
@@ -233,6 +240,26 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
          por_defecto[1] if cierra_con is None else cierra_con))
     cx.commit()
     return cur.lastrowid
+
+
+def medir(id_, medida):
+    """Declara **qué medida cierra** un ticket que se abrió sin decirlo.
+
+    Un ticket con `cierra_con` vacío no lo puede cerrar nada: `contestar` lo
+    rechaza, y con razón —ver `CierreAjeno`—. Pero eso deja tickets muertos, y
+    pasó: el #240 —«bootcamp en viu» por «en vivo»— quedó arreglado en la pieza
+    y sin forma de darlo por cerrado, porque su tipo no traía medida por defecto
+    en `RUTA`.
+
+    Esto no es una puerta trasera: **declara la medida y la deja escrita**, que
+    es justo lo que faltó al abrirlo. Cerrar sigue exigiendo que coincida.
+    """
+    if not str(medida).strip():
+        raise CierreAjeno(f"ticket #{id_}: una medida sin nombre no cierra nada")
+    cx = _con()
+    cx.execute("update ticket set cierra_con = ? where id = ?", (medida, id_))
+    cx.commit()
+    return medida
 
 
 def contestar(id_, respuesta, estado="contestado", quien="la linea", medida=""):
