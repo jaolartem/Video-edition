@@ -52,6 +52,22 @@ def _video_id(slug):
     return r["id"] if r else None
 
 
+def _aprobada(slug):
+    """Si la version viva de esa pieza la aprobo **una persona**.
+
+    Aprobar es lo unico que el motor no puede hacer solo, y por eso es tambien
+    lo unico que puede cerrarle la puerta a la maquina.
+    """
+    from .ticket import _con as _tc
+
+    cx = _tc()
+    r = cx.execute(
+        "select a.veredicto from aprobacion a join version v on v.id ="
+        " a.version_id join video vi on vi.id = v.video_id"
+        " where vi.slug = ? order by v.id desc limit 1", (slug,)).fetchone()
+    return bool(r and r["veredicto"] == "aprobada")
+
+
 def del_tiquet(piezas):
     """**Un tiquet abierto manda su pieza al paso que sabe atenderlo.**
 
@@ -71,6 +87,21 @@ def del_tiquet(piezas):
         slug = f"reel-{int(n):02d}"
         fase, ids = ticket.por_atender(slug)
         if not fase or not ids:
+            continue
+        # **Lo aprobado no lo reabre una puerta.** Jaime, 7-9-2026, viendo que
+        # reel-07 —firmada y subida a G:— habia vuelto a diseno: *«que hace r-07
+        # ahi??»*. La habia mandado el #284, que lo levanto la maquina, no el.
+        #
+        # Aprobar es el unico paso que no tiene servicio porque no hay nada que
+        # ejecutar: lo mueve una persona. Asi que una pieza aprobada vuelve
+        # cuando el lo dice —con `avanzar --volver`, como hizo con reel-04— y no
+        # porque una comprobacion interna encuentre algo. El tiquet no se cierra
+        # ni se tira: se queda abierto y se dice, que es lo que hay que hacer
+        # con algo que hay que mirar y no te toca decidir.
+        if _aprobada(slug):
+            dicho.append(f"  {slug}: APROBADA — {len(ids)} tiquet(s) de maquina"
+                         f" piden «{fase}» y la puerta no la reabre."
+                         f" Sube a Jaime: {', '.join('#' + str(i) for i in ids)}")
             continue
         destino, vid = _fase_id(fase), _video_id(slug)
         if destino is None or vid is None:

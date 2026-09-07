@@ -157,8 +157,14 @@ def vencidas(slug, fase_actual, orden):
     aqui = orden.get(fase_actual)
     if aqui is None:
         return []
+    # **Estrictamente ANTES, no «hasta aqui».** Con `<=`, una pieza sentada en la
+    # fase que atiende su correccion se declaraba bloqueada por lo que habia
+    # venido a arreglar: el 7-9-2026 el despachador dio vueltas sin mover nada
+    # con las siete piezas diciendo «tiene correcciones sin aplicar y su paso ya
+    # quedo atras», y reel-01 estaba EN `descrito` con su correccion PARA
+    # `descrito`. Igual no es atras — es ahora.
     return [t for t in suyas(slug)
-            if orden.get(t[2]) is not None and orden[t[2]] <= aqui]
+            if orden.get(t[2]) is not None and orden[t[2]] < aqui]
 
 
 #: **La capa de instrucción del contrato**, cuando lo que hay son tiquets.
