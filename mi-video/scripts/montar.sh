@@ -124,6 +124,17 @@ del_lote || python scripts/verdad.py
 # las 83 agujas daban «no esta» y el parte no lo miraba—. Va aqui por lo mismo
 # que las otras dos: lee ficheros y es barato.
 del_lote || python scripts/contratos.py
+# **Y con que se comprueba cada decision, que es lo que faltaba.** Jaime:
+# *«para tomar decisiones utilizan solo un mecanismo, los CC por ejemplo, y no
+# el sonido, que es el indicador mas claro de que el CC esta mal puesto»*.
+#
+# `verdad.py` dice de donde sale cada decision y `contratos.py` que dato viaja a
+# cada paso; faltaba la tercera: con que se comprueba lo decidido, y que sea con
+# OTRA señal. Falla si una comprobacion declarada ya no esta en el codigo y
+# avisa de las que no tienen ninguna — la lista de huecos es trabajo pendiente,
+# no un defecto de esta corrida. Va aqui por lo mismo que las otras dos: lee
+# ficheros y cuesta menos de un segundo.
+del_lote || python scripts/comprobado.py --solo-huecos
 
 # **El techo de 300 lineas, y aqui porque es donde para.** Jaime: *«maximo 300
 # lineas; 1000 lineas es espagueti»*. Esto imprimia «33 ficheros pasan del

@@ -193,6 +193,26 @@ def anotar(video_id, fase_id, por_que=None):
     con.close()
 
 
+#: **Qué eslabón de `cadena.py` produce cada fase**, para las que producen un
+#: fichero. Si ese eslabón está al día, la fase no tiene trabajo que hacer.
+#:
+#: `montar.sh` ya le pregunta a la cadena antes de cortar, de renderizar y de
+#: mezclar; el motor no preguntaba, así que al llegar a `masterizado` volvía a
+#: mezclar lo que la fase `montado` acababa de mezclar. El mismo trabajo, dos
+#: veces, por el mismo camino — y era lo que quedaba del punto 8 de
+#: `docs/rendimiento.md`: `montar.sh` hacía el trabajo de otras cinco fases y
+#: el motor lo repetía detrás.
+#:
+#: **Sólo las que producen un FICHERO declarado en la cadena.** `medido`
+#: —`suena.py`— escribe filas en `medicion`, y un fichero al día no dice nada
+#: de si la medida se tomó: saltarla sería dar por hecho lo que no se hizo. Es
+#: la misma frontera que separa un artefacto de una decisión.
+ESLABON_DE = {
+    "montado": "render",
+    "masterizado": "entrega",
+}
+
+
 #: Fase a la que vuelve una pieza cuyo render ya no corresponde a su corte.
 VUELVE_SI_CADUCO = "verificado"
 

@@ -42,8 +42,9 @@ BASE = "ads/decisiones.db"
 # los llaman así, y mover algo no tiene por qué romper a quien lo usa.
 from dominio import abierto as _abierto  # noqa: E402
 from dominio.fase import (  # noqa: E402,F401
-    _con, _fallo_antes, _render_caduco, VUELVE_SI_CADUCO, anotar, camino,
-    fase_de)
+    _con, _fallo_antes, _render_caduco, ESLABON_DE, VUELVE_SI_CADUCO, anotar,
+    camino, fase_de)
+import cadena  # noqa: E402
 
 
 def avanzar(n, ver=False, tope=None, permiso=None, planta=True):
@@ -146,6 +147,30 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
                       f" aplicar y su paso ya quedo atras — #{uno[0]}"
                       f" ({uno[1]}, va en «{uno[2]}»): «{uno[3]}»")
             break
+
+        # **Y si lo que ese paso produce ya corresponde, no se rehace.**
+        #
+        # `montar.sh` le pregunta a `cadena.py` antes de cortar, de renderizar y
+        # de mezclar; el motor no preguntaba, asi que al llegar a `masterizado`
+        # volvia a mezclar lo que `montado` acababa de mezclar. El mismo trabajo
+        # dos veces por el mismo camino, y sin que nadie lo notara: las dos
+        # corridas terminan bien.
+        #
+        # Que fases entran lo dice `ESLABON_DE`, y son solo las que producen un
+        # fichero de la cadena. La etiqueta avanza **sin motivo escrito**: un
+        # `por_que` en `video_fase` es lo que `_fallo_antes` cuenta como intento
+        # fallido, y esto no es un fallo — es un paso que no tenia trabajo.
+        eslabon = ESLABON_DE.get(siguiente["nombre"])
+        if eslabon and not ver and not cadena.hay_que(eslabon, n)[0]:
+            print(f"  {pieza.slug}: {siguiente['nombre']} ya esta al dia"
+                  f" — «{eslabon}» no ha caducado")
+            anotar(pieza.video_id, siguiente["id"])
+            actual = siguiente
+            saltos += 1
+            if tope and saltos >= tope:
+                motivo = "tope de saltos"
+                break
+            continue
 
         if ver:
             print(f"  {pieza.slug}: {actual['nombre']} -> {siguiente['nombre']}"
