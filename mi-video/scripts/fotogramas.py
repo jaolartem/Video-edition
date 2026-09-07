@@ -131,12 +131,57 @@ def de_la_cinta(toma, desde, hasta, cuantos=CUANTOS, etiqueta=""):
     return tiros
 
 
+def _del_still(slug):
+    """Los fotogramas que dejo `mirar.sh`, en la forma que devuelve `sacar`.
+
+    Misma forma para las dos procedencias —del video o del bundle— porque quien
+    los mira no tiene por que saber de donde salieron: son las mismas escenas y
+    los mismos cinco momentos.
+    """
+    import glob
+
+    fuera = []
+    for e in escenas(slug):
+        tiros = []
+        for jpg in sorted(glob.glob(os.path.join(
+                "work", "still", slug, f"e{e['n']:02d}-*"))):
+            tiros.append({"fichero": jpg.replace("\\", "/")})
+        if tiros:
+            fuera.append({"escena": e["n"], "etapa": e["etapa"],
+                          "desde": round(e["desde"], 2),
+                          "hasta": round(e["hasta"], 2), "mira": tiros,
+                          "de": "stills del bundle, la pieza aun no esta montada"})
+    return fuera
+
+
 def sacar(n, cuantos=CUANTOS):
     """Deja los fotogramas en disco y devuelve qué sacó, escena por escena."""
     slug = f"reel-{n:02d}"
     mp4 = RENDER.format(n=n)
+    # **Si no hay video, se renderizan los CINCO FOTOGRAMAS, no el video.**
+    #
+    # Jaime, 7-9-2026: *«ahora si es montaje nuevo o remontaje si renderiza esos
+    # 5 frames, no mas»*. Y el 6-9, dando el criterio: *«si pueden renderizar
+    # solo cinco fotogramas o tres por escena, es lo que necesitamos... con eso
+    # pueden ver que lo que estan haciendo tiene sentido estetico y que esta
+    # bien; unos minutos mas, pero muchos menos que cuando sale mal»*.
+    #
+    # Las dos mitades ya existian y no se hablaban: `mirar.sh` sabe sacar stills
+    # del bundle —1,9 s cada uno reutilizando un solo Chrome— y esto se rendia
+    # con «no esta el mp4». Asi que para que alguien pudiera MIRAR una pieza
+    # habia que renderizarla entera antes, que es el orden al reves: se mira
+    # para decidir si merece renderizarse.
+    #
+    # Lo que sale del render existente se saca con ffmpeg, que es medio segundo;
+    # esto es lo otro — ver lo que todavia no existe.
     if not os.path.exists(mp4):
-        return None, f"no esta {mp4}"
+        r = subprocess.run(["bash", "scripts/mirar.sh", str(n), str(cuantos)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            return None, (f"no esta {mp4} y no se pudieron renderizar los"
+                          f" {cuantos} fotogramas: "
+                          + (r.stderr or "")[-160:].strip())
+        return _del_still(slug), None
     fuera = os.path.join(*SALIDA.format(slug=slug).split("/"))
     os.makedirs(fuera, exist_ok=True)
     hechas = []
