@@ -86,6 +86,13 @@ const PASO = "describir";
  * contestado todavía — que es una espera, no un fallo.
  */
 function describePieza(slug, filas) {
+  // **Si ya hay respuesta, no se vuelve a construir la pregunta.** Esto estaba
+  // al final: para recoger una respuesta ya escrita se pagaba antes el pedido
+  // entero —`escucha.py`, cinco fotogramas por etapa de la cinta 4K, el montaje
+  // en fotogramas—, o sea minutos y decenas de subprocesos para un fichero que
+  // ya estaba en disco. Recoger pasa a costar cero.
+  const hecha = leeRespuesta(PASO, slug);
+  if (hecha) return hecha.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // `quien` tiene que decir QUIEN contesto. Puso «gemini» cuando esa via ni
   // existia, y decir «cli» de lo que contesto la sesion es el mismo error con
   // otro nombre: el campo esta para poder auditar de donde salio una decision.
@@ -170,8 +177,6 @@ function describePieza(slug, filas) {
   const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
                     revisa_oyendo: escucha, tiquets, editables,
                     ya_montada_asi: despues };
-  const ya = leeRespuesta(PASO, slug);
-  if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // **El contrato tiene dos capas y esta es la segunda.** Las capacidades no
   // cambian —son lo que sabe hacer—; lo que cambia es el encargo. El otro
   // oficio la pone con `abierto.modo` (`servicios/disenar.py`); aqui llega por
@@ -289,6 +294,29 @@ for (const [slug, suyas] of porPiezas(filas)) {
           `${(d.grafico || "").slice(0, 40)}`,
       );
     }
+    // **Y los tiquets que la respuesta dice haber atendido se cierran aqui.**
+    //
+    // No los cerraba nadie. El otro oficio si —`servicios/disenar.py` llama a
+    // `abierto.cerrar` con los numeros declarados—, y este paso guardaba la
+    // descripcion y dejaba la correccion abierta: la pieza avanzaba, `vencidas`
+    // la veia abierta con su paso ya detras y la devolvia. Tres vueltas la
+    // noche del 7 al 8 de septiembre, sin que nadie se equivocara.
+    //
+    // La regla de que numeros se cierran vive en `abierto.cerrar` —solo los
+    // declarados, y ahi esta el porque— y aqui solo se le pasa lo que la
+    // respuesta declaro.
+    const declarados = ds.flatMap((d) => d.tiquets || []);
+    if (declarados.length) {
+      const cerrados = JSON.parse(sql("cerrar_tiquets",
+        [slug, "descrito", `descrito: ${ok} etapa(s) guardadas`, declarados])
+        || "[]");
+      if (cerrados.length) console.log(`  ${slug}: cerrados ${cerrados.join(", ")}`);
+    }
+    // **Y archivar va DENTRO, donde se sabe que se consumio.** Estaba en un
+    // bucle de despues que archivaba toda pieza que no estuviera esperando, asi
+    // que una excepcion a mitad de aplicar se llevaba el pedido Y la respuesta
+    // a `usadas/`: el error se veia una vez y la prueba desaparecia.
+    archivaUsado(PASO, slug);
   } catch (e) {
     // Un fallo de credencial ya no llega aqui: `porCli` lo devuelve como
     // espera. Lo que llegue es un fallo de verdad —esquema, JSON roto— y ese
@@ -297,11 +325,6 @@ for (const [slug, suyas] of porPiezas(filas)) {
   }
 }
 
-// **Y lo aplicado se archiva.** Una respuesta que se queda en la carpeta
-// despues de aplicarse es una peticion abierta que miente: ver `archivaUsado`.
-for (const [slug] of porPiezas(filas)) {
-  if (!esperan.includes(slug)) archivaUsado(PASO, slug);
-}
 console.log(`${ok}/${filas.length} descritas y guardadas`);
 if (esperan.length) {
   console.error(

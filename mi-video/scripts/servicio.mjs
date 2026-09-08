@@ -144,7 +144,12 @@ export function archivaUsado(paso, slug) {
   const dir = `${RAIZ}/${paso}/usadas`;
   fs.mkdirSync(dir, { recursive: true });
   let n = 1;
-  while (fs.existsSync(`${dir}/${slug}.${n}.respuesta.json`)) n += 1;
+  // **El hueco lo decide el PAR, no la respuesta.** Numerando solo por la
+  // respuesta, un pedido archivado sin ella no ocupaba numero: el siguiente
+  // archivado escribia encima y se perdia la pregunta anterior. Paso con los
+  // pedidos que se archivaron sin contestar la noche del 7 de septiembre.
+  while (fs.existsSync(`${dir}/${slug}.${n}.respuesta.json`)
+         || fs.existsSync(`${dir}/${slug}.${n}.pedido.json`)) n += 1;
   for (const [cual, ruta] of [["pedido", rutaPedido(paso, slug)],
                               ["respuesta", rutaRespuesta(paso, slug)]]) {
     if (fs.existsSync(ruta)) {

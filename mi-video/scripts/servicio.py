@@ -494,6 +494,13 @@ def recoger(paso, slug):
     return d
 
 
+def _espera():
+    """Cuánto se espera al CLI. La declara `dominio/oficio.py`, aquí se lee."""
+    from dominio.oficio import ESPERA
+
+    return ESPERA
+
+
 def _hay_cli():
     """¿El CLI tiene credencial aquí?
 
@@ -516,7 +523,10 @@ def _por_cli(prompt, payload):
         out = subprocess.run(
             ["claude", "-p", "--output-format", "json"],
             input=f"{prompt}\n\n---\n\n{json.dumps(payload, ensure_ascii=False)}",
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            # La espera se declara una vez y la leen los dos sitios que llaman
+            # al CLI. Ver `dominio/oficio.py :: ESPERA`.
+            timeout=_espera())
         d = json.loads(out.stdout or "{}")
         if d.get("is_error"):
             return None
