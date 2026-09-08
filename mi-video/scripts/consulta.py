@@ -254,6 +254,24 @@ def acotado(slug, fase):
     return None if (not hay or todas or not etapas) else sorted(etapas)
 
 
+def modo(slug, fase):
+    """La segunda capa del contrato: el encargo de hoy. `""` si no hay tiquets.
+
+    Jaime: *«hay dos modos para cada agente; el contrato tiene dos capas, una
+    con las capacidades y otra con la instruccion»*. El prompt del paso son las
+    capacidades y no cambia; esto dice que hoy **no se compone la pieza, se
+    arreglan estos tiquets**.
+
+    `servicios/disenar.py` la pone con `abierto.modo` antes de preguntar. El
+    otro oficio vive en node y no tenia por donde pedirla, asi que recibia los
+    tiquets como dato y ninguna frase que dijera que el encargo era ese. Esta
+    puerta solo la deja cruzar; el texto es el de `dominio/abierto.py :: MODO` y
+    se manda literal.
+    """
+    from dominio import abierto
+    return abierto.encargo(slug, fase)[0] or ""
+
+
 def guardar_escena(slug, orden, d):
     """Guarda la descripción de una etapa, con el texto que describe."""
     try:
@@ -303,6 +321,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "proponer": proponer,
           "tiquets_de": tiquets_de,
           "acotado": acotado,
+          "modo": modo,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
 

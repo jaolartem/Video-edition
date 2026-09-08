@@ -236,7 +236,23 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
             # `verificar` lo anota como ticket puntual con su etapa, y lo mira
             # quien revisa la pieza montada. Lo que no hace es rehacer el
             # trabajo. `--rehacer` sigue existiendo para pedirlo a mano.
-            if guardado.get((slug, orden)) is not None:
+            #
+            # **Un tiquet suyo sobre una etapa la vuelve a poner en el encargo.
+            # No la rehace: la abre para que la mire con su correccion
+            # delante.** Es literalmente lo que hace el otro oficio —ver
+            # `servicios/disenar.py :: encargos`, que lo tiene desde el 5 de
+            # septiembre— y este paso no lo tenia: una etapa ya descrita no
+            # volvia a pedirse nunca, asi que un tiquet de `descrito` dejaba la
+            # pieza esperando a un oficio al que nadie preguntaba.
+            #
+            # Que sea una correccion y no un rediseno lo sostiene la otra mitad,
+            # la capa de instruccion: `abierto.MODO` dice «hoy no compones la
+            # pieza: arreglas estos tiquets» y `acotado` dice cuales son sus
+            # etapas. Sin ella esto si seria volver a describir.
+            from . import abierto
+            if (guardado.get((slug, orden)) is not None
+                    and not abierto.abre(slug, "descrito",
+                                         {"etapa_orden": orden})):
                 continue                 # ya descrita: no se vuelve a pedir
         fuera.append(d)
     return fuera

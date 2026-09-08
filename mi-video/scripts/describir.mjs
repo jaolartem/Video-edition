@@ -172,11 +172,22 @@ function describePieza(slug, filas) {
                     ya_montada_asi: despues };
   const ya = leeRespuesta(PASO, slug);
   if (ya) return ya.map(valida).map((d) => ({ ...d, quien: "servicio" }));
+  // **El contrato tiene dos capas y esta es la segunda.** Las capacidades no
+  // cambian —son lo que sabe hacer—; lo que cambia es el encargo. El otro
+  // oficio la pone con `abierto.modo` (`servicios/disenar.py`); aqui llega por
+  // `consulta.py :: modo`, que es la unica puerta de node a la base.
+  //
+  // Sin ella los tiquets viajaban como dato y ninguna frase decia que el
+  // encargo fuera ese: el 7-9-2026 el compositor recibio el t282 —una etapa— y
+  // devolvio las ocho compuestas. El texto vive en `dominio/abierto.py :: MODO`.
+  const instruccion = JSON.parse(sql("modo", [slug, "descrito"]) || '""');
+  const contrato = PROMPT + instruccion;
+  const encargo = instruccion ? { ...entrada, modo: "tiquets" } : entrada;
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
   // queda escrito es la pregunta entera —prompt incluido— y cualquiera puede
   // contestarla despues sin reconstruir nada.
-  dejaPedido(PASO, slug, PROMPT, entrada);
-  const arr = porCli(PROMPT, entrada);
+  dejaPedido(PASO, slug, contrato, encargo);
+  const arr = porCli(contrato, encargo);
   if (!arr) return null;
   /**
    * **Una respuesta a medias no se guarda como la respuesta.**
