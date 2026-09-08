@@ -450,6 +450,23 @@ def main():
 def _una_vuelta(a) -> int:
     """Un recorrido completo de todas las piezas. Devuelve cuanto se movio."""
     piezas = list(a.reels or rutas.piezas())
+    # **Y una respuesta que llego tarde devuelve su pieza al paso que la espera.**
+    #
+    # Las dos funciones estaban escritas —saben decir exactamente que respuestas
+    # llegaron para un paso que la pieza ya paso— y **no las llamaba nadie**: se
+    # fueron con el despachador cuando se retiro. Declarado y no implementado,
+    # que es la averia de la casa.
+    #
+    # Se paga en el acto. El 8-9-2026 el compositor contesto a reel-03 y reel-05
+    # segundos despues de que sus piezas cruzaran `descrito`: las respuestas se
+    # quedaron escritas sin aplicar y sus tiquets —#279, #283, #285— abiertos,
+    # que es lo que `vencidas` volveria a leer como pieza bloqueada.
+    #
+    # Va aqui, al principio de la vuelta, porque devolver es enrutar y esto es
+    # el enrutador. Lo aprobado no se devuelve: eso lo guarda `_devuelve`.
+    if not a.ver:
+        for paso, slug in _contestadas_tarde():
+            _devuelve(slug, paso)
     # **Las piezas que no comparten cinta trabajan a la vez.** El bucle de una
     # en una hacía que el paso más lento parase a las siete, incluidas las que
     # no dependían de él. Ver `planificador.py`.
