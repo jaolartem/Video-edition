@@ -114,9 +114,6 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
                 actual = destino
 
     saltos, motivo, atras = 0, None, {}
-    #: Las fases a cuyo oficio ya se llamo en esta corrida. Una vez por fase:
-    #: reintentar un paso cuya respuesta no lo satisface es el bucle de siempre.
-    llamado = set()
     while True:
         i = next((k for k, f in enumerate(ruta) if f["id"] == actual["id"]), None)
         if i is None or i + 1 >= len(ruta):
@@ -257,11 +254,9 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             # Se le pide desde este punto porque es por donde pasan los DOS
             # caminos —esta corrida y el salto reactivo—; colgado solo del
             # salto, una corrida a mano dejaba los tres pedidos escritos y a
-            # nadie llamado. Una vez por fase y por corrida: si el oficio
-            # contesta se reintenta el paso, y si no, la pieza se queda con su
-            # pedido abierto, que es el lado seguro.
-            if espera and siguiente["nombre"] not in llamado:
-                llamado.add(siguiente["nombre"])
+            # nadie llamado. Que no se le llame dos veces por la misma pregunta
+            # lo guarda el disparador, que es de quien llama: ver `_LLAMADOS`.
+            if espera:
                 from dominio import disparo as _disparo
                 if _disparo.llama(pieza.slug):
                     continue

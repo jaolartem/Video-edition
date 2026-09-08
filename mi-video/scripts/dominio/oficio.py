@@ -77,6 +77,20 @@ class Oficio:
         """Dónde tiene que dejar su respuesta. La deriva del pedido, no se pasa."""
         return self.pedido.replace(".pedido.json", ".respuesta.json")
 
+    @property
+    def huella(self) -> tuple:
+        """La pregunta concreta que se le hizo: su pedido y cuándo se escribió.
+
+        Es lo que distingue «no ha contestado todavía» de «hay algo nuevo que
+        preguntarle». Con el motor puesto, llamarle otra vez por el mismo
+        fichero es despertarle para que conteste lo mismo — el coste que hizo
+        retirar la patrulla.
+        """
+        try:
+            return (self.pedido, int(os.path.getmtime(self.pedido)))
+        except OSError:
+            return (self.pedido, 0)
+
     def contesto(self) -> bool:
         return os.path.exists(self.respuesta)
 

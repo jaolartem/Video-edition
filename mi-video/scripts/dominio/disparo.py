@@ -66,6 +66,12 @@ _CERROJO = threading.Lock()
 #: y debe estar activo siempre»*.
 APAGADO = "DISPARO_APAGADO"
 
+#: Las preguntas por las que ya se llamo a un oficio en este proceso, por su
+#: huella. Vive aqui y no en el objeto porque es memoria del disparador —de
+#: quien llama—, no del oficio: el oficio es de su pieza y se construye nuevo
+#: cada vez que se le busca.
+_LLAMADOS = set()
+
 def llama(slug):
     """Llama al oficio que esa pieza esta esperando. Cierto si contesto.
 
@@ -83,7 +89,43 @@ def llama(slug):
     from .oficio import Oficio
 
     quien = Oficio.de(slug)
-    return bool(quien and quien.llama())
+    if not quien:
+        return False
+    # **A la misma pregunta no se le llama dos veces.** Con el motor puesto, una
+    # vuelta que vuelve a ver el mismo pedido sin contestar despertaria al mismo
+    # oficio para contestar lo mismo — el coste exacto que hizo retirar la
+    # patrulla. Si el pedido se reescribe, su huella cambia y vuelve a entrar.
+    if quien.huella in _LLAMADOS:
+        return False
+    _LLAMADOS.add(quien.huella)
+    return quien.llama()
+
+
+def puesto(vuelta, cada=30):
+    """Se queda dando vueltas mientras corra. Es lo que hay que dejar activo.
+
+    Jaime, 7-9-2026: *«puedes hacer que se mantenga activo para que siempre que
+    este activo mueva las etiquetas»*.
+
+    No es la patrulla que se retiro, y la diferencia es lo que cuesta una vuelta
+    que no encuentra nada: leer estados y ficheros, cero tokens. Lo caro era
+    despertar al oficio para que contestara lo mismo, y eso lo corta
+    `_LLAMADOS`: a una pregunta se le llama una vez y solo vuelve a entrar si su
+    pedido se reescribe.
+
+    Vive aqui y no en el motor porque son dos responsabilidades: recorrer el
+    camino es de `avanzar`, y estar puesto es del disparador.
+    """
+    import time
+
+    print("disparador puesto — mueve las etiquetas mientras corra",
+          file=__import__("sys").stderr)
+    while True:
+        try:
+            vuelta()
+            time.sleep(max(5, int(cada)))
+        except KeyboardInterrupt:
+            return
 
 
 def encendido():
