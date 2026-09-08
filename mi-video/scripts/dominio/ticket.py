@@ -295,7 +295,18 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
          por_defecto[1] if cierra_con is None else cierra_con,
          _huella(pieza)))
     cx.commit()
-    return cur.lastrowid
+    ident = cur.lastrowid
+    # **Abrir el tiquet ES el evento.** Jaime: *«el tiquet abierto abre una
+    # puerta y un camino»*. La puerta vivia en el despachador, o sea en una
+    # patrulla que recorria las siete piezas preguntando si habia algo nuevo —
+    # y lo nuevo acaba de pasar aqui. Se enciende donde ocurre, no se busca.
+    try:
+        from . import puertas
+        for linea in puertas.del_tiquet([int(str(pieza)[-2:])]):
+            print(linea)
+    except Exception:                              # noqa: BLE001
+        pass
+    return ident
 
 
 def situar(id_, segundo):

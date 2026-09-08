@@ -311,9 +311,6 @@ def main():
                     help="como mucho N saltos por pieza")
     ap.add_argument("--volver", metavar="FASE",
                     help="devuelve la pieza a esa fase y la vuelve a recorrer")
-    ap.add_argument("--despachar", action="store_true",
-                    help="queda encendido repartiendo pedidos y recogiendo"
-                         " respuestas segun llegan")
     ap.add_argument("--por-que", default="", metavar="RAZON",
                     help="por que vuelve; queda en el log de la pieza")
     a = ap.parse_args()
@@ -398,10 +395,13 @@ def main():
     # ultima vuelta —en la que ya no se mueve nada— deja las preguntas escritas.
     # Un pedido abierto sobre un material que todavia puede cambiar es una
     # pregunta que no se puede contestar, y contestarla es trabajo tirado.
-    if a.despachar:
-        from despachador import despachar
-        despachar(a)
-        return
+    # **El despachador se retiro el 7-9-2026.** Era una patrulla: recorria las
+    # siete piezas preguntando a quien le tocaba, o sea un orquestador central
+    # —«un mini tu que mueve todo pero adentro del programa»—. Lo que ocupa su
+    # sitio no recorre nada: `dominio/disparo.py` se enciende cuando un paso
+    # acaba, da un salto y se apaga, y `ticket.abrir` enciende su puerta donde
+    # el tiquet se abre. Reaccionar cuesta cero tokens; patrullar costaba una
+    # vuelta entera por cada pregunta.
     _una_vuelta(a)
 
 

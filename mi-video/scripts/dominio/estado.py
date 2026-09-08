@@ -150,7 +150,18 @@ def marca(slug, paso, resultado, quien="la linea", nota=""):
     d.setdefault("log", []).append(
         {"cuando": fila["cuando"], "etapa": d.get("etapa"),
          "que": f"{paso}: {resultado} ({quien})"})
-    return _guarda(slug, d)
+    _guarda(slug, d)
+    # **Y el cambio enciende el paso siguiente.** Jaime: *«un proceso
+    # completado, un cambio de estado; un cambio de estado activa un nuevo
+    # proceso»*. Ver `dominio/disparo.py` — un salto, y sin agente en medio:
+    # los 18 pasos de codigo del ciclo se encadenan sin encender un modelo.
+    if resultado not in ("fallo", "espera"):
+        try:
+            from . import disparo
+            disparo.dispara(slug, f"{paso} lo dejo en «{resultado}»")
+        except Exception:                          # noqa: BLE001
+            pass
+    return lee(slug)
 
 
 def todas(piezas):
