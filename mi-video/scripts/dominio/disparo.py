@@ -27,17 +27,35 @@ bucle escondido en la recursión.
 ## Y una llamada dentro de otra no dispara
 
 `avanzar` ejecuta el paso, y el paso puede escribir estado — así que sin guarda
-un salto encendería otro desde dentro de sí mismo, sin fondo. `_ENCENDIDO` corta
-eso: mientras un disparo está en curso, los de dentro se anotan y no corren.
+un salto encendería otro desde dentro de sí mismo, sin fondo. `_EN_VUELO` corta
+eso, **y por pieza**: lo que hay que impedir es que una se llame a sí misma, no
+que dos avancen a la vez.
+
+## Y por eso esto no es una fila
+
+Jaime, 7-9-2026: *«al final es modular, cada video llama las funciones, no pasa
+por ellas»*. No hay una cinta transportadora con siete piezas encima: cada una
+llama a lo que necesita cuando su estado cambia, y las funciones son biblioteca,
+no estaciones. De ahí que el paralelismo sea lo normal y no algo que haya que
+organizar — el único recurso que de verdad comparten es la cinta, y eso lo
+serializa `planificador.py` sólo en los pasos que la reescriben.
 """
 from __future__ import annotations
 
 import os
+import threading
 
-#: Mientras hay un disparo en curso, los de dentro no encienden nada. No es una
-#: optimizacion: es lo que impide que un paso que escribe estado se llame a si
-#: mismo por la puerta de al lado.
-_ENCENDIDO = False
+#: Las piezas con un disparo en curso. **Por pieza, no una bandera global.**
+#:
+#: Jaime, 7-9-2026: *«al final es modular, cada video llama las funciones, no
+#: pasa por ellas»*. Con una bandera unica el modelo era el contrario —una sola
+#: linea por la que pasan las siete— y bastaba que reel-01 estuviera dando su
+#: salto para que reel-05 no pudiera dar el suyo. La reentrada que hay que
+#: cortar es la de UNA pieza llamandose a si misma; dos piezas distintas no se
+#: estorban, y el unico recurso que de verdad comparten —la cinta— ya lo
+#: serializa `planificador.py`, y solo en los pasos que la reescriben.
+_EN_VUELO = set()
+_CERROJO = threading.Lock()
 
 #: Con esto puesto, el estado se escribe y no enciende nada. Existe para poder
 #: mover una pieza a mano sin que la linea salga corriendo detras — que es lo
@@ -57,15 +75,16 @@ def dispara(slug, por_que=""):
     tiene la frontera donde los errores se anotan en vez de escaparse. Aquí sólo
     está la regla de cuándo se enciende.
     """
-    global _ENCENDIDO
-
-    if _ENCENDIDO or not encendido():
+    if not encendido():
         return None
     try:
         n = int(str(slug)[-2:])
     except ValueError:
         return None
-    _ENCENDIDO = True
+    with _CERROJO:
+        if slug in _EN_VUELO:
+            return None
+        _EN_VUELO.add(slug)
     try:
         import sys
 
@@ -89,4 +108,5 @@ def dispara(slug, por_que=""):
             pass
         return None
     finally:
-        _ENCENDIDO = False
+        with _CERROJO:
+            _EN_VUELO.discard(slug)
