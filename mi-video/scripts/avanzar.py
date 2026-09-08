@@ -244,7 +244,15 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             #
             # Una espera —un servicio de IA sin contestar— **no cuenta como
             # fallo**: ahi el paso no se rompio, esta pidiendo su turno.
-            espera = "espera" in (r.motivo or "").lower()
+            # **Y esperar se comprueba, no se lee.** Esto miraba si la palabra
+            # «espera» salia en el motivo, o sea en un texto que escribe cada
+            # paso a su manera: un paso que dijera «esperando» o «sin contestar»
+            # contaba como fallo, y uno que la nombrara de pasada contaba como
+            # espera. La senal de verdad es la que ya usan `turno.hay`,
+            # `verificar` y `Oficio.de`: un pedido esta servido cuando existe su
+            # respuesta al lado, asi que sin respuesta hay una pregunta abierta.
+            import servicio as _srv
+            espera = any(s == pieza.slug for _, s, _ in _srv.pendientes())
             # **Y una espera es exactamente cuando hay que llamar al oficio.**
             # Jaime, 7-9-2026: *«el disparador es el que se encarga de
             # lanzarlos, y debe estar activo siempre»*. El paso no se rompio:

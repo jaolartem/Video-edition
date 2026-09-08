@@ -35,11 +35,14 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import avanzar as _avanzar  # noqa: E402
+
 #: Qué carpeta de pedidos es de cada paso. Es el mismo reparto que ya usa
 #: `avanzar.DE_QUIEN`, leído en la otra dirección: de la fase a su buzón.
-BUZON = {"descrito": "describir", "disenado": "disenar", "visto": "visto",
-         "revalidado": "revalidar", "repasado": "repaso",
-         "sin_redundancia": "redundancia", "respaldado": "fuentes"}
+#: Y se deriva del reparto que ya existe, no se copia: escrito dos veces son dos
+#: listas, y estas dos ya habian divergido —`revisar` estaba en una y no en la
+#: otra—, con lo que un oficio suscrito a un paso real se quedaba sin buzon.
+BUZON = {fase: buzon for buzon, fase in _avanzar.DE_QUIEN.items()}
 
 
 def hay(paso):

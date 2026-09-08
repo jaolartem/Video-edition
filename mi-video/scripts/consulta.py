@@ -272,6 +272,18 @@ def modo(slug, fase):
     return abierto.encargo(slug, fase)[0] or ""
 
 
+def cerrar_tiquets(slug, fase, por_que, atendidos):
+    """Cierra los tiquets que una respuesta declara haber atendido.
+
+    La regla —sólo los declarados, y por qué— vive en `dominio/abierto.py ::
+    cerrar`, que es la que ya usa el paso de diseño. Esto es la puerta para que
+    el paso que vive en node pueda llamarla, no una segunda versión.
+    """
+    from dominio import abierto
+
+    return abierto.cerrar(slug, fase, por_que, atendidos)
+
+
 def guardar_escena(slug, orden, d):
     """Guarda la descripción de una etapa, con el texto que describe."""
     try:
@@ -322,6 +334,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "tiquets_de": tiquets_de,
           "acotado": acotado,
           "modo": modo,
+          "cerrar_tiquets": cerrar_tiquets,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
 

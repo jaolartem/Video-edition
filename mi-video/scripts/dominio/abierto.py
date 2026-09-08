@@ -265,6 +265,27 @@ def modo(prompt, payload, slug, fase):
                                   "tiquets": tiquets}
 
 
+def _medida(id_):
+    """Con qué se cierra ese tiquet: lo que declara su fila, o su tipo.
+
+    Las dos mitades ya están escritas —`ticket.cierra_con` y `ticket.RUTA`—, así
+    que aquí no se decide nada: se lee la primera y, si viene vacía, la segunda.
+    """
+    from . import ticket as _t
+
+    try:
+        cx = basedatos.abrir(BASE)
+        cx.row_factory = sqlite3.Row
+        f = cx.execute("select tipo, cierra_con from ticket where id = ?",
+                       (int(id_),)).fetchone()
+    except sqlite3.Error:
+        return "objecion"
+    if not f:
+        return "objecion"
+    return (f["cierra_con"] or _t.RUTA.get(f["tipo"], ("", ""))[1]
+            or f["tipo"] or "objecion")
+
+
 def cerrar(slug, fase, por_que, atendidos=None):
     """Cierra como `aplicada` los tiquets **que la respuesta dice haber atendido**.
 
@@ -293,15 +314,27 @@ def cerrar(slug, fase, por_que, atendidos=None):
             if t[2] == fase and str(t[0]).lstrip("t") in pedidos]
     tiquets = [int(str(i)[1:]) for i in mios if str(i).startswith("t")]
     suyos = [int(i) for i in mios if not str(i).startswith("t")]
+    # **Con la medida que el tiquet declara, no con una fija.** Esto cerraba
+    # todos con la de `objecion`, asi que un tiquet de `suena` —que se cierra
+    # oyendo el borde— quedaba cerrado con la medida de otra cosa: el recibo
+    # existe y no dice nada de lo que habia que comprobar. La medida la eligio
+    # quien lo abrio y esta en su fila (`ticket.abrir` la escribe desde `RUTA`).
+    #
+    # Y el fallo no se traga: cerrar es lo que convierte una correccion en
+    # atendida, asi que un cierre que revienta y devuelve el numero igual es la
+    # forma mas cara de mentir. Solo se devuelven los que se cerraron.
+    cerrados = []
     for i in tiquets:
+        from . import ticket as _t
+
         try:
-            from . import ticket as _t
-            _t.contestar(i, por_que[:400], "arreglado", "la linea",
-                         _t.RUTA.get("objecion", ("", ""))[1] or "objecion")
-        except Exception:                          # noqa: BLE001
-            pass
+            _t.contestar(i, por_que[:400], "arreglado", "la linea", _medida(i))
+            cerrados.append(i)
+        except Exception as e:                     # noqa: BLE001
+            print(f"  el tiquet #{i} no se pudo cerrar:"
+                  f" {type(e).__name__}: {e}", flush=True)
     if not suyos:
-        return [f"t{i}" for i in tiquets]
+        return [f"t{i}" for i in cerrados]
     try:
         cx = basedatos.abrir(BASE)
         cx.executemany(

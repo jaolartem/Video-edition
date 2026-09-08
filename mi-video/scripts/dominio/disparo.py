@@ -70,7 +70,7 @@ APAGADO = "DISPARO_APAGADO"
 #: huella. Vive aqui y no en el objeto porque es memoria del disparador —de
 #: quien llama—, no del oficio: el oficio es de su pieza y se construye nuevo
 #: cada vez que se le busca.
-_LLAMADOS = set()
+_LLAMADOS = {}
 
 def llama(slug):
     """Llama al oficio que esa pieza esta esperando. Cierto si contesto.
@@ -91,14 +91,39 @@ def llama(slug):
     quien = Oficio.de(slug)
     if not quien:
         return False
-    # **A la misma pregunta no se le llama dos veces.** Con el motor puesto, una
-    # vuelta que vuelve a ver el mismo pedido sin contestar despertaria al mismo
-    # oficio para contestar lo mismo — el coste exacto que hizo retirar la
-    # patrulla. Si el pedido se reescribe, su huella cambia y vuelve a entrar.
-    if quien.huella in _LLAMADOS:
+    # **A la misma pregunta se le llama dos veces y no más.** Con el motor
+    # puesto, repetirla en cada vuelta seria despertar al oficio para contestar
+    # lo mismo — el coste exacto que hizo retirar la patrulla. Pero una sola vez
+    # tampoco vale: la primera llamada se puede caer por algo de fuera —la
+    # credencial, la red, un CLI colgado— y con un intento la pregunta quedaba
+    # quemada para toda la vida del proceso, con el disparador puesto mirandola
+    # sin volver a intentarlo nunca. Dos separa «no contesta» de «no se pudo
+    # llamar». Si el pedido se reescribe, su huella cambia y vuelve a entrar.
+    if _LLAMADOS.get(quien.huella, 0) >= 2:
         return False
-    _LLAMADOS.add(quien.huella)
-    return quien.llama()
+    _LLAMADOS[quien.huella] = _LLAMADOS.get(quien.huella, 0) + 1
+    try:
+        hecho = quien.llama()
+    except Exception as e:                         # noqa: BLE001
+        # Llamar no puede tumbar al que llama: `avanzar` invoca esto fuera de
+        # todo `try`, asi que una excepcion aqui se llevaba la corrida entera.
+        _anota(f"{quien} revento al llamarle: {type(e).__name__}: {e}")
+        return False
+    if hecho:
+        _LLAMADOS[quien.huella] = 2
+    return hecho
+
+
+def _anota(detalle):
+    """Deja constancia sin depender de que el registro exista."""
+    print(f"  {detalle}", flush=True)
+    try:
+        import registro
+
+        registro.aviso("oficio", "no se pudo llamar", detalle=detalle,
+                       eco=False)
+    except Exception:                              # noqa: BLE001
+        pass
 
 
 def puesto(vuelta, cada=30):
@@ -110,8 +135,9 @@ def puesto(vuelta, cada=30):
     No es la patrulla que se retiro, y la diferencia es lo que cuesta una vuelta
     que no encuentra nada: leer estados y ficheros, cero tokens. Lo caro era
     despertar al oficio para que contestara lo mismo, y eso lo corta
-    `_LLAMADOS`: a una pregunta se le llama una vez y solo vuelve a entrar si su
-    pedido se reescribe.
+    `_LLAMADOS`: a una pregunta se le llama dos veces como mucho —la segunda
+    cubre que la primera se cayera por algo de fuera— y solo vuelve a entrar si
+    su pedido se reescribe.
 
     Vive aqui y no en el motor porque son dos responsabilidades: recorrer el
     camino es de `avanzar`, y estar puesto es del disparador.
@@ -120,9 +146,20 @@ def puesto(vuelta, cada=30):
 
     print("disparador puesto — mueve las etiquetas mientras corra",
           file=__import__("sys").stderr)
+    # **Una pieza plantada no apaga el reparto.** `avanzar` se planta a
+    # proposito con `SystemExit` cuando algo hay que arreglar —dos intentos
+    # fallando por lo mismo, un bucle de vueltas— y eso esta bien en una corrida
+    # a mano. Aqui es lo contrario: mata el puesto entero, y las otras seis
+    # piezas dejan de moverse por una. Se anota y se sigue a la vuelta
+    # siguiente, que es lo que el propio motor hace con `planta=False`.
     while True:
         try:
             vuelta()
+        except KeyboardInterrupt:
+            return
+        except (SystemExit, Exception) as e:       # noqa: BLE001
+            _anota(f"la vuelta del disparador se corto: {type(e).__name__}: {e}")
+        try:
             time.sleep(max(5, int(cada)))
         except KeyboardInterrupt:
             return
