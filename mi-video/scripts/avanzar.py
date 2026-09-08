@@ -567,9 +567,34 @@ def _contestadas_tarde() -> list:
     return fuera
 
 
+def _antes_de(fase):
+    """La fase desde la que se vuelve a correr ese paso. `None` si no la hay.
+
+    El orden ya está escrito en el camino (`dominio/fase.py :: CICLO`), así que
+    aquí sólo se lee: la anterior a la que la etiqueta nombra.
+    """
+    if not fase:
+        return None
+    ruta = camino()
+    i = next((k for k, f in enumerate(ruta) if f["nombre"] == fase), None)
+    return ruta[i - 1]["nombre"] if i else fase
+
+
 def _devuelve(slug: str, paso: str) -> None:
-    """Manda la pieza a la fase que espera esa respuesta."""
-    fase = DE_QUIEN.get(paso)
+    """Manda la pieza al punto desde el que ese paso se vuelve a correr.
+
+    **Que no es su propia fase, y ahí estaba el fallo.** Una etiqueta dice el
+    paso ya hecho: dejar la pieza en `descrito` es dejarla con la descripción
+    por buena, así que lo siguiente que corre es `disenado` y la respuesta que
+    la devolvió no la lee nadie. Medido el 8-9-2026: reel-03 y reel-05 entraron
+    en `descrito` a las 19:45:56 y salieron a `disenado` **el mismo segundo**,
+    con sus respuestas sin aplicar y sus tiquets abiertos.
+
+    Se devuelve a la fase ANTERIOR, que es desde donde el paso vuelve a correr,
+    y sale del camino declarado en vez de escribirse aquí: si mañana se mete un
+    paso entre medias, esto sigue apuntando al sitio correcto.
+    """
+    fase = _antes_de(DE_QUIEN.get(paso))
     # **Y una pieza aprobada no se devuelve.** Jaime, 7-9-2026, viendo el
     # tablero: *«por que esta el 4, el 6 y el 7... ya estan aprobados»*, y el
     # motivo: *«porque gastan tiempo valioso»*.
@@ -608,32 +633,13 @@ def _devuelve(slug: str, paso: str) -> None:
            f"llego la respuesta de «{paso}» y la pieza ya habia pasado")
 
 
-def _sin_contestar() -> list:
-    """Los pedidos escritos que nadie ha contestado. `(paso, pieza)`."""
-    import glob
-
-    fuera = []
-    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
-                                           "*.pedido.json"))):
-        if os.path.exists(f.replace(".pedido.json", ".respuesta.json")):
-            continue
-        paso = os.path.basename(os.path.dirname(f))
-        fuera.append((paso, os.path.basename(f)[:-len(".pedido.json")]))
-    return fuera
-
-
-def _respuestas() -> tuple:
-    """La huella de lo contestado. Si no cambia, no hay nada nuevo que recoger."""
-    import glob
-
-    fuera = []
-    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
-                                           "*.respuesta.json"))):
-        try:
-            fuera.append((f, os.path.getmtime(f)))
-        except OSError:
-            continue
-    return tuple(fuera)
+# **Aqui vivian `_sin_contestar` y `_respuestas`, y se van sin sustituto.**
+#
+# Las dos eran del despachador y se quedaron sin nadie que las llamara cuando se
+# retiro. La primera ademas era una segunda copia de `servicio.pendientes()` —la
+# misma pregunta, dos respuestas que pueden divergir—, que es la averia mas cara
+# de esta casa. Quitarlas es lo que deja sitio para la regla nueva: una regla no
+# añade un fichero al lado, quita uno.
 
 
 if __name__ == "__main__":
