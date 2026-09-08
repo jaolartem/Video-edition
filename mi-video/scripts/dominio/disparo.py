@@ -66,45 +66,6 @@ _CERROJO = threading.Lock()
 #: y debe estar activo siempre»*.
 APAGADO = "DISPARO_APAGADO"
 
-#: Que oficio contesta cada buzon. Los nombres son los de `.claude/agents/`, y un
-#: buzon sin oficio declarado no se llama: existe y lo contesta quien pueda, que
-#: es el caso honesto mientras ese agente no este escrito.
-OFICIO = {"describir": "compositor", "disenar": "disenador", "visto": "disenador"}
-
-#: El encargo es siempre el mismo texto. Lo que hay que contestar viaja DENTRO
-#: del pedido —`prompt` es su contrato— y esto solo dice que fichero leer y en
-#: cual escribir. Improvisar aqui seria un segundo contrato.
-ENCARGO = (
-    "Tu turno. Lee entero el pedido {pedido} —`prompt` es tu contrato completo y"
-    " `datos` el encargo— y escribe tu respuesta en {respuesta}, con la forma que"
-    " ese `prompt` define. Si el pedido no basta para contestar, se dice en la"
-    " respuesta; no se va a buscar fuera."
-)
-
-
-def _esperando(slug):
-    """El pedido sin contestar de esa pieza: `(buzon, ruta)`, o `None`.
-
-    Sale de `servicio.pendientes`, que es la cola del servicio y ya existia. La
-    pregunta que hace falta aqui es la misma acotada a una pieza: la que acaba
-    de moverse es la unica sobre la que hay algo nuevo que decir.
-    """
-    try:
-        import sys
-
-        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if raiz not in sys.path:
-            sys.path.insert(0, raiz)
-        import servicio
-
-        for paso, quien, ruta in servicio.pendientes():
-            if quien == slug and paso in OFICIO:
-                return paso, ruta.replace("\\", "/")
-    except Exception:                              # noqa: BLE001
-        pass
-    return None
-
-
 def llama(slug):
     """Llama al oficio que esa pieza esta esperando. Cierto si contesto.
 
@@ -113,30 +74,16 @@ def llama(slug):
     corrida a mano de `avanzar`, que recorre la pieza sin encender ningun salto.
     Colgada solo del salto, una corrida a mano dejaba el pedido escrito y a
     nadie llamado, que es como quedaron reel-01, reel-03 y reel-05 el 7-9-2026.
+
+    Quien es ese oficio, donde deja su respuesta y como se le llama lo sabe el
+    propio `Oficio`: aqui solo esta la regla de cuando se le llama.
     """
     if not encendido():
         return False
-    espera = _esperando(slug)
-    if not espera or not OFICIO.get(espera[0]):
-        return False
-    return _llama(OFICIO[espera[0]], espera[1])
+    from .oficio import Oficio
 
-
-def _llama(oficio, pedido):
-    """Llama al oficio y espera. Cierto si dejo su respuesta al lado.
-
-    Es la vuelta que `docs/caminos.md` daba por pendiente —*«`turno.py` es el
-    punto de suscripcion; falta la vuelta que lo une con `claude --agent`»*— y
-    va aqui porque el disparador es lo unico que ve las dos mitades: que un paso
-    acaba de dejar una pregunta escrita, y quien sabe contestarla.
-    """
-    import subprocess
-
-    respuesta = pedido.replace(".pedido.json", ".respuesta.json")
-    subprocess.run(["claude", "--agent", oficio, "-p",
-                    ENCARGO.format(pedido=pedido, respuesta=respuesta)],
-                   check=False)
-    return os.path.exists(respuesta)
+    quien = Oficio.de(slug)
+    return bool(quien and quien.llama())
 
 
 def encendido():
