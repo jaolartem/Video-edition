@@ -72,7 +72,7 @@ import { sql } from "./consulta.mjs";
 import { valida } from "./describir-esquema.mjs";
 import { PROMPT, pedidoDe } from "./describir-pedido.mjs";
 import {
-  archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta, porCli, rutaPedido,
+  archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta, rutaPedido,
 } from "./servicio.mjs";
 import { criterio as criterioDeFranja } from "./franja.mjs";
 import fs from "node:fs";
@@ -186,8 +186,20 @@ function describePieza(slug, filas) {
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
   // queda escrito es la pregunta entera —prompt incluido— y cualquiera puede
   // contestarla despues sin reconstruir nada.
+  // **El paso deja la pregunta escrita y se para. No la contesta él.**
+  //
+  // Aqui llamaba a `porCli`, que es `claude -p` generico: sin `--agent`, sin el
+  // contrato del compositor y sin la capa de tiquets. Desde la terminal de
+  // Jaime eso autentica y contesta, asi que el paso se daba por hecho — pero la
+  // respuesta no venia del oficio y no declaraba `tiquets: [...]`, que es lo
+  // unico que cierra un tiquet. La pieza pasaba, el tiquet seguia abierto y
+  // `vencidas` la devolvia: tres vueltas la noche del 7 al 8 de septiembre.
+  //
+  // Contestar es del oficio, y llamarle es del disparador (`dominio/disparo.py`,
+  // `dominio/oficio.py`). Con dos llamadores habia dos puertas para la misma
+  // pregunta; ahora hay una.
   dejaPedido(PASO, slug, contrato, encargo);
-  const arr = porCli(contrato, encargo);
+  const arr = null;
   if (!arr) return null;
   /**
    * **Una respuesta a medias no se guarda como la respuesta.**

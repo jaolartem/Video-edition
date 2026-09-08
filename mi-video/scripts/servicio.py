@@ -377,7 +377,19 @@ def pedir(paso, slug, prompt, payload, cli=True):
                         break
                 except OSError:
                     continue
-    if cli and _hay_cli():
+    # **El paso que tiene oficio no se contesta a si mismo.**
+    #
+    # `_por_cli` es `claude -p` generico: sin `--agent`, sin el contrato de ese
+    # oficio y sin la capa de tiquets. Contestaba, y por eso el paso se daba por
+    # hecho — pero la respuesta no declaraba `tiquets: [...]`, que es lo unico
+    # que cierra un tiquet, asi que la pieza pasaba con su correccion abierta y
+    # `vencidas` la devolvia. Tres vueltas la noche del 7 al 8 de septiembre.
+    #
+    # Donde hay oficio declarado, llamarle es del disparador y contestar es
+    # suyo: una sola puerta. Donde no lo hay —redundancia, fuentes— el CLI sigue
+    # siendo la unica forma de que ese pedido se conteste.
+    from dominio.oficio import DE as _OFICIOS
+    if cli and paso not in _OFICIOS and _hay_cli():
         r = _por_cli(prompt, payload)
         if r is not None:
             json.dump(r, open(ruta_respuesta(paso, slug), "w", encoding="utf-8"),
