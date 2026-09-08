@@ -47,6 +47,52 @@ def _con():
     return c
 
 
+def _cerrar_lo_abierto(slug, quien):
+    """**Aprobar cierra todo lo que quedaba abierto de esa pieza.**
+
+    Jaime, 7-9-2026: *«aprobado cierra todos los tikets abiertos siempre»*, y
+    antes, viendo tres piezas firmadas dando vueltas por la linea: *«de aprobado
+    no sale nada, a menos que yo lo diga»*, *«porque gastan tiempo valioso, mi
+    tiempo en algo que ya esta aprobado»*.
+
+    Sin esto, aprobar dejaba la pieza firmada **y con sus tiquets vivos**, asi
+    que cada mecanismo que mira pendientes la volvia a encontrar: la puerta la
+    devolvia a su paso, una respuesta tardia la sacaba de `aprobado`, y el
+    enrutador la listaba como bloqueada en cada vuelta. Tres formas distintas de
+    lo mismo, y las tres se arreglan aqui — en el origen — y no poniendo un
+    guarda en cada una.
+
+    Y es correcto, no una limpieza: **su firma es la respuesta**. Aprobar
+    viendo la pieza es decir que lo que quedaba abierto ya no importa o ya esta;
+    seguir tratandolo como pendiente es no creerle.
+
+    Cierra los tiquets y da por aplicadas sus correcciones. Queda escrito quien
+    y por que, que es lo que distingue cerrar de borrar.
+    """
+    por_que = f"cerrado por la aprobacion de {quien}: la pieza se firmo asi"
+    n = 0
+    try:
+        from dominio import ticket as _t
+        for t in _t.abiertos(slug):
+            _t.contestar(t["id"], por_que, "arreglado", quien)
+            n += 1
+    except Exception:                              # noqa: BLE001
+        pass
+    try:
+        import basedatos as _b
+        cx = _b.abrir("ads/decisiones.db")
+        cx.execute("update revision set estado = 'aplicada', regla = ?"
+                   " where video_slug = ? and estado = 'pendiente'",
+                   (por_que[:400], slug))
+        cx.commit()
+        cx.close()
+    except Exception:                              # noqa: BLE001
+        pass
+    if n:
+        print(f"  {slug}: {n} tiquet(s) cerrados por la aprobacion")
+    return n
+
+
 def veredicto(n, aprobada=True, notas=None, quien="jaime"):
     slug = f"reel-{n:02d}"
     con = _con()
@@ -71,6 +117,8 @@ def veredicto(n, aprobada=True, notas=None, quien="jaime"):
                         " values (?,?,?)", (vid["id"], f["id"], ahora))
     con.commit()
     con.close()
+    if aprobada:
+        _cerrar_lo_abierto(slug, quien)
     registro.nota("aprobar", "veredicto sobre una version",
                   detalle=f"{slug} v{v['n']}: "
                           f"{'aprobada' if aprobada else 'rehacer'}"

@@ -109,8 +109,38 @@ def escribe(slug):
             for t in _t.abiertos(slug)]
     except Exception:                              # noqa: BLE001
         pass
+    # **Y si llego al final, se cierra en vez de guardarse.** Ver `cierra`.
+    try:
+        from .fase import CICLO
+        if d.get("etapa") and d["etapa"] == CICLO[-1][1]:
+            cierra(slug, "llego al final del camino")
+            return d
+    except Exception:                              # noqa: BLE001
+        pass
     d["visto_por_ultima_vez"] = _ahora()
     return _guarda(slug, d)
+
+
+def cierra(slug, por_que="el proceso termino"):
+    """Borra el estado de una pieza. **Es memoria de trabajo, no archivo.**
+
+    Jaime, 7-9-2026: *«que se borre cuando se cierre, o cuando se termine el
+    proceso»*. Es la misma regla con la que trata el disco: F: es memoria de
+    trabajo y al cerrar se vacia; lo que queda es lo final.
+
+    Y no se pierde nada: el recorrido esta en `video_fase`, los tiquets en su
+    tabla y las versiones selladas en `version`. Esto era **la vista de lo que
+    esta en vuelo**, y una pieza terminada ya no vuela — dejarla ahi convierte
+    el tablero en una lista de lo que hubo, que es justo lo que no se mira.
+    """
+    r = ruta(slug)
+    try:
+        if os.path.exists(r):
+            os.remove(r)
+            return True
+    except OSError:
+        pass
+    return False
 
 
 def espera(slug, quien, que):

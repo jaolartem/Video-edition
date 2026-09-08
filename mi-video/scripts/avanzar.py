@@ -140,6 +140,23 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         # Aqui no se aplica nada —eso es trabajo del paso, y adivinarlo seria
         # peor—: se para y se nombra. Lo que garantiza es que ninguna pieza se
         # entrega con un tiquet suyo abierto.
+        # **De `aprobado` no sale nada.** Jaime, 7-9-2026: *«de aprobado no sale
+        # nada, a menos que yo lo diga»*, y el motivo: *«porque gastan tiempo
+        # valioso, mi tiempo en algo que ya esta aprobado»*.
+        #
+        # Aprobar es el unico paso del ciclo sin servicio, porque no hay nada
+        # que ejecutar: lo mueve una persona. Asi que tambien es el unico que la
+        # maquina no puede deshacer — ni avanzando, ni por una correccion
+        # pendiente, ni por una respuesta que llego tarde. La pieza sale de ahi
+        # con `avanzar --volver`, que es su palabra escrita con su porque.
+        #
+        # Y no es solo que no se mueva: **deja de aparecer como bloqueada**. Las
+        # tres firmadas salian en cada vuelta con su correccion delante, y leer
+        # eso cuesta el tiempo que el no quiere gastar en lo ya aprobado.
+        if actual["nombre"] == "aprobado" and planta:
+            motivo = "aprobada — de aqui solo la mueve Jaime"
+            break
+
         vencidas = _abierto.vencidas(pieza.slug, actual["nombre"], orden)
         if vencidas:
             uno = vencidas[0]
@@ -480,6 +497,31 @@ def _contestadas_tarde() -> list:
 def _devuelve(slug: str, paso: str) -> None:
     """Manda la pieza a la fase que espera esa respuesta."""
     fase = DE_QUIEN.get(paso)
+    # **Y una pieza aprobada no se devuelve.** Jaime, 7-9-2026, viendo el
+    # tablero: *«por que esta el 4, el 6 y el 7... ya estan aprobados»*, y el
+    # motivo: *«porque gastan tiempo valioso»*.
+    #
+    # Esto saco a reel-07 de `aprobado` a las 19:02 y dejo a reel-04 y reel-06
+    # rebotando: llega una respuesta escrita para un paso que la pieza ya paso,
+    # y el enrutador la manda atras. Para una pieza en vuelo eso es correcto —la
+    # respuesta se pago y aplicarla tarde es mejor que tirarla—; para una
+    # firmada es recomponer lo aprobado, y ademas en bucle, porque al volver a
+    # avanzar la respuesta sigue ahi.
+    #
+    # El guarda de `puertas._aprobada` cubria la puerta del tiquet y no esto. Es
+    # el mismo criterio en el otro camino: lo aprobado vuelve cuando Jaime lo
+    # dice, no porque llegue una respuesta con retraso.
+    try:
+        from dominio.puertas import _aprobada
+        if _aprobada(slug):
+            _reg_aviso = __import__("registro")
+            _reg_aviso.aviso(
+                "avanzar", "respuesta tardia sobre una pieza aprobada",
+                detalle=f"{slug}: llego «{paso}» y esta firmada; no se devuelve",
+                eco=True)
+            return
+    except Exception:                              # noqa: BLE001
+        pass
     con = _con()
     destino = con.execute("select id from fase where nombre = ?",
                           (fase,)).fetchone()
