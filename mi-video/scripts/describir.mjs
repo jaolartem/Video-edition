@@ -313,7 +313,14 @@ if (esperan.length) {
   );
   // La ULTIMA linea es la que el motor guarda como motivo en `video_fase`, asi
   // que tiene que decir que falta y donde se contesta.
-  console.error(
+  //
+  // **Y va por stdout.** `servicios/base.py` lo dice de si mismo: manda stdout,
+  // y stderr solo si el paso no dijo nada. Por stderr, el motivo que quedaba
+  // era «0/1 descritas y guardadas» — que no contiene la palabra «espera», asi
+  // que `avanzar` no lo leia como espera y no le pedia al disparador que
+  // llamara al oficio. La linea que pide el turno tiene que ir por el canal en
+  // el que el motor escucha.
+  console.log(
     `espera respuesta del servicio -> ${
       esperan.map((s) => rutaPedido(PASO, s)).join(" ")}`);
   process.exit(1);
