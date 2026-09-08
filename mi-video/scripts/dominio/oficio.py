@@ -115,7 +115,15 @@ class Oficio:
           oficio se le llamó, si no resolvió o si contestó mal.
         """
         r = subprocess.run(
-            ["claude", "--agent", self.nombre, "-p",
+            ["claude", "--agent", self.nombre,
+             # **Y con permiso de escribir, que es la mitad del oficio.** Sin
+             # esto el CLI le deniega la escritura y el agente hace el trabajo
+             # entero para acabar contandolo en prosa: «leyo el pedido y preparo
+             # la respuesta», salida 0 y ningun fichero. Se le dan las dos
+             # herramientas que su contrato declara —`docs/caminos.md`: *«lo que
+             # ninguno toca: la base, los scripts, el EDL, los ficheros de
+             # entrega; trabajan con Read y Write»*— y ninguna mas.
+             "--allowedTools", "Read Write", "-p",
              ENCARGO.format(pedido=os.path.abspath(self.pedido),
                             respuesta=os.path.abspath(self.respuesta))],
             cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
