@@ -96,8 +96,11 @@ fi
 # la maquina parada. El presupuesto es doce y se divide; nunca sube de ahi, que
 # es lo que tumbaba el render en el frame 1387. Y no baja de cuatro: por debajo
 # de ahi una pieza tarda mas de lo que el paralelismo le ahorra al lote.
-export RENDER_CONCURRENCIA=$(( 12 / A_LA_VEZ ))
-[ "$RENDER_CONCURRENCIA" -lt 4 ] && RENDER_CONCURRENCIA=4
+#
+# **La cuenta no se repite aqui: se pregunta.** Escrita en bash protegia solo a
+# este lanzador, y `avanzar.py --hilos` —el otro— no la conocia. Vive en
+# `planificador.por_pieza`, que es de quien reparte piezas.
+export RENDER_CONCURRENCIA=$(python scripts/planificador.py --por-pieza "$A_LA_VEZ")
 
 export EN_LOTE=1
 export SALTA

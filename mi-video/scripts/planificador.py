@@ -28,8 +28,63 @@ piezas distintas.
 """
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import contextlib
 import threading
+
+
+#: **El presupuesto de pestañas de Chrome del render, y vive AQUI.**
+#:
+#: La regla es de quien reparte las piezas, no de quien renderiza: doce pestañas
+#: entre las que corren a la vez, y nunca menos de cuatro por pieza —por debajo,
+#: una pieza tarda más de lo que el paralelismo le ahorra al lote.
+#:
+#: Estaba escrita en aritmética de bash dentro de `montar-lote.sh`, y ahí sólo
+#: protegía a ese lanzador: `avanzar.py --hilos 4` lanzaba cuatro montajes a la
+#: vez y cada `render.mjs` cogía su defecto de ocho — **treinta y dos pestañas**,
+#: cuando el fallo documentado del frame 1387 llegó con dieciséis. Una regla
+#: escrita en un lanzador y no en el otro es media regla.
+PESTANAS = 12
+MINIMO = 4
+
+
+def por_pieza(hilos: int) -> int:
+    """Cuántas pestañas le tocan a cada pieza si corren `hilos` a la vez."""
+    return max(MINIMO, PESTANAS // max(1, int(hilos)))
+
+
+def antes_de_montar(piezas):
+    """Corre una vez lo que `montar.sh` comprueba del proyecto entero.
+
+    Devuelve `True` si lo pago (y entonces las piezas lo saltan con `EN_LOTE`).
+    Con `--ver` no toca nada: ese modo enseña el camino, no lo recorre.
+    """
+    from dominio.fase import camino
+    from servicios import Pieza
+
+    ruta = camino()
+    i = next((k for k, f in enumerate(ruta) if f["nombre"] == "montado"), None)
+    if i is None or i == 0:
+        return False
+    previa = ruta[i - 1]["nombre"]
+    van = [n for n in piezas
+           if ((Pieza(n).fase or {}).get("nombre") == previa)]
+    if not van:
+        return False
+    # El interprete se resuelve, no se nombra: el antivirus ya se llevo
+    # `bash.exe` una vez y `sh.exe` es el mismo binario (ver `montar-lote.sh`).
+    sh = shutil.which("bash") or shutil.which("sh")
+    orden = [sh, "scripts/montar.sh", "--solo-lote"] + [str(n) for n in van]
+    r = subprocess.run(orden, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+    if r.returncode != 0:
+        raise SystemExit(
+            "avanzar: las comprobaciones del proyecto no pasan, asi que no se"
+            " despacha nada. El motivo esta arriba.")
+    os.environ["EN_LOTE"] = "1"
+    return True
+
 
 
 class Planificador:
@@ -112,3 +167,14 @@ class Planificador:
                     salida[n] = {"slug": slug, "fase": "?", "saltos": 0,
                                  "motivo": motivo[:300]}
         return salida
+
+
+if __name__ == "__main__":
+    # `montar-lote.sh` pregunta por aqui en vez de repetir la cuenta en bash:
+    #   RENDER_CONCURRENCIA=$(python scripts/planificador.py --por-pieza 3)
+    import sys
+    a = sys.argv[1:]
+    if "--por-pieza" in a:
+        print(por_pieza(int(a[a.index("--por-pieza") + 1])))
+    else:
+        print(f"presupuesto {PESTANAS} pestañas · minimo {MINIMO} por pieza")

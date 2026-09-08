@@ -23,6 +23,8 @@ toca aquí.
 import argparse
 import datetime
 import os
+import shutil
+import subprocess
 import sqlite3
 import basedatos
 import sys
@@ -428,7 +430,38 @@ def _una_vuelta(a) -> int:
     # **Las piezas que no comparten cinta trabajan a la vez.** El bucle de una
     # en una hacía que el paso más lento parase a las siete, incluidas las que
     # no dependían de él. Ver `planificador.py`.
-    plan = planificador.Planificador(hilos=1 if (a.ver or a.paso) else a.hilos)
+    hilos = 1 if (a.ver or a.paso) else a.hilos
+    plan = planificador.Planificador(hilos=hilos)
+    # **Y el reparto de la maquina lo hace quien reparte las piezas.**
+    #
+    # Sin esto, `--hilos 4` lanzaba cuatro montajes y cada `render.mjs` cogia su
+    # defecto de ocho pestañas: treinta y dos, cuando el fallo del frame 1387
+    # llego con dieciseis. La regla vivia en `montar-lote.sh` y este lanzador no
+    # la conocia. Ahora la cuenta esta en `planificador.por_pieza` y la
+    # preguntan los dos; el entorno lo heredan los servicios (`ServicioScript`
+    # pasa `os.environ` a sus hijos).
+    os.environ["RENDER_CONCURRENCIA"] = str(planificador.por_pieza(hilos))
+
+    # **Y lo que mira el proyecto entero se paga una vez, tambien aqui.**
+    #
+    # `montar.sh` empieza comprobando guardas, verdad, contratos, techo,
+    # recibos, la puerta de `verificar.py` y el lint: unos 20 s que no hablan de
+    # ninguna pieza. `montar-lote.sh` los corre una vez y las piezas los saltan
+    # con `EN_LOTE`; este lanzador no lo hacia, y con las puertas nuevas es el
+    # camino normal — asi que se pagaban por pieza y por vuelta.
+    #
+    # **Solo cuando se sabe de antemano que alguien va a montar**, que es cuando
+    # su fase actual es la anterior a `montado`. Una pieza que llegue ahi
+    # atravesando varias fases en la misma vuelta no entra en la cuenta: entonces
+    # no se pone `EN_LOTE` y su `montar.sh` comprueba todo, como hasta hoy. La
+    # degradacion es hacia comprobar de mas, que es el lado bueno.
+    #
+    # Si la puerta dice que no, no se despacha: es la regla de `montar.sh`
+    # —«mejor no renderizar que renderizar seis piezas inservibles»— y aqui vale
+    # igual, porque lo que falla es del proyecto y no de una pieza.
+    # `--ver` enseña el camino y no lo recorre: no puede lanzar un montaje.
+    if not a.ver:
+        planificador.antes_de_montar(piezas)
     ultimo, total = {}, {}
     # Con `--paso N` se pidio un numero de saltos, no que se agote: una vuelta.
     vueltas = 1 if (a.ver or a.paso) else 4
