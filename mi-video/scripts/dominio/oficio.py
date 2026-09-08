@@ -25,6 +25,11 @@ from __future__ import annotations
 import os
 import subprocess
 
+#: Desde dónde se llama al CLI: la raíz del repositorio, que es donde vive
+#: `.claude/agents/`. La línea corre desde `mi-video/`, un nivel más abajo.
+RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))))
+
 #: Qué oficio contesta cada buzón. Los nombres son los de `.claude/agents/`, y un
 #: buzón sin oficio declarado no se llama: existe y lo contesta quien pueda, que
 #: es el caso honesto mientras ese agente no esté escrito.
@@ -95,12 +100,40 @@ class Oficio:
         return os.path.exists(self.respuesta)
 
     def llama(self) -> bool:
-        """Lo llama y espera. Cierto si dejó su respuesta al lado."""
-        subprocess.run(["claude", "--agent", self.nombre, "-p",
-                        ENCARGO.format(pedido=self.pedido,
-                                       respuesta=self.respuesta)],
-                       check=False)
-        return self.contesto()
+        """Lo llama y espera. Cierto si dejó su respuesta al lado.
+
+        Tres cosas que no son detalles y costaron una noche:
+
+        - **Se llama desde donde viven los agentes.** `.claude/agents/` está en
+          la raíz del repositorio y la línea corre desde `mi-video/`; un
+          `--agent` que no resuelve no avisa de que no resuelve.
+        - **Las rutas van absolutas**, porque al llamar desde la raíz una ruta
+          relativa a `mi-video/` deja de existir.
+        - **Y si no deja respuesta, queda escrito por qué.** Sin esto la llamada
+          fallaba en silencio: el pedido seguía abierto, el motivo de la pieza
+          decía «espera respuesta del servicio» y no había forma de saber si al
+          oficio se le llamó, si no resolvió o si contestó mal.
+        """
+        r = subprocess.run(
+            ["claude", "--agent", self.nombre, "-p",
+             ENCARGO.format(pedido=os.path.abspath(self.pedido),
+                            respuesta=os.path.abspath(self.respuesta))],
+            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", check=False)
+        if self.contesto():
+            return True
+        dijo = ((r.stdout or "") + (r.stderr or "")).strip()
+        detalle = (f"{self} no dejo respuesta (salida {r.returncode}):"
+                   f" {dijo[-400:] or 'sin salida'}")
+        print(f"  {detalle}", flush=True)
+        try:
+            import registro
+
+            registro.aviso("oficio", "el oficio no contesto", detalle=detalle,
+                           eco=False)
+        except Exception:                          # noqa: BLE001
+            pass
+        return False
 
     def __str__(self) -> str:
         return f"{self.nombre} ({self.buzon})"
