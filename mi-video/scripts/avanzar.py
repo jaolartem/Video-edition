@@ -114,6 +114,9 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
                 actual = destino
 
     saltos, motivo, atras = 0, None, {}
+    #: Las fases a cuyo oficio ya se llamo en esta corrida. Una vez por fase:
+    #: reintentar un paso cuya respuesta no lo satisface es el bucle de siempre.
+    llamado = set()
     while True:
         i = next((k for k, f in enumerate(ruta) if f["id"] == actual["id"]), None)
         if i is None or i + 1 >= len(ruta):
@@ -245,6 +248,23 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             # Una espera —un servicio de IA sin contestar— **no cuenta como
             # fallo**: ahi el paso no se rompio, esta pidiendo su turno.
             espera = "espera" in (r.motivo or "").lower()
+            # **Y una espera es exactamente cuando hay que llamar al oficio.**
+            # Jaime, 7-9-2026: *«el disparador es el que se encarga de
+            # lanzarlos, y debe estar activo siempre»*. El paso no se rompio:
+            # dejo su pedido escrito y se paro, asi que aqui hay una pregunta
+            # con dueno conocido.
+            #
+            # Se le pide desde este punto porque es por donde pasan los DOS
+            # caminos —esta corrida y el salto reactivo—; colgado solo del
+            # salto, una corrida a mano dejaba los tres pedidos escritos y a
+            # nadie llamado. Una vez por fase y por corrida: si el oficio
+            # contesta se reintenta el paso, y si no, la pieza se queda con su
+            # pedido abierto, que es el lado seguro.
+            if espera and siguiente["nombre"] not in llamado:
+                llamado.add(siguiente["nombre"])
+                from dominio import disparo as _disparo
+                if _disparo.llama(pieza.slug):
+                    continue
             if not espera and _fallo_antes(pieza.video_id, actual["id"], motivo):
                 atasco = (f"{pieza.slug} lleva dos intentos fallando en"
                           f" «{siguiente['nombre']}» por lo mismo — {r.motivo}")

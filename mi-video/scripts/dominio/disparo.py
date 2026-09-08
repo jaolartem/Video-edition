@@ -105,6 +105,23 @@ def _esperando(slug):
     return None
 
 
+def llama(slug):
+    """Llama al oficio que esa pieza esta esperando. Cierto si contesto.
+
+    Es la puerta publica del disparador, y existe porque los dos caminos tienen
+    que pasar por ella: el salto reactivo —`dispara`, cuando un paso acaba— y la
+    corrida a mano de `avanzar`, que recorre la pieza sin encender ningun salto.
+    Colgada solo del salto, una corrida a mano dejaba el pedido escrito y a
+    nadie llamado, que es como quedaron reel-01, reel-03 y reel-05 el 7-9-2026.
+    """
+    if not encendido():
+        return False
+    espera = _esperando(slug)
+    if not espera or not OFICIO.get(espera[0]):
+        return False
+    return _llama(OFICIO[espera[0]], espera[1])
+
+
 def _llama(oficio, pedido):
     """Llama al oficio y espera. Cierto si dejo su respuesta al lado.
 
@@ -157,13 +174,11 @@ def dispara(slug, por_que=""):
         # de IA no acaba: deja la pregunta escrita y se para. Sin esto el estado
         # queda correcto —el pedido esta ahi— y no enciende nada, que es lo que
         # `docs/caminos.md` llamaba «el disparo» y daba por pendiente.
-        espera = _esperando(slug)
-        if espera and OFICIO.get(espera[0]):
-            if _llama(OFICIO[espera[0]], espera[1]):
-                # La respuesta es un evento nuevo y le toca su salto. Va por
-                # `avanzar` y no por `dispara`, que para esta pieza esta cerrado
-                # mientras dure esta llamada.
-                salto = _a.avanzar(n, tope=1, planta=False) or salto
+        if llama(slug):
+            # La respuesta es un evento nuevo y le toca su salto. Va por
+            # `avanzar` y no por `dispara`, que para esta pieza esta cerrado
+            # mientras dure esta llamada.
+            salto = _a.avanzar(n, tope=1, planta=False) or salto
         return salto
     except Exception as e:                         # noqa: BLE001
         # El disparo no puede tumbar a quien lo enciende: quien acaba de
