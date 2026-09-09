@@ -64,6 +64,20 @@ VACIAS = {
 #: que es lo que de verdad ata una decisión a un motivo.
 COINCIDEN = 3
 
+#: Los motivos que **no son una duda: son una decisión PERDIDA.** Alguien
+#: declaró algo y el montaje no lo lleva. Preguntar aquí «¿esto ya lo decidió
+#: Jaime?» es el error de categoría exacto —su decisión es justo lo que falta,
+#: así que la respuesta siempre es que sí— y el precio lo pagó reel-03.
+#:
+#: Medido el 9-9-2026: la puerta dijo *«reel-03 e1: el tramo fijado
+#: [340,711-342,191] no dejó rastro en el corte»* y salió como *«YA DECIDIDO
+#: (nota #779)»*, una nota suya sobre los palitos y las bolitas del panel del
+#: beat 1. Misma pieza y misma etapa es toda la señal que esto tiene, así que
+#: una decisión suya sobre paneles calló la pérdida de otra decisión suya sobre
+#: el corte. La pieza se rindió con «todo en pie», sin el adelanto de los
+#: tiquets #276, #277 y #279, y se entregó abriendo por el gancho de siempre.
+PERDIDAS = ("no dejo rastro en el corte", "sin aplicar")
+
 
 def _palabras(t: str) -> set:
     return {w for w in re.findall(r"[a-záéíóúñ]{4,}", (t or "").lower())
@@ -107,6 +121,11 @@ def contestado(motivo: str, slug: str, salvo=None):
     Devuelve `(de_donde, sus_palabras)` para poder decirlo en pantalla. Esto no
     silencia nada: da con qué explicarlo.
     """
+    # **Una decisión perdida no se le pregunta a quien la tomó.** Va delante de
+    # todo lo demás porque no depende de con qué se cruce: no hay decisión suya
+    # que pueda contestar que el montaje se dejó una decisión suya.
+    if any(x in motivo for x in PERDIDAS):
+        return None
     quiere = _palabras(motivo)
     etapa = _etapa(motivo)
     # **Una nota no se contesta a si misma.** Sin esto, preguntarle a la #709 si
