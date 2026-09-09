@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 
 #: Las piezas con un disparo en curso. **Por pieza, no una bandera global.**
 #:
@@ -66,11 +67,24 @@ _CERROJO = threading.Lock()
 #: y debe estar activo siempre»*.
 APAGADO = "DISPARO_APAGADO"
 
-#: Las preguntas por las que ya se llamo a un oficio en este proceso, por su
-#: huella. Vive aqui y no en el objeto porque es memoria del disparador —de
-#: quien llama—, no del oficio: el oficio es de su pieza y se construye nuevo
-#: cada vez que se le busca.
+#: Las preguntas por las que ya se llamo a un oficio en este proceso: por su
+#: huella, `(veces, cuando fue la ultima)`. Vive aqui y no en el objeto porque
+#: es memoria del disparador —de quien llama—, no del oficio: el oficio es de
+#: su pieza y se construye nuevo cada vez que se le busca.
 _LLAMADOS = {}
+
+#: Cuantas veces seguidas se llama por la misma pregunta, y cuanto se espera
+#: antes de volver a preguntar.
+#:
+#: **El plazo existe porque «para toda la vida del proceso» dejo de ser una
+#: tarde.** Con el disparador puesto —*«debe estar activo siempre»*— un proceso
+#: vive dias, asi que quemar la pregunta en el es quemarla para siempre. Medido
+#: el 9-9-2026: reel-03 se quedo en `repasado` con su pedido escrito y el bucle
+#: dando vueltas cada 100 s **sin nombrarlo ni una vez** — el aviso de «la pieza
+#: no avanza» no salta cuando la pieza espera a un oficio, asi que la unica
+#: pieza parada era la unica invisible.
+TOPE = 2
+REINTENTO = 600
 
 def llama(slug):
     """Llama al oficio que esa pieza esta esperando. Cierto si contesto.
@@ -91,7 +105,8 @@ def llama(slug):
     quien = Oficio.de(slug)
     if not quien:
         return False
-    # **A la misma pregunta se le llama dos veces y no más.** Con el motor
+    # **A la misma pregunta se le llama dos veces seguidas, y luego con
+    # plazo.** Con el motor
     # puesto, repetirla en cada vuelta seria despertar al oficio para contestar
     # lo mismo — el coste exacto que hizo retirar la patrulla. Pero una sola vez
     # tampoco vale: la primera llamada se puede caer por algo de fuera —la
@@ -99,9 +114,20 @@ def llama(slug):
     # quemada para toda la vida del proceso, con el disparador puesto mirandola
     # sin volver a intentarlo nunca. Dos separa «no contesta» de «no se pudo
     # llamar». Si el pedido se reescribe, su huella cambia y vuelve a entrar.
-    if _LLAMADOS.get(quien.huella, 0) >= 2:
+    veces, ultimo = _LLAMADOS.get(quien.huella, (0, 0.0))
+    ahora = time.time()
+    if veces >= TOPE and ahora - ultimo < REINTENTO:
+        # **Y callarse no es una opcion.** Se dice una vez —no en cada vuelta—,
+        # porque una pieza parada y sin nombrar es peor que una parada y dicha.
+        if veces == TOPE:
+            _LLAMADOS[quien.huella] = (veces + 1, ultimo)
+            _anota(f"{slug}: {quien} no contesta despues de {TOPE} llamadas."
+                   f" La pieza NO avanza; se le vuelve a preguntar en"
+                   f" {REINTENTO // 60} min")
         return False
-    _LLAMADOS[quien.huella] = _LLAMADOS.get(quien.huella, 0) + 1
+    if veces >= TOPE:
+        veces = 0                                  # pasado el plazo, se repregunta
+    _LLAMADOS[quien.huella] = (veces + 1, ahora)
     try:
         hecho = quien.llama()
     except Exception as e:                         # noqa: BLE001
@@ -110,7 +136,7 @@ def llama(slug):
         _anota(f"{quien} revento al llamarle: {type(e).__name__}: {e}")
         return False
     if hecho:
-        _LLAMADOS[quien.huella] = 2
+        _LLAMADOS[quien.huella] = (TOPE, ahora)
     return hecho
 
 
