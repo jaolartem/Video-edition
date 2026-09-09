@@ -203,8 +203,23 @@ const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
   const d0 = (edl.detalle || [])[iSeg] || {};
   // La pausa declarada dice de QUE LADO se conserva el silencio, no sólo que
   // esta etapa lo tiene: el criterio vive en `declarado.mjs :: conPausa`.
+  // **Un tramo declarado entra entero: no se le quita el silencio de dentro.**
+  //
+  // `conHabla` recorta el silencio interno y devuelve trozos, y cada trozo es
+  // una escena, o sea un corte de plano. Eso vale cuando el segmento lo eligio
+  // el automatismo y no cuando alguien declaro «esta frase va entera»: la
+  // declaracion existia justo para quitar ese corte y el recorte la deshacia.
+  // Es lo que `consulta.fijos` lleva escrito desde que existe —«un tramo
+  // declarado no se vuelve a partir»— y lo que ningun sitio cumplia.
+  //
+  // Medido el 8-9-2026 sobre el plan: reel-01 declara 562,932-571,580 y salian
+  // dos escenas con 0,937 s de hueco entre ellas — «semanales» solo entre dos
+  // silencios, el tiquet #287 y el t282 antes que el. reel-03 declara
+  // 340,251-342,320 y arrancaba 0,317 s tarde, que es el «es que» del t279.
   const t = conPausa(PAUSAS, d0.beat, a, b,
-                     conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]));
+                     declarado(a, b)
+                       ? [[a, b]]
+                       : conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]));
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
   const d = (edl.detalle || [])[iSeg] || {};
   /**
