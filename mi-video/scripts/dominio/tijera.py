@@ -141,8 +141,29 @@ class Tijera:
         return True
 
     def quitar(self, indices) -> int:
-        """Fuera esos trozos, con su detalle."""
-        fuera = set(indices)
+        """Fuera esos trozos, con su detalle. **Salvo los declarados.**
+
+        `mover` ya se negaba a tocar un trozo fijado; `quitar` no preguntaba, y
+        por ahi se perdio entero. El 9-9-2026 reel-03 se entrego sin el adelanto
+        de los tiquets #276, #277 y #279: el cosido veia que [340,711-342,191]
+        de la etapa 1 se pisaba con [340,251-342,32] de la etapa 4 —la misma
+        cinta y los mismos segundos— y lo daba por audio repetido.
+
+        **Y lo era, a proposito.** La decision de Jaime es que esa frase suene
+        dos veces: de adelanto arriba y en su sitio del cuerpo. `sin_solapes`
+        esta hecha para el solape que nadie quiso —«la convocatoria entera
+        sonando dos veces»—, y ahi sigue valiendo; lo que no puede es disolver
+        una decision porque se parece a un accidente.
+
+        Un declarado se queda y se dice; el contador cuenta lo que de verdad
+        salio, para que el paso que llama no crea que hizo mas de lo que hizo.
+        """
+        fuera = {i for i in indices if not self.fijado(i)}
+        quedan = set(indices) - fuera
+        if quedan:
+            self.respetados |= quedan
+            print(f"  quitar: {len(quedan)} trozo(s) declarados se quedan"
+                  f" — una decision no se disuelve por parecerse a un descuido")
         if not fuera:
             return 0
         edl = self.m.edl
