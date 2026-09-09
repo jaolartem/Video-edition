@@ -32,6 +32,20 @@ const KIND_DE = {
   EvidenceCard: "acumulacion",
 };
 
+/**
+ * Las dos exigencias que no son una lista. Viven aquí, en una sola frase cada
+ * una, porque las leen dos sitios: el error que rechaza y el contrato que se le
+ * manda a quien contesta. Escritas dos veces serían dos reglas.
+ */
+const REGLAS = [
+  "Si `componente` no es «ninguno», `tablero` tiene que ser un objeto con"
+  + " `props`: sin él el tablero se queda con lo que ya hubiera y la"
+  + " descripción no llega a la pantalla.",
+  "Si el `grafico` es tipográfico, el copy va en `tablero.props.texto` (o"
+  + " `props.titulo`, o `tablero.texto`) y no puede estar vacío: sin él el"
+  + " render no tiene copy y la capa no entra — o peor, repite el rótulo.",
+];
+
 /** Las claves que la descripción tiene que traer, y sus valores admitidos. */
 export const CAMPOS = {
   etapa_orden: null,
@@ -48,6 +62,43 @@ export const CAMPOS = {
   sonido: null,
   plano: ["en cuadro", "cerrado", "fuera"],
 };
+
+/**
+ * **Y lo que se exige se le dice a quien contesta, derivado de aquí.**
+ *
+ * Jaime, 7-9-2026, eligiendo entre las dos salidas posibles: *«que el contrato
+ * declare lo que el esquema exige, que es lo que lo hace innecesario: hoy el
+ * que contesta se entera del requisito por el rechazo»*.
+ *
+ * Se paga en vueltas enteras del servicio. `componente: null` —cuando la lista
+ * dice `ninguno`— tumbó la respuesta de reel-01 el 7 de septiembre y la de
+ * reel-03 el 8, las dos después de que el oficio hiciera el trabajo entero.
+ *
+ * Va DERIVADO y no escrito a mano por el mismo motivo que las dos listas de
+ * arriba: copiarlo al prompt sería una tercera copia, y cuando divergiera las
+ * dos parecerían correctas. Cambiar `CAMPOS` cambia lo que se pide.
+ */
+export const exigencias = () => [
+  "\n\n---\n\n## Lo que el esquema rechaza al recibir esto",
+  "",
+  "No es consejo: es la validación que corre al consumir tu respuesta, y una",
+  "sola etapa que no encaje devuelve la respuesta entera sin aplicar.",
+  "",
+  "Valores admitidos, y no hay otros:",
+  "",
+  ...Object.entries(CAMPOS).filter(([, v]) => v)
+    .map(([k, v]) => `- \`${k}\`: ${v.join(", ")}`),
+  "",
+  "Y dos reglas que no son de lista:",
+  "",
+  `- ${REGLAS[0]}`,
+  `- ${REGLAS[1]}`,
+  "",
+  "`null` sólo vale donde el prompt lo declara —`integridad`, `grafico`,",
+  "`sonido`, `corrige`, `tablero`—. Donde hay lista, «no hace falta» se dice con",
+  "el valor que la lista trae para eso (`ninguno`, `dejar`), no con `null`.",
+  "",
+].join("\n");
 
 /** El esquema se comprueba aquí: lo que no encaja se rechaza. */
 export function valida(d) {
@@ -73,9 +124,8 @@ export function valida(d) {
     const t = d.tablero;
     if (!t || typeof t !== "object" || !t.props) {
       throw new Error(
-        `«tablero» falta y la etapa declara componente «${d.componente}»:` +
-        ` sin él, el tablero se queda con lo que ya hubiera y la descripción` +
-        ` no llega a la pantalla`);
+        `«tablero» falta y la etapa declara componente «${d.componente}». `
+        + REGLAS[0]);
     }
     // Sin `?? "comparacion"`: la lista de componentes admitidos SON las claves
     // de `KIND_DE`, asi que aqui ya no hay hueco que rellenar. El valor por
@@ -104,9 +154,8 @@ export function valida(d) {
     const txt = t?.props?.texto ?? t?.props?.titulo ?? t?.texto;
     if (typeof txt !== "string" || !txt.trim()) {
       throw new Error(
-        `«tablero» falta y el gráfico de esta etapa es tipográfico: di qué dice` +
-        ` en \`tablero.props.texto\`. Si no, el render no tiene copy y la capa` +
-        ` no entra — o peor, repite el rótulo`);
+        "«tablero» falta y el gráfico de esta etapa es tipográfico. "
+        + REGLAS[1]);
     }
   }
   return d;
