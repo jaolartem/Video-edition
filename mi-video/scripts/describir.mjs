@@ -69,7 +69,7 @@
  *   node scripts/describir.mjs --rehacer  # vuelve a pedir todo
  */
 import { sql } from "./consulta.mjs";
-import { valida } from "./describir-esquema.mjs";
+import { exigencias, valida } from "./describir-esquema.mjs";
 import { PROMPT, pedidoDe } from "./describir-pedido.mjs";
 import {
   archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta, rutaPedido,
@@ -186,7 +186,11 @@ function describePieza(slug, filas) {
   // encargo fuera ese: el 7-9-2026 el compositor recibio el t282 —una etapa— y
   // devolvio las ocho compuestas. El texto vive en `dominio/abierto.py :: MODO`.
   const instruccion = JSON.parse(sql("modo", [slug, "descrito"]) || '""');
-  const contrato = PROMPT + instruccion;
+  // **Y lo que el esquema rechaza va escrito en el contrato**, derivado de él:
+  // ver `describir-esquema.mjs :: exigencias`. Sin esto el que contesta se
+  // entera del requisito por el rechazo, y cada requisito cuesta una vuelta
+  // entera del servicio — `componente: null` tumbó dos respuestas en dos días.
+  const contrato = PROMPT + exigencias() + instruccion;
   const encargo = instruccion ? { ...entrada, modo: "tiquets" } : entrada;
   // El pedido se deja SIEMPRE antes de preguntar: si el CLI no contesta, lo que
   // queda escrito es la pregunta entera —prompt incluido— y cualquiera puede
@@ -258,6 +262,10 @@ console.log(`${filas.length} escenas a describir`);
 
 let ok = 0;
 const esperan = [];
+//: Las piezas cuya respuesta llego y el esquema tumbo. **No es lo mismo que una
+//: espera y tampoco es un exito**: hay una respuesta escrita que no se puede
+//: aplicar, y hasta que se rehaga la pieza no ha pasado este paso.
+const rechazadas = [];
 for (const [slug, suyas] of porPiezas(filas)) {
   const tocables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   try {
@@ -322,6 +330,7 @@ for (const [slug, suyas] of porPiezas(filas)) {
     // espera. Lo que llegue es un fallo de verdad —esquema, JSON roto— y ese
     // se dice por pieza sin parar el lote.
     console.error(`  ${slug}: ${String(e.message).slice(0, 160)}`);
+    rechazadas.push(`${slug}: ${String(e.message).slice(0, 120)}`);
   }
 }
 
@@ -346,5 +355,18 @@ if (esperan.length) {
   console.log(
     `espera respuesta del servicio -> ${
       esperan.map((s) => rutaPedido(PASO, s)).join(" ")}`);
+  process.exit(1);
+}
+// **Y una respuesta rechazada no es un paso hecho.**
+//
+// Esto salia con codigo 0: el esquema tumbaba la respuesta —«componente = null
+// no es de la lista»—, el paso se daba por bueno y la pieza avanzaba con su
+// respuesta sin aplicar y su tiquet abierto. Medido el 8-9-2026 con reel-03 y
+// reel-05: cruzaron `descrito` en cinco segundos, dos veces seguidas, y nadie
+// se entero de que la razon era el esquema.
+//
+// Sale por stdout y por la ultima linea, que es el motivo que el motor guarda.
+if (rechazadas.length) {
+  console.log(`el esquema rechazo la respuesta -> ${rechazadas.join(" | ")}`);
   process.exit(1);
 }
