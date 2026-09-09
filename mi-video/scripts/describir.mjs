@@ -72,7 +72,8 @@ import { sql } from "./consulta.mjs";
 import { exigencias, valida } from "./describir-esquema.mjs";
 import { PROMPT, pedidoDe } from "./describir-pedido.mjs";
 import {
-  archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta, rutaPedido,
+  apartaRespuesta, archivaUsado, dejaPedido, guardaRespuesta, leeRespuesta,
+  rutaPedido,
 } from "./servicio.mjs";
 import { criterio as criterioDeFranja } from "./franja.mjs";
 import fs from "node:fs";
@@ -330,7 +331,15 @@ for (const [slug, suyas] of porPiezas(filas)) {
     // espera. Lo que llegue es un fallo de verdad —esquema, JSON roto— y ese
     // se dice por pieza sin parar el lote.
     console.error(`  ${slug}: ${String(e.message).slice(0, 160)}`);
+    // **Y la respuesta que no vale se aparta, para que se pueda volver a
+    // preguntar.** Dejandola en su sitio el pedido deja de contar como abierto:
+    // nadie espera a nadie, el disparador no llama y el paso rechaza el mismo
+    // fichero en cada vuelta. Apartada, la pregunta vuelve a estar viva y el
+    // oficio la contesta otra vez — ahora con las listas del esquema delante.
+    const fuera = apartaRespuesta(PASO, slug);
+    if (fuera) console.error(`  ${slug}: apartada en ${fuera}`);
     rechazadas.push(`${slug}: ${String(e.message).slice(0, 120)}`);
+    esperan.push(slug);
   }
 }
 
@@ -352,21 +361,11 @@ if (esperan.length) {
   // que `avanzar` no lo leia como espera y no le pedia al disparador que
   // llamara al oficio. La linea que pide el turno tiene que ir por el canal en
   // el que el motor escucha.
+  // Y si alguna espera porque su respuesta se tumbo, el motivo lo dice: no es
+  // lo mismo «nadie ha contestado» que «contesto y no valia».
+  const por = rechazadas.length ? ` (rechazadas: ${rechazadas.join(" | ")})` : "";
   console.log(
-    `espera respuesta del servicio -> ${
+    `espera respuesta del servicio${por} -> ${
       esperan.map((s) => rutaPedido(PASO, s)).join(" ")}`);
-  process.exit(1);
-}
-// **Y una respuesta rechazada no es un paso hecho.**
-//
-// Esto salia con codigo 0: el esquema tumbaba la respuesta —«componente = null
-// no es de la lista»—, el paso se daba por bueno y la pieza avanzaba con su
-// respuesta sin aplicar y su tiquet abierto. Medido el 8-9-2026 con reel-03 y
-// reel-05: cruzaron `descrito` en cinco segundos, dos veces seguidas, y nadie
-// se entero de que la razon era el esquema.
-//
-// Sale por stdout y por la ultima linea, que es el motivo que el motor guarda.
-if (rechazadas.length) {
-  console.log(`el esquema rechazo la respuesta -> ${rechazadas.join(" | ")}`);
   process.exit(1);
 }
