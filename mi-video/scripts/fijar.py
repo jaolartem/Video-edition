@@ -44,9 +44,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 BASE = "ads/decisiones.db"
 
-#: La medida que cierra el tiquet de una prueba que se movio: que vuelva a
-#: casar. La abre y la cierra el mismo codigo, que es lo que evita que quede
-#: colgada.
+#: La medida que cierra el tiquet de una prueba que se movio. Lo abre `fijar`
+#: y lo cierra el compositor con su respuesta, por el conducto de siempre: no
+#: hay atajo que lo cierre desde dentro de la linea.
 MOVIDA = "prueba movida"
 
 
@@ -318,30 +318,28 @@ def rehacer(slug, beats=None):
 
 
 def _con_prueba_viva(slug, fjs):
-    """Deja constancia de que la prueba se movio. **Ya no tira la decision.**
+    """Deja fuera la declaracion cuya prueba ya no casa, **y la manda**.
 
-    Esto dejaba fuera la declaracion entera cuando su huella no casaba, y el
-    9-9-2026 se vio lo que cuesta: reel-03 se entrego sin el adelanto de los
-    tiquets #276, #277 y #279 —43,8 s, `desatura: []` y abriendo por el
-    gancho de siempre— porque cinco de sus catorce declaraciones se
-    descartaron aqui, en silencio, con un `print`. reel-02 estaba igual.
+    La regla en si estaba bien: si el texto que se oye ahi no es el que se
+    declaro, no se aplica a ciegas. Lo que faltaba era la otra mitad — nadie
+    volvia nunca. El aviso se escribia en `stdout`, la linea seguia, y por ahi
+    reel-03 se entrego sin el adelanto de los tiquets #276, #277 y #279:
+    43,8 s, `desatura: []` y con el gancho de siempre. reel-02 estaba igual.
 
-    **Y las descartaba por algo que no puede pasar.** Una declaracion dice
-    *este trozo de esta cinta*, y el audio de una cinta no cambia: el segundo
-    340,711 de `20260825_224414` dice hoy lo que decia el dia que se grabo.
-    Lo unico que puede moverse es lo que whisper lee ahi — y la linea lo
-    reescribe ella misma: `afinado` (fase 3) vuelve a transcribir los tramos
-    elegidos, JUSTO DESPUES de `fijado` (fase 2.5), que es donde se estampa
-    la prueba. Asi que toda declaracion nueva duraba exactamente una vuelta.
-    Medido: de las cinco que murieron, ninguna aparece desplazada en ±1,5 s
-    — no es un desfase, es otra segmentacion de las mismas palabras.
+    Ahora la etapa se queda fuera —`verificar` para la pieza por el tramo que
+    no dejo rastro— y **su encargo va al compositor por tiquet**, acotado a esa
+    etapa. Jaime, 9-9-2026: *«se envia al compositor que es el que arregla
+    todo, y continua por la linea de produccion»*.
 
-    Asi que la decision se aplica y la prueba se vuelve a estampar. Lo que si
-    merece una mirada —que la cinta sea otra grabacion con el mismo nombre—
-    sale por tiquet de tipo `dato`: no para el render y si la publicacion.
+    **Y salta mas de lo que parece**, que es lo que hay que tener presente al
+    leer un aviso de estos: `afinado` (fase 3) vuelve a transcribir los tramos
+    elegidos justo despues de `fijado` (fase 2.5), que es donde se estampa la
+    prueba. Medido el 9-9-2026 en reel-03: cinco de catorce declaraciones no
+    casaban, y ninguna aparece desplazada en ±1,5 s — no era desfase, era otra
+    segmentacion de las mismas palabras.
 
     Las que no tienen huella son las de antes de que esto existiera: se
-    estampan con la de ahora, pero se cuenta cuantas, porque adoptar una
+    estampan con la de ahora y se aplican, pero se cuenta cuantas, porque adoptar una
     prueba no es haberla comprobado.
     """
     vivas, movidas, adoptadas = [], {}, 0
@@ -351,14 +349,14 @@ def _con_prueba_viva(slug, fjs):
             vivas.append(f)
             continue
         h = huella(f["toma"], f["desde"], f["hasta"])
-        if h and h != f.get("huella"):
-            if f.get("huella"):
-                movidas.setdefault(f["beat"], 0)
-                movidas[f["beat"]] += 1
-            else:
-                adoptadas += 1
+        if f.get("huella") and h and h != f["huella"]:
+            movidas.setdefault(f["beat"], 0)
+            movidas[f["beat"]] += 1
+            continue
+        if not f.get("huella") and h:
             con.execute("update corte_fijo set huella = ? where id = ?",
                         (h, f["id"]))
+            adoptadas += 1
         vivas.append(f)
     con.commit()
     con.close()
@@ -366,9 +364,9 @@ def _con_prueba_viva(slug, fjs):
         print(f"  {slug}: {adoptadas} declaracion(es) sin prueba estampada —"
               f" se adopta la de hoy; no es lo mismo que comprobada")
     if movidas:
-        _prueba_movida(slug, movidas)
-    else:
-        _prueba_casa(slug)
+        fuera = set(movidas)
+        vivas = [f for f in vivas if f["beat"] not in fuera]
+        _al_compositor(slug, movidas)
     return vivas
 
 
@@ -383,28 +381,43 @@ def _prueba_casa(slug):
                          "arreglado", "la linea", MOVIDA)
 
 
-def _prueba_movida(slug, movidas):
-    """El transcript de debajo de una declaracion cambio. Se dice, no se tira.
+def _al_compositor(slug, movidas):
+    """La etapa se queda sin su declaracion y va al compositor por tiquet.
 
-    **Y se dice una vez, no una por vuelta.** El tiquet es de tipo `dato`: no
-    para el render —Jaime quiere ver la pieza— y si para la publicacion. Se
-    cierra solo en la corrida en que la prueba vuelve a casar.
+    **El seguro para, y la pieza entra por donde entra todo: el tiquet.**
+    Jaime, 9-9-2026: *«no se envia por secciones, se envia al compositor que es el que
+    arregla todo, y continua por la linea de produccion; por supuesto que los
+    seguros van a saltar si no se sigue la linea, porque para eso son»*.
+
+    Lo que faltaba no era aflojar el seguro: era la otra mitad, que nadie
+    volviera nunca. El aviso se escribia en `stdout` y la linea seguia — asi
+    perdio reel-03 el adelanto de los tiquets #276, #277 y #279. Ahora la etapa
+    no se aplica, `verificar` para la pieza por el tramo que no dejo rastro, y
+    el compositor recibe el encargo acotado a esa etapa.
+
+    Uno por etapa y no uno por vuelta: la condicion es de la etapa.
     """
     from dominio import ticket as _t
 
-    etapas = sorted(movidas)
-    cuantos = sum(movidas.values())
-    print(f"  {slug}: etapa(s) {etapas} llevaban una prueba de un transcript"
-          f" anterior — se aplican igual y se vuelve a estampar")
-    if any((t["cierra_con"] or "") == MOVIDA for t in _t.abiertos(slug)):
-        return
-    _t.abrir(slug, (
-        f"{slug}: {cuantos} tramo(s) declarados en las etapas {etapas} tenian"
-        f" estampada la prueba de un transcript anterior. El audio de la cinta"
-        f" no se mueve, asi que la declaracion se aplica; lo que cambio es lo"
-        f" que whisper lee ahi. Merece una mirada antes de publicar: si la"
-        f" cinta es otra grabacion, el tramo ya no dice lo que se declaro."),
-        tipo="dato", cierra_con=MOVIDA, etapa="pieza")
+    print(f"  {slug}: etapa(s) {sorted(movidas)} declaradas contra un texto"
+          f" que ya no esta ahi — NO se aplican. Van al compositor por"
+          f" tiquet.")
+    ya = {t["beat"] for t in _t.abiertos(slug)
+          if (t["cierra_con"] or "") == MOVIDA}
+    for beat, cuantos in sorted(movidas.items()):
+        if beat in ya:
+            continue
+        _t.abrir(slug, (
+            f"e{beat} — sus {cuantos} tramo(s) declarados llevan una prueba"
+            f" que"
+            f" ya no casa con el transcript de hoy, asi que `fijar --aplicar`"
+            f" NO los pone y la etapa sale con la seleccion automatica. La"
+            f" decision sigue entera en `corte_fijo`, con su autor y su"
+            f" porque:"
+            f" lo que caduco es la prueba, no la decision. ACOTADO A ESTA"
+            f" ETAPA: mira el tramo con la cinta de hoy delante y vuelve a"
+            f" declararlo, o di por que ya no procede."),
+            tipo="falta", vuelve_a="descrito", cierra_con=MOVIDA)
 
 
 def aplicar(slug, solo=None):

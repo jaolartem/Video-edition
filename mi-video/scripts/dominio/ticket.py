@@ -351,11 +351,27 @@ def medir(id_, medida):
 
 
 def _huella(pieza):
-    """La huella del corte sobre el que se abre el ticket. `None` si no se sabe."""
+    """La huella del corte sobre el que se abre el ticket. `None` si no se sabe.
+
+    **Y se busca por los dos caminos, porque el que la usa es el CLI.** Este
+    fichero se importa como `dominio.ticket` desde la linea y se EJECUTA como
+    `python scripts/dominio/ticket.py`, que es el camino que CLAUDE.md le da a
+    Jaime para abrir un tiquet. Corriendo como script no hay paquete, `from .
+    import version` revienta, el `except` lo daba por «no se sabe» y el tiquet
+    nacia sin sello — para morir en el `caducar` siguiente.
+
+    Medido el 9-9-2026: 268 de los 288 tiquets no tienen huella, y **los 41 que
+    se han descartado alguna vez con «Caducado con el corte» son los 41 sin
+    sello**. Ni uno se descarto por venir de un montaje distinto: se
+    descartaron por no poder decir de cual venian.
+    """
     try:
         from . import version
+    except ImportError:                            # corriendo como script
+        import version
+    try:
         return version.huella_edl(pieza)
-    except Exception:
+    except Exception:                              # noqa: BLE001
         return None
 
 
@@ -384,9 +400,14 @@ def caducar(pieza):
     if not h:
         return []
     cx = _con()
+    # **Sin sello no es viejo: es que no se supo decir de que corte venia.** La
+    # regla mata al que demuestra ser de otro montaje, y un `NULL` no demuestra
+    # nada. Contarlo como prueba fue lo que se llevo los 41 —todos los que se
+    # han caducado en la vida del proyecto— y entre ellos los que Jaime abrio
+    # desde el CLI, que es justo el camino que CLAUDE.md le ofrece.
     viejos = [dict(r) for r in cx.execute(
         "select id, dijo from ticket where pieza = ? and respuesta is null"
-        " and (huella is null or huella <> ?)", (pieza, h))]
+        " and huella is not null and huella <> ?", (pieza, h))]
     if viejos:
         ahora = datetime.datetime.now().isoformat(timespec="seconds")
         cx.executemany(
