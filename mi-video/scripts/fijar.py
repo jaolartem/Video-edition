@@ -44,6 +44,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 BASE = "ads/decisiones.db"
 
+#: La medida que cierra el tiquet de una prueba que se movio: que vuelva a
+#: casar. La abre y la cierra el mismo codigo, que es lo que evita que quede
+#: colgada.
+MOVIDA = "prueba movida"
+
 
 def _con():
     c = basedatos.abrir(BASE)
@@ -313,49 +318,93 @@ def rehacer(slug, beats=None):
 
 
 def _con_prueba_viva(slug, fjs):
-    """Deja fuera las declaraciones que hablan de un texto que ya no esta ahi.
+    """Deja constancia de que la prueba se movio. **Ya no tira la decision.**
 
-    **Por etapa entera y no por tramo**: `aplicar` rehace la etapa con los
-    tramos que le llegan, asi que colar la mitad de una declaracion vieja deja
-    la etapa peor que no tocarla.
+    Esto dejaba fuera la declaracion entera cuando su huella no casaba, y el
+    9-9-2026 se vio lo que cuesta: reel-03 se entrego sin el adelanto de los
+    tiquets #276, #277 y #279 —43,8 s, `desatura: []` y abriendo por el
+    gancho de siempre— porque cinco de sus catorce declaraciones se
+    descartaron aqui, en silencio, con un `print`. reel-02 estaba igual.
 
-    Lo que NO hace es borrarlas. Una declaracion es una decision con autor y
-    porque; lo que caduca es su prueba, no la decision. Se queda en la tabla,
-    no se aplica, y se dice en voz alta — para que el paso que la puso la vuelva
-    a mirar con la cinta de hoy delante.
+    **Y las descartaba por algo que no puede pasar.** Una declaracion dice
+    *este trozo de esta cinta*, y el audio de una cinta no cambia: el segundo
+    340,711 de `20260825_224414` dice hoy lo que decia el dia que se grabo.
+    Lo unico que puede moverse es lo que whisper lee ahi — y la linea lo
+    reescribe ella misma: `afinado` (fase 3) vuelve a transcribir los tramos
+    elegidos, JUSTO DESPUES de `fijado` (fase 2.5), que es donde se estampa
+    la prueba. Asi que toda declaracion nueva duraba exactamente una vuelta.
+    Medido: de las cinco que murieron, ninguna aparece desplazada en ±1,5 s
+    — no es un desfase, es otra segmentacion de las mismas palabras.
 
-    Las que no tienen huella son las de antes de que esto existiera: se estampan
-    con la de ahora y se aplican, pero se cuenta cuantas, porque adoptar una
+    Asi que la decision se aplica y la prueba se vuelve a estampar. Lo que si
+    merece una mirada —que la cinta sea otra grabacion con el mismo nombre—
+    sale por tiquet de tipo `dato`: no para el render y si la publicacion.
+
+    Las que no tienen huella son las de antes de que esto existiera: se
+    estampan con la de ahora, pero se cuenta cuantas, porque adoptar una
     prueba no es haberla comprobado.
     """
-    vivas, viejas, adoptadas = [], {}, 0
+    vivas, movidas, adoptadas = [], {}, 0
     con = _con()
     for f in fjs:
         if not f.get("toma"):
             vivas.append(f)
             continue
         h = huella(f["toma"], f["desde"], f["hasta"])
-        if f.get("huella") and h and h != f["huella"]:
-            viejas.setdefault(f["beat"], 0)
-            viejas[f["beat"]] += 1
-            continue
-        if not f.get("huella") and h:
+        if h and h != f.get("huella"):
+            if f.get("huella"):
+                movidas.setdefault(f["beat"], 0)
+                movidas[f["beat"]] += 1
+            else:
+                adoptadas += 1
             con.execute("update corte_fijo set huella = ? where id = ?",
                         (h, f["id"]))
-            adoptadas += 1
         vivas.append(f)
     con.commit()
     con.close()
     if adoptadas:
         print(f"  {slug}: {adoptadas} declaracion(es) sin prueba estampada —"
               f" se adopta la de hoy; no es lo mismo que comprobada")
-    if viejas:
-        fuera = set(viejas)
-        vivas = [f for f in vivas if f["beat"] not in fuera]
-        print(f"  {slug}: etapa(s) {sorted(fuera)} declaradas contra un texto"
-              f" que ya no esta ahi — NO se aplican. Manda la seleccion de hoy"
-              f" hasta que el paso que las puso las vuelva a mirar.")
+    if movidas:
+        _prueba_movida(slug, movidas)
+    else:
+        _prueba_casa(slug)
     return vivas
+
+
+def _prueba_casa(slug):
+    """Cierra el tiquet de la prueba movida cuando vuelve a casar entera."""
+    from dominio import ticket as _t
+
+    for t in _t.abiertos(slug):
+        if (t["cierra_con"] or "") == MOVIDA:
+            _t.contestar(t["id"], f"{slug}: las declaraciones vuelven a casar"
+                         f" con el transcript de hoy, una por una.",
+                         "arreglado", "la linea", MOVIDA)
+
+
+def _prueba_movida(slug, movidas):
+    """El transcript de debajo de una declaracion cambio. Se dice, no se tira.
+
+    **Y se dice una vez, no una por vuelta.** El tiquet es de tipo `dato`: no
+    para el render —Jaime quiere ver la pieza— y si para la publicacion. Se
+    cierra solo en la corrida en que la prueba vuelve a casar.
+    """
+    from dominio import ticket as _t
+
+    etapas = sorted(movidas)
+    cuantos = sum(movidas.values())
+    print(f"  {slug}: etapa(s) {etapas} llevaban una prueba de un transcript"
+          f" anterior — se aplican igual y se vuelve a estampar")
+    if any((t["cierra_con"] or "") == MOVIDA for t in _t.abiertos(slug)):
+        return
+    _t.abrir(slug, (
+        f"{slug}: {cuantos} tramo(s) declarados en las etapas {etapas} tenian"
+        f" estampada la prueba de un transcript anterior. El audio de la cinta"
+        f" no se mueve, asi que la declaracion se aplica; lo que cambio es lo"
+        f" que whisper lee ahi. Merece una mirada antes de publicar: si la"
+        f" cinta es otra grabacion, el tramo ya no dice lo que se declaro."),
+        tipo="dato", cierra_con=MOVIDA, etapa="pieza")
 
 
 def aplicar(slug, solo=None):
