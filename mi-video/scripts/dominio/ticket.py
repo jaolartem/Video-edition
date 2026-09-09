@@ -40,6 +40,16 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# **Este fichero tambien SE EJECUTA, no solo se importa.** `python
+# scripts/dominio/ticket.py reel-03 30 "..."` es el camino que CLAUDE.md le da
+# a Jaime para abrir un tiquet, y corriendo asi no hay paquete: cada `from .
+# import ...` de aqui abajo revienta. Se lo tragaban dos `except` y costo las
+# dos mitades del tiquet — el sello del corte (C-344) y **la puerta que manda
+# la pieza al paso que lo atiende**, o sea que el tiquet existia y no movia
+# nada. Declarar el paquete lo arregla en un sitio y para los tres vecinos.
+if not __package__:
+    __package__ = "dominio"
+
 import basedatos  # noqa: E402
 
 #: La carpeta `mi-video`, sacada de este fichero y **no del cwd**.
@@ -304,8 +314,9 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
         from . import puertas
         for linea in puertas.del_tiquet([int(str(pieza)[-2:])]):
             print(linea)
-    except Exception:                              # noqa: BLE001
-        pass
+    except Exception as e:                         # noqa: BLE001
+        print(f"  ticket #{ident}: la puerta no abrio ({e}) — la pieza NO ha"
+              f" vuelto al paso que lo atiende")
     return ident
 
 
@@ -367,9 +378,6 @@ def _huella(pieza):
     """
     try:
         from . import version
-    except ImportError:                            # corriendo como script
-        import version
-    try:
         return version.huella_edl(pieza)
     except Exception:                              # noqa: BLE001
         return None
