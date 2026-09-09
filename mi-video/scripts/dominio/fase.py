@@ -169,6 +169,30 @@ def camino():
     return fs
 
 
+def antes_de(fase):
+    """Desde donde se vuelve a correr ese paso. **No es su propia etiqueta.**
+
+    Una etiqueta nombra el paso YA HECHO: dejar la pieza en `descrito` es
+    dejarla con la descripcion por buena, asi que lo siguiente que corre es
+    `disenar` y el compositor no vuelve a mirar nada.
+
+    La regla estaba escrita en `avanzar._antes_de` y **la otra puerta no la
+    preguntaba**: `puertas.del_tiquet` mandaba la pieza a la fase que el tiquet
+    nombra, tal cual. Medido el 9-9-2026: el tiquet #289 de reel-03 pedia
+    «descrito», la puerta dejo la pieza en `descrito`, y de ahi lo unico que
+    podia correr era el disenador — el compositor, que es quien lo atiende, no
+    entraba nunca. Es la misma averia del 8-9 con reel-03 y reel-05, que
+    entraron en `descrito` y salieron a `disenado` el mismo segundo.
+
+    Vive aqui porque el orden es de `CICLO`, y las dos puertas lo preguntan.
+    """
+    if not fase:
+        return None
+    ruta = camino()
+    i = next((k for k, f in enumerate(ruta) if f["nombre"] == fase), None)
+    return ruta[i - 1]["nombre"] if i else fase
+
+
 def fase_de(pieza):
     return pieza.fase
 

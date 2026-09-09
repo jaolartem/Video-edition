@@ -27,7 +27,7 @@ from __future__ import annotations
 import os
 
 from . import ticket
-from .fase import anotar
+from .fase import anotar, antes_de
 
 #: Lo que cuenta como un bruto. El resto de la carpeta de origen —proyectos,
 #: audio suelto, capturas— no abre nada.
@@ -103,7 +103,10 @@ def del_tiquet(piezas):
                          f" piden «{fase}» y la puerta no la reabre."
                          f" Sube a Jaime: {', '.join('#' + str(i) for i in ids)}")
             continue
-        destino, vid = _fase_id(fase), _video_id(slug)
+        # **Al punto desde el que ese paso vuelve a correr, no a su etiqueta.**
+        # La etiqueta dice el paso YA HECHO; ver `fase.antes_de`.
+        vuelve = antes_de(fase)
+        destino, vid = _fase_id(vuelve), _video_id(slug)
         if destino is None or vid is None:
             dicho.append(f"  {slug}: {len(ids)} tiquet(s) piden «{fase}» y esa"
                          f" fase no existe en el camino — no se puede abrir")
@@ -111,8 +114,9 @@ def del_tiquet(piezas):
         anotar(vid, destino,
                f"puerta del tiquet: {', '.join('#' + str(i) for i in ids)}")
         ticket.devolver(ids)
-        dicho.append(f"  puerta del tiquet -> {slug} vuelve a «{fase}»"
-                     f" por {', '.join('#' + str(i) for i in ids)}")
+        dicho.append(f"  puerta del tiquet -> {slug} vuelve a «{vuelve}» para"
+                     f" que corra «{fase}», por"
+                     f" {', '.join('#' + str(i) for i in ids)}")
     return dicho
 
 

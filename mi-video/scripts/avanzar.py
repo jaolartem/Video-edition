@@ -45,7 +45,7 @@ BASE = "ads/decisiones.db"
 from dominio import abierto as _abierto  # noqa: E402
 from dominio.fase import (  # noqa: E402,F401
     _con, _fallo_antes, _render_caduco, ESLABON_DE, VUELVE_SI_CADUCO, anotar,
-    camino, fase_de)
+    antes_de, camino, fase_de)
 import cadena  # noqa: E402
 
 
@@ -588,19 +588,6 @@ def _contestadas_tarde() -> list:
     return fuera
 
 
-def _antes_de(fase):
-    """La fase desde la que se vuelve a correr ese paso. `None` si no la hay.
-
-    El orden ya está escrito en el camino (`dominio/fase.py :: CICLO`), así que
-    aquí sólo se lee: la anterior a la que la etiqueta nombra.
-    """
-    if not fase:
-        return None
-    ruta = camino()
-    i = next((k for k, f in enumerate(ruta) if f["nombre"] == fase), None)
-    return ruta[i - 1]["nombre"] if i else fase
-
-
 def _devuelve(slug: str, paso: str) -> None:
     """Manda la pieza al punto desde el que ese paso se vuelve a correr.
 
@@ -615,7 +602,7 @@ def _devuelve(slug: str, paso: str) -> None:
     y sale del camino declarado en vez de escribirse aquí: si mañana se mete un
     paso entre medias, esto sigue apuntando al sitio correcto.
     """
-    fase = _antes_de(DE_QUIEN.get(paso))
+    fase = antes_de(DE_QUIEN.get(paso))
     # **Y una pieza aprobada no se devuelve.** Jaime, 7-9-2026, viendo el
     # tablero: *«por que esta el 4, el 6 y el 7... ya estan aprobados»*, y el
     # motivo: *«porque gastan tiempo valioso»*.
