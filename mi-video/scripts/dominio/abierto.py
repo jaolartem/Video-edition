@@ -208,19 +208,6 @@ Las capacidades de arriba siguen siendo las tuyas. Lo que cambia es el encargo:
 """
 
 
-def encargo(slug, fase):
-    """La instrucción y los tiquets de esa fase, o `(None, None)` si no hay.
-
-    Devolver `None` **no es un caso raro**: es el modo general, el de componer
-    la pieza entera. Los dos modos son legítimos y la diferencia la marca si hay
-    o no correcciones suyas esperando en ese paso.
-    """
-    suyos = [t for t in suyas(slug) if t[2] == fase]
-    if not suyos:
-        return None, None
-    return MODO, [{"id": i, "de": acc, "dice": txt} for i, acc, _f, txt in suyos]
-
-
 def etapa_de(texto):
     """La etapa que nombra una corrección suya, o `None` si habla de la pieza.
 
@@ -233,36 +220,6 @@ def etapa_de(texto):
 
     m = re.search(r"\b(?:e|etapa\s*|beat\s*)(\d{1,2})\b", (texto or "").lower())
     return int(m.group(1)) if m else None
-
-
-def alcance(slug, fase):
-    """Qué etapas abre un tiquet suyo: `(hay_tiquets, etapas, todas)`.
-
-    `todas` es cierto cuando alguna corrección no nombra etapa — «el abuso del
-    glitch en este reel» habla de la pieza entera—. Acotar de menos pierde la
-    corrección, que de los dos errores es el caro: uno cuesta mirar una etapa de
-    más, el otro cuesta que él la vuelva a pedir.
-    """
-    _, tiquets = encargo(slug, fase)
-    if not tiquets:
-        return False, set(), False
-    etapas = {e for e in (etapa_de(t["dice"]) for t in tiquets) if e is not None}
-    return True, etapas, len(etapas) < len(tiquets)
-
-
-def modo(prompt, payload, slug, fase):
-    """Pone la capa de instrucción sobre el pedido, si hay tiquets de esa fase.
-
-    Devuelve `(prompt, payload)` tocados o tal cual. Vive aquí y no en el
-    servicio porque **la segunda capa es del tiquet, no del oficio**: el que
-    compone y el que dibuja tienen capacidades distintas y la misma forma de
-    recibir un encargo acotado.
-    """
-    instruccion, tiquets = encargo(slug, fase)
-    if not instruccion:
-        return prompt, payload
-    return prompt + instruccion, {**payload, "modo": "tiquets",
-                                  "tiquets": tiquets}
 
 
 def _medida(id_):
@@ -347,7 +304,7 @@ def cerrar(slug, fase, por_que, atendidos=None):
     return suyos
 
 
-def _de_la_tabla_ticket(slug, fase):
+def beats_de_tiquets(slug, fase):
     """Las etapas que abre un tiquet de `ticket`, por su `beat`.
 
     **Son dos tablas para lo mismo y sólo una abría trabajo.** `revision` guarda
@@ -374,15 +331,27 @@ def _de_la_tabla_ticket(slug, fase):
     except Exception:                                  # noqa: BLE001
         return set()
 
-
 def abre(slug, fase, fila):
     """¿Un tiquet suyo vuelve a poner esta etapa en el encargo?
 
-    Una etapa con su tablero ya montado no entraba —el paso sólo preguntaba por
-    lo que faltaba—, así que una corrección sobre un tablero existente no
-    llegaba nunca a quien podía arreglarlo.
+    La respuesta la sabe el alcance; esto es la puerta que ya usaban los pasos.
     """
-    hay, etapas, todas = alcance(slug, fase)
-    if hay and (todas or fila["etapa_orden"] in etapas):
-        return True
-    return int(fila["etapa_orden"]) in _de_la_tabla_ticket(slug, fase)
+    from .alcance import Alcance
+
+    return Alcance.de(slug, fase).abre(fila["etapa_orden"])
+
+
+def modo(prompt, payload, slug, fase):
+    """Pone el alcance encima del contrato. Ver `dominio/alcance.py :: sobre`."""
+    from .alcance import Alcance
+
+    return Alcance.de(slug, fase).sobre(prompt, payload)
+
+
+# **`encargo`, `alcance`, `modo` y `abre` se fueron a `dominio/alcance.py`.**
+#
+# Eran cinco funciones y una tupla desnuda —`(hay, etapas, todas)`— para una
+# sola pregunta: hasta donde llega el encargo de hoy. Jaime, 8-9-2026: *«las
+# herramientas quedan iguales, lo que cambia es el alcance; esto es POO»*.
+# Ahora es un objeto y aqui queda lo que si es de este fichero: que hay abierto,
+# que quedo vencido y como se cierra.
