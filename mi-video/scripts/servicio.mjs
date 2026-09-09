@@ -81,6 +81,30 @@ export function desenvuelve(d) {
   return arr;
 }
 
+/**
+ * **Aparta una respuesta que el esquema tumbó, y deja el pedido abierto.**
+ *
+ * Una respuesta invalida no es una respuesta, pero mientras siga en su sitio lo
+ * parece: `servicio.pendientes` deja de nombrar el pedido, asi que la pieza no
+ * espera a nadie, el disparador no llama y el paso vuelve a rechazar el mismo
+ * fichero en cada vuelta. Es un atasco silencioso — reel-03 y reel-05 lo
+ * estuvieron dos dias.
+ *
+ * Se aparta con su marca para poder mirarla, y el pedido se queda: la pregunta
+ * sigue siendo buena, lo que falló fue la contestación.
+ */
+export function apartaRespuesta(paso, slug) {
+  const dir = `${RAIZ}/${paso}/usadas`;
+  const r = rutaRespuesta(paso, slug);
+  if (!fs.existsSync(r)) return null;
+  fs.mkdirSync(dir, { recursive: true });
+  let n = 1;
+  while (fs.existsSync(`${dir}/${slug}.${n}.rechazada.json`)) n += 1;
+  const destino = `${dir}/${slug}.${n}.rechazada.json`;
+  fs.renameSync(r, destino);
+  return destino;
+}
+
 /** Guarda la respuesta como la respuesta del paso. Ver `describir.mjs`. */
 export function guardaRespuesta(paso, slug, arr) {
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
