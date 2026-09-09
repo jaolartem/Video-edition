@@ -26,6 +26,7 @@ from .montaje import Montaje  # noqa: E402
 from .texto import dice_lo_mismo  # noqa: E402
 from .pieza import Pieza  # noqa: E402
 from .repetido import repetido  # noqa: E402
+from .alcance import Alcance  # noqa: E402
 
 ETAPAS = """
     select v.slug, e.orden, ec.nombre as etapa, es.nombre as estructura,
@@ -80,6 +81,8 @@ class _DeLaPieza:
         self.repetido = repetido(m)
         self.quitadas = quitadas(slug)
         self.en_la_cinta = _en_la_cinta(slug)
+        #: Hasta donde llega el encargo de hoy en esta pieza.
+        self.alcance = Alcance.de(slug, "descrito")
 
 
 def _en_la_cinta(slug):
@@ -249,10 +252,8 @@ def por_describir(reels=None, rehacer: bool = False) -> list:
             # la capa de instruccion: `abierto.MODO` dice «hoy no compones la
             # pieza: arreglas estos tiquets» y `acotado` dice cuales son sus
             # etapas. Sin ella esto si seria volver a describir.
-            from . import abierto
             if (guardado.get((slug, orden)) is not None
-                    and not abierto.abre(slug, "descrito",
-                                         {"etapa_orden": orden})):
+                    and not piezas[slug].alcance.abre(orden)):
                 continue                 # ya descrita: no se vuelve a pedir
         fuera.append(d)
     return fuera

@@ -232,9 +232,9 @@ def tiquets_de(slug, fase):
     El pedido esta hecho para contestarse sin reconstruir nada; esto es lo que
     faltaba para que sea verdad.
     """
-    from dominio import abierto
-    _, tiquets = abierto.encargo(slug, fase)
-    return tiquets or []
+    from dominio.alcance import Alcance
+
+    return Alcance.de(slug, fase).tiquets
 
 
 def acotado(slug, fase):
@@ -249,9 +249,9 @@ def acotado(slug, fase):
     `dominio/abierto.py :: alcance`; lo que faltaba era que node pudiera
     preguntarla, que es lo unico que hace esta puerta.
     """
-    from dominio import abierto
-    hay, etapas, todas = abierto.alcance(slug, fase)
-    return None if (not hay or todas or not etapas) else sorted(etapas)
+    from dominio.alcance import Alcance
+
+    return Alcance.de(slug, fase).editables
 
 
 def modo(slug, fase):
@@ -268,8 +268,9 @@ def modo(slug, fase):
     puerta solo la deja cruzar; el texto es el de `dominio/abierto.py :: MODO` y
     se manda literal.
     """
-    from dominio import abierto
-    return abierto.encargo(slug, fase)[0] or ""
+    from dominio.alcance import Alcance
+
+    return Alcance.de(slug, fase).instruccion
 
 
 def cerrar_tiquets(slug, fase, por_que, atendidos):
