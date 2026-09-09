@@ -171,10 +171,10 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         # Va DELANTE de `vencidas` porque si no, no llega a medirse nunca: el
         # bloqueo corta la vuelta antes de que ningun paso corra.
         #
-        # Se mide, no se supone: `dominio/borde.py` mira si en el segundo que el
+        # Se mide, no se supone: `dominio/cierre.py` mira si en el segundo que el
         # tiquet señala queda empalme. Si sigue habiendo, no se cierra.
         try:
-            from dominio.borde import cierra_los_suyos
+            from dominio.cierre import cierra_los_suyos
             for i in cierra_los_suyos(pieza.slug):
                 print(f"  {pieza.slug}: cerrado #{i} por su medida (bordes)")
         except Exception:                          # noqa: BLE001
