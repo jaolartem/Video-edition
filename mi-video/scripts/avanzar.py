@@ -103,7 +103,13 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
     # quien compone decide con el delante.
     # **Y si la etiqueta miente, se corrige antes de recorrer nada.**
     orden = {f["nombre"]: k for k, f in enumerate(ruta)}
-    if orden.get(actual["nombre"], -1) >= orden.get("montado", 10 ** 9):
+    # **Y lo aprobado no vuelve por esto tampoco.** Es el mismo criterio que ya
+    # guardan `puertas.del_tiquet` y `_devuelve`: una pieza firmada sale de ahi
+    # cuando Jaime lo dice. Sin esto, preguntarle a la cadena entera —que ve mas
+    # que la huella del render— sacaba a reel-07 de `aprobado` por unos
+    # subtitulos viejos.
+    if (orden.get(actual["nombre"], -1) >= orden.get("montado", 10 ** 9)
+            and actual["nombre"] != "aprobado"):
         caduco = _render_caduco(pieza)
         if caduco:
             destino = next((f for f in ruta if f["nombre"] == VUELVE_SI_CADUCO), None)
