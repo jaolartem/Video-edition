@@ -290,6 +290,23 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
                 motivo = atasco
             break
 
+        # **Y un paso que acaba cierra los tiquets que su medida ya cierra.**
+        #
+        # Un oficio declara en su respuesta que tiquets atiende; un paso de
+        # codigo no declara nada, asi que un tiquet de `cosido` no lo podia
+        # cerrar nadie: la pieza volvia a coser, avanzaba, y la correccion
+        # seguia abierta con su paso ya detras — `vencidas` la paraba para
+        # siempre. El #282 y el #287 de reel-01 dieron tres vueltas asi.
+        #
+        # Se mide, no se supone: `dominio/borde.py` mira si en el segundo que el
+        # tiquet señala queda empalme. Si sigue habiendo, no se cierra.
+        try:
+            from dominio.borde import cierra_los_suyos
+            for i in cierra_los_suyos(pieza.slug):
+                print(f"  {pieza.slug}: cerrado #{i} por su medida (bordes)")
+        except Exception:                          # noqa: BLE001
+            pass
+
         if r.volver_a:
             # **El ciclo, y acotado.** Un paso puede mandar la pieza atras
             # porque cambio algo que ya se habia dado por bueno. Se permite,
