@@ -75,6 +75,29 @@ def _piso():
     return _piso_cache
 
 
+def _marcador(slug):
+    """Donde esta la pieza y en que fichero lo escribe quien la mueve.
+
+    Lo publica `dominio/estado.py`; aqui solo se lleva al pedido **con su
+    ruta**, porque un oficio que solo tiene `Read` y `Write` necesita saber que
+    fichero abrir. La ruta es relativa a `mi-video`, que es el `cwd` con el que
+    se le llama (ver `dominio/oficio.py :: CASA`).
+
+    `etapa` y `abiertos` los reescribe la base en cada vuelta; `hecho` es del
+    que trabaja, y es lo unico que se le pide que toque.
+    """
+    try:
+        from dominio import estado
+
+        d = estado.lee(slug)
+        return {"fichero": os.path.relpath(estado.ruta(slug),
+                                           estado.RAIZ).replace("\\", "/"),
+                "etapa": d.get("etapa"), "abiertos": d.get("abiertos") or [],
+                "hecho": d.get("hecho") or []}
+    except Exception:                              # noqa: BLE001
+        return None
+
+
 def _dir(paso):
     d = os.path.join(RAIZ, paso)
     os.makedirs(d, exist_ok=True)
@@ -220,7 +243,19 @@ def pedir(paso, slug, prompt, payload, cli=True):
              # Una objecion suya —«en el segundo 30 el tablero se queda sin
              # sonido»— no se puede atender si el paso no sabe que etapa cae en
              # el segundo 30. Ver `dominio/ticket.py`.
-             "lo_que_dijo_jaime_de_la_pieza": _tickets(slug)}
+             "lo_que_dijo_jaime_de_la_pieza": _tickets(slug),
+             # **El marcador que viaja con la pieza.** Jaime, 9-9-2026: *«los
+             # agentes deben poder leer y escribir en el Json, es lo que permite
+             # ver la etiqueta, y es lo que articula todo lo de la base de
+             # datos; el json debe ser el documento que se mueve por la cinta y
+             # mantiene el marcador»*.
+             #
+             # `dominio/estado.py` lo publica desde la base desde el 7-9 —con su
+             # frase: *«se necesita un JSON por video que diga el estado, y que
+             # cada agente pueda modificarlo conforme avanza»*— y **no llegaba
+             # al que trabaja**: `estado.marca` no la llamaba nadie y `hecho`
+             # estaba vacio en las siete piezas. Declarado y no implementado.
+             "marcador": _marcador(slug)}
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
                         **comun, "datos": payload},
                        ensure_ascii=False, indent=1)
@@ -250,8 +285,12 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # no cuenta como pregunta distinta: si contara, toda respuesta escrita
     # anoche seria «anterior a su pedido» esta manana, y volveria a preguntarse
     # lo mismo. Es el mismo caso que `vuelta`.
+    # Y `marcador` con ellos, por lo mismo y de forma mas evidente: lleva la
+    # etiqueta de la pieza, que **cambia justo porque el paso avanzo**. Si
+    # contara como pregunta, cada pedido seria nuevo por haber contestado el
+    # anterior — el bucle de C-122 con otra puerta.
     VOLATILES = ("vuelta", "hoy", "precio_vigente", "instrucciones_de_jaime",
-                 "lo_que_dijo_jaime_de_la_pieza")
+                 "lo_que_dijo_jaime_de_la_pieza", "marcador")
 
     # **Y lo que es contexto tampoco cambia la pregunta.**
     #
