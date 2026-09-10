@@ -202,12 +202,70 @@ def formas_sin_componente():
     return fuera
 
 
+#: Columnas que parecen catalogo y no lo son: fechas, huellas, rutas y claves
+#: que ya apuntan a su tabla. Se declaran para que la cuenta signifique algo.
+NO_SON_ENTIDAD = ("fecha", "cuando", "cerrado", "devuelto", "huella", "commit",
+                  "fichero", "virgen", "config", "video_slug", "pieza",
+                  "video_id", "etapa_id", "slug", "id")
+
+
+def columnas_que_son_entidad():
+    """Texto libre que se repite: un catalogo sin tabla.
+
+    Jaime, 10-9-2026, despues de encontrarme cuatro seguidas: *«cada paso que
+    das en la supuesta normalidad es un paso en donde encuentro entidades»*, y
+    *«las estoy encontrando yo; tu las mandas por buenas»*. Tenia razon en las
+    dos: yo iba diciendo «ya esta normalizado» y el iba senalando la siguiente.
+
+    Asi que la cuenta deja de ser una opinion mia. Una columna con **pocos
+    valores distintos, cortos y repetidos muchas veces** es un catalogo: `trato`
+    con cinco valores en 62 filas, `plano` con tres, `remedio` con cuatro. Como
+    texto libre no se puede declarar, ni relacionar, ni ver que dos etapas usan
+    el mismo — y deja pasar que `primer plano` y `primer_plano` sean dos cosas.
+
+    No es una regla de estilo: es la unica forma de que «esto ya esta ordenado»
+    sea una medida y no algo que yo digo.
+    """
+    import sqlite3
+
+    import basedatos
+
+    cx = basedatos.abrir()
+    cx.row_factory = sqlite3.Row
+    fuera = []
+    for (t,) in cx.execute("select name from sqlite_master where type='table'"
+                           " order by name"):
+        n = cx.execute(f"select count(*) from {t}").fetchone()[0]
+        if n < 20:
+            continue
+        for c in [d[1] for d in cx.execute(f"pragma table_info({t})")]:
+            if any(x in c for x in NO_SON_ENTIDAD):
+                continue
+            try:
+                vals = [r[0] for r in cx.execute(
+                    f"select {c} from {t} where {c} is not null")
+                    if isinstance(r[0], str) and r[0].strip()[:1] not in "{["]
+            except sqlite3.Error:
+                continue
+            if len(vals) < 20:
+                continue
+            d = len(set(vals))
+            if 1 < d <= 20 and max(len(v) for v in vals) <= 30 and d < len(vals) * 0.4:
+                fuera.append(
+                    f"«{t}.{c}» es un catalogo escrito a mano: {d} valores en"
+                    f" {len(vals)} filas ({', '.join(sorted(set(vals))[:4])}...)"
+                    f" — sin tabla no se puede declarar ni relacionar")
+    cx.close()
+    return fuera
+
+
 def main():
     faltas = []
     for titulo, fn in (("estado que no se guarda", tablas_muertas),
                        ("respuestas que nadie consume", respuestas_sin_dueno),
                        ("pasos que nadie llama", pasos_sin_quien_los_llame),
-                       ("formas que nadie dibuja", formas_sin_componente)):
+                       ("formas que nadie dibuja", formas_sin_componente),
+                       ("columnas que son una entidad", columnas_que_son_entidad)):
         malas = fn()
         if malas:
             print(f"\n{titulo}:")
