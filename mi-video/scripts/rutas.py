@@ -47,6 +47,38 @@ TOMAS = _cfg.get("tomas", {})
 _ES_CINTA = re.compile(r"^\d{8}_\d{6}$")
 
 
+#: Donde instala Git for Windows su `bash.exe`. No es adivinar: son las dos
+#: rutas del instalador oficial, y se miran solo si el PATH no lo trae.
+BASH = ("C:/Program Files/Git/bin/bash.exe",
+        "C:/Program Files (x86)/Git/bin/bash.exe")
+
+
+def interprete():
+    """Con que se corre un `.sh`. **Se resuelve, no se hereda.**
+
+    `servicios/base.py` anteponia el literal `"bash"` y `planificador` hacia
+    `which("bash")`: los dos dependen del PATH de la ventana desde la que
+    alguien arranca la linea. Desde Git Bash va y desde PowerShell no.
+
+    Medido el 9-9-2026: `masterizado` de reel-01 murio con `FileNotFoundError
+    [WinError 2]` y la pieza se quedo en `voz_limpia`. Un paso del ciclo no
+    puede depender de con que consola se llamo, y si de verdad no hay
+    interprete se dice con su nombre en vez de reventar con un errno.
+    """
+    import shutil
+
+    return (shutil.which("bash") or shutil.which("sh")
+            or next((x for x in BASH if os.path.exists(x)), None)
+            or _sin_interprete())
+
+
+def _sin_interprete():
+    raise SystemExit(
+        "no hay con que correr un .sh: `bash` no esta en el PATH ni en "
+        + " ni en ".join(BASH)
+        + ". Instala Git for Windows o anade su carpeta `bin` al PATH.")
+
+
 def material():
     """**Todas las cintas que hay**, no las que alguien apunto en el mapa.
 

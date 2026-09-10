@@ -139,6 +139,15 @@ def _marcador_viaja(h):
            "y el piso le dice al oficio que lo lea y lo escriba")
 
 
+def _interprete_resuelto(h):
+    """El paso `.sh` no depende de la consola desde la que se llamo."""
+    import rutas
+
+    sh = rutas.interprete()
+    h.mide("C-349", bool(sh) and os.path.exists(sh),
+           f"un paso .sh sabe con que correrse: {sh}")
+
+
 def _camino_lleva_el_adelanto(h):
     """Lo unico que no es una guarda: que la pieza de hoy lleva lo declarado."""
     edl = json.load(open(f"ads/{PIEZA}/edl-sell.json", encoding="utf-8"))
@@ -159,7 +168,8 @@ def main():
     h = Humo()
     for f in (_perdida_no_se_calla, _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
-              _pregunta_quemada, _marcador_viaja, _camino_lleva_el_adelanto):
+              _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
+              _camino_lleva_el_adelanto):
         try:
             f(h)
         except Exception as e:                     # noqa: BLE001

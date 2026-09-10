@@ -225,7 +225,9 @@ class ServicioScript(Servicio):
         elif partes[0].endswith(".mjs"):
             partes = ["node"] + partes
         elif partes[0].endswith(".sh"):
-            partes = ["bash"] + partes
+            # El interprete se resuelve y no se hereda del PATH de quien
+            # arranco la linea. Ver `rutas.interprete` y C-349.
+            partes = [rutas.interprete()] + partes
         # **Las dos mitades del mismo acuerdo.** `PYTHONIOENCODING` dice al
         # hijo que escriba UTF-8 y hacia falta la otra: sin `encoding` aqui,
         # el padre decodifica con la pagina de codigos de Windows y **un paso

@@ -29,10 +29,11 @@ piezas distintas.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import contextlib
 import threading
+
+import rutas
 
 
 #: **El presupuesto de pestañas de Chrome del render, y vive AQUI.**
@@ -75,7 +76,9 @@ def antes_de_montar(piezas):
         return False
     # El interprete se resuelve, no se nombra: el antivirus ya se llevo
     # `bash.exe` una vez y `sh.exe` es el mismo binario (ver `montar-lote.sh`).
-    sh = shutil.which("bash") or shutil.which("sh")
+    # Y lo resuelve `rutas`, que es quien sabe donde vive cada cosa: preguntar
+    # cada uno por su cuenta es como se rompio `masterizado` (C-349).
+    sh = rutas.interprete()
     orden = [sh, "scripts/montar.sh", "--solo-lote"] + [str(n) for n in van]
     r = subprocess.run(orden, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
     if r.returncode != 0:
@@ -84,7 +87,6 @@ def antes_de_montar(piezas):
             " despacha nada. El motivo esta arriba.")
     os.environ["EN_LOTE"] = "1"
     return True
-
 
 
 class Planificador:
