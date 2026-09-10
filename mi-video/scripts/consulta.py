@@ -287,6 +287,47 @@ def cerrar_tiquets(slug, fase, por_que, atendidos):
     return abierto.cerrar(slug, fase, por_que, atendidos)
 
 
+def guardar_paneles(slug, paneles):
+    """Guarda los paneles de una pieza como **entidades**, no como cálculo.
+
+    Jaime, 10-9-2026: *«panel es una entidad, no una columna»*, y después:
+    *«revisa que todo esté conectado y que los agentes puedan leer y escribir lo
+    que encuentran»*. Un panel se calculaba en `reels-spec.mjs` y moría en el
+    spec: no se podía declarar, ni aprobar, ni abrirle un tiquet, ni verlo desde
+    el marcador. Existía en la pantalla y en ningún sitio más.
+
+    Se reescriben enteros en cada montaje —son el resultado de colocar, no una
+    decisión que se acumule—, y por eso la conexión se borra antes.
+    """
+    import basedatos
+
+    con = basedatos.abrir()
+    ids = {r[1]: r[0] for r in con.execute(
+        "select e.id, e.orden from etapa e join video v on v.id = e.video_id"
+        " where v.slug = ?", (slug,))}
+    con.execute("delete from etapa_panel where etapa_id in"
+                " (select e.id from etapa e join video v on v.id = e.video_id"
+                "  where v.slug = ?)", (slug,))
+    n = 0
+    for p in (paneles or []):
+        et = ids.get(p.get("beat"))
+        if et is None:
+            continue
+        bloques = json.dumps(p.get("bloques") or [], ensure_ascii=False)
+        fila = con.execute(
+            "select id from panel where bloques = ? and cubre is ? and lado is ?",
+            (bloques, p.get("cubre"), p.get("lado"))).fetchone()
+        pid = fila[0] if fila else con.execute(
+            "insert into panel (bloques, cubre, lado) values (?,?,?)",
+            (bloques, p.get("cubre"), p.get("lado"))).lastrowid
+        con.execute("insert or replace into etapa_panel (etapa_id, panel_id,"
+                    " hueco) values (?,?,?)", (et, pid, p.get("hueco")))
+        n += 1
+    con.commit()
+    con.close()
+    return {"guardados": n}
+
+
 def guardar_escena(slug, orden, d):
     """Guarda la descripción de una etapa, con el texto que describe."""
     try:
@@ -338,6 +379,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "acotado": acotado,
           "modo": modo,
           "cerrar_tiquets": cerrar_tiquets,
+          "guardar_paneles": guardar_paneles,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
 

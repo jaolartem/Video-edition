@@ -1,3 +1,4 @@
+import { sql } from "../consulta.mjs";
 /**
  * **Qué le falta a un panel para poder montarse.**
  *
@@ -260,3 +261,36 @@ export const faltasDePaneles = (r) =>
         `(${(p.at / FPS).toFixed(1)}s) ${falta}.`
       : null;
   }).filter(Boolean);
+
+
+/**
+ * Guarda los paneles de todas las piezas **como entidades**, no como cálculo.
+ *
+ * Jaime, 10-9-2026: *«panel es una entidad, no una columna»*, y *«que los
+ * agentes puedan leer y escribir lo que encuentran»*. Un panel se calculaba
+ * aquí y moría en el spec: no se podía declarar, ni aprobar, ni abrirle un
+ * tiquet, ni verlo desde el marcador. Ahora cuelga de su etapa por
+ * `etapa_panel`, que es lo que el oficio lee al abrir `estado.json`.
+ *
+ * Vive con quien los coloca y no con quien arma el fichero: persistir una
+ * entidad es de su módulo. C-358.
+ */
+export function guardaPaneles(spec) {
+  for (const p of spec) {
+    const n = Number(String(p.id).replace(/\D/g, ""));
+    if (!n) continue;
+    try {
+      sql("guardar_paneles", [`reel-${String(n).padStart(2, "0")}`, p.paneles || []]);
+    } catch (e) {
+      console.log(`  aviso: los paneles de ${p.id} no se guardaron: ${e.message}`);
+    }
+  }
+}
+
+// Corrido solo, guarda los paneles del spec que hay en disco. Es un paso de
+// la cadena, y por eso se llama desde `montar.sh` y no desde `reels-spec`:
+// armar el fichero y persistir una entidad son dos trabajos.
+if (process.argv[2] === "--guardar") {
+  const fs = await import("fs");
+  guardaPaneles(JSON.parse(fs.readFileSync("src/reels.json", "utf8")));
+}

@@ -423,6 +423,7 @@ done
 # en paralelo sin tocarse, porque todo lo demas es de su pieza.
 if [ -z "${SALTA_SPEC:-}" ]; then
   REELS_PEDIDOS="${REELS[*]}" node scripts/reels-spec.mjs
+  node scripts/reels/paneles.mjs --guardar
 else
   echo "  (spec ya hecho para el lote: no se regenera)"
 fi

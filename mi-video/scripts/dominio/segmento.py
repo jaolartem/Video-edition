@@ -185,12 +185,70 @@ class Segmento:
         cx.close()
         return True
 
+    @property
+    def tiene(self):
+        """Las entidades colgadas de este segmento: tablero, camara, voz, tipo.
+
+        Jaime, 10-9-2026: *«revisa que el Json tenga acceso al nuevo modelo»*.
+        Sin esto, `tablero` y `panel` dejaban de ser columnas y seguian sin
+        llegar al que trabaja: el oficio abre el marcador y nada mas, asi que
+        una entidad que no se publica aqui **no existe para el**.
+
+        Se lee por las tablas de conexion, que es donde vive el estado de cada
+        una en ESTA etapa: un tablero `propuesto` y uno `aplicado` son la misma
+        entidad en dos momentos, y el oficio necesita ver los dos.
+        """
+        import json as _j
+
+        fuera = {}
+        try:
+            cx = _con()
+            e = cx.execute(
+                "select e.id from etapa e join video v on v.id = e.video_id"
+                " where v.slug = ? and e.orden = ?", (self.slug, self.n)).fetchone()
+            if not e:
+                cx.close()
+                return fuera
+            eid = e["id"]
+            for r in cx.execute(
+                    "select t.kind, t.props, et.estado from etapa_tablero et"
+                    " join tablero t on t.id = et.tablero_id"
+                    " where et.etapa_id = ?", (eid,)):
+                try:
+                    props = _j.loads(r["props"])
+                except Exception:                  # noqa: BLE001
+                    props = {}
+                fuera.setdefault("tableros", []).append(
+                    {"estado": r["estado"], "kind": r["kind"], "props": props})
+            for tabla, ent, campos in (
+                    ("etapa_camara", "camara", ("encuadre", "movimiento")),
+                    ("etapa_voz", "voz", ("trato", "sobre", "dura")),
+                    ("etapa_tipo", "tipo_escena", ("trato", "plano", "densidad"))):
+            
+                r = cx.execute(
+                    f"select {', '.join(campos)} from {tabla} c"
+                    f" join {ent} x on x.id = c.{'tipo_id' if ent == 'tipo_escena' else ent + '_id'}"
+                    f" where c.etapa_id = ?", (eid,)).fetchone()
+                if r:
+                    clave = "tipo" if ent == "tipo_escena" else ent
+                    fuera[clave] = {k: r[k] for k in campos}
+            ps = [dict(x) for x in cx.execute(
+                "select p.bloques, p.cubre, p.lado, ep.hueco from etapa_panel ep"
+                " join panel p on p.id = ep.panel_id where ep.etapa_id = ?", (eid,))]
+            if ps:
+                fuera["paneles"] = ps
+            cx.close()
+        except Exception:                          # noqa: BLE001
+            pass
+        return fuera
+
     def como_json(self):
         """Lo que de el se publica en el marcador."""
         return {"etapa": self.n, "etiqueta": self.etiqueta,
                 "tramos": [list(t) for t in self.tramos], "dura": self.dura,
                 "dice": self.dice, "huella": self.huella,
-                "aprobado": self.aprobado, "por": self.por_quien}
+                "aprobado": self.aprobado, "por": self.por_quien,
+                **self.tiene}
 
     def __str__(self):
         donde = self.etiqueta or "abierto"
