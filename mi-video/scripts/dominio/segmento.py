@@ -49,6 +49,14 @@ APROBADO = "aprobado"
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _quien_es(quien):
+    """El id del autor que firma esto. `None` es nadie, y nadie no tiene permisos."""
+    from .autor import Autor
+
+    a = Autor.de(quien)
+    return a.id if a else None
+
+
 def _con():
     from . import ticket as _t
 
@@ -162,11 +170,13 @@ class Segmento:
             return False
         cx.execute(
             "insert into segmento (video_id, etapa, etiqueta, huella, quien,"
-            " cuando) values (?,?,?,?,?,?) on conflict (video_id, etapa) do"
-            " update set etiqueta = excluded.etiqueta, huella = excluded.huella,"
-            " quien = excluded.quien, cuando = excluded.cuando",
+            " cuando, autor_id) values (?,?,?,?,?,?,?) on conflict"
+            " (video_id, etapa) do update set etiqueta = excluded.etiqueta,"
+            " huella = excluded.huella, quien = excluded.quien,"
+            " cuando = excluded.cuando, autor_id = excluded.autor_id",
             (v["id"], self.n, etiqueta, self.huella, quien,
-             datetime.datetime.now().isoformat(timespec="seconds")))
+             datetime.datetime.now().isoformat(timespec="seconds"),
+             _quien_es(quien)))
         cx.commit()
         cx.close()
         return True

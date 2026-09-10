@@ -259,13 +259,45 @@ def columnas_que_son_entidad():
     return fuera
 
 
+def filas_sin_autor():
+    """Filas que dicen `quien` y no dicen **cual** autor.
+
+    La migracion de C-365 dejo las 692 con su `autor_id`. Lo que esto impide es
+    que se pudra: un `insert` nuevo que escriba solo el texto deja la columna a
+    medias, y una clave foranea a medias es peor que no tenerla — parece que se
+    puede preguntar por el tipo y a veces no.
+    """
+    import sqlite3
+
+    import basedatos
+
+    cx = basedatos.abrir()
+    fuera = []
+    for (t,) in cx.execute("select name from sqlite_master where type='table'"
+                           " order by name"):
+        cols = [d[1] for d in cx.execute(f"pragma table_info({t})")]
+        if "quien" not in cols or "autor_id" not in cols:
+            continue
+        try:
+            n = cx.execute(f"select count(*) from {t} where quien is not null"
+                           f" and autor_id is null").fetchone()[0]
+        except sqlite3.Error:
+            continue
+        if n:
+            fuera.append(f"«{t}»: {n} fila(s) con `quien` escrito y sin autor"
+                         f" declarado — el que las inserta no lo esta poniendo")
+    cx.close()
+    return fuera
+
+
 def main():
     faltas = []
     for titulo, fn in (("estado que no se guarda", tablas_muertas),
                        ("respuestas que nadie consume", respuestas_sin_dueno),
                        ("pasos que nadie llama", pasos_sin_quien_los_llame),
                        ("formas que nadie dibuja", formas_sin_componente),
-                       ("columnas que son una entidad", columnas_que_son_entidad)):
+                       ("columnas que son una entidad", columnas_que_son_entidad),
+                       ("filas sin autor", filas_sin_autor)):
         malas = fn()
         if malas:
             print(f"\n{titulo}:")

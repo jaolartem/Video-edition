@@ -34,18 +34,17 @@ def _con():
     return _t._con()
 
 
-def _limpio(quien) -> str:
-    """El nombre, sin el articulo, sin mayusculas y sin la razon pegada detras.
+def _sin_el_motivo(quien) -> str:
+    """El nombre, sin la razon que alguien le pego detras.
 
     Las filas viejas traen `jaime · aprobo la pieza el 7-9-2026`: el nombre con
-    su motivo dentro, que escribi yo. Se parte por el separador y se queda el
-    nombre, que es lo unico que identifica a quien actuo.
+    su motivo dentro, que escribi yo. Eso si es limpiar el dato — lo que **no**
+    se hace aqui es adivinar equivalencias recortando articulos y mayusculas:
+    `diseno` y `disenador` son el mismo actor porque `autor_alias` lo declara,
+    no porque dos cadenas se parezcan. Decidir comparando texto es lo que C-363
+    quito de la agencia y no vuelve por la puerta de atras.
     """
-    t = str(quien or "").split("·")[0].split(" - ")[0].strip().lower()
-    for x in ("el ", "la ", "los "):
-        if t.startswith(x) and t != "la linea":
-            t = t[len(x):]
-    return t
+    return str(quien or "").split("·")[0].split(" - ")[0].strip()
 
 
 class Autor:
@@ -63,14 +62,15 @@ class Autor:
         `None` no es un hueco benigno: es **nadie**, y nadie no tiene permisos.
         Un `quien` que no esta en la tabla no puede aprobar por descuido.
         """
-        n = _limpio(quien)
+        n = _sin_el_motivo(quien)
         if not n:
             return None
         cx = _con()
         r = cx.execute(
             "select a.id, a.nombre, t.nombre tipo from autor a"
             " join tipo_autor t on t.id = a.tipo_id"
-            " where lower(a.nombre) = ?", (n,)).fetchone()
+            " where a.id = (select autor_id from autor_alias where alias = ?)"
+            "    or lower(a.nombre) = lower(?)", (n, n)).fetchone()
         cx.close()
         return cls(r["nombre"], r["tipo"], r["id"]) if r else None
 

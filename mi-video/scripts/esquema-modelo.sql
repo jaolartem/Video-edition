@@ -401,3 +401,14 @@ CREATE TABLE IF NOT EXISTS tipo_autor (
         nombre   TEXT NOT NULL,
         marca    TEXT
       );
+
+
+-- **Como se escribio cada autor, historicamente.** Quince formas para diez
+-- actores: `Jaime` y `jaime`, `el compositor` y `compositor`, `diseno` y
+-- `disenador`. Resolverlas recortando la cadena en el codigo es decidir
+-- comparando texto — justo lo que C-363 quito de la agencia. Aqui la
+-- equivalencia esta declarada, se puede mirar y se puede discutir.
+CREATE TABLE IF NOT EXISTS autor_alias (
+  alias    TEXT PRIMARY KEY,
+  autor_id INTEGER NOT NULL REFERENCES autor(id) ON DELETE CASCADE
+);
