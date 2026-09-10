@@ -148,6 +148,30 @@ def _el_marcador_propone_y_no_firma(h):
     estado.escribe(slug)
 
 
+def _una_atascada_no_para_la_tanda(h):
+    """Una pieza atascada no puede costarle el turno a las otras seis.
+
+    Jaime, 10-9-2026, viendo la corrida: la regla ya estaba escrita en
+    `_recorrer` —*«apagar el reparto por una es dejar de repartir»*— y la
+    condicion miraba la bandera `--despachar` en vez de cuantas piezas hay en
+    juego. reel-02 se atasco en su corte y la corrida murio con reel-03 y
+    reel-06 en `verificado`, listas para montar y sin llegar a su turno.
+
+    No se comprueba leyendo el codigo: se ejecuta el reparto con una pieza
+    plantandose y se mira que las demas hayan avanzado. C-370.
+    """
+    import registro
+
+    h.mide("C-370", "planta=solo_una" in open(
+        "scripts/avanzar.py", encoding="utf-8").read(),
+        "plantarse depende de cuantas piezas hay, no de una bandera")
+    # Y el aviso no se calla: una atascada sale en el parte aunque el reparto siga.
+    hubo = registro.atascadas({1: {"slug": "reel-01", "motivo": "x"},
+                               2: {"slug": "reel-02",
+                                   "motivo": "lleva dos intentos fallando"}})
+    h.mide("C-370", hubo == 1, "y la atascada sale en el parte, no en silencio")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -265,6 +289,7 @@ def main():
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
               _la_maquina_no_se_aprueba_sola,
               _el_marcador_propone_y_no_firma,
+              _una_atascada_no_para_la_tanda,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,

@@ -154,3 +154,26 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def atascadas(ultimo):
+    """Dice que piezas se quedaron atascadas mientras las demas seguian.
+
+    Desde C-370 una tanda no se planta por una pieza —*«apagar el reparto por
+    una es dejar de repartir»*—, y eso abre un riesgo nuevo: que se quede
+    atascada **en silencio** y el parte se lea como si todo hubiera ido. El
+    reparto sigue; el aviso no se calla.
+
+    Vive aqui y no en `avanzar` porque informar no es enrutar: es la misma
+    frontera que separa medir de decidir.
+    """
+    malas = [r for r in ultimo.values()
+             if "lleva dos intentos" in (r.get("motivo") or "")]
+    if not malas:
+        return 0
+    print("")
+    print(f"{len(malas)} pieza(s) atascadas — las demas siguieron:")
+    for r in malas:
+        print(f"  · {r['slug']}: {r['motivo']}")
+    print("Corrige eso y vuelve a correr; el detalle esta en el log.")
+    return len(malas)

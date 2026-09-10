@@ -469,11 +469,6 @@ def main():
     _una_vuelta(a)
 
 
-def piezas_slug(ns):
-    """Los slugs de una lista de numeros de pieza."""
-    return [f"reel-{int(n):02d}" for n in ns]
-
-
 def _una_vuelta(a) -> int:
     """Un recorrido completo de todas las piezas. Devuelve cuanto se movio."""
     piezas = list(a.reels or rutas.piezas())
@@ -501,7 +496,7 @@ def _una_vuelta(a) -> int:
         #
         # Va delante de todo lo demas porque cambia lo que el resto de la
         # vuelta va a leer: un segmento aprobado deja de estar en juego.
-        for slug in piezas_slug(piezas):
+        for slug in (f"reel-{int(n):02d}" for n in piezas):
             try:
                 _estado.aplica(slug)
             except Exception as e:                 # noqa: BLE001
@@ -550,9 +545,15 @@ def _una_vuelta(a) -> int:
     vueltas = 1 if (a.ver or a.paso) else 4
     for vuelta in range(1, vueltas + 1):
         movidos = 0
+        # **Plantarse es de una pieza, no de una tanda.** La regla ya estaba
+        # escrita en `_recorrer` —*«apagar el reparto por una es dejar de
+        # repartir»*— y miraba una bandera en vez de cuantas piezas hay. Con
+        # una sola si se planta: ahi «se para» es «esto es lo que ibas a
+        # mirar». C-370.
+        solo_una = len(piezas) == 1
         hechos = plan.correr(piezas, lambda n: avanzar(
             n, ver=a.ver, tope=a.paso, permiso=plan.permiso,
-            planta=not getattr(a, "despachar", False)))
+            planta=solo_una and not getattr(a, "despachar", False)))
         for n in piezas:
             r = hechos.get(n)
             if not r:
@@ -573,17 +574,13 @@ def _una_vuelta(a) -> int:
         print(f"{r['slug']}: {r['fase']}"
               + (f"  (+{saltos})" if saltos else "")
               + (f"  — {r['motivo']}" if r["motivo"] else ""))
+    registro.atascadas(ultimo)
     return sum(total.values())
 
 
 DE_QUIEN = {"disenar": "disenado", "describir": "descrito", "repaso": "repasado",
             "redundancia": "sin_redundancia", "revalidar": "revalidado",
             "revisar": "revisado", "visto": "visto", "fuentes": "respaldado"}
-
-
-def piezas_de(a) -> list:
-    """Las piezas que este despachador atiende."""
-    return list(a.reels or rutas.piezas())
 
 
 def _contestadas_tarde() -> list:
