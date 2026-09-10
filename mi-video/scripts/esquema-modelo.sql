@@ -437,10 +437,6 @@ CREATE TABLE IF NOT EXISTS etapa_remedio (
 );
 
 
--- **Lo retirado no se borra: se marca, y apunta a lo que va en su lugar.**
--- Borrar la fila de `cortinilla` no la retiraba — el volcado la volvia a
--- insertar en cuanto encontraba una descripcion vieja que la nombraba, y el
--- humo lo cazo. Y ademas `camara.mjs` dice por que no debe borrarse: *«se
--- listan aqui para que el que compone vea que existieron y por que no estan;
--- borrarlas del todo invita a reinventarlas dentro de un mes»*.
-ALTER TABLE transicion ADD COLUMN en_su_lugar INTEGER REFERENCES transicion(id);
+-- (`transicion.en_su_lugar` lo anade `migraciones._retiradas_fuera_del_catalogo`:
+--  un ALTER no es idempotente y este fichero se corre en cada arranque.)
+;

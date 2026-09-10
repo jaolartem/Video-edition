@@ -206,7 +206,7 @@ def formas_sin_componente():
 #: que ya apuntan a su tabla. Se declaran para que la cuenta signifique algo.
 NO_SON_ENTIDAD = ("fecha", "cuando", "cerrado", "devuelto", "huella", "commit",
                   "fichero", "virgen", "config", "video_slug", "pieza",
-                  "video_id", "etapa_id", "slug", "id")
+                  "video_id", "etapa_id", "slug", "id", "integrado")
 
 
 def columnas_que_son_entidad():
@@ -250,11 +250,32 @@ def columnas_que_son_entidad():
             if len(vals) < 20:
                 continue
             d = len(set(vals))
-            if 1 < d <= 20 and max(len(v) for v in vals) <= 30 and d < len(vals) * 0.4:
+            if not (1 < d <= 20 and max(len(v) for v in vals) <= 30
+                    and d < len(vals) * 0.4):
+                continue
+            # **Y se distingue la deuda de la deuda.** Una columna con su clave
+            # al lado ya tiene su entidad: lo que queda es la copia de texto,
+            # que sale cuando el ultimo lector se mueva. Una sin clave no tiene
+            # donde declararse. Contarlas juntas hacia que el numero no
+            # significara nada — y que yo pudiera dar por bueno lo que no lo
+            # estaba (C-367).
+            cols = {d2[1] for d2 in cx.execute(f"pragma table_info({t})")}
+            # La entidad puede estar al lado (`{c}_id`), ser el autor, o vivir
+            # en su propio catalogo aunque la clave cuelgue de otra tabla —
+            # `trato`, `plano` y `color` van en `tipo_escena`, y `remedio` en
+            # `etapa_remedio`, no en una columna de `escena_desc`.
+            suya = cx.execute("select 1 from sqlite_master where type='table'"
+                              " and name = ?", (c,)).fetchone()
+            if f"{c}_id" in cols or (c == "quien" and "autor_id" in cols) or suya:
                 fuera.append(
-                    f"«{t}.{c}» es un catalogo escrito a mano: {d} valores en"
-                    f" {len(vals)} filas ({', '.join(sorted(set(vals))[:4])}...)"
-                    f" — sin tabla no se puede declarar ni relacionar")
+                    f"«{t}.{c}» ya tiene su entidad y **arrastra la copia de"
+                    f" texto**: {d} valores en {len(vals)} filas. Sale cuando"
+                    f" el ultimo lector pase a la clave")
+            else:
+                fuera.append(
+                    f"«{t}.{c}» es un catalogo escrito a mano SIN TABLA:"
+                    f" {d} valores en {len(vals)} filas"
+                    f" ({', '.join(sorted(set(vals))[:4])}...)")
     cx.close()
     return fuera
 

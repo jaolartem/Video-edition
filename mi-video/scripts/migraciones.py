@@ -477,6 +477,12 @@ def _retiradas_fuera_del_catalogo(con):
     import json
     import subprocess
 
+    # **Lo retirado no se borra: se marca, y apunta a lo que va en su lugar.**
+    # La columna se anade aqui y no en el `.sql` porque un ALTER no es
+    # idempotente y ese fichero se corre en cada arranque.
+    if "en_su_lugar" not in {r[1] for r in con.execute("pragma table_info(transicion)")}:
+        con.execute("alter table transicion add column en_su_lugar INTEGER"
+                    " REFERENCES transicion(id)")
     try:
         salida = subprocess.run(
             ["node", "-e", "import('./scripts/camara.mjs').then(m =>"
@@ -593,6 +599,112 @@ def _tipo_escena_es_una_seleccion(con):
     return True
 
 
+#: Los vocabularios del dominio que seguian escritos a mano, con la tabla que
+#: los declara. Es una lista y no codigo repetido: cada linea es «esta columna
+#: es este catalogo», y `_vocabularios` hace lo mismo con todas.
+#:
+#: Jaime, 10-9-2026: *«cada paso que das en la supuesta normalidad es un paso en
+#: donde encuentro entidades»*. Contadas por `conectado.py`, no por mi.
+#: Columnas que ya apuntaban a una tabla existente y la nombraban por su texto:
+#: `toma` tiene tabla desde el principio y `fase` tambien. Una clave foranea
+#: escrita como cadena es una clave foranea que nadie puede exigir.
+FORANEAS = (
+    ("corte_fijo",  "toma",      "toma", "nombre"),
+    ("incidencia",  "toma",      "toma", "nombre"),
+    ("ticket",      "vuelve_a",  "fase", "nombre"),
+)
+
+VOCABULARIOS = (
+    ("corte_fijo",  "papel",    "papel_corte"),
+    ("colocacion",  "tipo",     "tipo_colocacion"),
+    ("dato",        "respalda", "respaldo_dato"),
+    ("densidad",    "nivel",    "nivel"),
+    ("fragmento",   "origen",   "origen_fragmento"),
+    ("incidencia",  "nivel",    "nivel_incidencia"),
+    ("instruccion", "ambito",   "ambito"),
+    # `paso` NO es una fase: sus valores son `audio`, `corte`, `disenar`,
+    # `montado` y `montaje`, y solo uno coincide con el ciclo. Es el area
+    # de la que habla la instruccion, que es otra cosa.
+    ("instruccion", "paso",     "area_instruccion"),
+    ("instruccion", "estado",   "estado_instruccion"),
+    ("regla",       "clase",    "clase_regla"),
+    ("revision",    "accion",   "accion_revision"),
+    ("revision",    "estado",   "estado_revision"),
+    ("ticket",      "tipo",     "tipo_ticket"),
+    ("ticket",      "estado",   "estado_ticket"),
+    ("ticket",      "cierra_con", "medida"),
+    ("etapa_tablero", "estado",   "estado_tablero"),
+    # Los 17 pasos que dejan aviso. Con 10.823 filas detras, «que scripts
+    # hablan» no se puede contestar sin recorrerlas todas.
+    ("incidencia",  "script",   "script_incidencia"),
+)
+
+
+def _foraneas_de_texto(con):
+    """Claves foraneas escritas como cadena, teniendo su tabla al lado.
+
+    `corte_fijo.toma` y `incidencia.toma` nombran las cintas por su nombre
+    cuando `toma` es una tabla desde el principio; `instruccion.paso` y
+    `ticket.vuelve_a` nombran fases igual. Una clave foranea escrita como texto
+    no la puede exigir nadie: un paso que ya no existe se queda escrito y solo
+    se descubre cuando algo lo busca — como paso con `--volver descrito`, que
+    nombraba una fase que significaba lo contrario de lo que yo creia.
+    """
+    hecho = False
+    for tabla, col, destino, campo in FORANEAS:
+        cols = {r[1] for r in con.execute(f"pragma table_info({tabla})")}
+        if not cols or col not in cols:
+            continue
+        clave = f"{col}_id"
+        if clave not in cols:
+            con.execute(f"alter table {tabla} add column {clave} INTEGER"
+                        f" REFERENCES {destino}(id)")
+        con.execute(f"update {tabla} set {clave} = (select id from {destino}"
+                    f" where {destino}.{campo} = {tabla}.{col})"
+                    f" where {col} is not null and {col} <> ''")
+        hecho = True
+    return hecho
+
+
+def _vocabularios(con):
+    """Cada vocabulario a su tabla, y la columna con su clave al lado.
+
+    Catorce columnas de texto libre con entre dos y doce valores repetidos
+    cientos de veces. Como texto no se pueden declarar —«que medidas existen»
+    no se puede contestar sin leer 213 filas—, ni relacionar, ni impedir que
+    entre una decimoquinta por una errata.
+
+    El texto se queda de momento: lo leen pasos que todavia no han cambiado, y
+    quitarlo antes de moverlos seria romper la linea por normalizar. Lo que
+    `conectado.py` cuenta a partir de ahora es la diferencia entre «no tiene
+    tabla» y «la tiene y aun arrastra su copia», que no son la misma deuda.
+    """
+    hecho = False
+    for tabla, col, catalogo in VOCABULARIOS:
+        try:
+            cols = {r[1] for r in con.execute(f"pragma table_info({tabla})")}
+        except sqlite3.OperationalError:
+            continue
+        if not cols or col not in cols:
+            continue
+        con.execute(f"CREATE TABLE IF NOT EXISTS {catalogo} ("
+                    f" id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE)")
+        clave = f"{col}_id"
+        if clave not in cols:
+            con.execute(f"alter table {tabla} add column {clave} INTEGER"
+                        f" REFERENCES {catalogo}(id)")
+        for (v,) in con.execute(f"select distinct {col} from {tabla}"
+                                f" where {col} is not null and {col} <> ''"):
+            if not isinstance(v, str):
+                continue
+            con.execute(f"insert or ignore into {catalogo} (nombre) values (?)", (v,))
+            con.execute(f"update {tabla} set {clave} ="
+                        f" (select id from {catalogo} where nombre = ?)"
+                        f" where {col} = ?", (v, v))
+        hecho = True
+    return hecho
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -609,6 +721,8 @@ def migrar():
     _entidades_de_la_escena(con)
     _camara_es_una_seleccion(con)
     _tipo_escena_es_una_seleccion(con)
+    _vocabularios(con)
+    _foraneas_de_texto(con)
     _retiradas_fuera_del_catalogo(con)
     _quien_es_agencia(con)
     hecho = _clave_por_slug(con)
