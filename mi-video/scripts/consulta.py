@@ -287,6 +287,20 @@ def cerrar_tiquets(slug, fase, por_que, atendidos):
     return abierto.cerrar(slug, fase, por_que, atendidos)
 
 
+def lo_medido(slug):
+    """Lo que la linea midio de esa pieza y **todavia no ha decidido nadie**.
+
+    Jaime, 10-9-2026: *«nada de lo que sucede de 1 a 6 llega como decision; el
+    compositor ve todos estos datos y puede utilizar esas herramientas para
+    estar seguro. El compositor es quien toma la decision»*. La regla vive en
+    `verificar.lo_medido`; esto es la puerta para que node se la lleve al
+    pedido.
+    """
+    import verificar
+
+    return verificar.lo_medido(slug)
+
+
 def guardar_paneles(slug, paneles):
     """Guarda los paneles de una pieza como **entidades**, no como cálculo.
 
@@ -380,6 +394,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "modo": modo,
           "cerrar_tiquets": cerrar_tiquets,
           "guardar_paneles": guardar_paneles,
+          "lo_medido": lo_medido,
           "guardar_escena": guardar_escena,
           "guardar_tablero": guardar_tablero}
 

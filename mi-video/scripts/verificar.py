@@ -226,6 +226,41 @@ def _fecha_ajena(slug, edl):
     return []
 
 
+#: Lo que **no se puede juzgar antes de describir**: habla de tableros, de
+#: paneles o de la descripcion misma. No es que la puerta de entrada lo perdone
+#: — es que en ese momento no existe todavia, y la de salida sí lo mira.
+PIDE_DESCRIPCION = (
+    "habla de otro texto", "nadie lo ha compuesto", "sin material y sin tablero",
+    "composicion escrita y sin aplicar", "sin contestar", "el tablero del beat",
+    "ninguna fila de `dato`", "no rotula ninguna cifra", "sin sonido",
+    "no esta en el spec", "salen de un literal",
+)
+
+
+def lo_medido(slug):
+    """Lo que la linea ya midio de esta pieza, **para que lo vea quien decide**.
+
+    Jaime, 10-9-2026, corrigiendo una puerta que yo habia puesto en el 6.2:
+    *«nada de lo que sucede de 1 a 6 llega como decision; el compositor ve todos
+    estos datos y puede utilizar esas herramientas para estar seguro. El
+    compositor es quien toma la decision»*.
+
+    Y por eso esto **no para nada**. Los pasos 1 a 6 —transcribir, elegir,
+    fijar, afinar, depurar, la redundancia y el cosido— producen medidas, no
+    veredictos: que el corte se come una palabra, que una etapa se queda muda,
+    que algo suena dos veces, que un tramo declarado no llego al corte. Todo eso
+    ya se sabe cuando la pieza esta cosida, y hasta hoy se quedaba esperando a
+    la fase 10 —la puerta de salida, que es la guarda final— o sea a despues de
+    pagar dos llamadas de IA y un corte.
+
+    Ahora viaja en su pedido. Es la misma regla de la casa: **la maquina mide y
+    el oficio decide.** Lo que depende de la descripcion no esta aqui porque en
+    ese momento no existe todavia, no porque se perdone.
+    """
+    return [m for m in revisar(slug)
+            if not any(x in m for x in PIDE_DESCRIPCION)]
+
+
 def revisar(slug):
     """Todo lo que tiene que cumplirse. Devuelve la lista de motivos para parar."""
     ruta = f"ads/{slug}/edl-sell.json"
@@ -691,13 +726,17 @@ def revisar(slug):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
+    ap.add_argument("--medido", action="store_true",
+                    help="solo lo que ya se puede medir sin la descripcion —"
+                         " lo que ve el compositor. No para: informa.")
     ap.add_argument("--avisa", action="store_true",
                     help="informa y no bloquea")
     a = ap.parse_args()
     todo = []
     for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
-        paran, avisan = separa(revisar(slug), slug=slug)
+        paran, avisan = separa(
+            lo_medido(slug) if a.medido else revisar(slug), slug=slug)
         todo += paran
         print(f"{slug}: {'OK' if not paran else str(len(paran)) + ' motivo(s)'}"
               + (f"  ({len(avisan)} anotado(s))" if avisan else ""))
@@ -705,7 +744,7 @@ def main():
             print(f"    · {m}")
         for m in avisan:
             print(f"    ~ {m}")
-    if todo and not a.avisa:
+    if todo and not a.avisa and not a.medido:
         print(f"\nEL CAMINO SE PARA — {len(todo)} motivo(s). Nada se renderiza"
               f" hasta que esten resueltos.")
         sys.exit(1)

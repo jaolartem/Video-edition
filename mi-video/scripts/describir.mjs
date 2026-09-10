@@ -177,6 +177,15 @@ function describePieza(slug, filas) {
   const editables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
                     revisa_oyendo: escucha, tiquets, editables,
+                    // **Lo que la linea ya midio, delante de quien decide.**
+                    // Jaime, 10-9-2026: «nada de lo que sucede de 1 a 6 llega
+                    // como decision; el compositor ve todos estos datos y puede
+                    // utilizar esas herramientas para estar seguro. El compositor
+                    // es quien toma la decision». Un corte que se come una palabra
+                    // se sabe en cuanto la pieza esta cosida, y se quedaba esperando
+                    // a la fase 10 — o sea a despues de pagarle a el y al
+                    // disenador. C-359.
+                    la_linea_midio: JSON.parse(sql("lo_medido", [slug]) || "[]"),
                     ya_montada_asi: despues };
   // **El contrato tiene dos capas y esta es la segunda.** Las capacidades no
   // cambian —son lo que sabe hacer—; lo que cambia es el encargo. El otro
