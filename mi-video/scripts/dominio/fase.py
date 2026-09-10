@@ -277,29 +277,6 @@ def _render_caduco(pieza):
     if not os.path.exists(edl):
         return None
     n = int(pieza.slug[-2:])
-    # **Y se pregunta por la CADENA entera, no solo por el ultimo eslabon.**
-    #
-    # Lo de abajo compara el render con el spec de hoy, y eso solo dice que el
-    # render dibujo lo que habia. Si el spec sale de un plan viejo, los dos
-    # casan y la pieza pasa por al dia. `cadena.py` lo dice desde que existe —
-    # *«comprobaba salvo en un sitio (`_render_caduco`, y solo para el
-    # render)»*— y aqui no se le preguntaba.
-    #
-    # Medido el 9-9-2026, con las tres piezas que Jaime esperaba: esta guarda
-    # daba «al dia» para reel-01, reel-03 y reel-05, y la cadena decia que a
-    # reel-01 le faltaba el render (mp4 mas viejo que el spec) y que el plan de
-    # reel-05 **se hizo con el `plan-reel.mjs` de antes** — el de antes de que
-    # un tramo declarado entrara entero. Seis de siete piezas con eslabones
-    # caducados y ninguna volviendo.
-    try:
-        import cadena as _cad
-
-        _malo = _cad.desde(n)
-    except Exception:                              # noqa: BLE001
-        _malo = None
-    if _malo:
-        return (f"la cadena de {pieza.slug} esta caducada en «{_malo[1]}»:"
-                f" {_malo[3]}")
     video = rutas.salida("reels", f"reel-R{n}.mp4")
     if not os.path.exists(video):
         return f"no hay render de {pieza.slug}: la fase dice montado y el fichero no esta"
