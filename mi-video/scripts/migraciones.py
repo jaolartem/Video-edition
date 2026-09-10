@@ -472,6 +472,57 @@ def _entidades_de_la_escena(con):
     return True
 
 
+def _camara_es_una_seleccion(con):
+    """`camara` no es la entidad: es la **seleccion** de especificaciones tecnicas.
+
+    Jaime, 10-9-2026, corrigiendo dos veces seguidas: *«de esas 5 cuantas son
+    entidades? transicion es una entidad»*, y despues: *«varias de esas son
+    entidades; camara debe ser una tabla de seleccion de especificaciones
+    tecnicas, como el encuadre, como casi todas las que pones ahi»*.
+
+    Lo que yo habia hecho era mover el problema: saque `camara` de una columna
+    de `escena_desc` y la deje como una fila con cinco textos sueltos dentro.
+    Un `encuadre` no es una cadena que se repita 38 veces — es un catalogo, y lo
+    mismo `movimiento` (45) y `virado` (5). Y `transicion` (35) ni siquiera es de
+    la camara: **ya tenia su tabla**, con seis filas que no escribia ni leia
+    nadie, mientras el dato vivia dentro del JSON de otra entidad. El valor
+    `filete` que usan cinco etapas no estaba en ese catalogo.
+
+    Asi que: cada especificacion su tabla, `camara` la fila que las relaciona, y
+    la etapa conectada a esa seleccion. `detras` —una sola etapa, «columna»— se
+    queda fuera a proposito: es del mundo de `placa` y no se decide aqui.
+    """
+    cols = {r[1] for r in con.execute("pragma table_info(camara)")}
+    if "encuadre_id" in cols:
+        return False
+    con.executescript("""
+      CREATE TABLE IF NOT EXISTS encuadre   (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+      CREATE TABLE IF NOT EXISTS movimiento (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+      CREATE TABLE IF NOT EXISTS virado     (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+      DROP TABLE IF EXISTS etapa_camara;
+      DROP TABLE IF EXISTS camara;
+      CREATE TABLE camara (
+        id            INTEGER PRIMARY KEY,
+        encuadre_id   INTEGER REFERENCES encuadre(id),
+        movimiento_id INTEGER REFERENCES movimiento(id),
+        virado_id     INTEGER REFERENCES virado(id),
+        UNIQUE (encuadre_id, movimiento_id, virado_id)
+      );
+      CREATE TABLE etapa_camara (
+        etapa_id  INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        camara_id INTEGER NOT NULL REFERENCES camara(id) ON DELETE CASCADE,
+        PRIMARY KEY (etapa_id)
+      );
+      CREATE TABLE IF NOT EXISTS etapa_transicion (
+        etapa_id      INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        transicion_id INTEGER NOT NULL REFERENCES transicion(id) ON DELETE CASCADE,
+        PRIMARY KEY (etapa_id)
+      );
+      INSERT OR IGNORE INTO transicion (nombre) VALUES ('filete');
+    """)
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -486,6 +537,7 @@ def migrar():
     _version_guarda_el_montaje(con)
     _segmento_con_etiqueta(con)
     _entidades_de_la_escena(con)
+    _camara_es_una_seleccion(con)
     hecho = _clave_por_slug(con)
     hecho += _muertas(con)
     con.commit()

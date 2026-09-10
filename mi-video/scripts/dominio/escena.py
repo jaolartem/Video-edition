@@ -168,9 +168,80 @@ class Escena:
         }
         con = basedatos.abrir()
         con.execute(_upsert(), [valores[c] for c in COLUMNAS])
+        self._entidades(con, d)
         con.commit()
         con.close()
         return {"ok": True}
+
+    def _entidades(self, con, d):
+        """Cámara, voz y tipo de escena, **escritas por quien describe**.
+
+        Jaime, 10-9-2026: *«tablero es una entidad, no una columna; panel es una
+        entidad, no una columna; tipo de escena es una entidad que relaciona
+        otras entidades»*. Las tablas se crearon ese día y se llenaron con un
+        volcado de una vez — o sea que nacieron **sin autor**: la primera pieza
+        que se volviera a describir las dejaba viejas, que es exactamente la
+        avería contra la que existen.
+
+        Aquí es donde tienen autor. El mismo sitio que guarda la descripción
+        guarda lo que la descripción dice de cada una, y por eso no pueden
+        divergir: no hay dos escrituras, hay una.
+
+        Las entidades **se reutilizan** —«pecho / fijo» es una cámara, no
+        cincuenta— y por eso se busca antes de insertar: 19 cámaras para 52
+        usos y 8 tipos para 62 etapas, que es la normalización enseñándose sola.
+        """
+        et = con.execute(
+            "select e.id from etapa e join video v on v.id = e.video_id"
+            " where v.slug = ? and e.orden = ?", (self.slug, self.orden)).fetchone()
+        if not et:
+            return
+        eid = et[0]
+
+        def una(tabla, campos, vals):
+            if not any(v is not None for v in vals):
+                return None
+            donde = " and ".join(f"{c} is ?" for c in campos)
+            fila = con.execute(f"select id from {tabla} where {donde}", vals).fetchone()
+            if fila:
+                return fila[0]
+            return con.execute(
+                f"insert into {tabla} ({', '.join(campos)})"
+                f" values ({', '.join('?' * len(campos))})", vals).lastrowid
+
+        # **`camara` es la seleccion, no la entidad.** Un `encuadre` no es una
+        # cadena que se repita 38 veces: es un catalogo, y lo mismo
+        # `movimiento` y `virado`. `transicion` ni siquiera es suya —ya tenia
+        # tabla— y `detras` es del mundo de la placa, asi que no se decide aqui.
+        cam = d.get("camara") or {}
+
+        def cat(tabla, valor):
+            if not valor:
+                return None
+            f = con.execute(f"select id from {tabla} where nombre = ?",
+                            (valor,)).fetchone()
+            return f[0] if f else con.execute(
+                f"insert into {tabla} (nombre) values (?)", (valor,)).lastrowid
+
+        cid = una("camara", ["encuadre_id", "movimiento_id", "virado_id"],
+                  [cat("encuadre", cam.get("encuadre")),
+                   cat("movimiento", cam.get("movimiento")),
+                   cat("virado", cam.get("virado"))])
+        if cid:
+            con.execute("insert or replace into etapa_camara values (?,?)", (eid, cid))
+        if cam.get("transicion"):
+            con.execute("insert or replace into etapa_transicion values (?,?)",
+                        (eid, cat("transicion", cam["transicion"])))
+        voz = d.get("voz") or {}
+        vid = una("voz", ["trato", "sobre", "dura"],
+                  [voz.get("trato"), voz.get("sobre"), voz.get("dura")])
+        if vid:
+            con.execute("insert or replace into etapa_voz values (?,?)", (eid, vid))
+        tid = una("tipo_escena", ["trato", "plano", "densidad"],
+                  [d.get("trato"), d.get("plano"), d.get("densidad")])
+        if tid:
+            con.execute("insert or replace into etapa_tipo values (?,?,?)",
+                        (eid, tid, d.get("trato_porque")))
 
     def poner_tablero(self, tablero: dict) -> dict:
         """Guarda SOLO el tablero. Es la entrega del paso de diseño.
