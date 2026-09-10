@@ -89,9 +89,16 @@ def _codigo(f):
         return 0
     lineas = src.splitlines()
     if not f.endswith(".py"):
-        # Fuera de Python se cuenta lo que no es blanco ni comentario de línea.
+        # Fuera de Python se cuenta lo que no es blanco ni comentario.
+        #
+        # **Y el bloque `/** ... *\/` tambien es prosa.** Esto exime el docstring
+        # en Python y no eximia el JSDoc en `.mjs`, o sea la misma regla aplicada
+        # a medias: un fichero explicado con `/**` pesaba mas que el mismo
+        # fichero explicado con `//`, y la unica salida era documentar peor.
+        # Contradice la razon por la que este contador existe, escrita arriba.
         return sum(1 for l in lineas
-                   if l.strip() and not l.strip().startswith(("#", "//")))
+                   if l.strip() and not l.strip().startswith(
+                       ("#", "//", "/*", "*/", "*")))
     try:
         arbol = ast.parse(src)
     except SyntaxError:

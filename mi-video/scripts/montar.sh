@@ -533,6 +533,17 @@ for r in "${REELS[@]}"; do
   # su `.huella`, la pieza sale caduca para siempre —la escribe `render.mjs`
   # y no el CLI—, asi que rehacerla es la unica forma de que la linea
   # converja.
+  # **Y lo que no se puede dibujar no se intenta.** `rompe` lo escribe
+  # `reels-spec.mjs` con lo que dijo `revisarTablero`, que comprueba solo lo
+  # que tumba el render. Renderizar igual es pagar 3,6 minutos de maquina para
+  # que node repita —en un volcado de React— lo que la comprobacion barata dijo
+  # en una linea. El proceso va de barato a caro: aqui se para, con el motivo
+  # en stdout, y la pieza entra por su tiquet al compositor. C-372.
+  ROMPE=$(node -e "const s=JSON.parse(require('fs').readFileSync('src/reels.json','utf8'));const r=s.find(x=>x.id==='Reel-R$n');console.log((r&&r.rompe||[]).join(' | '))")
+  if [ -n "$ROMPE" ]; then
+    echo "montar.sh: Reel-R$n no se renderiza porque no se puede dibujar: $ROMPE"
+    exit 1
+  fi
   RENDERIZADA=0
   if _hay_que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
     node scripts/render.mjs "$n"

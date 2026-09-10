@@ -207,6 +207,69 @@ def _un_paso_que_falla_deja_su_diagnostico(h):
            "y lo que dijo por stderr queda en el registro, no se pierde")
 
 
+def _lo_que_no_se_dibuja_no_se_renderiza(h):
+    """Lo que la comprobacion barata da por roto no llega al peldano caro.
+
+    `revisarTablero` comprueba **solo lo que rompe el render** —lo dice de si
+    misma— y sus faltas viajaban en el mismo saco que las demas, que no para
+    el lote. Asi que reel-03 murio en el frame 550 por «Techo necesita
+    titulo», impreso mas arriba en la misma corrida.
+
+    Se ejecuta la guarda de `montar.sh` —su propia expresion, sacada del
+    fichero— y se compara el `rompe` del spec con lo que dice la fuente de esas
+    faltas. C-372.
+    """
+    import json
+    import re
+    import subprocess
+
+    falso = "work/humo-spec.json"
+    json.dump([{"id": "Reel-R9", "rompe": ["«X» necesita `y` y no llega"]}],
+              open(falso, "w", encoding="utf-8"))
+    texto = open("scripts/montar.sh", encoding="utf-8").read()
+    m = re.search(r'ROMPE=\$\(node -e "(.+?)"\)', texto)
+    expr = m.group(1).replace("src/reels.json", falso).replace("$n", "9")
+    out = subprocess.run(["node", "-e", expr], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
+    os.remove(falso)
+    h.mide("C-372", "necesita" in out.stdout,
+           "montar.sh lee `rompe` y para antes de pagar el render")
+    # Y el spec lo trae de donde nace: las faltas de `revisarTablero`.
+    dice = subprocess.run(
+        ["node", "--input-type=module", "-e",
+         "import {tablerosDe} from './scripts/reels/base.mjs';"
+         "const mal=[1,2,3,4,5,6,7].filter(n=>"
+         "tablerosDe('reel-0'+n).faltas.length).map(n=>'Reel-R'+n);"
+         "console.log(JSON.stringify(mal));"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        nacen = set(json.loads(dice.stdout.strip().splitlines()[-1]))
+    except Exception:                              # noqa: BLE001
+        nacen = None
+    spec = json.load(open("src/reels.json", encoding="utf-8"))
+    marcadas = {r["id"] for r in spec if r.get("rompe")}
+    h.mide("C-372", nacen is not None and nacen == marcadas,
+           f"y el spec marca exactamente las que nacen rotas: {sorted(marcadas)}")
+
+def _documentar_no_engorda_el_fichero(h):
+    """El techo cuenta sentencias, y en `.mjs` contaba tambien la prosa.
+
+    `tamano.py` exime el docstring en Python porque *«un docstring largo no hace
+    un fichero mas dificil de cambiar»*, y en `.mjs` no eximia el bloque JSDoc:
+    el mismo fichero pesaba mas explicado con `/**` que con `//`, y la unica
+    salida era documentar peor. C-373.
+    """
+    import tamano
+
+    prueba = "work/humo-jsdoc.mjs"
+    open(prueba, "w", encoding="utf-8").write(chr(10).join([
+        "/**", " * Por que esta regla es como es, en tres lineas", " */",
+        "export const uno = 1;"]))
+    n = tamano._codigo(prueba)
+    os.remove(prueba)
+    h.mide("C-373", n == 1, f"el JSDoc no cuenta: {n} sentencia(s) de 4 lineas")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -326,6 +389,8 @@ def main():
               _el_marcador_propone_y_no_firma,
               _una_atascada_no_para_la_tanda,
               _un_paso_que_falla_deja_su_diagnostico,
+              _lo_que_no_se_dibuja_no_se_renderiza,
+              _documentar_no_engorda_el_fichero,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,

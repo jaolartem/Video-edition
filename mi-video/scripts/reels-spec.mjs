@@ -365,6 +365,11 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   // que deshacía la única regla que impedía dos capas dibujando lo mismo.
   if (contraste && !pisado) pieza.contraste = contraste;
   pieza.compuestos = comp.n;
+  // **Lo que no se puede dibujar no viaja al render.** `fBase` sale de
+  // `revisarTablero`, que comprueba solo lo que ROMPE el render, y viajaba en el
+  // saco que no para el lote —«una pieza peor, no una pieza invalida»—: aqui no
+  // hay pieza peor, no hay pieza. Aparte de `bloqueado`, que es otra cosa. C-372.
+  if (fBase.length) pieza.rompe = fBase;
   return pieza;
 });
 // **Cada pieza lleva la huella de lo que se compuso.**
