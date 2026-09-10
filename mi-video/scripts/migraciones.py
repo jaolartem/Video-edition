@@ -523,6 +523,54 @@ def _camara_es_una_seleccion(con):
     return True
 
 
+def _retiradas_fuera_del_catalogo(con):
+    """Una transicion retirada no se queda en el catalogo esperando a que la pidan.
+
+    Jaime, 10-9-2026: *«borra la cortinilla, es horrible»*. Y ya estaba
+    declarada retirada — `camara.mjs :: RETIRADAS` la lleva con su motivo y su
+    sustituto, `glitch`— desde que reel-01 salio con una placa de 0,7 s en el
+    segundo 61,7 y el dijo: *«eso ya lo habiamos depreciado, por que el
+    disenador volvio a traer esa cortina?»*.
+
+    Lo que fallo entonces vuelve a fallar ahora, una capa mas abajo: el menu la
+    daba por retirada y **el catalogo la seguia ofreciendo**, con cuatro etapas
+    usandola —reel-01 e6, reel-02 e7, reel-04 e7 y reel-06 e4—. Un mecanismo que
+    sigue en la tabla no esta retirado: esta esperando.
+
+    Las que la usaban pasan a su sustituto **declarado**, no a uno que elija yo:
+    lo dice `RETIRADAS.cortinilla.en_su_lugar`. Y la lista se lee de ahi, que es
+    donde vive la decision — copiarla aqui seria la segunda carta.
+    """
+    import json
+    import subprocess
+
+    try:
+        salida = subprocess.run(
+            ["node", "-e", "import('./scripts/camara.mjs').then(m =>"
+                           " console.log(JSON.stringify(m.RETIRADAS || {})))"],
+            capture_output=True, text=True, timeout=30).stdout.strip()
+        retiradas = json.loads(salida or "{}")
+    except Exception:                              # noqa: BLE001
+        return False
+    hecho = False
+    for nombre, d in retiradas.items():
+        vieja = con.execute("select id from transicion where nombre = ?",
+                            (nombre,)).fetchone()
+        if not vieja:
+            continue
+        nueva = con.execute("select id from transicion where nombre = ?",
+                            (d.get("en_su_lugar"),)).fetchone()
+        if nueva:
+            con.execute("update etapa_transicion set transicion_id = ?"
+                        " where transicion_id = ?", (nueva[0], vieja[0]))
+        else:
+            con.execute("delete from etapa_transicion where transicion_id = ?",
+                        (vieja[0],))
+        con.execute("delete from transicion where id = ?", (vieja[0],))
+        hecho = True
+    return hecho
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -538,6 +586,7 @@ def migrar():
     _segmento_con_etiqueta(con)
     _entidades_de_la_escena(con)
     _camara_es_una_seleccion(con)
+    _retiradas_fuera_del_catalogo(con)
     hecho = _clave_por_slug(con)
     hecho += _muertas(con)
     con.commit()

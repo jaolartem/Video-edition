@@ -94,6 +94,33 @@ def _la_maquina_no_se_aprueba_sola(h):
            "y una que puso la maquina, no")
 
 
+def _lo_retirado_no_esta_en_el_catalogo(h):
+    """Lo que Jaime retiro no puede seguir en la tabla esperando a que lo pidan.
+
+    La cortinilla se retiro una vez, `camara.mjs :: RETIRADAS` lo declaraba con
+    su sustituto, y el catalogo la seguia ofreciendo con cuatro etapas usandola.
+    Es el mismo fallo que hizo salir reel-01 con una placa de 0,7 s: el menu la
+    daba por muerta y el mecanismo seguia vivo. C-362.
+    """
+    import json
+    import subprocess
+
+    import basedatos
+
+    try:
+        r = json.loads(subprocess.run(
+            ["node", "-e", "import('./scripts/camara.mjs').then(m =>"
+                           " console.log(JSON.stringify(m.RETIRADAS || {})))"],
+            capture_output=True, text=True, timeout=30).stdout.strip() or "{}")
+    except Exception:                              # noqa: BLE001
+        r = {}
+    h.mide("C-362", bool(r), "hay retiradas declaradas y se pueden leer")
+    cx = basedatos.abrir()
+    vivas = {x[0] for x in cx.execute("select nombre from transicion")}
+    h.mide("C-362", not (set(r) & vivas),
+           "y ninguna sigue en el catalogo de transiciones")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -210,6 +237,7 @@ def main():
     h = Humo()
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
               _la_maquina_no_se_aprueba_sola,
+              _lo_retirado_no_esta_en_el_catalogo,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
