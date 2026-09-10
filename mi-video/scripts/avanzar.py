@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import planificador  # noqa: E402
 import registro  # noqa: E402
 import servicios  # noqa: E402
+from dominio import estado as _estado  # noqa: E402
 from servicios import Pieza  # noqa: E402
 import rutas  # noqa: E402
 
@@ -468,6 +469,11 @@ def main():
     _una_vuelta(a)
 
 
+def piezas_slug(ns):
+    """Los slugs de una lista de numeros de pieza."""
+    return [f"reel-{int(n):02d}" for n in ns]
+
+
 def _una_vuelta(a) -> int:
     """Un recorrido completo de todas las piezas. Devuelve cuanto se movio."""
     piezas = list(a.reels or rutas.piezas())
@@ -486,6 +492,22 @@ def _una_vuelta(a) -> int:
     # Va aqui, al principio de la vuelta, porque devolver es enrutar y esto es
     # el enrutador. Lo aprobado no se devuelve: eso lo guarda `_devuelve`.
     if not a.ver:
+        # **Y lo que los oficios escribieron en su marcador entra en la base.**
+        #
+        # Jaime, 10-9-2026: *«los contratos y el disparador, todo basado en el
+        # Json; modifican el Json y este modifica a la base de datos»*. Un
+        # oficio solo tiene `Read` y `Write`, asi que el fichero es lo unico
+        # que puede tocar; sin esta linea anotaba y no se enteraba nadie.
+        #
+        # Va delante de todo lo demas porque cambia lo que el resto de la
+        # vuelta va a leer: un segmento aprobado deja de estar en juego.
+        for slug in piezas_slug(piezas):
+            try:
+                _estado.aplica(slug)
+            except Exception as e:                 # noqa: BLE001
+                registro.aviso("marcador", "no se pudo aplicar",
+                               detalle=f"{slug}: {type(e).__name__}: {e}"[:200],
+                               eco=False)
         for paso, slug in _contestadas_tarde():
             _devuelve(slug, paso)
     # **Las piezas que no comparten cinta trabajan a la vez.** El bucle de una

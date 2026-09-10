@@ -117,8 +117,61 @@ def escribe(slug):
             return d
     except Exception:                              # noqa: BLE001
         pass
+    # **Y los segmentos, que son la unidad con la que se revisa.** Jaime,
+    # 10-9-2026: *«en el Json van los segmentos del video, y van los que estan
+    # aprobados y los que no; cada segmento con su propia etiqueta»*. Van aqui
+    # y no en un fichero aparte porque este es el documento que el oficio puede
+    # abrir: sin ellos dentro, el que trabaja no sabe que puede tocar.
+    try:
+        from . import segmento as _sg
+
+        d["segmentos"] = [x.como_json() for x in _sg.Segmento.de(slug)]
+        d["aprobada"] = _sg.aprobada(slug)
+    except Exception:                              # noqa: BLE001
+        pass
     d["visto_por_ultima_vez"] = _ahora()
     return _guarda(slug, d)
+
+
+def aplica(slug, quien="el marcador"):
+    """Lo que se escribio en el marcador **entra en la base**.
+
+    Jaime, 10-9-2026: *«los contratos y el disparador, todo basado en el Json;
+    modifican el Json y este modifica a la base de datos»*. `escribe()` era la
+    mitad que iba de la base al fichero; esta es la que faltaba, y sin ella un
+    oficio con `Read`/`Write` podia anotar y nadie se enteraba.
+
+    **Solo se leen los campos del que trabaja.** El volcado es dueno de donde
+    esta la pieza, de sus tramos y de su huella; el oficio lo es de la etiqueta
+    de cada segmento. Si esto leyera todo, una vuelta del volcado pisaria lo que
+    el agente acaba de anotar — y al reves, el agente reescribiria el corte.
+
+    Devuelve los segmentos que de verdad se movieron.
+    """
+    from . import segmento as _sg
+
+    d = lee(slug)
+    puestos = {x.n: x for x in _sg.Segmento.de(slug)}
+    movidos = []
+    for fila in d.get("segmentos") or []:
+        n, nueva = fila.get("etapa"), (fila.get("etiqueta") or "").strip()
+        seg = puestos.get(n)
+        if seg is None or not nueva or nueva == seg.etiqueta:
+            continue
+        # **Contra su corte, no contra cualquiera.** Un marcador de hace dos
+        # montajes trae etiquetas de tramos que ya no existen: aplicarlas seria
+        # dar por bueno lo que nadie vio.
+        if fila.get("huella") and fila["huella"] != seg.huella:
+            continue
+        seg.mueve(nueva, fila.get("por") or quien)
+        movidos.append((n, nueva))
+    if movidos:
+        d.setdefault("log", []).append(
+            {"cuando": _ahora(), "etapa": d.get("etapa"),
+             "que": "del marcador a la base: "
+                    + ", ".join(f"e{n}->{e}" for n, e in movidos)})
+        _guarda(slug, d)
+    return movidos
 
 
 def cierra(slug, por_que="el proceso termino"):

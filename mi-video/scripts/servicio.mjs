@@ -45,8 +45,28 @@ export function dejaPedido(paso, slug, prompt, datos) {
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
   fs.writeFileSync(
     rutaPedido(paso, slug),
-    JSON.stringify({ paso, slug, prompt, datos }, null, 1),
+    JSON.stringify({ paso, slug, prompt, marcador: marcador(slug), datos }, null, 1),
   );
+}
+
+/**
+ * El marcador de la pieza, o `null` si todavía no hay.
+ *
+ * **Y por qué estaba en un solo lado.** Los pedidos se arman en dos sitios —
+ * `servicio.py` para los pasos de Python y esto para `descrito`—, y sólo el
+ * primero metía el marcador. Así que el compositor recibía `modo` y
+ * `editables` y no el marcador, y el diseñador el marcador y no los tiquets:
+ * cada oficio con media hoja, y ninguno de los dos con el documento entero.
+ *
+ * Jaime, 10-9-2026: *«los contratos y el disparador, todo basado en el Json»*.
+ * Un solo documento, y los dos lo leen.
+ */
+export function marcador(slug) {
+  try {
+    return JSON.parse(fs.readFileSync(`ads/${slug}/estado.json`, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /** Lo que el servicio dejó contestado, o `null` si todavía no hay nada. */

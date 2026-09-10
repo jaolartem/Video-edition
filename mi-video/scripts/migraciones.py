@@ -306,6 +306,43 @@ def _muertas(con):
     return hecho
 
 
+def _segmento_con_etiqueta(con):
+    """Cada segmento lleva su propia etiqueta, y aprobar es una de ellas.
+
+    Jaime, 10-9-2026: *«la aprobacion de la pieza es igual a la aprobacion de
+    todos los segmentos, y cada segmento se debe revisar como la unidad de
+    analisis»*, y despues: *«cada segmento con su propia etiqueta»*.
+
+    Lo que habia era un veredicto por VERSION —`aprobacion` es `version_id,
+    veredicto, quien`—, asi que la pieza entera estaba bien o no lo estaba. Con
+    eso, una correccion de un tramo volvia a poner en juego las seis etapas, y
+    «lo aprobado no se rediscute» no se podia cumplir: no habia con que decir
+    que la 3 seguia buena.
+
+    **La huella es lo que la hace verdad.** La etiqueta se pone contra el corte
+    que el segmento tenia ese dia; si sus tramos se mueven, lo que se etiqueto
+    era otra cosa y la fila deja de aplicar **sola**, sin que nadie se acuerde
+    de retirarla. Es la vara que ya usan `corte_fijo` y `ticket`, y su ausencia
+    es lo que costo las siete vueltas del reel-01.
+
+    Sin fila el segmento esta abierto: no hay que sembrar seis filas en falso
+    al declarar una pieza.
+    """
+    con.execute("""
+      CREATE TABLE IF NOT EXISTS segmento (
+        video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+        etapa    INTEGER NOT NULL,
+        -- Donde esta ESE segmento: una fase del ciclo, o 'aprobado'.
+        etiqueta TEXT NOT NULL,
+        -- El corte contra el que se puso. Ver `dominio/segmento.py::huella`.
+        huella   TEXT NOT NULL,
+        quien    TEXT NOT NULL,
+        cuando   TEXT NOT NULL,
+        PRIMARY KEY (video_id, etapa)
+      )""")
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -318,6 +355,7 @@ def migrar():
     _escalera(con)
     _ciclo(con)
     _version_guarda_el_montaje(con)
+    _segmento_con_etiqueta(con)
     hecho = _clave_por_slug(con)
     hecho += _muertas(con)
     con.commit()
