@@ -180,6 +180,27 @@ _techo() {
 }
 del_lote || _techo || exit 1
 
+# **Un nombre que no existe no llega a un render.**
+#
+# C-349 puso `rutas.interprete()` en `servicios/base.py` y no puso su `import`.
+# El humo pasaba —16 de 16— porque esa linea solo corre cuando un paso `.sh`
+# se ejecuta de verdad, y hasta que reel-05 llego a `montado` no se ejecuto
+# ninguno: `NameError: name 'rutas' is not defined`, la corrida entera perdida
+# y la pieza parada en `verificado`. La averia de la casa —declarado y no
+# ejercitado— con otra cara.
+#
+# `pyflakes` lo dice en dos segundos sobre los 90 ficheros, sin correr nada.
+# Solo los nombres sin definir: lo demas es estilo y no tumba una corrida.
+_nombres() {
+  local salida
+  salida=$(python -m pyflakes scripts/ 2>&1 | grep "undefined name") || return 0
+  [ -z "$salida" ] && return 0
+  echo "NOMBRES QUE NO EXISTEN - esto revienta cuando esa linea se ejecute:"
+  echo "$salida"
+  return 1
+}
+del_lote || _nombres || exit 1
+
 # **Y el conducto es una guarda, igual que el techo.** Un tiquet que vuelve a
 # `descrito` o a `disenado` lo atiende un servicio, y ese servicio deja recibo:
 # el pedido que se le escribio y la respuesta que devolvio. Cerrarlo sin eso es

@@ -208,7 +208,9 @@ def proponer(slug, etapa, quien, texto):
     Y con su etapa, que es lo que Jaime pidio en la misma frase: *«cada tiquet va
     ligado a la escena»*. Sin etapa nadie puede acotar quien la atiende.
     """
-    con = _con()
+    import basedatos
+
+    con = basedatos.abrir()
     con.execute(
         "insert into revision (video_slug, accion, que, estado, fecha, etapa,"
         " quien, pasada, cual) values (?,?,?,'sube',?,?,?,1,1)",

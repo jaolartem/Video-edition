@@ -103,13 +103,30 @@ class Segmento:
         return round(sum(b - a for a, b in self.tramos), 3)
 
     def _fila(self):
+        """Lo etiquetado para este segmento, **contra su corte de hoy**.
+
+        Jaime, 10-9-2026: *«ahora la fuente de verdad es el Json, una sola
+        fuente»*. Asi que se mira ahi primero: el marcador es lo que el oficio
+        puede abrir y escribir, y tener dos sitios donde leer lo mismo es la
+        averia que este proyecto lleva persiguiendo desde el principio.
+
+        La base es la **copia que sobrevive**: el marcador se borra al cerrar la
+        pieza —memoria de trabajo— y entonces la fila es lo unico que queda. Por
+        eso se lee de segunda y nunca por delante.
+        """
+        from . import estado as _e
+
+        for f in (_e.lee(self.slug).get("segmentos") or []):
+            if f.get("etapa") == self.n and f.get("huella") == self.huella:
+                return {"etiqueta": f.get("etiqueta") or "",
+                        "quien": f.get("por") or "", "cuando": ""}
         cx = _con()
         r = cx.execute(
             "select etiqueta, huella, quien, cuando from segmento s"
             " join video v on v.id = s.video_id"
             " where v.slug = ? and s.etapa = ?", (self.slug, self.n)).fetchone()
         cx.close()
-        return r if (r and r["huella"] == self.huella) else None
+        return dict(r) if (r and r["huella"] == self.huella) else None
 
     @property
     def etiqueta(self) -> str:
