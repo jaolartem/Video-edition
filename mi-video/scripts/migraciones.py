@@ -705,6 +705,28 @@ def _vocabularios(con):
     return hecho
 
 
+def _paso_de_instruccion_apunta_bien(con):
+    """`instruccion.paso_id` decia apuntar a `fase` y guardaba areas.
+
+    Lo hice yo el 10-9-2026 en dos pasos: primero mapee `instruccion.paso`
+    contra `fase` —resolvio 1 de 37, porque sus valores son `audio`, `corte`,
+    `disenar` y `montaje`, que son el area de la que habla la instruccion y no
+    pasos del ciclo— y luego lo mande a su propio catalogo. Pero la columna ya
+    estaba declarada `REFERENCES fase(id)` y SQLite no cambia una foranea: se
+    quedo diciendo una cosa y guardando otra.
+
+    No se veia hasta que `conectado.copias_que_discrepan` empezo a comparar la
+    copia con su clave, y salio en las 37. Una foranea que apunta a la tabla
+    equivocada es peor que no tenerla: se puede unir, devuelve filas, y son de
+    otro sitio.
+    """
+    fk = {f[3]: f[2] for f in con.execute("pragma foreign_key_list(instruccion)")}
+    if fk.get("paso_id") != "fase":
+        return False
+    con.execute("alter table instruccion drop column paso_id")
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -721,6 +743,7 @@ def migrar():
     _entidades_de_la_escena(con)
     _camara_es_una_seleccion(con)
     _tipo_escena_es_una_seleccion(con)
+    _paso_de_instruccion_apunta_bien(con)
     _vocabularios(con)
     _foraneas_de_texto(con)
     _retiradas_fuera_del_catalogo(con)

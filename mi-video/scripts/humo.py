@@ -141,6 +141,27 @@ def _lo_retirado_no_esta_en_el_catalogo(h):
     h.mide("C-362", not usadas, "y ninguna etapa sigue usandola")
 
 
+def _la_copia_no_contradice_a_su_clave(h):
+    """Mientras la copia de texto conviva con su clave, no pueden discrepar.
+
+    Veintinueve columnas siguen llevando su texto al lado de la clave: quitarlas
+    hoy seria mover 26 lectores de `escena_desc.plano` de golpe, o sea romper la
+    linea por normalizar. Lo que si se puede exigir es que digan lo mismo — si
+    no, hay dos verdades vivas y las dos creibles, que es lo que la
+    normalizacion venia a cerrar.
+
+    Lo primero que caso al ponerlo fue mio: `instruccion.paso_id` declaraba
+    `REFERENCES fase(id)` de un mapeo equivocado y guardaba ids de
+    `area_instruccion`. Las 37 filas discrepaban y no se veia. C-368.
+    """
+    import conectado
+
+    h.mide("C-368", conectado.copias_que_discrepan() == [],
+           "ninguna copia de texto contradice a su clave")
+    h.mide("C-368", conectado.filas_sin_autor() == [],
+           "y ninguna fila dice `quien` sin decir cual")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -258,6 +279,7 @@ def main():
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
               _la_maquina_no_se_aprueba_sola,
               _lo_retirado_no_esta_en_el_catalogo,
+              _la_copia_no_contradice_a_su_clave,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,

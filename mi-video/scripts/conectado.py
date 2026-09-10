@@ -311,6 +311,53 @@ def filas_sin_autor():
     return fuera
 
 
+def copias_que_discrepan():
+    """La copia de texto y su clave, diciendo cosas distintas.
+
+    Jaime, 10-9-2026: *«antes de correr resuelve lo estructural»*. Y lo
+    estructural aqui no es quitar las 29 copias —`escena_desc.plano` tiene 26
+    lectores y moverlos todos de golpe es romper la linea por normalizar—: es
+    que **mientras convivan no puedan contradecirse**.
+
+    Hasta ahora nada lo impedia. Un `update` que tocara el texto y no la clave
+    dejaba las dos versiones vivas y las dos creibles, que es exactamente la
+    averia que la normalizacion venia a cerrar. Con esto, la copia es una
+    proyeccion comprobada y no una segunda verdad.
+    """
+    import sqlite3
+
+    import basedatos
+
+    cx = basedatos.abrir()
+    fuera = []
+    for (t,) in cx.execute("select name from sqlite_master where type='table'"
+                           " order by name"):
+        cols = [d[1] for d in cx.execute(f"pragma table_info({t})")]
+        for c in cols:
+            clave = f"{c}_id"
+            if clave not in cols:
+                continue
+            # ¿A que tabla apunta? Se lee de la propia declaracion.
+            destino = next((f[2] for f in cx.execute(f"pragma foreign_key_list({t})")
+                            if f[3] == clave), None)
+            if not destino:
+                continue
+            campo = "nombre"
+            if campo not in [d[1] for d in cx.execute(f"pragma table_info({destino})")]:
+                continue
+            try:
+                n = cx.execute(
+                    f"select count(*) from {t} join {destino} d on d.id = {t}.{clave}"
+                    f" where {t}.{c} is not null and {t}.{c} <> d.{campo}").fetchone()[0]
+            except sqlite3.Error:
+                continue
+            if n:
+                fuera.append(f"«{t}.{c}» y «{t}.{clave}» dicen cosas distintas en"
+                             f" {n} fila(s) — la copia dejo de ser proyeccion")
+    cx.close()
+    return fuera
+
+
 def main():
     faltas = []
     for titulo, fn in (("estado que no se guarda", tablas_muertas),
@@ -318,7 +365,8 @@ def main():
                        ("pasos que nadie llama", pasos_sin_quien_los_llame),
                        ("formas que nadie dibuja", formas_sin_componente),
                        ("columnas que son una entidad", columnas_que_son_entidad),
-                       ("filas sin autor", filas_sin_autor)):
+                       ("filas sin autor", filas_sin_autor),
+                       ("copias que discrepan", copias_que_discrepan)):
         malas = fn()
         if malas:
             print(f"\n{titulo}:")
