@@ -401,74 +401,7 @@ def _entidades_de_la_escena(con):
     Las conexiones llevan lo que es de la RELACION y no de la entidad: el estado
     de un tablero en su etapa, o el segundo en el que entra un panel.
     """
-    con.executescript("""
-      CREATE TABLE IF NOT EXISTS tablero (
-        id      INTEGER PRIMARY KEY,
-        kind    TEXT NOT NULL,
-        props   TEXT NOT NULL,
-        encargo TEXT
-      );
-      CREATE TABLE IF NOT EXISTS etapa_tablero (
-        etapa_id   INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
-        tablero_id INTEGER NOT NULL REFERENCES tablero(id) ON DELETE CASCADE,
-        -- Lo que distinguia a las dos columnas, ahora en la relacion.
-        estado     TEXT NOT NULL CHECK (estado IN ('propuesto','aplicado')),
-        quien      TEXT,
-        fecha      TEXT,
-        PRIMARY KEY (etapa_id, estado)
-      );
-      CREATE TABLE IF NOT EXISTS panel (
-        id      INTEGER PRIMARY KEY,
-        bloques TEXT NOT NULL,
-        cubre   TEXT,
-        lado    TEXT
-      );
-      CREATE TABLE IF NOT EXISTS etapa_panel (
-        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
-        panel_id INTEGER NOT NULL REFERENCES panel(id) ON DELETE CASCADE,
-        hueco    REAL,
-        PRIMARY KEY (etapa_id, panel_id)
-      );
-      CREATE TABLE IF NOT EXISTS camara (
-        id         INTEGER PRIMARY KEY,
-        encuadre   TEXT,
-        movimiento TEXT,
-        UNIQUE (encuadre, movimiento)
-      );
-      CREATE TABLE IF NOT EXISTS etapa_camara (
-        etapa_id  INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
-        camara_id INTEGER NOT NULL REFERENCES camara(id) ON DELETE CASCADE,
-        PRIMARY KEY (etapa_id)
-      );
-      CREATE TABLE IF NOT EXISTS voz (
-        id    INTEGER PRIMARY KEY,
-        trato TEXT NOT NULL,
-        sobre TEXT,
-        dura  REAL
-      );
-      CREATE TABLE IF NOT EXISTS etapa_voz (
-        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
-        voz_id   INTEGER NOT NULL REFERENCES voz(id) ON DELETE CASCADE,
-        PRIMARY KEY (etapa_id)
-      );
-      -- **La entidad que relaciona otras.** Trato, plano y densidad viajaban
-      -- repetidos en cada fila de `escena_desc`; aqui son una combinacion con
-      -- nombre, que es lo que permite decir «estas tres etapas son del mismo
-      -- tipo» sin comparar tres cadenas.
-      CREATE TABLE IF NOT EXISTS tipo_escena (
-        id       INTEGER PRIMARY KEY,
-        trato    TEXT,
-        plano    TEXT,
-        densidad TEXT,
-        UNIQUE (trato, plano, densidad)
-      );
-      CREATE TABLE IF NOT EXISTS etapa_tipo (
-        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
-        tipo_id  INTEGER NOT NULL REFERENCES tipo_escena(id) ON DELETE CASCADE,
-        por_que  TEXT,
-        PRIMARY KEY (etapa_id)
-      );
-    """)
+    pass  # el modelo lo declara `esquema-modelo.sql`
     return True
 
 
@@ -571,6 +504,53 @@ def _retiradas_fuera_del_catalogo(con):
     return hecho
 
 
+def _quien_es_agencia(con):
+    """`quien` no es un nombre: es **quién actuó y qué tenía derecho a hacer**.
+
+    Jaime, 10-9-2026: *«hay autores y hay tipos de autores. Estoy yo como
+    persona asociada a mi propia imagen de marca, pero si entra otra persona la
+    imagen de marca debería cambiar. También están los agentes de IA, que
+    modifican y definen pasos y cosas. Quien es al final un declarador de
+    agencia, requiere más trabajo que sólo declarar una entidad»*. Y precisando:
+    *«el tipo no es jaime sino persona; la entidad persona tiene nombre e
+    identidad de marca; agencia son los permisos que hay sobre todo»*.
+
+    Quince cadenas para diez actores en nueve tablas, y el permiso decidido
+    comparandolas: `segmento.es_suya` miraba si `quien` empieza por «jaime». Un
+    derecho que se comprueba por prefijo de cadena no es un derecho. El detalle
+    y las cuentas, en C-363.
+
+    Cuatro tablas: el tipo declara la agencia y la persona **apunta** a su
+    marca. Las indicaciones no se copian a una tabla porque ya son los
+    contratos — `contrato/marca.py` lleva la parte fija del contrato del
+    disenador desde que Jaime la separo de la variable.
+    """
+    pass  # el modelo lo declara `esquema-modelo.sql`
+    for n in ("persona", "oficio", "paso"):
+        con.execute("insert or ignore into tipo_autor (nombre) values (?)", (n,))
+    permisos = [
+        ("aprobar", "Cerrar una pieza o un segmento. Lo unico que el motor no"
+                    " puede hacer solo, y por eso lo unico que le cierra la puerta."),
+        ("decidir criterio", "Elegir entre dos cosas que cumplen: que se dice,"
+                             " que se dibuja, que toma entrega mejor."),
+        ("medir", "Contar lo medible. No decide: deja el numero delante de quien"
+                  " decide."),
+        ("abrir tiquet", "Declarar que algo esta mal en una pieza."),
+    ]
+    for n, p in permisos:
+        con.execute("insert or ignore into permiso (nombre, por_que) values (?,?)",
+                    (n, p))
+    dan = {"persona": ("aprobar", "decidir criterio", "abrir tiquet"),
+           "oficio": ("decidir criterio", "abrir tiquet"),
+           "paso": ("medir", "abrir tiquet")}
+    for tipo, ps in dan.items():
+        t = con.execute("select id from tipo_autor where nombre = ?", (tipo,)).fetchone()[0]
+        for n in ps:
+            pid = con.execute("select id from permiso where nombre = ?", (n,)).fetchone()[0]
+            con.execute("insert or ignore into agencia values (?,?)", (t, pid))
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -587,6 +567,7 @@ def migrar():
     _entidades_de_la_escena(con)
     _camara_es_una_seleccion(con)
     _retiradas_fuera_del_catalogo(con)
+    _quien_es_agencia(con)
     hecho = _clave_por_slug(con)
     hecho += _muertas(con)
     con.commit()

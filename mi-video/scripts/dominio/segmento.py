@@ -255,17 +255,22 @@ class Segmento:
         return f"{self.slug} e{self.n} ({self.dura}s, «{donde}»)"
 
 
-#: Quien puede aprobar. **Aprobar es lo unico que el motor no puede hacer
-#: solo**, y por eso es tambien lo unico que puede cerrarle la puerta: si la
-#: maquina pudiera etiquetar `aprobado`, se abriria a si misma. La marca es el
-#: nombre en `quien`, igual que `contestado.suyas` filtra las notas por el suyo.
-SUYAS = ("jaime",)
-
-
 def es_suya(quien) -> bool:
-    """Si esa etiqueta la puso una persona y no la linea."""
-    q = (quien or "").strip().lower()
-    return any(q.startswith(x) or f" {x}" in q for x in SUYAS)
+    """Si quien puso esa etiqueta **tenia derecho a aprobar**.
+
+    Esto era `quien.startswith("jaime")`. Funcionaba con una persona y con una
+    ortografia, y ninguna de las dos cosas es una regla: el dia que entrara otra
+    persona no habria aprobado nada, y `Jaime` con mayuscula ya se colaba por
+    los pelos. Jaime, 10-9-2026: *«quien es al final un declarador de agencia»*.
+
+    Ahora lo contesta `agencia`, que cuelga del TIPO: «aprobar es de una
+    persona» vale para cualquier persona. La guarda que importa sigue en pie —
+    la linea y los oficios no aprueban— y ya no depende de como se escriba un
+    nombre.
+    """
+    from .autor import puede
+
+    return puede(quien, "aprobar")
 
 
 def aprobada(slug) -> bool:

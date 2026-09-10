@@ -280,3 +280,124 @@ CREATE TABLE IF NOT EXISTS hueco_oido (
 -- postproduccion. Lo de arriba queda como el porque, que es lo que hay que
 -- conservar. C-353.
 
+
+
+-- ══════════════════════════════════════════════════════════════════
+-- EL MODELO DE LA ESCENA Y LA AGENCIA
+--
+-- Jaime, 10-9-2026: «tablero es una entidad, no una columna; panel es una
+-- entidad, no una columna; tipo de escena es una entidad que relaciona
+-- otras entidades», «utiliza tablas de conexion para las relaciones 1:n y
+-- n:n», y «quien es al final un declarador de agencia».
+--
+-- Vienen de `migraciones.py`, que llego a 300 lineas por acumular veinte
+-- declaraciones: el modelo se declara aqui y alli se queda solo lo que hay
+-- que sembrar o mover. Es la misma separacion que hizo `contrato/`.
+-- ══════════════════════════════════════════════════════════════════
+
+-- de `migraciones._entidades_de_la_escena`
+CREATE TABLE IF NOT EXISTS tablero (
+        id      INTEGER PRIMARY KEY,
+        kind    TEXT NOT NULL,
+        props   TEXT NOT NULL,
+        encargo TEXT
+      );
+      CREATE TABLE IF NOT EXISTS etapa_tablero (
+        etapa_id   INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        tablero_id INTEGER NOT NULL REFERENCES tablero(id) ON DELETE CASCADE,
+        -- Lo que distinguia a las dos columnas, ahora en la relacion.
+        estado     TEXT NOT NULL CHECK (estado IN ('propuesto','aplicado')),
+        quien      TEXT,
+        fecha      TEXT,
+        PRIMARY KEY (etapa_id, estado)
+      );
+      CREATE TABLE IF NOT EXISTS panel (
+        id      INTEGER PRIMARY KEY,
+        bloques TEXT NOT NULL,
+        cubre   TEXT,
+        lado    TEXT
+      );
+      CREATE TABLE IF NOT EXISTS etapa_panel (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        panel_id INTEGER NOT NULL REFERENCES panel(id) ON DELETE CASCADE,
+        hueco    REAL,
+        PRIMARY KEY (etapa_id, panel_id)
+      );
+      CREATE TABLE IF NOT EXISTS camara (
+        id         INTEGER PRIMARY KEY,
+        encuadre   TEXT,
+        movimiento TEXT,
+        UNIQUE (encuadre, movimiento)
+      );
+      CREATE TABLE IF NOT EXISTS etapa_camara (
+        etapa_id  INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        camara_id INTEGER NOT NULL REFERENCES camara(id) ON DELETE CASCADE,
+        PRIMARY KEY (etapa_id)
+      );
+      CREATE TABLE IF NOT EXISTS voz (
+        id    INTEGER PRIMARY KEY,
+        trato TEXT NOT NULL,
+        sobre TEXT,
+        dura  REAL
+      );
+      CREATE TABLE IF NOT EXISTS etapa_voz (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        voz_id   INTEGER NOT NULL REFERENCES voz(id) ON DELETE CASCADE,
+        PRIMARY KEY (etapa_id)
+      );
+      -- **La entidad que relaciona otras.** Trato, plano y densidad viajaban
+      -- repetidos en cada fila de `escena_desc`; aqui son una combinacion con
+      -- nombre, que es lo que permite decir «estas tres etapas son del mismo
+      -- tipo» sin comparar tres cadenas.
+      CREATE TABLE IF NOT EXISTS tipo_escena (
+        id       INTEGER PRIMARY KEY,
+        trato    TEXT,
+        plano    TEXT,
+        densidad TEXT,
+        UNIQUE (trato, plano, densidad)
+      );
+      CREATE TABLE IF NOT EXISTS etapa_tipo (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        tipo_id  INTEGER NOT NULL REFERENCES tipo_escena(id) ON DELETE CASCADE,
+        por_que  TEXT,
+        PRIMARY KEY (etapa_id)
+      );
+
+-- de `migraciones._quien_es_agencia`
+CREATE TABLE IF NOT EXISTS tipo_autor (
+        id     INTEGER PRIMARY KEY,
+        nombre TEXT NOT NULL UNIQUE
+      );
+      CREATE TABLE IF NOT EXISTS permiso (
+        id      INTEGER PRIMARY KEY,
+        nombre  TEXT NOT NULL UNIQUE,
+        por_que TEXT
+      );
+      -- **La agencia: que puede hacer cada tipo.** Va por tipo y no por autor
+      -- porque el derecho es de la clase — «aprobar es de una persona» vale para
+      -- cualquier persona, no solo para la que hay hoy.
+      CREATE TABLE IF NOT EXISTS agencia (
+        tipo_id    INTEGER NOT NULL REFERENCES tipo_autor(id) ON DELETE CASCADE,
+        permiso_id INTEGER NOT NULL REFERENCES permiso(id) ON DELETE CASCADE,
+        PRIMARY KEY (tipo_id, permiso_id)
+      );
+      CREATE TABLE IF NOT EXISTS autor (
+        id      INTEGER PRIMARY KEY,
+        tipo_id INTEGER NOT NULL REFERENCES tipo_autor(id),
+        nombre  TEXT NOT NULL UNIQUE
+      );
+      -- La persona es una entidad, no una fila de `autor` con una etiqueta:
+      -- tiene nombre propio y **su** identidad de marca.
+      -- **Y su marca NO se guarda aqui: se apunta.** Jaime: *«las
+      -- indicaciones son los contratos»*, y el contrato de la marca ya
+      -- existe — `contrato/marca.py :: MARCA`, la parte fija del contrato
+      -- del disenador, con sus palabras: *«el contrato del disenador tiene
+      -- dos partes: una variable, que es la que da el compositor, y otra
+      -- fija, que son las reglas de la marca personal»*. Copiar esa prosa a
+      -- una tabla seria la segunda carta. `marca` dice **cual** bloque le
+      -- toca, y por eso otra persona trae el suyo sin tocar nada mas.
+      CREATE TABLE IF NOT EXISTS persona (
+        autor_id INTEGER PRIMARY KEY REFERENCES autor(id) ON DELETE CASCADE,
+        nombre   TEXT NOT NULL,
+        marca    TEXT
+      );

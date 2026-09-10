@@ -86,12 +86,24 @@ def _la_maquina_no_se_aprueba_sola(h):
     """
     from dominio import segmento as sg
 
-    h.mide("C-354", sg.es_suya("jaime") and sg.es_suya("jaime - aprobo el 7-9"),
-           "una etiqueta suya cuenta como aprobacion")
+    h.mide("C-354", sg.es_suya("jaime") and sg.es_suya("Jaime")
+           and sg.es_suya("jaime · aprobo la pieza el 7-9-2026"),
+           "una etiqueta de una persona cuenta como aprobacion")
     h.mide("C-354",
            not sg.es_suya("la linea") and not sg.es_suya("servicio")
-           and not sg.es_suya("disenador") and not sg.es_suya(""),
-           "y una que puso la maquina, no")
+           and not sg.es_suya("disenador") and not sg.es_suya("")
+           and not sg.es_suya("alguien que no existe"),
+           "y una de un oficio, un paso o un desconocido, no")
+    # **Y el derecho es del TIPO, no del nombre.** C-363: si entra otra
+    # persona, aprueba por ser persona y no por llamarse como se llame.
+    from dominio.autor import Autor, puede
+
+    h.mide("C-363", (Autor.de("jaime") or Autor.de("x")).tipo == "persona"
+           and puede("jaime", "aprobar") and not puede("compositor", "aprobar"),
+           "la agencia cuelga del tipo, no del nombre")
+    h.mide("C-363", puede("compositor", "decidir criterio")
+           and puede("la linea", "medir") and not puede("la linea", "decidir criterio"),
+           "y cada tipo puede lo suyo: la linea mide, el oficio decide")
 
 
 def _lo_retirado_no_esta_en_el_catalogo(h):
