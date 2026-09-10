@@ -440,3 +440,160 @@ CREATE TABLE IF NOT EXISTS etapa_remedio (
 -- (`transicion.en_su_lugar` lo anade `migraciones._retiradas_fuera_del_catalogo`:
 --  un ALTER no es idempotente y este fichero se corre en cada arranque.)
 ;
+
+
+-- ══════════════════════════════════════════════════════════════════
+-- LA COPIA LA MANTIENE LA BASE, NO UN CONTADOR
+--
+-- Jaime, 10-9-2026: «elimina todas las guardas sintomaticas, busquemos
+-- refuerzos estructurales». Habia puesto un contador que avisaba cuando
+-- `<col>` y `<col>_id` decian cosas distintas: eso mira el destrozo
+-- despues de hecho. Estos disparadores lo hacen imposible — escribes el
+-- texto y la clave se pone sola, escribes la clave y el texto se pone solo.
+--
+-- Las 29 copias siguen porque `escena_desc.plano` tiene 26 lectores y
+-- moverlos de golpe es romper la linea. Pero ya no pueden divergir: no hay
+-- ningun camino que escriba una sin la otra.
+--
+-- Sin recursion: SQLite trae `recursive_triggers` apagado. C-369.
+-- ══════════════════════════════════════════════════════════════════
+
+CREATE TRIGGER IF NOT EXISTS corte_fijo_papel_texto_a_clave
+AFTER UPDATE OF papel ON corte_fijo FOR EACH ROW WHEN new.papel IS NOT NULL
+BEGIN UPDATE corte_fijo SET papel_id = (SELECT id FROM papel_corte WHERE nombre = new.papel) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS corte_fijo_papel_clave_a_texto
+AFTER UPDATE OF papel_id ON corte_fijo FOR EACH ROW WHEN new.papel_id IS NOT NULL
+BEGIN UPDATE corte_fijo SET papel = (SELECT nombre FROM papel_corte WHERE id = new.papel_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS colocacion_tipo_texto_a_clave
+AFTER UPDATE OF tipo ON colocacion FOR EACH ROW WHEN new.tipo IS NOT NULL
+BEGIN UPDATE colocacion SET tipo_id = (SELECT id FROM tipo_colocacion WHERE nombre = new.tipo) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS colocacion_tipo_clave_a_texto
+AFTER UPDATE OF tipo_id ON colocacion FOR EACH ROW WHEN new.tipo_id IS NOT NULL
+BEGIN UPDATE colocacion SET tipo = (SELECT nombre FROM tipo_colocacion WHERE id = new.tipo_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS dato_respalda_texto_a_clave
+AFTER UPDATE OF respalda ON dato FOR EACH ROW WHEN new.respalda IS NOT NULL
+BEGIN UPDATE dato SET respalda_id = (SELECT id FROM respaldo_dato WHERE nombre = new.respalda) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS dato_respalda_clave_a_texto
+AFTER UPDATE OF respalda_id ON dato FOR EACH ROW WHEN new.respalda_id IS NOT NULL
+BEGIN UPDATE dato SET respalda = (SELECT nombre FROM respaldo_dato WHERE id = new.respalda_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS densidad_nivel_texto_a_clave
+AFTER UPDATE OF nivel ON densidad FOR EACH ROW WHEN new.nivel IS NOT NULL
+BEGIN UPDATE densidad SET nivel_id = (SELECT id FROM nivel WHERE nombre = new.nivel) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS densidad_nivel_clave_a_texto
+AFTER UPDATE OF nivel_id ON densidad FOR EACH ROW WHEN new.nivel_id IS NOT NULL
+BEGIN UPDATE densidad SET nivel = (SELECT nombre FROM nivel WHERE id = new.nivel_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS fragmento_origen_texto_a_clave
+AFTER UPDATE OF origen ON fragmento FOR EACH ROW WHEN new.origen IS NOT NULL
+BEGIN UPDATE fragmento SET origen_id = (SELECT id FROM origen_fragmento WHERE nombre = new.origen) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS fragmento_origen_clave_a_texto
+AFTER UPDATE OF origen_id ON fragmento FOR EACH ROW WHEN new.origen_id IS NOT NULL
+BEGIN UPDATE fragmento SET origen = (SELECT nombre FROM origen_fragmento WHERE id = new.origen_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS incidencia_nivel_texto_a_clave
+AFTER UPDATE OF nivel ON incidencia FOR EACH ROW WHEN new.nivel IS NOT NULL
+BEGIN UPDATE incidencia SET nivel_id = (SELECT id FROM nivel_incidencia WHERE nombre = new.nivel) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS incidencia_nivel_clave_a_texto
+AFTER UPDATE OF nivel_id ON incidencia FOR EACH ROW WHEN new.nivel_id IS NOT NULL
+BEGIN UPDATE incidencia SET nivel = (SELECT nombre FROM nivel_incidencia WHERE id = new.nivel_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS instruccion_ambito_texto_a_clave
+AFTER UPDATE OF ambito ON instruccion FOR EACH ROW WHEN new.ambito IS NOT NULL
+BEGIN UPDATE instruccion SET ambito_id = (SELECT id FROM ambito WHERE nombre = new.ambito) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS instruccion_ambito_clave_a_texto
+AFTER UPDATE OF ambito_id ON instruccion FOR EACH ROW WHEN new.ambito_id IS NOT NULL
+BEGIN UPDATE instruccion SET ambito = (SELECT nombre FROM ambito WHERE id = new.ambito_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS instruccion_paso_texto_a_clave
+AFTER UPDATE OF paso ON instruccion FOR EACH ROW WHEN new.paso IS NOT NULL
+BEGIN UPDATE instruccion SET paso_id = (SELECT id FROM area_instruccion WHERE nombre = new.paso) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS instruccion_paso_clave_a_texto
+AFTER UPDATE OF paso_id ON instruccion FOR EACH ROW WHEN new.paso_id IS NOT NULL
+BEGIN UPDATE instruccion SET paso = (SELECT nombre FROM area_instruccion WHERE id = new.paso_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS instruccion_estado_texto_a_clave
+AFTER UPDATE OF estado ON instruccion FOR EACH ROW WHEN new.estado IS NOT NULL
+BEGIN UPDATE instruccion SET estado_id = (SELECT id FROM estado_instruccion WHERE nombre = new.estado) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS instruccion_estado_clave_a_texto
+AFTER UPDATE OF estado_id ON instruccion FOR EACH ROW WHEN new.estado_id IS NOT NULL
+BEGIN UPDATE instruccion SET estado = (SELECT nombre FROM estado_instruccion WHERE id = new.estado_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS regla_clase_texto_a_clave
+AFTER UPDATE OF clase ON regla FOR EACH ROW WHEN new.clase IS NOT NULL
+BEGIN UPDATE regla SET clase_id = (SELECT id FROM clase_regla WHERE nombre = new.clase) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS regla_clase_clave_a_texto
+AFTER UPDATE OF clase_id ON regla FOR EACH ROW WHEN new.clase_id IS NOT NULL
+BEGIN UPDATE regla SET clase = (SELECT nombre FROM clase_regla WHERE id = new.clase_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS revision_accion_texto_a_clave
+AFTER UPDATE OF accion ON revision FOR EACH ROW WHEN new.accion IS NOT NULL
+BEGIN UPDATE revision SET accion_id = (SELECT id FROM accion_revision WHERE nombre = new.accion) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS revision_accion_clave_a_texto
+AFTER UPDATE OF accion_id ON revision FOR EACH ROW WHEN new.accion_id IS NOT NULL
+BEGIN UPDATE revision SET accion = (SELECT nombre FROM accion_revision WHERE id = new.accion_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS revision_estado_texto_a_clave
+AFTER UPDATE OF estado ON revision FOR EACH ROW WHEN new.estado IS NOT NULL
+BEGIN UPDATE revision SET estado_id = (SELECT id FROM estado_revision WHERE nombre = new.estado) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS revision_estado_clave_a_texto
+AFTER UPDATE OF estado_id ON revision FOR EACH ROW WHEN new.estado_id IS NOT NULL
+BEGIN UPDATE revision SET estado = (SELECT nombre FROM estado_revision WHERE id = new.estado_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS ticket_tipo_texto_a_clave
+AFTER UPDATE OF tipo ON ticket FOR EACH ROW WHEN new.tipo IS NOT NULL
+BEGIN UPDATE ticket SET tipo_id = (SELECT id FROM tipo_ticket WHERE nombre = new.tipo) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS ticket_tipo_clave_a_texto
+AFTER UPDATE OF tipo_id ON ticket FOR EACH ROW WHEN new.tipo_id IS NOT NULL
+BEGIN UPDATE ticket SET tipo = (SELECT nombre FROM tipo_ticket WHERE id = new.tipo_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS ticket_estado_texto_a_clave
+AFTER UPDATE OF estado ON ticket FOR EACH ROW WHEN new.estado IS NOT NULL
+BEGIN UPDATE ticket SET estado_id = (SELECT id FROM estado_ticket WHERE nombre = new.estado) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS ticket_estado_clave_a_texto
+AFTER UPDATE OF estado_id ON ticket FOR EACH ROW WHEN new.estado_id IS NOT NULL
+BEGIN UPDATE ticket SET estado = (SELECT nombre FROM estado_ticket WHERE id = new.estado_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS ticket_cierra_con_texto_a_clave
+AFTER UPDATE OF cierra_con ON ticket FOR EACH ROW WHEN new.cierra_con IS NOT NULL
+BEGIN UPDATE ticket SET cierra_con_id = (SELECT id FROM medida WHERE nombre = new.cierra_con) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS ticket_cierra_con_clave_a_texto
+AFTER UPDATE OF cierra_con_id ON ticket FOR EACH ROW WHEN new.cierra_con_id IS NOT NULL
+BEGIN UPDATE ticket SET cierra_con = (SELECT nombre FROM medida WHERE id = new.cierra_con_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS etapa_tablero_estado_texto_a_clave
+AFTER UPDATE OF estado ON etapa_tablero FOR EACH ROW WHEN new.estado IS NOT NULL
+BEGIN UPDATE etapa_tablero SET estado_id = (SELECT id FROM estado_tablero WHERE nombre = new.estado) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS etapa_tablero_estado_clave_a_texto
+AFTER UPDATE OF estado_id ON etapa_tablero FOR EACH ROW WHEN new.estado_id IS NOT NULL
+BEGIN UPDATE etapa_tablero SET estado = (SELECT nombre FROM estado_tablero WHERE id = new.estado_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS incidencia_script_texto_a_clave
+AFTER UPDATE OF script ON incidencia FOR EACH ROW WHEN new.script IS NOT NULL
+BEGIN UPDATE incidencia SET script_id = (SELECT id FROM script_incidencia WHERE nombre = new.script) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS incidencia_script_clave_a_texto
+AFTER UPDATE OF script_id ON incidencia FOR EACH ROW WHEN new.script_id IS NOT NULL
+BEGIN UPDATE incidencia SET script = (SELECT nombre FROM script_incidencia WHERE id = new.script_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS corte_fijo_toma_texto_a_clave
+AFTER UPDATE OF toma ON corte_fijo FOR EACH ROW WHEN new.toma IS NOT NULL
+BEGIN UPDATE corte_fijo SET toma_id = (SELECT id FROM toma WHERE nombre = new.toma) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS corte_fijo_toma_clave_a_texto
+AFTER UPDATE OF toma_id ON corte_fijo FOR EACH ROW WHEN new.toma_id IS NOT NULL
+BEGIN UPDATE corte_fijo SET toma = (SELECT nombre FROM toma WHERE id = new.toma_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS incidencia_toma_texto_a_clave
+AFTER UPDATE OF toma ON incidencia FOR EACH ROW WHEN new.toma IS NOT NULL
+BEGIN UPDATE incidencia SET toma_id = (SELECT id FROM toma WHERE nombre = new.toma) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS incidencia_toma_clave_a_texto
+AFTER UPDATE OF toma_id ON incidencia FOR EACH ROW WHEN new.toma_id IS NOT NULL
+BEGIN UPDATE incidencia SET toma = (SELECT nombre FROM toma WHERE id = new.toma_id) WHERE rowid = new.rowid; END;
+
+CREATE TRIGGER IF NOT EXISTS ticket_vuelve_a_texto_a_clave
+AFTER UPDATE OF vuelve_a ON ticket FOR EACH ROW WHEN new.vuelve_a IS NOT NULL
+BEGIN UPDATE ticket SET vuelve_a_id = (SELECT id FROM fase WHERE nombre = new.vuelve_a) WHERE rowid = new.rowid; END;
+CREATE TRIGGER IF NOT EXISTS ticket_vuelve_a_clave_a_texto
+AFTER UPDATE OF vuelve_a_id ON ticket FOR EACH ROW WHEN new.vuelve_a_id IS NOT NULL
+BEGIN UPDATE ticket SET vuelve_a = (SELECT nombre FROM fase WHERE id = new.vuelve_a_id) WHERE rowid = new.rowid; END;

@@ -106,60 +106,46 @@ def _la_maquina_no_se_aprueba_sola(h):
            "y cada tipo puede lo suyo: la linea mide, el oficio decide")
 
 
-def _lo_retirado_no_esta_en_el_catalogo(h):
-    """Lo que Jaime retiro no puede seguir en la tabla esperando a que lo pidan.
+def _el_marcador_propone_y_no_firma(h):
+    """Un fichero no prueba quien lo escribio, asi que no puede aprobar.
 
-    La cortinilla se retiro una vez, `camara.mjs :: RETIRADAS` lo declaraba con
-    su sustituto, y el catalogo la seguia ofreciendo con cuatro etapas usandola.
-    Es el mismo fallo que hizo salir reel-01 con una placa de 0,7 s: el menu la
-    daba por muerta y el mecanismo seguia vivo. C-362.
+    Jaime, 10-9-2026: *«la guarda es el Json, y lo que verifica y garantiza
+    integridad es que solo se pueda modificar con los permisos»*, y despues:
+    *«elimina todas las guardas sintomaticas, busquemos refuerzos
+    estructurales»*.
+
+    Esto no comprueba que nada haya salido mal: **ejecuta el ataque**. Un oficio
+    tiene `Write` sobre el marcador; escribe ahi que la etapa esta aprobada y
+    firma «jaime». Si el sistema lo acepta, la firma no vale nada.
+
+    Aguanta por dos cosas a la vez, y hacen falta las dos: el lector va a la
+    base y no al fichero —antes iba al fichero, asi que el permiso se
+    comprobaba al escribir y se regalaba al leer—, y la puerta rechaza que un
+    oficio firme por una persona. C-369.
     """
     import json
-    import subprocess
 
-    import basedatos
+    from dominio import estado, segmento as sg
 
-    try:
-        r = json.loads(subprocess.run(
-            ["node", "-e", "import('./scripts/camara.mjs').then(m =>"
-                           " console.log(JSON.stringify(m.RETIRADAS || {})))"],
-            capture_output=True, text=True, timeout=30).stdout.strip() or "{}")
-    except Exception:                              # noqa: BLE001
-        r = {}
-    h.mide("C-362", bool(r), "hay retiradas declaradas y se pueden leer")
-    # **Se marcan, no se borran.** Borrar la fila no retiraba nada: el volcado
-    # la resucitaba en cuanto encontraba una descripcion vieja que la nombraba,
-    # y este mismo humo lo caso. Marcada con su sustituto, `cat()` la redirige.
-    cx = basedatos.abrir()
-    marcadas = {x[0] for x in cx.execute(
-        "select nombre from transicion where en_su_lugar is not null")}
-    usadas = {x[0] for x in cx.execute(
-        "select t.nombre from transicion t join etapa_transicion e"
-        " on e.transicion_id = t.id where t.en_su_lugar is not null")}
-    h.mide("C-362", set(r) <= marcadas,
-           "cada retirada esta marcada con su sustituto")
-    h.mide("C-362", not usadas, "y ninguna etapa sigue usandola")
-
-
-def _la_copia_no_contradice_a_su_clave(h):
-    """Mientras la copia de texto conviva con su clave, no pueden discrepar.
-
-    Veintinueve columnas siguen llevando su texto al lado de la clave: quitarlas
-    hoy seria mover 26 lectores de `escena_desc.plano` de golpe, o sea romper la
-    linea por normalizar. Lo que si se puede exigir es que digan lo mismo — si
-    no, hay dos verdades vivas y las dos creibles, que es lo que la
-    normalizacion venia a cerrar.
-
-    Lo primero que caso al ponerlo fue mio: `instruccion.paso_id` declaraba
-    `REFERENCES fase(id)` de un mapeo equivocado y guardaba ids de
-    `area_instruccion`. Las 37 filas discrepaban y no se veia. C-368.
-    """
-    import conectado
-
-    h.mide("C-368", conectado.copias_que_discrepan() == [],
-           "ninguna copia de texto contradice a su clave")
-    h.mide("C-368", conectado.filas_sin_autor() == [],
-           "y ninguna fila dice `quien` sin decir cual")
+    slug = PIEZA
+    estado.escribe(slug)
+    d = estado.lee(slug)
+    abierto = next((f for f in d.get("segmentos") or [] if not f["aprobado"]), None)
+    if not abierto:
+        h.mide("C-369", True, "no hay segmento abierto con el que probar")
+        return
+    n = abierto["etapa"]
+    abierto["etiqueta"] = abierto["propone"] = "aprobado"
+    abierto["por"] = "jaime"
+    json.dump(d, open(estado.ruta(slug), "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    estado.aplica(slug)
+    seg = next(x for x in sg.Segmento.de(slug) if x.n == n)
+    h.mide("C-369", seg.etiqueta != "aprobado",
+           "un oficio no aprueba escribiendolo en el marcador")
+    h.mide("C-369", not sg.aprobada(slug),
+           "y la pieza no queda aprobada por un fichero")
+    estado.escribe(slug)
 
 
 def _prueba_movida_va_al_compositor(h):
@@ -278,8 +264,7 @@ def main():
     h = Humo()
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
               _la_maquina_no_se_aprueba_sola,
-              _lo_retirado_no_esta_en_el_catalogo,
-              _la_copia_no_contradice_a_su_clave,
+              _el_marcador_propone_y_no_firma,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,

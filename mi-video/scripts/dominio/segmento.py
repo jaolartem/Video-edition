@@ -113,21 +113,24 @@ class Segmento:
     def _fila(self):
         """Lo etiquetado para este segmento, **contra su corte de hoy**.
 
-        Jaime, 10-9-2026: *«ahora la fuente de verdad es el Json, una sola
-        fuente»*. Asi que se mira ahi primero: el marcador es lo que el oficio
-        puede abrir y escribir, y tener dos sitios donde leer lo mismo es la
-        averia que este proyecto lleva persiguiendo desde el principio.
+        Se lee de la base y **no del marcador**, y esa es la diferencia entre
+        una guarda y un adorno. Jaime, 10-9-2026: *«la guarda es el Json, y lo
+        que verifica y garantiza integridad es que solo se pueda modificar con
+        los permisos»*.
 
-        La base es la **copia que sobrevive**: el marcador se borra al cerrar la
-        pieza —memoria de trabajo— y entonces la fila es lo unico que queda. Por
-        eso se lee de segunda y nunca por delante.
+        Lo tenia al reves. El marcador mandaba tambien al LEER, asi que un
+        oficio —que tiene `Write` sobre el fichero— escribia
+        `{"etiqueta": "aprobado", "por": "jaime"}` y quedaba aprobado, aunque
+        `estado.aplica` rechazara la firma un segundo despues: comprobar el
+        permiso al escribir no vale nada si al leer se cree el fichero.
+        Medido, y por eso esta escrito.
+
+        El reparto que si aguanta: **el marcador propone y la puerta decide.**
+        Escribir un fichero solo puede proponer —un fichero no prueba quien lo
+        escribio—; lo que paso el permiso queda en la base, y el marcador lo
+        vuelve a publicar. La fuente de verdad sigue siendo el documento que
+        viaja; lo que no puede es firmar por su cuenta.
         """
-        from . import estado as _e
-
-        for f in (_e.lee(self.slug).get("segmentos") or []):
-            if f.get("etapa") == self.n and f.get("huella") == self.huella:
-                return {"etiqueta": f.get("etiqueta") or "",
-                        "quien": f.get("por") or "", "cuando": ""}
         cx = _con()
         r = cx.execute(
             "select etiqueta, huella, quien, cuando from segmento s"

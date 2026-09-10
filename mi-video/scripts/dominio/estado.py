@@ -133,6 +133,55 @@ def escribe(slug):
     return _guarda(slug, d)
 
 
+#: Que permiso hace falta para poner cada etiqueta. Lo que no esta aqui solo
+#: pide `medir`, que es lo que cualquier paso puede.
+PIDE = {"aprobado": "aprobar"}
+
+
+def _admite(quien, etiqueta):
+    """¿Ese autor puede poner esa etiqueta **por el marcador**? Y por que no.
+
+    Dos reglas, y la segunda es la que cierra la puerta de verdad:
+
+    1. El autor tiene que existir y tener el permiso que la etiqueta pide.
+    2. **Por el marcador no actua una persona.** El fichero lo escriben los
+       oficios, y un fichero no prueba quien lo escribio: si bastara con poner
+       `"por": "jaime"`, la firma no valdria nada. Una persona aprueba en su
+       terminal —`aprobar.py`—, que es el unico sitio donde su identidad no la
+       declara el que escribe.
+    """
+    from .autor import Autor
+
+    a = Autor.de(quien)
+    if a is None:
+        return False, f"«{quien}» no es un autor declarado"
+    permiso = PIDE.get(etiqueta, "medir")
+    if not a.puede(permiso):
+        return False, f"{a} no tiene el permiso «{permiso}»"
+    if a.tipo == "persona":
+        return False, ("una persona no actua por el marcador: el fichero lo"
+                       " escribe un oficio y no puede firmar por ella")
+    return True, ""
+
+
+def _rechaza(slug, etapa, etiqueta, quien, por_que):
+    """Un rechazo se cuenta. Callarlo seria peor que aceptarlo."""
+    d = lee(slug)
+    d.setdefault("log", []).append(
+        {"cuando": _ahora(), "etapa": d.get("etapa"),
+         "que": f"RECHAZADO del marcador: e{etapa} -> «{etiqueta}»"
+                f" firmado por «{quien}»: {por_que}"})
+    _guarda(slug, d)
+    try:
+        import registro
+
+        registro.aviso("marcador", "modificacion sin permiso",
+                       detalle=f"{slug} e{etapa} «{etiqueta}» por «{quien}»:"
+                               f" {por_que}"[:250], eco=False)
+    except Exception:                              # noqa: BLE001
+        pass
+
+
 def aplica(slug, quien="el marcador"):
     """Lo que se escribio en el marcador **entra en la base**.
 
@@ -154,7 +203,11 @@ def aplica(slug, quien="el marcador"):
     puestos = {x.n: x for x in _sg.Segmento.de(slug)}
     movidos = []
     for fila in d.get("segmentos") or []:
-        n, nueva = fila.get("etapa"), (fila.get("etiqueta") or "").strip()
+        # **Se propone en `propone`, no en `etiqueta`.** `etiqueta` es lo
+        # que ya paso la puerta y lo publica el volcado; si el que
+        # escribe pudiera tocar ese campo, proponer y decidir serian
+        # el mismo gesto.
+        n, nueva = fila.get("etapa"), (fila.get("propone") or "").strip()
         seg = puestos.get(n)
         if seg is None or not nueva or nueva == seg.etiqueta:
             continue
@@ -163,7 +216,22 @@ def aplica(slug, quien="el marcador"):
         # dar por bueno lo que nadie vio.
         if fila.get("huella") and fila["huella"] != seg.huella:
             continue
-        seg.mueve(nueva, fila.get("por") or quien)
+        # **Y no entra sin permiso.** Jaime, 10-9-2026: *«la guarda es el Json,
+        # y lo que verifica y garantiza integridad es que solo se pueda
+        # modificar con los permisos»*.
+        #
+        # Esto aceptaba el autor que el propio fichero declaraba. Un oficio
+        # tiene `Write` sobre el marcador, asi que podia escribir
+        # `{"etiqueta": "aprobado", "por": "jaime"}` y entraba como una
+        # aprobacion suya: **un fichero no puede probar quien lo escribio**. El
+        # detector de copias que discrepan habria visto el destrozo despues; lo
+        # que impide que ocurra es esto.
+        firma = fila.get("por") or quien
+        vale, por_que = _admite(firma, nueva)
+        if not vale:
+            _rechaza(slug, n, nueva, firma, por_que)
+            continue
+        seg.mueve(nueva, firma)
         movidos.append((n, nueva))
     if movidos:
         d.setdefault("log", []).append(
