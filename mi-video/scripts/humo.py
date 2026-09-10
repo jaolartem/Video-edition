@@ -52,6 +52,30 @@ def _perdida_no_se_calla(h):
            "y la duda legitima si la contesta su nota")
 
 
+def _las_dos_puertas_leen_igual(h):
+    """La puerta a mano y la de la linea tienen que decir lo mismo.
+
+    `separa` solo consulta lo que Jaime ya decidio si se le pasa la pieza, y el
+    servicio la llamaba sin ella: `verificar.py 3` daba «todo en pie» y la
+    linea paraba esa misma pieza por un motivo que la nota #661 contesta desde
+    el 5-9. Dos respuestas distintas de la misma regla — y la que se mira a
+    mano era la que no mandaba. C-351.
+    """
+    import inspect
+
+    import verificar
+    from servicios import verificar as sv
+
+    fuente = inspect.getsource(sv.ServicioVerificar.correr)
+    h.mide("C-351", "slug=pieza.slug" in fuente,
+           "el servicio le pasa la pieza a `separa`")
+    mal = ["reel-03 e6: sin material y sin tablero"]
+    h.mide("C-351",
+           verificar.separa(mal, slug="reel-03")[0] == []
+           and verificar.separa(mal)[0] != [],
+           "y con la pieza delante deja de parar lo ya contestado")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -166,7 +190,8 @@ def _camino_lleva_el_adelanto(h):
 
 def main():
     h = Humo()
-    for f in (_perdida_no_se_calla, _prueba_movida_va_al_compositor,
+    for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
+              _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
               _camino_lleva_el_adelanto):

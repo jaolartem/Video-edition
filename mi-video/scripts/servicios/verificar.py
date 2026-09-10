@@ -37,7 +37,16 @@ class ServicioVerificar(Servicio):
         # Que pare o no lo decide `verificar.separa`, que es una sola regla y la
         # leen las dos puertas. Lo que no para viene aqui y sale como ticket con
         # su pieza, para que viaje con ella hasta que alguien lo mire.
-        paran, avisan = verificar.separa(mal)
+        # **Y se le pasa la pieza, que es lo que hace que sea la misma regla.**
+        #
+        # `separa` solo le pregunta a lo que Jaime ya decidio `if not blando and
+        # slug`, asi que sin el slug la consulta no ocurre. Esta puerta lo
+        # omitia: `verificar.py 3` decia «OK, todo en pie» y la linea paraba la
+        # misma pieza por «e6: sin material y sin tablero», que la nota #661
+        # contesta desde el 5-9. reel-03 dio dos vueltas asi y el motor la
+        # planto — con el detalle correcto en un log que decia lo contrario del
+        # que se corre a mano. C-351.
+        paran, avisan = verificar.separa(mal, slug=pieza.slug)
         for m in avisan:
             _anota(pieza, m)
         if not paran:
