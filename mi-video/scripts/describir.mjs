@@ -137,9 +137,8 @@ function describePieza(slug, filas) {
     try {
       const j = execFileSync("python", ["-c",
         "import sys,json;sys.path.insert(0,'scripts');import fotogramas as F;"
-        + "print(json.dumps(F.de_la_cinta(sys.argv[1],float(sys.argv[2]),"
-        + "float(sys.argv[3]),etiqueta=sys.argv[4])))",
-        d.toma, String(d.start), String(d.end), `b${f.orden}`],
+        + "print(json.dumps(F.de_la_escena(sys.argv[1],int(sys.argv[2]))))",
+        slug, String(f.orden)],
         { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
       return { ...f, fotogramas: JSON.parse(j) };
     } catch { return f; }

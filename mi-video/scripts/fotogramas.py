@@ -131,6 +131,59 @@ def de_la_cinta(toma, desde, hasta, cuantos=CUANTOS, etiqueta=""):
     return tiros
 
 
+def de_la_escena(slug, etapa, cuantos=CUANTOS):
+    """De 3 a 5 fotogramas repartidos **a lo largo de la escena**, no de la ventana.
+
+    Jaime, 10-9-2026: *«el compositor tiene que ver que no haya escenas leyendo a
+    la hora de escogerlas, que no haya duplicacion o cosas mal seleccionadas;
+    tiene que utilizar la herramienta de renderizar 3 a 5 frames de cada escena
+    — ojo, frames, no segundos, centesimas o video: 3 a 5 fotos estaticas
+    repartidas a lo largo de la escena para ver su estetica y continuidad»*.
+
+    **Y estaban repartidos por la ventana de busqueda, que es otra cosa.**
+    Medido en el pedido de reel-03 del 10-9: los cinco fotogramas del beat 1
+    salian en los segundos 66,2 · 125,8 · 185,4 · 245,0 · 304,6 de la cinta —
+    un minuto entre uno y otro— mientras los tramos que esa etapa monta de
+    verdad son 28,5-33,5, 39,3-42,4 y 340,6-342,2. Ninguno de los cinco caia
+    dentro de la escena. Se le pedia que dijera si estaba leyendo AHI mirando
+    fotos de cuatro minutos de distancia.
+
+    Los tramos salen del segmento, que es la unidad, y el reparto es por tiempo
+    de escena: un tramo que dura el doble se lleva el doble de fotos, porque lo
+    que se juzga es la continuidad de lo que se ve, no cuantos trozos hay.
+    """
+    from dominio.segmento import Segmento
+
+    seg = next((x for x in Segmento.de(slug) if x.n == int(etapa)), None)
+    if not seg or not seg.tramos:
+        return []
+    total = sum(b - a for a, b in seg.tramos) or 1.0
+    cuantos = max(3, min(int(cuantos), CUANTOS))
+    fuera, toma = [], _toma_de(slug, seg.n)
+    if not toma:
+        return []
+    for a, b in seg.tramos:
+        # Al menos uno por tramo: un trozo corto tambien puede tenerlo leyendo.
+        cuota = max(1, round(cuantos * (b - a) / total))
+        fuera += de_la_cinta(toma, a, b, cuantos=cuota, etiqueta=f"e{seg.n}")
+    return fuera[:CUANTOS]
+
+
+def _toma_de(slug, etapa):
+    """De que cinta sale esa etapa, segun el EDL."""
+    import json as _j
+
+    try:
+        edl = _j.load(open(os.path.join("ads", slug, "edl-sell.json"),
+                           encoding="utf-8"))
+    except OSError:
+        return None
+    for d in edl.get("detalle", []):
+        if d.get("beat") == int(etapa) and d.get("toma"):
+            return d["toma"]
+    return None
+
+
 def _del_still(slug):
     """Los fotogramas que dejo `mirar.sh`, en la forma que devuelve `sacar`.
 
