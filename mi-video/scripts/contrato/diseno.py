@@ -108,7 +108,7 @@ DISENO = Contrato(
         # gancho para el scroll. No es ambicion estetica, es la aritmetica de la
         # campana.
         Campo("intencion_del_gancho",
-              manda=Aguja("scripts/servicios/disenar.py", "ENTRADA_GANCHO = {"),
+              manda=Aguja("scripts/contrato/marca.py", "ENTRADA_GANCHO = {"),
               exige=(Prompt("scripts/disenar.prompt.md", "parar el scroll"),),
               nota="Jaime: «que todos los hooks se revisen y se hagan animados"
                    " de verdad, que paren scroll». El gancho no compite contra"

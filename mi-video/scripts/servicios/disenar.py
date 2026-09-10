@@ -41,6 +41,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from contrato.marca import ENTRADA_GANCHO, ESTILO, PRIORIDAD  # noqa: E402,F401
+
 from dominio import abierto as _abierto  # noqa: E402
 import fotogramas as _fotogramas  # noqa: E402
 from dominio import remate as _remate  # noqa: E402
@@ -89,24 +91,7 @@ def _con():
     return c
 
 
-#: El encargo de estilo. **No es una lista de prohibiciones**: eso es lo que
-#: habia y produjo minimalismo corporativo, porque lo unico que no estaba
-#: prohibido era no hacer nada.
-ESTILO = {
-    "que_es": "Neoconstructivista: el nieto millennial o alfa del constructivismo ruso. Emparentado con lo corporativo, pero lejos de el.",
-    "jaime": "Respeto por la cuadricula si, pero tambien irrespeto con criterio. Manejo de la forma si, pero tambien encuadres caoticos. Mucho color: NO HAY PROHIBICIONES DE COLOR, hay prohibiciones de coherencia y composicion.",
-    "la_vara": "Queremos dejar la sensacion de wow, y eso se consigue haciendonos entender. Un tablero que solo se lee no cumple; uno que se entiende de un vistazo, si.",
-    "el_tablero_es": "Fundamentalmente IMAGEN, no texto. Es un elemento didactico, igual que el panel. Si lo que compones se puede leer en voz alta y no se pierde nada, no es un tablero: es un rotulo.",
-}
 
-#: Cuando dos criterios chocan, gana el de mas arriba. Palabras de Jaime.
-PRIORIDAD = {
-    "1_carga_cognitiva": "Reducir lo que el espectador tiene que procesar. Si el tablero propuesto obliga a leer tres cosas para entender una, se cambia.",
-    "2_coherencia_visual": "Que la pieza se vea de una sola mano y del canon de las 26 laminas.",
-    "3_objetivo_emocional": "Que la etapa deje la emocion que le toca.",
-    "jaime": "El disenador puede respetar el tablero o no; debe primar la reduccion de la carga cognitiva para el espectador, la coherencia visual y el objetivo emocional, en ese orden. MUCHO MOVIMIENTO, MUCHA DOPAMINA.",
-    "y_si_lo_cambias": "Dilo en `por_que`: que proponia el encargo, que compusiste y por cual de los tres criterios.",
-}
 
 #: El oficio del reel comercial, y el filtro de marca que lo acota.
 #:
@@ -143,23 +128,6 @@ ANTES_DE_DIBUJAR = {
 }
 
 
-#: Lo que el gancho tiene que cumplir, y lo comprueba `gancho.mjs`.
-ENTRADA_GANCHO = {
-    "entradas_minimo": 6,
-    "por_que": "el primer segundo decide si alguien sigue mirando; el maximalismo aqui es DENSIDAD DE ENTRADAS, no adorno",
-    "jaime": "espero animaciones mucho MAS FUERTES en todos los hooks: letras que entran DETRAS de mi cara y se acomodan, movimientos de subtitulos, cosas llamativas, con muchos efectos",
-    # **Esto TODAVIA NO SE PUEDE.** Se ofrecia como si estuviera hecho y no
-    # lo esta: `scripts/text-behind.py` saca el recorte del sujeto y
-    # funciona, pero ningun paso del render lo consume. Es la avería que
-    # Jaime nombro —*«que no quede otra vez el mismo error de declarar sin
-    # implementar»*— en el mismo bloque donde la nombro. Vive en
-    # `camara.por_construir`, que es donde se piden las cosas que cuestan
-    # codigo, y aqui se dice lo que hay.
-    "letras_detras": "POR CONSTRUIR, no lo compongas como si estuviera: el rotulo naciendo detras de la cara es lo que mas subiria el gancho y hoy no hay capa que lo dibuje. Si tu gancho lo pide, pidelo en `por_que` y se agenda. Ver `camara.por_construir`.",
-    "el_subtitulo_se_mueve": "En el gancho el subtitulo no solo aparece: entra, se asienta, acompana. Fuera del gancho se queda quieto.",
-    "exige": "una figura dibujable declarada o una composicion tipografica; no vale prosa, porque nadie la dibuja",
-    "prohibido": "rebote, confeti, wiggle y cualquier micro-animacion juguetona: esto es un asesor financiero hablando a duenos de negocio. Fuerte no es gracioso.",
-}
 
 
 def _pide_tablero(fila):

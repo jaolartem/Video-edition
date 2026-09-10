@@ -7,6 +7,7 @@ solo sitio donde se decide cómo se ve una etapa.
 """
 from .aguja import NADIE, Aguja, Prompt
 from .comun import CUMPLIMIENTO, REDUNDANCIA
+from .marca import MARCA
 from .piezas import Campo, Clave, Contrato, Momento
 
 COMPONE = Contrato(
@@ -248,7 +249,14 @@ COMPONE = Contrato(
               efecto="para la pieza entera",
               lista=("compone", "rota")),
     ),
-    bloques=(REDUNDANCIA, CUMPLIMIENTO),
+    # **Y la marca, que estaba solo en el contrato del disenador.** Jaime,
+    # 10-9-2026: *«una vez algo queda hecho y en catalogo, el sistema queda
+    # actualizado y esa herramienta le sirve a todos»*. El compositor escribe
+    # **la orden que el disenador ejecuta** —su propio contrato lo dice: «si no
+    # dejas dicho que tiene que vestir y con que intencion, el disenador no lo
+    # va a adivinar»— y decidia el trato de cada etapa sin conocer la marca en
+    # la que lo estaba encargando. C-364.
+    bloques=(MARCA, REDUNDANCIA, CUMPLIMIENTO),
     repite=None,
     nota="Lo único que para de verdad hoy es `sinAfinar` al 95%: el contenido no"
          " se juzga en ningún sitio, y una etapa con `integridad` diciendo que el"
