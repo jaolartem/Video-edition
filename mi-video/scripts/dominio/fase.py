@@ -276,6 +276,19 @@ def _render_caduco(pieza):
     edl = os.path.join("ads", pieza.slug, "edl-sell.json")
     if not os.path.exists(edl):
         return None
+    # **Lo aprobado no se devuelve, y esta es la linea que le faltaba a C-348.**
+    #
+    # Aquella guarda le pregunto a la cadena entera —bien— y arrastro a
+    # `verificado` cuatro piezas firmadas: se revirtio por eso. Ahora hay con
+    # que distinguirlas, porque el segmento sabe decir quien lo aprobo. Una
+    # pieza firmada por Jaime sale de la cinta y no vuelve por una fecha.
+    try:
+        from . import segmento as _sg
+
+        if _sg.aprobada(pieza.slug):
+            return None
+    except Exception:                              # noqa: BLE001
+        pass
     n = int(pieza.slug[-2:])
     video = rutas.salida("reels", f"reel-R{n}.mp4")
     if not os.path.exists(video):
@@ -330,26 +343,38 @@ def _render_caduco(pieza):
             return (f"el render de {pieza.slug} dibujo otra cosa"
                     f" ({_puesta or 'sin huella'} != {_h}): no es lo que se"
                     f" compuso")
-        return None
-    if os.path.getmtime(video) < os.path.getmtime(edl):
-        return (f"el render de {pieza.slug} es anterior a su corte"
-                f" — se rehace, la etiqueta no basta")
-    # **Y la descripcion tambien cambia el video.** El corte decide que se oye;
-    # la descripcion decide los tableros y lo que se lee. Comparar solo con el
-    # EDL dejaba pasar una pieza re-descrita: reel-03 y reel-06 quedaron
-    # montadas con la descripcion vieja porque su corte no se habia movido.
-    con = _con()
-    f = con.execute("select max(fecha) from escena_desc where video_slug = ?",
-                    (pieza.slug,)).fetchone()[0]
-    con.close()
-    if f:
-        try:
-            descrito = datetime.datetime.fromisoformat(f).timestamp()
-        except ValueError:
-            descrito = 0
-        if os.path.getmtime(video) < descrito:
-            return (f"el render de {pieza.slug} es anterior a su descripcion"
-                    f" — los tableros y los subtitulos salen de ahi")
+        # **La huella contesta por SU eslabon, no por los once.** Si coincide,
+        # el render dibujo el spec de ahora — y eso no dice nada de si el spec
+        # sale de un plan viejo. Devolver `None` aqui era darle a la huella una
+        # autoridad que no tiene, y por eso `_render_caduco` decia «al dia» de
+        # reel-05 mientras la cadena la daba por caducada.
+    # **Y si no hay huella, la pregunta es de la cadena. Una sola.**
+    #
+    # Esto comparaba a mano la fecha del mp4 con la del EDL y con la de
+    # `escena_desc`. `cadena.py` compara los ONCE eslabones —y ademas contra la
+    # version del codigo que los hizo—, asi que eran dos guardas contestando
+    # «¿el artefacto corresponde?» con distinta vara. Medido el 10-9-2026 sobre
+    # reel-05: la cadena decia «out/reels/reel-R5.mp4 es mas viejo que
+    # src/reels.json» y esto decia «al dia», sobre la misma pieza y a la vez.
+    #
+    # Aqui se queda lo que la cadena NO sabe —la huella de lo que el fichero
+    # dibujo y el audio de la entrega— y lo demas se le pregunta a ella.
+    try:
+        import cadena as _cad
+
+        malo = _cad.desde(n)
+        # **Cada una contesta por lo suyo y no se pisan.** De `render` en
+        # adelante manda la huella —compara lo que el fichero DIBUJO, no cuando
+        # se escribio, que es lo que rehacia renders buenos—; de `spec` hacia
+        # atras manda la cadena, que es la unica que mira esos eslabones. El
+        # corte esta en el indice de `render`, y sale de la propia lista.
+        corte = next((i for i, e in enumerate(_cad.ESLABONES)
+                      if e[0] == "render"), 99)
+        if malo and malo[0] < corte:
+            return (f"la cadena de {pieza.slug} esta caducada en"
+                    f" «{malo[1]}»: {malo[3]}")
+    except Exception:                              # noqa: BLE001
+        pass
     return None
 
 

@@ -71,9 +71,35 @@ class Alcance:
     def editables(self):
         """Las etapas que se pueden tocar, o `None` si es la pieza entera.
 
-        `None` no es un hueco: es el modo normal, componer de cero. Una lista
-        significa **sólo éstas**, y el resto ya está aprobado.
+        `None` no es un hueco: es **refactor**, componer de cero. Una lista
+        significa «sólo éstas», y el resto está aprobado.
+
+        **Y quien dice qué está aprobado es el segmento, no el tiquet.** Esto
+        se calculaba sólo de los tiquets abiertos, así que sin ninguno devolvía
+        `None` — «la pieza entera»— aunque las siete etapas estuvieran firmadas.
+        Medido el 10-9-2026 con cero tiquets abiertos: `Alcance.editables` decía
+        `None` en las siete piezas mientras el marcador decía que reel-02, -04,
+        -06 y -07 no tenían **ninguna** etapa abierta. O sea, la orden que le
+        llegaba al compositor era recomponer entero lo ya aprobado.
+
+        Jaime, 10-9-2026: *«dos modos: refactor, que es todo el documento, o
+        segmento por segmento, que ya está declarado en el Json»*. Los dos
+        salen de aquí, y de una sola fuente.
         """
+        try:
+            from . import segmento as _sg
+
+            segs = _sg.Segmento.de(self.slug)
+            abiertos = [x.n for x in segs if not x.aprobado]
+            # Nada aprobado todavia: es refactor de verdad, la pieza entera.
+            if segs and len(abiertos) < len(segs):
+                # Un tiquet no abre lo aprobado por su cuenta: acota DENTRO de
+                # lo que ya estaba abierto, o nombra la etapa que reabre.
+                if self and self.etapas and not self.toda_la_pieza:
+                    return sorted(set(abiertos) | self.etapas)
+                return sorted(abiertos)
+        except Exception:                          # noqa: BLE001
+            pass
         if not self or self.toda_la_pieza or not self.etapas:
             return None
         return sorted(self.etapas)
