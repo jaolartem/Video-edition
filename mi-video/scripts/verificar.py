@@ -109,6 +109,23 @@ def _queda_trabajo(paso: str, slug: str) -> bool:
         return True
 
 
+#: La marca que lleva un motivo al que Jaime **ya contesto**. Vive aqui para
+#: que quien la escribe y quien la lee usen la misma cadena: sin eso, la puerta
+#: de la linea convertia en tiquet un aviso que decia «ya decidido», y ese
+#: tiquet paraba la pieza por algo resuelto (C-352).
+CONTESTADO = "YA DECIDIDO"
+
+
+def _aprobado(slug, beat) -> bool:
+    """Si ese segmento esta etiquetado `aprobado` contra el corte de hoy."""
+    try:
+        from dominio import segmento as _sg
+
+        return any(x.n == int(beat) and x.aprobado for x in _sg.Segmento.de(slug))
+    except Exception:                              # noqa: BLE001
+        return False
+
+
 def separa(mal, final: bool = False, slug: str = ""):
     """Parte los motivos en los que paran la pieza y los que solo se anotan.
 
@@ -142,7 +159,7 @@ def separa(mal, final: bool = False, slug: str = ""):
         if not blando and slug:
             ya = _c.contestado(m, slug)
             if ya:
-                avisan.append(f"{m}  — YA DECIDIDO ({ya[0]}): «{ya[1]}»")
+                avisan.append(f"{m}  — {CONTESTADO} ({ya[0]}): «{ya[1]}»")
                 continue
         (avisan if blando else paran).append(m)
     return paran, avisan
@@ -268,7 +285,14 @@ def revisar(slug):
             # contenido, cifras y negaciones— y perdona el relleno. Asi lo que
             # salta es puntual, que es la condicion que Jaime le puso a que algo
             # vuelva: *«si vuelve, vuelve con cosas tremendamente puntuales»*.
-            if b in dice and antes and not _dice_lo_mismo(antes, ahora):
+            # **Y un segmento aprobado no se rediscute.** Jaime, 10-9-2026:
+            # *«cada segmento se debe revisar como la unidad de analisis»*. Si
+            # su etiqueta dice `aprobado` contra ESTE corte, su descripcion
+            # entra en lo aprobado y volver a compararla abre un tiquet sobre
+            # criterio ya cerrado. Si el corte se moviera, la etiqueta habria
+            # caducado sola y esto volveria a mirar.
+            if (b in dice and antes and not _dice_lo_mismo(antes, ahora)
+                    and not _aprobado(slug, b)):
                 viejas.append(b)
         if viejas:
             mal.append(

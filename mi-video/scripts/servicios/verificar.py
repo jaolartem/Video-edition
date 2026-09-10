@@ -47,7 +47,16 @@ class ServicioVerificar(Servicio):
         # planto — con el detalle correcto en un log que decia lo contrario del
         # que se corre a mano. C-351.
         paran, avisan = verificar.separa(mal, slug=pieza.slug)
+        # **Lo que Jaime ya contesto no vuelve como tiquet.** Con C-351 la
+        # puerta empezo a ablandar esos motivos —bien— y este bucle los
+        # convertia en tiquets igual: el #291 decia literalmente «e6 · sin
+        # material y sin tablero — YA DECIDIDO (nota #661)», iba a `disenado` y
+        # dejaba la pieza trabada por algo resuelto hace cinco dias. Un aviso
+        # que cita la decision que lo contesta no es trabajo pendiente: es la
+        # prueba de que no lo hay.
         for m in avisan:
+            if verificar.CONTESTADO in m:
+                continue
             _anota(pieza, m)
         if not paran:
             return Resultado(True, salida=f"pasa; {len(avisan)} ticket(s)"
