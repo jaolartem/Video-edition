@@ -197,15 +197,34 @@ class Segmento:
         return f"{self.slug} e{self.n} ({self.dura}s, «{donde}»)"
 
 
+#: Quien puede aprobar. **Aprobar es lo unico que el motor no puede hacer
+#: solo**, y por eso es tambien lo unico que puede cerrarle la puerta: si la
+#: maquina pudiera etiquetar `aprobado`, se abriria a si misma. La marca es el
+#: nombre en `quien`, igual que `contestado.suyas` filtra las notas por el suyo.
+SUYAS = ("jaime",)
+
+
+def es_suya(quien) -> bool:
+    """Si esa etiqueta la puso una persona y no la linea."""
+    q = (quien or "").strip().lower()
+    return any(q.startswith(x) or f" {x}" in q for x in SUYAS)
+
+
 def aprobada(slug) -> bool:
     """**La pieza esta aprobada cuando lo estan todos sus segmentos.**
 
     Regla de Jaime, y no es un atajo de calculo: es lo que hace que una
     correccion de un tramo no vuelva a poner en juego la pieza entera. Sin
     segmentos no hay pieza que aprobar, asi que devuelve falso.
+
+    **Y aprobado por el.** `puertas._aprobada` leia la tabla `aprobacion` y esto
+    leia el marcador: dos respuestas a la misma pregunta, que es la averia que
+    este proyecto persigue. Ahora la fuente es una —el marcador— y la guarda
+    que se perdia al unirlas se conserva aqui: una etiqueta que puso la linea
+    no aprueba nada.
     """
     segs = Segmento.de(slug)
-    return bool(segs) and all(s.aprobado for s in segs)
+    return bool(segs) and all(s.aprobado and es_suya(s.por_quien) for s in segs)
 
 
 def abiertos(slug, modo=SEGMENTO):

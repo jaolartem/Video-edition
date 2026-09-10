@@ -57,16 +57,18 @@ def _aprobada(slug):
 
     Aprobar es lo unico que el motor no puede hacer solo, y por eso es tambien
     lo unico que puede cerrarle la puerta a la maquina.
+
+    **Y se pregunta en un solo sitio.** Esto leia la tabla `aprobacion` —un
+    veredicto por version— mientras `estado.json` publicaba el suyo contado por
+    segmentos: dos respuestas a la misma pregunta, y nada que las mantuviera de
+    acuerdo. Desde el 10-9-2026 la fuente es el marcador, que es lo que Jaime
+    pidio: *«ahora la fuente de verdad es el Json, una sola fuente»*. La fila de
+    `aprobacion` se queda como lo que de verdad es: **la firma** —quien, cuando
+    y con que notas—, no la respuesta.
     """
-    from .ticket import _con as _tc
+    from . import segmento as _sg
 
-    cx = _tc()
-    r = cx.execute(
-        "select a.veredicto from aprobacion a join version v on v.id ="
-        " a.version_id join video vi on vi.id = v.video_id"
-        " where vi.slug = ? order by v.id desc limit 1", (slug,)).fetchone()
-    return bool(r and r["veredicto"] == "aprobada")
-
+    return _sg.aprobada(slug)
 
 def del_tiquet(piezas):
     """**Un tiquet abierto manda su pieza al paso que sabe atenderlo.**

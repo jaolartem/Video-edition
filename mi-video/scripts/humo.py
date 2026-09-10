@@ -76,6 +76,24 @@ def _las_dos_puertas_leen_igual(h):
            "y con la pieza delante deja de parar lo ya contestado")
 
 
+def _la_maquina_no_se_aprueba_sola(h):
+    """Aprobar es de una persona, y ahora se pregunta en un solo sitio.
+
+    `puertas._aprobada` leia la tabla `aprobacion` y `estado.json` publicaba su
+    propia cuenta por segmentos: dos respuestas a la misma pregunta. Al unirlas
+    en el marcador —la fuente unica— habia que conservar la guarda que la tabla
+    daba gratis: la linea no puede etiquetar `aprobado` y abrirse la puerta.
+    """
+    from dominio import segmento as sg
+
+    h.mide("C-354", sg.es_suya("jaime") and sg.es_suya("jaime - aprobo el 7-9"),
+           "una etiqueta suya cuenta como aprobacion")
+    h.mide("C-354",
+           not sg.es_suya("la linea") and not sg.es_suya("servicio")
+           and not sg.es_suya("disenador") and not sg.es_suya(""),
+           "y una que puso la maquina, no")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -191,6 +209,7 @@ def _camino_lleva_el_adelanto(h):
 def main():
     h = Humo()
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
+              _la_maquina_no_se_aprueba_sola,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
