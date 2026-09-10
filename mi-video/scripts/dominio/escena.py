@@ -54,6 +54,24 @@ NO_SE_BORRAN = ("tablero", "componente", "color", "sonido", "plano")
 COLUMNAS = CLAVE + MANDA_QUIEN_COMPONE + NO_SE_BORRAN
 
 
+
+def _dibujables():
+    """Las formas que `src/components/Tablero.tsx` despacha. Sin copiar la lista.
+
+    Es la unica autoridad: si el render no tiene una rama para ese `kind`, la
+    forma no se dibuja por mucho que tres ficheros la nombren.
+    """
+    import re
+
+    raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        with open(os.path.join(raiz, "src", "components", "Tablero.tsx"),
+                  encoding="utf-8") as h:
+            return set(re.findall(r'cue\.kind === "([^"]+)"', h.read()))
+    except OSError:
+        return set()
+
+
 class EscenaInvalida(ValueError):
     """Lo que llega no describe una escena. Se dice, no se guarda a medias."""
 
@@ -164,6 +182,23 @@ class Escena:
         if not isinstance(tablero, dict) or not tablero.get("kind"):
             raise EscenaInvalida(
                 f"{self.slug} e{self.orden}: el tablero necesita `kind`")
+        # **Y una forma que el render no sabe dibujar no se guarda.**
+        #
+        # Cuatro formas declaradas —`FileteCaida`, `AdelantoEstatica`,
+        # `tachadura`, `CausalChain`— llegaban al spec y caian en el `return`
+        # final de `Tablero.tsx`, que dibuja `TableroDeclarado` con props que no
+        # son suyas: un hueco en la pieza y nadie avisado. `describir-esquema`
+        # decia tener «la lista de componentes que existen» y tenia seis de las
+        # quince, asi que no rechazaba nada.
+        #
+        # La lista no se copia: **se lee del propio render**, que es quien
+        # decide. Copiarla seria la cuarta version de lo mismo. C-353.
+        kind = tablero["kind"]
+        sabe = _dibujables()
+        if sabe and kind not in sabe:
+            raise EscenaInvalida(
+                f"{self.slug} e{self.orden}: el render no sabe dibujar"
+                f" «{kind}». Las que dibuja son: {', '.join(sorted(sabe))}.")
         props = tablero.get("props")
         if not isinstance(props, dict) or not props:
             raise EscenaInvalida(

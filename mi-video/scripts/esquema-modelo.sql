@@ -270,14 +270,13 @@ CREATE TABLE IF NOT EXISTS hueco_oido (
 -- dura menos en el montaje que en la cinta, asi que `plan-reel` avanza por
 -- `duracion / velocidad`. Si esto no fuera asi volveriamos a tener dos lineas de
 -- tiempo, que es el fallo mas caro de esta sesion (C-97 y C-103).
-CREATE TABLE IF NOT EXISTS tratamiento (
-  id          INTEGER PRIMARY KEY,
-  video_slug  TEXT NOT NULL,
-  etapa_orden INTEGER NOT NULL,
-  -- 1.0 es sin tocar. Por encima de ~1,2 se nota como prisa, no como energia.
-  velocidad   REAL NOT NULL DEFAULT 1.0,
-  por_que     TEXT NOT NULL,
-  quien       TEXT,
-  fecha       TEXT,
-  UNIQUE (video_slug, etapa_orden)
-);
+-- **`tratamiento` NO se declara aqui, y es a proposito.** La creaba este
+-- fichero y `migraciones.MUERTAS` la tiraba por vacia y sin lector, en cada
+-- arranque, para siempre: `migrar()` corrido tres veces devolvia
+-- `['-tratamiento']` las tres. Una tabla que se crea y se borra en bucle no es
+-- una promesa: es ruido con forma de esquema.
+--
+-- Se declara el dia que alguien la escriba y la lea, que es cuando entre la
+-- postproduccion. Lo de arriba queda como el porque, que es lo que hay que
+-- conservar. C-353.
+
