@@ -207,12 +207,38 @@ class Escena:
         if fuente and fuente != "sin cifra":
             props = {**props, "source": fuente}
         con = basedatos.abrir()
+        # **El tablero es una entidad, y aqui es donde deja de ser una columna.**
+        #
+        # Jaime, 10-9-2026: *«tablero es una entidad, no una columna»*. Vivia en
+        # `escena_desc.tablero` y `escena_desc.tablero_propuesto` —dos columnas
+        # para lo mismo, distintas en 35 de las 36 filas que tenian las dos—
+        # porque no eran dos cosas: eran **una entidad con dos estados**. Ahora
+        # el estado esta en la conexion, que es de la relacion y no de la
+        # entidad, y por eso no pueden volver a discrepar.
+        #
+        # `escena_desc.tablero` se sigue escribiendo, y no es escritura doble:
+        # es la **proyeccion** que leen los pasos que aun no han cambiado —
+        # `escena.mjs`, `llega.py`, `mudo.py`— con un solo autor, este. La misma
+        # figura que `estado.json` con la base: manda uno, publica el otro.
+        entero = json.dumps({"kind": tablero["kind"], "props": props},
+                            ensure_ascii=False)
+        et = con.execute(
+            "select e.id from etapa e join video v on v.id = e.video_id"
+            " where v.slug = ? and e.orden = ?", (self.slug, self.orden)).fetchone()
+        if et:
+            cur = con.execute(
+                "insert into tablero (kind, props, encargo) values (?,?,?)",
+                (tablero["kind"], json.dumps(props, ensure_ascii=False),
+                 json.dumps(tablero.get("encargo"), ensure_ascii=False)
+                 if tablero.get("encargo") else None))
+            con.execute(
+                "insert or replace into etapa_tablero (etapa_id, tablero_id,"
+                " estado, quien, fecha) values (?,?,'aplicado',?,?)",
+                (et[0], cur.lastrowid, "disenador", _ahora()))
         n = con.execute(
             f"update {TABLA} set tablero = ?, fecha = ?"
             f" where video_slug = ? and etapa_orden = ?",
-            (json.dumps({"kind": tablero["kind"], "props": props},
-                        ensure_ascii=False),
-             _ahora(), self.slug, self.orden)).rowcount
+            (entero, _ahora(), self.slug, self.orden)).rowcount
         con.commit()
         con.close()
         if not n:

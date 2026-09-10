@@ -292,10 +292,41 @@ def _clave_por_slug(con):
     return hecho
 
 
+
+def _declaradas_en_el_esquema():
+    """Los nombres de tabla que `esquema.sql` declara. Se lee, no se copia."""
+    import re
+
+    fuera = set()
+    for f in (ESQUEMA, os.path.join(os.path.dirname(ESQUEMA), "esquema.sql")):
+        try:
+            with open(f, encoding="utf-8") as h:
+                fuera |= set(re.findall(
+                    r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)", h.read(), re.I))
+        except OSError:
+            pass
+    return fuera
+
+
 def _muertas(con):
-    """Las tablas vacias y sin lector se tiran. Con filas dentro, no se tocan."""
+    """Las tablas vacias y sin lector se tiran. Con filas dentro, no se tocan.
+
+    **Y no se tira lo que el esquema declara.** `esquema.sql` es el modelo —su
+    propia cabecera lo dice: *«1FN, nada de grupos repetidos; por eso
+    `tarjeta_bloque` es una tabla y no una columna»*— y esto las borraba por
+    estar vacias, para que `esquema()` las recreara en el arranque siguiente:
+    `migrar()` corrido dos veces devolvia cinco drops y luego nada, en bucle.
+    Dos mecanismos con la intencion contraria sobre la misma tabla.
+
+    Gana el modelo. Una tabla declarada y vacia es una promesa pendiente —se ve
+    en `conectado.py`, que para eso esta—; una tabla borrada y recreada cada
+    arranque no es ni promesa ni aviso: es ruido. C-356.
+    """
+    declaradas = _declaradas_en_el_esquema()
     hecho = []
     for t in MUERTAS:
+        if t in declaradas:
+            continue
         try:
             n = con.execute(f"select count(*) from {t}").fetchone()[0]
             if n == 0:
@@ -343,6 +374,104 @@ def _segmento_con_etiqueta(con):
     return True
 
 
+def _entidades_de_la_escena(con):
+    """`tablero`, `panel`, `camara` y `voz` dejan de ser columnas y son entidades.
+
+    Jaime, 10-9-2026: *«tablero es una entidad, no una columna; panel es una
+    entidad, no una columna; tipo de escena es una entidad que relaciona otras
+    entidades. Si me dices que una tabla es una columna no hay nada de tercera
+    normalizacion»*. Y sobre la forma: *«utiliza tablas de conexion para las
+    relaciones 1:n y n:n»*.
+
+    Lo que habia. `escena_desc` son **24 columnas** haciendo de escena, tablero,
+    camara, voz, correccion e integridad a la vez, y cuatro de ellas guardan una
+    entidad entera en TEXT: `tablero` (50 filas), `tablero_propuesto` (36),
+    `camara` (52) y `voz` (6). Medido: en **35 de las 36** filas que tienen las
+    dos, `tablero` y `tablero_propuesto` dicen cosas distintas y nada declara
+    cual manda — porque no son dos columnas, son **una entidad con dos estados**
+    aplastada en el ancho de la fila. Y `panel` ni siquiera existia: los tres de
+    reel-03 se calculan al vuelo y mueren en el spec, asi que no se pueden
+    declarar, ni aprobar, ni recibir un tiquet.
+
+    El ancla es `etapa` —62 filas, una por etapa montada, las mismas 62 que
+    `escena_desc`—, y se une por `etapa.orden`, **no** por `etapa.etapa_orden`:
+    62 de 62 contra 46 de 62. Dos columnas de la misma tabla que se llaman casi
+    igual y no significan lo mismo.
+
+    Las conexiones llevan lo que es de la RELACION y no de la entidad: el estado
+    de un tablero en su etapa, o el segundo en el que entra un panel.
+    """
+    con.executescript("""
+      CREATE TABLE IF NOT EXISTS tablero (
+        id      INTEGER PRIMARY KEY,
+        kind    TEXT NOT NULL,
+        props   TEXT NOT NULL,
+        encargo TEXT
+      );
+      CREATE TABLE IF NOT EXISTS etapa_tablero (
+        etapa_id   INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        tablero_id INTEGER NOT NULL REFERENCES tablero(id) ON DELETE CASCADE,
+        -- Lo que distinguia a las dos columnas, ahora en la relacion.
+        estado     TEXT NOT NULL CHECK (estado IN ('propuesto','aplicado')),
+        quien      TEXT,
+        fecha      TEXT,
+        PRIMARY KEY (etapa_id, estado)
+      );
+      CREATE TABLE IF NOT EXISTS panel (
+        id      INTEGER PRIMARY KEY,
+        bloques TEXT NOT NULL,
+        cubre   TEXT,
+        lado    TEXT
+      );
+      CREATE TABLE IF NOT EXISTS etapa_panel (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        panel_id INTEGER NOT NULL REFERENCES panel(id) ON DELETE CASCADE,
+        hueco    REAL,
+        PRIMARY KEY (etapa_id, panel_id)
+      );
+      CREATE TABLE IF NOT EXISTS camara (
+        id         INTEGER PRIMARY KEY,
+        encuadre   TEXT,
+        movimiento TEXT,
+        UNIQUE (encuadre, movimiento)
+      );
+      CREATE TABLE IF NOT EXISTS etapa_camara (
+        etapa_id  INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        camara_id INTEGER NOT NULL REFERENCES camara(id) ON DELETE CASCADE,
+        PRIMARY KEY (etapa_id)
+      );
+      CREATE TABLE IF NOT EXISTS voz (
+        id    INTEGER PRIMARY KEY,
+        trato TEXT NOT NULL,
+        sobre TEXT,
+        dura  REAL
+      );
+      CREATE TABLE IF NOT EXISTS etapa_voz (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        voz_id   INTEGER NOT NULL REFERENCES voz(id) ON DELETE CASCADE,
+        PRIMARY KEY (etapa_id)
+      );
+      -- **La entidad que relaciona otras.** Trato, plano y densidad viajaban
+      -- repetidos en cada fila de `escena_desc`; aqui son una combinacion con
+      -- nombre, que es lo que permite decir «estas tres etapas son del mismo
+      -- tipo» sin comparar tres cadenas.
+      CREATE TABLE IF NOT EXISTS tipo_escena (
+        id       INTEGER PRIMARY KEY,
+        trato    TEXT,
+        plano    TEXT,
+        densidad TEXT,
+        UNIQUE (trato, plano, densidad)
+      );
+      CREATE TABLE IF NOT EXISTS etapa_tipo (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        tipo_id  INTEGER NOT NULL REFERENCES tipo_escena(id) ON DELETE CASCADE,
+        por_que  TEXT,
+        PRIMARY KEY (etapa_id)
+      );
+    """)
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -356,6 +485,7 @@ def migrar():
     _ciclo(con)
     _version_guarda_el_montaje(con)
     _segmento_con_etiqueta(con)
+    _entidades_de_la_escena(con)
     hecho = _clave_por_slug(con)
     hecho += _muertas(con)
     con.commit()
