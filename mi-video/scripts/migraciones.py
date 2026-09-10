@@ -490,16 +490,23 @@ def _retiradas_fuera_del_catalogo(con):
         vieja = con.execute("select id from transicion where nombre = ?",
                             (nombre,)).fetchone()
         if not vieja:
-            continue
+            vieja = (con.execute("insert into transicion (nombre) values (?)",
+                                 (nombre,)).lastrowid,)
         nueva = con.execute("select id from transicion where nombre = ?",
                             (d.get("en_su_lugar"),)).fetchone()
         if nueva:
             con.execute("update etapa_transicion set transicion_id = ?"
                         " where transicion_id = ?", (nueva[0], vieja[0]))
+            # **Se marca, no se borra.** Borrarla no la retiraba: el volcado la
+            # volvia a insertar en cuanto encontraba una descripcion vieja que
+            # la nombraba. Marcada, `cat()` la redirige sola y el que compone
+            # ve que existio y por que no esta.
+            con.execute("update transicion set en_su_lugar = ? where id = ?",
+                        (nueva[0], vieja[0]))
         else:
             con.execute("delete from etapa_transicion where transicion_id = ?",
                         (vieja[0],))
-        con.execute("delete from transicion where id = ?", (vieja[0],))
+            con.execute("delete from transicion where id = ?", (vieja[0],))
         hecho = True
     return hecho
 
@@ -551,6 +558,41 @@ def _quien_es_agencia(con):
     return True
 
 
+def _tipo_escena_es_una_seleccion(con):
+    """`tipo_escena` guardaba trato, plano y densidad como texto. Ahora selecciona.
+
+    Es el mismo fallo que tenia `camara` (C-361) un piso mas arriba, y lo comeli
+    el mismo dia: hice la tabla que **relaciona** otras entidades guardando
+    cadenas en vez de claves. Jaime: *«sigue con trato, plano, color y
+    remedio»*.
+
+    `color` entra en la seleccion —es tratamiento, como el trato y el plano— y
+    `remedio` no: no es un tipo de escena, es la decision sobre un problema de
+    integridad, asi que cuelga de la etapa.
+    """
+    cols = {r[1] for r in con.execute("pragma table_info(tipo_escena)")}
+    if "trato_id" in cols:
+        return False
+    con.executescript("""
+      DROP TABLE IF EXISTS etapa_tipo;
+      DROP TABLE IF EXISTS tipo_escena;
+      CREATE TABLE tipo_escena (
+        id       INTEGER PRIMARY KEY,
+        trato_id INTEGER REFERENCES trato(id),
+        plano_id INTEGER REFERENCES plano(id),
+        color_id INTEGER REFERENCES color(id),
+        UNIQUE (trato_id, plano_id, color_id)
+      );
+      CREATE TABLE etapa_tipo (
+        etapa_id INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+        tipo_id  INTEGER NOT NULL REFERENCES tipo_escena(id) ON DELETE CASCADE,
+        por_que  TEXT,
+        PRIMARY KEY (etapa_id)
+      );
+    """)
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -566,6 +608,7 @@ def migrar():
     _segmento_con_etiqueta(con)
     _entidades_de_la_escena(con)
     _camara_es_una_seleccion(con)
+    _tipo_escena_es_una_seleccion(con)
     _retiradas_fuera_del_catalogo(con)
     _quien_es_agencia(con)
     hecho = _clave_por_slug(con)

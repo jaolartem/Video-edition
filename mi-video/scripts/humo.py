@@ -127,10 +127,18 @@ def _lo_retirado_no_esta_en_el_catalogo(h):
     except Exception:                              # noqa: BLE001
         r = {}
     h.mide("C-362", bool(r), "hay retiradas declaradas y se pueden leer")
+    # **Se marcan, no se borran.** Borrar la fila no retiraba nada: el volcado
+    # la resucitaba en cuanto encontraba una descripcion vieja que la nombraba,
+    # y este mismo humo lo caso. Marcada con su sustituto, `cat()` la redirige.
     cx = basedatos.abrir()
-    vivas = {x[0] for x in cx.execute("select nombre from transicion")}
-    h.mide("C-362", not (set(r) & vivas),
-           "y ninguna sigue en el catalogo de transiciones")
+    marcadas = {x[0] for x in cx.execute(
+        "select nombre from transicion where en_su_lugar is not null")}
+    usadas = {x[0] for x in cx.execute(
+        "select t.nombre from transicion t join etapa_transicion e"
+        " on e.transicion_id = t.id where t.en_su_lugar is not null")}
+    h.mide("C-362", set(r) <= marcadas,
+           "cada retirada esta marcada con su sustituto")
+    h.mide("C-362", not usadas, "y ninguna etapa sigue usandola")
 
 
 def _prueba_movida_va_al_compositor(h):

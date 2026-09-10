@@ -216,12 +216,28 @@ class Escena:
         cam = d.get("camara") or {}
 
         def cat(tabla, valor):
+            """El id de ese valor en su catalogo, creandolo si hace falta.
+
+            **Y si esta retirado, devuelve el que va en su lugar.** Una
+            descripcion vieja que nombra `cortinilla` no puede resucitarla: el
+            catalogo la lleva marcada con su sustituto y aqui se sigue la
+            marca. Sin esto, borrar una retirada duraba hasta el siguiente
+            volcado — medido, y lo caso el humo.
+            """
             if not valor:
                 return None
             f = con.execute(f"select id from {tabla} where nombre = ?",
                             (valor,)).fetchone()
-            return f[0] if f else con.execute(
-                f"insert into {tabla} (nombre) values (?)", (valor,)).lastrowid
+            if not f:
+                return con.execute(f"insert into {tabla} (nombre) values (?)",
+                                   (valor,)).lastrowid
+            cols = {r[1] for r in con.execute(f"pragma table_info({tabla})")}
+            if "en_su_lugar" in cols:
+                r = con.execute(f"select en_su_lugar from {tabla} where id = ?",
+                                (f[0],)).fetchone()
+                if r and r[0]:
+                    return r[0]
+            return f[0]
 
         cid = una("camara", ["encuadre_id", "movimiento_id", "virado_id"],
                   [cat("encuadre", cam.get("encuadre")),
@@ -237,11 +253,20 @@ class Escena:
                   [voz.get("trato"), voz.get("sobre"), voz.get("dura")])
         if vid:
             con.execute("insert or replace into etapa_voz values (?,?)", (eid, vid))
-        tid = una("tipo_escena", ["trato", "plano", "densidad"],
-                  [d.get("trato"), d.get("plano"), d.get("densidad")])
+        # **El tipo de escena es una seleccion, como la camara.** `trato`,
+        # `plano` y `color` son catalogos —5, 3 y 3 valores en 62 etapas— y no
+        # cadenas que se repitan. `remedio` va aparte: no es un tipo, es la
+        # decision sobre un problema de integridad.
+        tid = una("tipo_escena", ["trato_id", "plano_id", "color_id"],
+                  [cat("trato", d.get("trato")), cat("plano", d.get("plano")),
+                   cat("color", d.get("color"))])
         if tid:
             con.execute("insert or replace into etapa_tipo values (?,?,?)",
                         (eid, tid, d.get("trato_porque")))
+        rid = cat("remedio", d.get("remedio"))
+        if rid:
+            con.execute("insert or replace into etapa_remedio values (?,?)",
+                        (eid, rid))
 
     def poner_tablero(self, tablero: dict) -> dict:
         """Guarda SOLO el tablero. Es la entrega del paso de diseño.

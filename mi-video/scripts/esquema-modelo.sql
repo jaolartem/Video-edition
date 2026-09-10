@@ -412,3 +412,35 @@ CREATE TABLE IF NOT EXISTS autor_alias (
   alias    TEXT PRIMARY KEY,
   autor_id INTEGER NOT NULL REFERENCES autor(id) ON DELETE CASCADE
 );
+
+
+-- **El trato, el plano, el color y el remedio: cuatro catalogos.** Jaime,
+-- 10-9-2026, despues de la camara: *«sigue con trato, plano, color y remedio»*.
+-- Eran texto libre en `escena_desc` —5, 3, 3 y 4 valores en 62 filas— y
+-- `tipo_escena` repetia el fallo un piso mas arriba: se creo el mismo dia
+-- guardando `trato`, `plano` y `densidad` como texto, o sea la seleccion
+-- hecha de cadenas en vez de claves.
+--
+-- `tipo_escena` pasa a ser lo que su nombre dice: la seleccion que relaciona
+-- otras entidades. `remedio` va aparte porque no es un tipo — es la decision
+-- sobre un problema de integridad, y por eso cuelga de la etapa y no del tipo.
+CREATE TABLE IF NOT EXISTS trato   (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS plano   (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS color   (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS remedio (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS nivel   (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE);
+
+CREATE TABLE IF NOT EXISTS etapa_remedio (
+  etapa_id   INTEGER NOT NULL REFERENCES etapa(id) ON DELETE CASCADE,
+  remedio_id INTEGER NOT NULL REFERENCES remedio(id) ON DELETE CASCADE,
+  PRIMARY KEY (etapa_id)
+);
+
+
+-- **Lo retirado no se borra: se marca, y apunta a lo que va en su lugar.**
+-- Borrar la fila de `cortinilla` no la retiraba — el volcado la volvia a
+-- insertar en cuanto encontraba una descripcion vieja que la nombraba, y el
+-- humo lo cazo. Y ademas `camara.mjs` dice por que no debe borrarse: *«se
+-- listan aqui para que el que compone vea que existieron y por que no estan;
+-- borrarlas del todo invita a reinventarlas dentro de un mes»*.
+ALTER TABLE transicion ADD COLUMN en_su_lugar INTEGER REFERENCES transicion(id);
