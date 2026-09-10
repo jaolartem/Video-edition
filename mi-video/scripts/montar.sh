@@ -8,8 +8,20 @@
 #   bash scripts/montar.sh --origen D:/brutos
 #
 # Ninguna ruta va escrita aquí dentro: se declaran una vez y se preguntan.
-set -e
+set -eE
 cd "$(dirname "$0")/.."
+
+# **Y si este script muere, lo dice en stdout.** El acuerdo con el motor es que
+# la ULTIMA LINEA DE STDOUT es el motivo (ver `servicios/base.py`), y `set -e`
+# lo rompe justo cuando mas falta hace: mata el fichero en la linea que falla
+# **sin imprimir nada mas**. Cuando quien revienta es un hijo —`render.mjs`—,
+# la ultima linea que quedaba era «bundle listo en 13.0 s», progreso guardado
+# como causa, y reel-03 y reel-06 se quedaron en `verificado` con un motivo que
+# suena a que todo fue bien.
+#
+# Va como `trap` y no como un `echo` en cada sitio porque asi cumple el acuerdo
+# **toda** linea del fichero, incluidas las que aun no existen.
+trap 'c=$?; echo "montar.sh: murio en la linea $LINENO (codigo $c) al correr: $BASH_COMMAND"; exit $c' ERR
 
 # Remotion escribe sus frames temporales en el TEMP del sistema, que aqui vive
 # en C: y se queda sin sitio a 1800x3200 — Chrome rechaza la peticion y el

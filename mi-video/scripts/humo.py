@@ -172,6 +172,41 @@ def _una_atascada_no_para_la_tanda(h):
     h.mide("C-370", hubo == 1, "y la atascada sale en el parte, no en silencio")
 
 
+def _un_paso_que_falla_deja_su_diagnostico(h):
+    """El motivo es una etiqueta; el diagnostico es lo que el paso dijo.
+
+    `montar.sh` muere con `set -e` dentro de `render.mjs`, asi que su ultima
+    linea de stdout es «bundle listo en 13.0 s» —progreso— y eso quedo escrito
+    como la causa de que reel-03 y reel-06 no se montaran. El error de node
+    estaba en stderr y se tiraba al salir del paso.
+
+    No se comprueba leyendo: se ejecuta un paso que falla igual —progreso en
+    stdout, error en stderr— y se mira que el error este en el registro. C-371.
+    """
+    import registro
+    import servicios
+
+    guion = "work/humo-falla.py"
+    os.makedirs("work", exist_ok=True)
+    open(guion, "w", encoding="utf-8").write(chr(10).join([
+        "import sys",
+        "print('bundle listo en 13.0 s')",
+        "print('Error: la fuente no existe', file=sys.stderr)",
+        "raise SystemExit(1)"]))
+    r = servicios.ServicioScript("montado", guion).correr(servicios.Pieza(99))
+    h.mide("C-371", not r.ok and "bundle listo" in r.motivo,
+           "el motivo sigue siendo la ultima linea de stdout")
+    con = registro._con()
+    fila = con.execute("select detalle from incidencia where toma='reel-99'"
+                       " order by id desc limit 1").fetchone()
+    con.execute("delete from incidencia where toma='reel-99'")
+    con.commit()
+    con.close()
+    os.remove(guion)
+    h.mide("C-371", bool(fila) and "la fuente no existe" in (fila[0] or ""),
+           "y lo que dijo por stderr queda en el registro, no se pierde")
+
+
 def _prueba_movida_va_al_compositor(h):
     import fijar
 
@@ -290,6 +325,7 @@ def main():
               _la_maquina_no_se_aprueba_sola,
               _el_marcador_propone_y_no_firma,
               _una_atascada_no_para_la_tanda,
+              _un_paso_que_falla_deja_su_diagnostico,
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,

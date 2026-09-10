@@ -247,30 +247,26 @@ class ServicioScript(Servicio):
         if r.returncode == 0:
             return Resultado(True, salida=salida)
         # **El motivo sale de lo que el paso dijo, no de lo ultimo que se leyo.**
-        #
-        # Esto tomaba la ultima linea de `stdout + stderr`, y eso no es «lo
-        # ultimo que paso»: es lo ultimo del texto. `entorno.sh` escribe su
-        # aviso de disco en stderr **al arrancar**, o sea lo primero de todo, y
-        # la concatenacion lo dejaba el ultimo — asi que las siete piezas se
-        # quedaron paradas en `montado` con este motivo:
-        #
-        #     AVISA, no para. De seis piezas con 21 GB libres renderizaron
-        #     cuatro, y las dos que cayeron eran las dos mas largas...
-        #
-        # Un mensaje que **dice de si mismo que no para**, tapando el motivo de
-        # verdad —«pedido(s) de IA sin contestar», «1 corte(s) caen en pleno
-        # sonido»— que estaba en stdout y nadie llego a ver. Un dia entero
-        # diagnosticando el disco por un problema que no era del disco.
-        #
-        # Los pasos de este proyecto dicen POR QUE no pudieron en stdout, y su
-        # ultima linea esta escrita para eso: *«la ULTIMA linea es la que el
-        # motor guarda como motivo»*. stderr es el canal del entorno y de los
-        # avisos. Asi que manda stdout, y stderr solo cuando el paso no dijo
-        # nada — que ahi si es lo unico que hay.
+        # Tomaba la ultima linea de `stdout + stderr`, y eso no es «lo ultimo
+        # que paso»: es lo ultimo del texto. El aviso de disco de `entorno.sh`
+        # sale en stderr **al arrancar** y la concatenacion lo dejaba el
+        # ultimo, tapando el motivo de verdad. Los pasos de aqui dicen POR QUE
+        # no pudieron en stdout y su ultima linea esta escrita para eso; stderr
+        # es el canal del entorno. Manda stdout, y stderr solo si no dijo nada.
         dicho = (r.stdout or "").strip().splitlines()
         if not dicho:
             dicho = (r.stderr or "").strip().splitlines()
         ultima = dicho[-1] if dicho else "sin salida"
+        # **Y lo que dijo el paso no se tira.** Una etiqueta no es un
+        # diagnostico: `montar.sh` muere con `set -e` dentro de `render.mjs`,
+        # su ultima linea de stdout es «bundle listo en 13.0 s» —progreso
+        # guardado como causa— y el error de node se perdia aqui. `salida` ya
+        # trae las dos mitades y nadie la guardaba. Va en este punto porque los
+        # que llaman son dos y este es el unico por el que pasa entera. C-371.
+        import registro
+        registro.aviso(self.nombre, "el paso no pudo, y esto es lo que dijo",
+                       toma=pieza.slug, eco=False,
+                       detalle=chr(10).join(salida.strip().splitlines()[-25:]))
         return Resultado(False, motivo=ultima[:160], salida=salida)
 
 
