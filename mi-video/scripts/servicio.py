@@ -129,16 +129,28 @@ def _tickets(slug):
 
 
 def _decididos(slug):
-    """Lo ya decidido de esa pieza y, si deriva, de su origen en sus etapas."""
+    """Lo ya decidido de esa pieza —sus tiquets cerrados, con lo que se hizo— y,
+    si deriva, lo de su origen puesto en sus etapas.
+
+    Jaime, 11-9-2026: *«que viajen las decisiones cerradas»*. Sólo viajaban los
+    abiertos, así que el #282 —*«el semanales se mantiene»*— dejó de existir
+    para quien revisaba en cuanto se cerró, y la revisión mandó cortarlo.
+    """
     try:
         from dominio import ticket
         from dominio.libreto import origen_de
 
+        def de(s, mapa=None):
+            return [{"id": t["id"], "segundo": t["segundo"],
+                     "etapa": t["beat"] if mapa is None else mapa.get(t["beat"]),
+                     "dijo": (t["dijo"] or "")[:400],
+                     "se_hizo": (t["respuesta"] or "")[:200]}
+                    for t in ticket.historia(s)
+                    if t["estado"] in ("arreglado", "contestado")
+                    and (mapa is None or t["beat"] is None or t["beat"] in mapa)]
+
         origen, mapa = origen_de(slug)
-        heredados = [dict(d, etapa=mapa.get(d["etapa"]))
-                     for d in (ticket.decididos(origen) if origen else [])
-                     if d["etapa"] is None or d["etapa"] in mapa]
-        return ticket.decididos(slug) + heredados
+        return de(slug) + (de(origen, mapa) if origen else [])
     except Exception:                              # noqa: BLE001
         return []
 
@@ -266,7 +278,7 @@ def pedir(paso, slug, prompt, payload, cli=True):
              # el segundo 30. Ver `dominio/ticket.py`.
              "lo_que_dijo_jaime_de_la_pieza": _tickets(slug),
              # **Y lo que ya se decidió, que no se rediscute.** Ver
-             # `ticket.decididos`: cerrado, el #282 dejaba de viajar.
+             # `_decididos`: cerrado, el #282 dejaba de viajar.
              "lo_ya_decidido_de_la_pieza": _decididos(slug),
              # **El marcador que viaja con la pieza.** Jaime, 9-9-2026: *«los
              # agentes deben poder leer y escribir en el Json, es lo que permite
@@ -314,8 +326,8 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # contara como pregunta, cada pedido seria nuevo por haber contestado el
     # anterior — el bucle de C-122 con otra puerta.
     VOLATILES = ("vuelta", "hoy", "precio_vigente", "instrucciones_de_jaime",
-                 "lo_que_dijo_jaime_de_la_pieza", "lo_ya_decidido_de_la_pieza",
-                 "marcador")
+                 "lo_ya_decidido_de_la_pieza",
+                 "lo_que_dijo_jaime_de_la_pieza", "marcador")
 
     # **Y lo que es contexto tampoco cambia la pregunta.**
     #
