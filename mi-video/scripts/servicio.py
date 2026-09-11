@@ -206,6 +206,16 @@ def _respaldos(slug):
         cx.close()
     except sqlite3.Error:
         return []
+    if not filas:
+        # **Una derivada respalda con las cifras de su origen**, puestas en sus
+        # etapas y sin las que quitó. reel-08 llegaba con cero y reel-01 con
+        # ocho: el compositor vio «30 mil» sin fuente. C-396.
+        from dominio.libreto import origen_de
+
+        origen, mapa = origen_de(slug)
+        return [dict(f, etapa=mapa.get(f.get("etapa")))
+                for f in (_respaldos(origen) if origen else [])
+                if f.get("etapa") is None or f.get("etapa") in mapa]
     return [{k: r[k] for k in r.keys() if r[k] is not None} for r in filas]
 
 
