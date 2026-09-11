@@ -32,6 +32,22 @@ from ..palabra import Palabra  # noqa: E402
 from ..tramo import Tramo  # noqa: E402
 
 
+def literal(parrafo: str, texto: str, n: int = 4) -> float:
+    """Cuánta secuencia EXACTA del libreto reproduce un texto. El detector de lectura.
+
+    Vivía dentro de `Ventana.lee`, y `fijar` —que aplica tramos declarados sin
+    pasar por la selección— no tenía con qué medir: heredaba el `literal` de la
+    ventana vieja con `{**d}`, así que un tramo leído y fijado sobrevivía a
+    cualquier regla de lectura. Una sola medida para los dos (C-382).
+    """
+    a, b = beats.palabras(parrafo), beats.palabras(texto)
+    if len(a) < n:
+        return 0.0
+    ga = {tuple(a[i:i + n]) for i in range(len(a) - n + 1)}
+    gb = {tuple(b[i:i + n]) for i in range(len(b) - n + 1)}
+    return len(ga & gb) / max(1, len(ga))
+
+
 def reaparece(cola: str, cabeza: str) -> float:
     """¿Reaparece el final de un trozo al principio del siguiente?
 
@@ -181,12 +197,7 @@ class Ventana:
         leer. El umbral (`pesos.LEIDA`) sale de un salto de 0,17 en la
         distribución de los 53 fragmentos elegidos.
         """
-        a, b = beats.palabras(parrafo), beats.palabras(self.texto)
-        if len(a) < n:
-            return 0.0
-        ga = {tuple(a[i:i + n]) for i in range(len(a) - n + 1)}
-        gb = {tuple(b[i:i + n]) for i in range(len(b) - n + 1)}
-        return len(ga & gb) / max(1, len(ga))
+        return literal(parrafo, self.texto, n)
 
     def puntua(self, parrafo: str, exige=(), siguiente: str = "") -> tuple:
         """Lo que vale para esta etapa: `(puntuación, cubre, dice)`.

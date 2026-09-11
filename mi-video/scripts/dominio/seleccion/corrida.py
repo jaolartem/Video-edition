@@ -156,15 +156,57 @@ class Corrida:
         premio = [pesos.PREMIO_OBLIG if self.beat(i).get("obligatorio")
                   else pesos.PREMIO for i in range(len(self.libreto))]
         rep = Reparto(self.marcas, self.ventanas, premio)
-        plan, total = rep.en_orden()
-        suelto, total_s = rep.libre()
+        # **Si la pieza lo declara, lo leído no compite (T-05).** Jaime, 10-9:
+        # *«si salgo leyendo hay que buscar otras tomas»*, y con los tableros
+        # mostrando su cara la lectura ya no se puede tapar. Es un prop de la
+        # pieza —`lectura: "otra_toma"` en `frames.json`— y no una regla del
+        # lote: las siete de venta siguen como estaban.
+        prohibidas = (self.leidas() if self.frame.get("lectura") == "otra_toma"
+                      else frozenset())
+        plan, total = rep.en_orden(prohibidas)
+        suelto, total_s = rep.libre(prohibidas)
         if len(con_toma(suelto)) > len(con_toma(plan)):
             registro.nota("seleccionar", "reparto fuera de orden",
                           detalle=f"{self.slug}: {len(con_toma(suelto))} etapas"
                                   f" frente a {len(con_toma(plan))} en orden")
             plan, total = suelto, total_s
         self.plan = rep.sin_repetir(plan)
+        self.sin_otra = self._vuelven_las_leidas(rep) if prohibidas else []
         return self.plan, total
+
+    def leidas(self) -> frozenset:
+        """Las ventanas que leen el párrafo de una etapa en la que compiten."""
+        from .ventana import literal
+
+        return frozenset(
+            k for k, v in enumerate(self.ventanas)
+            if any(self.marcas[s][k] is not None
+                   and literal(self.parrafo(s), v.texto) >= pesos.LEIDA
+                   for s in range(len(self.marcas))))
+
+    def _vuelven_las_leidas(self, rep) -> list[tuple]:
+        """Una etapa que sólo tenía tomas leídas **no se queda vacía**.
+
+        Jaime, 10-9: *«todo está grabado; hay videos que no se subieron»*. Sin
+        otra toma, lo que falta no es que él regrabe: es una cinta que el
+        proyecto no tiene. Así que vuelve la leída —la etapa no se pierde— y
+        quien llama pide la grabación. Devuelve `(beat, cinta, literal)`.
+        """
+        from .ventana import literal
+
+        libre, _ = rep.en_orden()
+        vuelven = []
+        for s0, k in enumerate(self.plan):
+            antes = libre[s0] if s0 < len(libre) else None
+            if k is not None or antes is None:
+                continue
+            v = self.ventanas[antes]
+            if any(o is not None and v.solapa(self.ventanas[o]) for o in self.plan):
+                continue
+            self.plan[s0] = antes
+            vuelven.append((s0 + 1, v.toma,
+                            round(literal(self.parrafo(s0), v.texto), 3)))
+        return vuelven
 
     def entrega(self) -> list[tuple]:
         """El paso 3: entre las que dicen lo mismo, manda la voz."""
@@ -236,8 +278,86 @@ class Corrida:
         return perdidos
 
     def a_tablero(self) -> list[tuple]:
+        # **Donde se pide otra toma, lo leído no se tapa.** Si queda una etapa
+        # leída es porque no hubo otra, y ya lleva su tiquet pidiendo la
+        # grabación: esconderla bajo un tablero —que ahora muestra su cara—
+        # enseñaría justo lo que se quiere quitar.
+        if self.frame.get("lectura") == "otra_toma":
+            return []
         return Entrega(self.corpus, self.marcas, self.ventanas).a_tablero(
             self.plan, self.libreto)
 
     def repetidos(self) -> list[tuple]:
         return una_sola_vez(self.plan, self.ventanas, self.frame)
+
+
+def pide_otra_toma(slug: str, beat: int, toma: str, lectura: float,
+                   por: str = "la selección"):
+    """**Se pide la grabación: ni se tapa ni se regraba** (T-05).
+
+    Jaime, 10-9: *«hay tomas sin leer dentro de todos los videos que subí,
+    todos están grabados, hay videos que no subieron»*. Una etapa que sólo tiene
+    tomas leídas no dice que falte una toma buena: dice que el proyecto no tiene
+    la cinta donde está. El tiquet es de tipo `falta` y **sin paso de vuelta**
+    —lo arregla él subiéndola, ningún paso solo—, así que no mueve la pieza.
+    Uno abierto por etapa.
+    """
+    from .. import ticket
+
+    marca = f"lectura · e{beat}"
+    if any((t.get("dijo") or "").startswith(marca) for t in ticket.abiertos(slug)):
+        return None
+    dijo = (f"{marca}: {por} sólo encuentra tomas leídas (literal {lectura:.0%},"
+            f" cinta {toma}). Todo está grabado sin leer: falta subir la"
+            f" grabación de este párrafo, probablemente de la sesión"
+            f" {(toma or '?').split('_')[0]}.")
+    try:
+        return ticket.abrir(slug, dijo, tipo="falta", vuelve_a="")
+    except ticket.SinEscena:
+        return ticket.abrir(slug, dijo, tipo="falta", vuelve_a="", etapa="pieza")
+
+
+def leidos_declarados(slug: str, por_beat: dict, transcribir) -> list:
+    """Los beats cuyo tramo DECLARADO lee y no lo fijó una persona: no entran.
+
+    Lo declarado (`corte_fijo`) entra en el EDL sin pasar por la selección, y
+    heredaba el `literal` de la ventana vieja: una apertura leída fijada en su
+    día sobrevivía a T-05. Aquí se mide lo que suena dentro del tramo, con la
+    misma `literal` que la selección. Si lee y lo fijó la máquina, no entra —se
+    queda lo que eligió la selección—; si lo fijó Jaime, entra, porque es suyo.
+    En los dos casos se pide la grabación. Sólo en piezas con
+    `lectura: "otra_toma"`.
+    """
+    from ..autor import Autor
+    from .ventana import literal
+
+    n = int(slug[-2:])
+    try:
+        libreto = beats.beats_del_libreto(n)
+        if beats.frame_del_reel(n, libreto).get("lectura") != "otra_toma":
+            return []
+    except SystemExit:
+        return []
+    fuera = []
+    for b, fs in por_beat.items():
+        if not 0 < b <= len(libreto):
+            continue
+        dicho = []
+        for f in fs:
+            try:
+                pal = (transcribir.exigir(f["toma"])["segmentos"]
+                       if f.get("toma") else [])
+            except SystemExit:
+                pal = []
+            dicho += [w["text"] for w in pal
+                      if transcribir.suena(w, f["desde"], f["hasta"])]
+        lee = literal(libreto[b - 1], " ".join(dicho))
+        if lee < pesos.LEIDA:
+            continue
+        suyo = any((a := Autor.de(f.get("quien") or "")) is not None
+                   and a.tipo == "persona" for f in fs)
+        pide_otra_toma(slug, b, fs[0].get("toma") or "?", lee,
+                       por="el tramo declarado" + (" por Jaime" if suyo else ""))
+        if not suyo:
+            fuera.append(b)
+    return fuera

@@ -241,6 +241,11 @@ def main():
     inf.handicap(c.rotas(), beats.PASO_VOZ)
 
     _plan, total = c.repartir()
+    # **Lo que sólo se encontró leído se pide, no se tapa (T-05).** Ver
+    # `Corrida._vuelven_las_leidas`.
+    from dominio.seleccion.corrida import pide_otra_toma
+    for b, toma, lect in c.sin_otra:
+        pide_otra_toma(c.slug, b, toma, lect)
     if not a.sin_voz:
         inf.voz(c.entrega())
     # **Las tres reglas de no-redundancia**, y después los extremos, que es

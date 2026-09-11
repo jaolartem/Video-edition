@@ -97,7 +97,7 @@ def fijados(slug):
     con = _con()
     filas = con.execute(
         "select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que,"
-        " cf.huella"
+        " cf.huella, cf.quien"
         "  from corte_fijo cf join video v on v.id = cf.video_id"
         " where v.slug = ? and cf.papel = 'etapa' order by cf.orden, cf.desde",
         (slug,)).fetchall()
@@ -420,6 +420,14 @@ def _al_compositor(slug, movidas):
             tipo="falta", vuelve_a="descrito", cierra_con=MOVIDA)
 
 
+def _leidos_declarados(slug, por_beat, transcribir):
+    """Lo declarado que lee. La regla es de la lectura, no de aquí: ver
+    `dominio.seleccion.corrida.leidos_declarados` (T-05)."""
+    from dominio.seleccion.corrida import leidos_declarados
+
+    return leidos_declarados(slug, por_beat, transcribir)
+
+
 def aplicar(slug, solo=None):
     """Mete los tramos fijados en el EDL, sustituyendo los de esa etapa.
 
@@ -462,6 +470,17 @@ def aplicar(slug, solo=None):
     # mismo. Lo unico que cambia es que ahora se puede decir otra cosa.
     for v in por_beat.values():
         v.sort(key=lambda x: x["id"])
+    # **T-05 · Un tramo declarado que lee no se cuela por aquí.** Lo declarado
+    # entra sin pasar por la selección, y heredaba el `literal` de la ventana
+    # vieja: una apertura leída fijada en su día sobrevivía a la regla. Donde la
+    # pieza pide otra toma, se mide el texto que suena: si lee y lo fijó la
+    # máquina, no entra —se queda lo que eligió la selección—; si lo fijó Jaime,
+    # entra, porque es suyo, y se le dice. En los dos casos se pide la grabación.
+    _fuera = _leidos_declarados(slug, por_beat, transcribir)
+    for b_ in _fuera:
+        por_beat.pop(b_, None)
+    if not por_beat:
+        return 0, []
     # **Un fijado ya aplicado no se vuelve a aplicar.** `aplicar` rehace la etapa
     # entera, asi que corriendolo dos veces borraba lo que hubiera pasado por
     # encima despues —los recortes de redundancia, sobre todo— y la pieza se

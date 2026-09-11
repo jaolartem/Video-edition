@@ -163,6 +163,27 @@ INSTRUCCIONES = (
                   "pieza.captions = trataElCc(pieza, slug, bajarEnElGancho("),
         ),
     ),
+    Instruccion(
+        codigo="T-05",
+        paso="seleccionar",
+        clase="montaje",
+        enunciado=(
+            "Si salgo leyendo hay que buscar otras tomas (Jaime, 10-9-2026). En"
+            " las piezas que lo declaran —lectura: otra_toma— una toma que lee"
+            " su parrafo no compite; si una etapa solo tiene tomas leidas,"
+            " vuelve la leida y se pide la grabacion que falta, porque todo esta"
+            " grabado sin leer. Lo leido no se tapa con tablero. Sustituye a"
+            " T-01 en esas piezas; las siete de venta siguen con T-01."
+        ),
+        agujas=(
+            Aguja("scripts/dominio/seleccion/corrida.py",
+                  'prohibidas = (self.leidas() if self.frame.get("lectura") == "otra_toma"'),
+            Aguja("scripts/dominio/seleccion/corrida.py", "def pide_otra_toma("),
+            Aguja("scripts/fijar.py",
+                  "_fuera = _leidos_declarados(slug, por_beat, transcribir)"),
+            Aguja("scripts/seleccionar.py", "pide_otra_toma(c.slug, b, toma, lect)"),
+        ),
+    ),
 )
 
 
