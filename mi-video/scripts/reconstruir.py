@@ -138,6 +138,7 @@ def main():
     ap.add_argument("--escribir", action="store_true",
                     help="deja el EDL reconstruido; sin esto solo se mira")
     a = ap.parse_args()
+    import rutas
     for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         mp4 = ENTREGADO.format(n=n)

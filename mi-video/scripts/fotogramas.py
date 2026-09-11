@@ -260,6 +260,7 @@ def main():
     ap.add_argument("--cuantos", type=int, default=CUANTOS)
     a = ap.parse_args()
     total = 0
+    import rutas
     for n in (a.reels or rutas.piezas()):
         hechas, mal = sacar(n, a.cuantos)
         if mal:
