@@ -191,6 +191,27 @@ def aplicar(pieza: Pieza, veredicto) -> Resultado:
     por_que = (v.get("por_que") or "sin motivo")[:200]
     if v.get("se_ensena"):
         return Resultado(True, salida=f"se puede enseñar: {por_que}")
+    # **Y el «no» se le dice a alguien: es un tiquet.** Devolver la pieza sin
+    # el motivo era mandarla a un paso que no tenia nada nuevo que contestar:
+    # reel-03, 11-9, cruzo `descrito`, `disenado`, `cortado` y `verificado` en
+    # el mismo minuto, con el gancho igual de roto, camino de otro render y otro
+    # «no». El tiquet es la puerta que ya existe —la misma que las
+    # observaciones de Jaime—: viaja en el pedido de quien lo atiende, y
+    # `vencidas` retiene la pieza si ese paso pasa sin cerrarlo.
+    #
+    # `vuelve_a` nombra el paso que lo atiende, como en cualquier tiquet; la
+    # pieza se coloca justo antes (`antes_de`). Uno abierto por pieza: un «no»
+    # repetido no abre otro.
+    from dominio import ticket
+    from dominio.fase import antes_de, camino
+
+    atiende = v.get("vuelve_a")
+    if atiende not in {f["nombre"] for f in camino()}:
+        atiende = "descrito"
+    if not any((t.get("dijo") or "").startswith("visto ·")
+               for t in ticket.abiertos(pieza.slug)):
+        ticket.abrir(pieza.slug,
+                     f"visto · el diseñador no la enseña: {v.get('por_que') or 'sin motivo'}",
+                     etapa="pieza", tipo="objecion", vuelve_a=atiende)
     return Resultado(False, motivo=f"no se enseña: {por_que}",
-                     volver_a=v.get("vuelve_a") or "cosido",
-                     salida=por_que)
+                     volver_a=antes_de(atiende), salida=por_que)
