@@ -536,6 +536,24 @@ def abiertos(pieza=None):
     return [dict(f) for f in filas]
 
 
+def decididos(pieza):
+    """Lo que ya se decidió de la pieza: sus tiquets cerrados, con lo que se hizo.
+
+    Jaime, 11-9-2026: *«que viajen las decisiones cerradas»*. Sólo viajaban los
+    abiertos, así que el #282 —*«el semanales se mantiene»*— dejó de existir
+    para quien revisaba en cuanto se cerró, y la revisión mandó cortarlo.
+    """
+    cx = _con()
+    filas = cx.execute(
+        "select id, beat, segundo, dijo, respuesta from ticket where pieza = ?"
+        " and estado in ('arreglado', 'contestado') order by segundo, id",
+        (pieza,)).fetchall()
+    cx.close()
+    return [{"id": f["id"], "etapa": f["beat"], "segundo": f["segundo"],
+             "dijo": (f["dijo"] or "")[:400], "se_hizo": (f["respuesta"] or "")[:200]}
+            for f in filas]
+
+
 def recolocar(pieza):
     """Vuelve a traducir el segundo a etapa. **El corte cambia; el segundo no.**
 

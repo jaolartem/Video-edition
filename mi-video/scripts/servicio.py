@@ -128,6 +128,21 @@ def _tickets(slug):
         return []
 
 
+def _decididos(slug):
+    """Lo ya decidido de esa pieza y, si deriva, de su origen en sus etapas."""
+    try:
+        from dominio import ticket
+        from dominio.libreto import origen_de
+
+        origen, mapa = origen_de(slug)
+        heredados = [dict(d, etapa=mapa.get(d["etapa"]))
+                     for d in (ticket.decididos(origen) if origen else [])
+                     if d["etapa"] is None or d["etapa"] in mapa]
+        return ticket.decididos(slug) + heredados
+    except Exception:                              # noqa: BLE001
+        return []
+
+
 def _precio():
     """El escalon abierto hoy, ya redactado. Ver `consulta.precio_vigente`."""
     try:
@@ -250,6 +265,9 @@ def pedir(paso, slug, prompt, payload, cli=True):
              # sonido»— no se puede atender si el paso no sabe que etapa cae en
              # el segundo 30. Ver `dominio/ticket.py`.
              "lo_que_dijo_jaime_de_la_pieza": _tickets(slug),
+             # **Y lo que ya se decidió, que no se rediscute.** Ver
+             # `ticket.decididos`: cerrado, el #282 dejaba de viajar.
+             "lo_ya_decidido_de_la_pieza": _decididos(slug),
              # **El marcador que viaja con la pieza.** Jaime, 9-9-2026: *«los
              # agentes deben poder leer y escribir en el Json, es lo que permite
              # ver la etiqueta, y es lo que articula todo lo de la base de
@@ -296,7 +314,8 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # contara como pregunta, cada pedido seria nuevo por haber contestado el
     # anterior — el bucle de C-122 con otra puerta.
     VOLATILES = ("vuelta", "hoy", "precio_vigente", "instrucciones_de_jaime",
-                 "lo_que_dijo_jaime_de_la_pieza", "marcador")
+                 "lo_que_dijo_jaime_de_la_pieza", "lo_ya_decidido_de_la_pieza",
+                 "marcador")
 
     # **Y lo que es contexto tampoco cambia la pregunta.**
     #
