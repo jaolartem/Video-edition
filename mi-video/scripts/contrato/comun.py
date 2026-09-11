@@ -96,7 +96,7 @@ lo decide Jaime. Tu salida es la evidencia, y va en `sube`.
                    " Bird y dieron por caducado un precio abierto (C-160)."),
         Campo("hoy",
               manda=Aguja("scripts/servicio.py",
-                          'comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),'),
+                          'return {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),'),
               exige=(Prompt("scripts/fuentes.prompt.md", "no respalda una cifra de hoy"),),
               nota="La fecha del render. Sin ella, «hoy» es lo que el modelo"
                    " suponga, y una vigencia se juzga contra una fecha"
