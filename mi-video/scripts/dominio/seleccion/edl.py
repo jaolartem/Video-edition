@@ -19,8 +19,9 @@ import trato as trato_mod  # noqa: E402
 
 #: Las etapas de cierre que declara el frame. Las zonas van por **función de la
 #: etapa y no por reloj**: el gancho es el primer beat y el CTA empieza en la
-#: primera etapa de cierre.
-CIERRE = ("promesa", "urgencia", "registro", "aplicación", "aplicacion")
+#: primera etapa de cierre. Vive en `dominio/libreto.py`, que corta por ella a
+#: las piezas derivadas (C-388).
+from dominio.libreto import CIERRE  # noqa: E402
 
 #: Lo que describe a UN EDL concreto y **no se hereda al escribir otro**.
 #: Arrastrarlas hacía que `depurar` se saltara una selección recién hecha y que
@@ -105,7 +106,8 @@ def escribir(slug: str, plan, ventanas, libreto, frame) -> tuple[str, float]:
 
     out = dict(base)
     out.update({
-        "pilar": base.get("pilar", "SELL"),
+        # El pilar lo declara la pieza (C-388): un reel derivado es EDUCATE.
+        "pilar": frame.get("pilar", base.get("pilar", "SELL")),
         "estructura": frame.get("estructura", base.get("estructura")),
         "mecanismo": frame.get("mecanismo", base.get("mecanismo")),
         "zonas": zonas,

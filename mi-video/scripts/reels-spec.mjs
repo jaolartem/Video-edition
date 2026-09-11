@@ -66,7 +66,14 @@ const faltas = [];
 
 // **Las piezas salen de lo declarado, no de `LINEAS`.** Una que no estuviera en
 // ese literal no existia para el render: reel-07 llevaba dias invisible aqui.
-const spec = Object.keys(FRAMES.reels).map((slug) => {
+// **Y una pieza sin cortar no tumba el spec de las demás** (C-388). Cada una
+// exige su vídeo cortado, su plan y su EDL, y una recién declarada todavía no
+// los tiene: sin esto, declarar reel-08 paraba el render de las siete.
+const cortada = (s) => [`public/${s}.mp4`, `work/scenes/${s}/plan-full.json`,
+  `ads/${s}/edl-sell.json`].every((f) => fs.existsSync(f));
+const sinCortar = Object.keys(FRAMES.reels).filter((s) => !cortada(s));
+if (sinCortar.length) console.log(`    sin cortar todavía, fuera del spec: ${sinCortar.join(", ")}`);
+const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
   // **El rotulo lo declara el diseno; `LINEAS` es el respaldo.** Del literal
   // salia «No es por / ser inmigrante», que refuta la creencia antes de plantarla.
   // El DECLARADO y el que se usa son dos cosas: si se pasa el resuelto a

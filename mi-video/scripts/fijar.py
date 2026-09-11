@@ -93,16 +93,28 @@ def huella(toma, a, b):
 
 
 def fijados(slug):
-    """Los tramos declarados de una pieza, por beat."""
+    """Los tramos declarados de una pieza, por beat.
+
+    **Una pieza derivada hereda los de su origen** mientras no declare los
+    suyos (C-388): lo que Jaime fijó en el anuncio no se rediscute en el reel.
+    Se leen, no se copian —una copia dejaría de enterarse de sus cambios—, y
+    cada uno llega con el número de etapa de la derivada.
+    """
+    from dominio.libreto import origen_de
+
+    sql = ("select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que,"
+           " cf.huella, cf.quien"
+           "  from corte_fijo cf join video v on v.id = cf.video_id"
+           " where v.slug = ? and cf.papel = 'etapa' order by cf.orden, cf.desde")
     con = _con()
-    filas = con.execute(
-        "select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que,"
-        " cf.huella, cf.quien"
-        "  from corte_fijo cf join video v on v.id = cf.video_id"
-        " where v.slug = ? and cf.papel = 'etapa' order by cf.orden, cf.desde",
-        (slug,)).fetchall()
+    filas = [dict(f) for f in con.execute(sql, (slug,)).fetchall()]
+    origen, mapa = origen_de(slug)
+    if not filas and origen:
+        filas = [{**dict(f), "beat": mapa[f["beat"]]}
+                 for f in con.execute(sql, (origen,)).fetchall()
+                 if f["beat"] in mapa]
     con.close()
-    return [dict(f) for f in filas]
+    return filas
 
 
 def huerfanas(slug):

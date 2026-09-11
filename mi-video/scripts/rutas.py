@@ -43,6 +43,15 @@ RECOGER = [LIMPIAR, "out/audio-puro",
 PUBLICO = _cfg.get("publico", "public")
 FUENTES = _cfg.get("fuentes", {})
 TOMAS = _cfg.get("tomas", {})
+# **Una pieza que deriva de otra usa su cinta** (C-388): se deduce de
+# `deriva_de` en `ads/frames.json`, no se escribe dos veces.
+try:
+    for _s, _f in json.load(open(os.path.join("ads", "frames.json"),
+                                 encoding="utf-8"))["reels"].items():
+        if _f.get("deriva_de") in TOMAS and _s not in TOMAS:
+            TOMAS[_s] = TOMAS[_f["deriva_de"]]
+except (OSError, ValueError, KeyError):
+    pass
 # `AAAAMMDD_HHMMSS`: lo que la camara pone y lo que un derivado no tiene.
 _ES_CINTA = re.compile(r"^\d{8}_\d{6}$")
 

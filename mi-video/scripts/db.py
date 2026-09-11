@@ -66,6 +66,11 @@ def _id(cx, tabla, nombre, **extra):
 def migrar():
     """Vuelca los JSON actuales a la base. Se puede correr las veces que haga falta."""
     cx = crear()
+    # **Las piezas que derivan de otra se expanden antes de leer nada** (C-388):
+    # su línea de `frames.json` se vuelve a generar desde su origen.
+    sys.path.insert(0, os.path.dirname(__file__))
+    from dominio.libreto import escribir_derivadas
+    escribir_derivadas()
     frames = json.load(open("ads/frames.json", encoding="utf-8"))
     rutas = json.load(open("rutas.json", encoding="utf-8"))
 
@@ -81,7 +86,9 @@ def migrar():
     for slug, f in frames["reels"].items():
         est = cx.execute("SELECT id FROM estructura WHERE nombre = ?",
                          (f["estructura"],)).fetchone()["id"]
-        toma = _id(cx, "toma", rutas["tomas"][slug])
+        # Una derivada usa la cinta de su origen (C-388).
+        toma = _id(cx, "toma", rutas["tomas"].get(slug)
+                   or rutas["tomas"][f["deriva_de"]])
         m1 = _id(cx, "mecanismo", f["mecanismo"]["primario"])
         m2 = _id(cx, "mecanismo", f["mecanismo"]["secundario"])
         porque = " ".join(f.get("porque", []))
@@ -99,6 +106,23 @@ def migrar():
         # Las etapas de la pieza, con su mensaje esperado sacado del libreto.
         sys.path.insert(0, os.path.dirname(__file__))
         import beats  # noqa: E402  (import tardío: necesita cwd en mi-video)
+        # **Y su libreto es el de su origen**, en las etapas que hereda (C-388).
+        # Nueve sitios leen la tabla `libreto` por el slug: una copia que se
+        # regenera en cada migración es lo que les deja ver la pieza, y no puede
+        # separarse del origen porque no sobrevive a la migración siguiente.
+        if f.get("deriva_de"):
+            ov = cx.execute("SELECT id FROM video WHERE slug = ?",
+                            (f["deriva_de"],)).fetchone()
+            textos = [r["texto"] for r in cx.execute(
+                "SELECT texto FROM libreto WHERE video_id = ? ORDER BY orden",
+                (ov["id"],))] if ov else []
+            cx.execute("DELETE FROM libreto WHERE video_id = ?", (vid,))
+            cx.executemany(
+                "INSERT INTO libreto (video_id, orden, texto) VALUES (?,?,?)",
+                [(vid, j + 1, textos[o - 1])
+                 for j, o in enumerate(f.get("de_origen") or [])
+                 if o - 1 < len(textos)])
+            cx.commit()
         libreto = beats.beats_del_libreto(int(slug[-2:]))
         # `etapa_orden` apunta a la canónica; si la pieza declara una etapa que
         # no está en la secuencia canónica, se añade al final de ésta. Pasa con

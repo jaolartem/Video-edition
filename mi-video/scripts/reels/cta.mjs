@@ -43,6 +43,10 @@ const CTA_S = 5.5;
 export const ctasSinDatos = [];
 
 export function ctaDe(slug, marco, duracion) {
+  // **Un pilar que no es SELL no lleva tarjeta, y eso no es una falta** (C-388).
+  // Playbook: el CTA va en uno en SELL y en cero en los demás; los reels que
+  // derivan de un anuncio sin su CTA son EDUCATE.
+  if ((marco?.pilar ?? "SELL") !== "SELL") return null;
   // **Un CTA al que le faltan datos NO se emite.**
   //
   // `PROMESA` y `CUENTA` son mapas por pieza, o sea un `if (slug === …)` con

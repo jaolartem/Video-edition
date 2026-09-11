@@ -43,6 +43,81 @@ BASE = basedatos.BASE
 LIBRETOS = os.path.join("..", "docs", "libretos.md")
 FRAMES = os.path.join("ads", "frames.json")
 
+#: Las etapas de cierre: desde la primera, la pieza vende. Vivía en
+#: `seleccion/edl.py`, que la usa para las zonas; aquí la usa también el corte
+#: de una pieza que deriva de otra sin su CTA (C-388).
+CIERRE = ("promesa", "urgencia", "registro", "aplicación", "aplicacion")
+
+#: Lo que declara una pieza derivada. Lo demás se hereda de su origen.
+DECLARA = ("_deriva", "deriva_de", "pilar", "cara", "lectura", "quita")
+
+#: Lo del origen que una derivada NO hereda: todo es del cierre que se corta.
+#: `debe_decir` de pieza lleva las cifras de ese cierre (reel-01: «550|576»).
+NO_HEREDA = ("cierre", "_cierre", "nota_de_cierre", "debe_decir")
+
+
+def derivada(origen: dict, decl: dict) -> dict:
+    """La pieza que deriva de otra, **resuelta** (C-388).
+
+    Jaime, 10-9-2026: *«toma los 7 videos y conviértelos en reels, es decir
+    quítales el CTA comercial»*. La derivada hereda las etapas de su origen
+    **hasta la primera de cierre**, menos las que declara en `quita`, y nada del
+    CTA: ni `cierre` —la frase del link—, ni el `debe_decir` de pieza. Y lleva
+    `de_origen`, qué etapa del origen es cada una de las suyas.
+    """
+    beats = origen["beats"]
+    corte = next((i for i, b in enumerate(beats)
+                  if any(c in (b.get("etapa") or "").lower() for c in CIERRE)),
+                 len(beats))
+    quita = set(decl.get("quita") or [])
+    quedan = [i for i in range(corte) if i + 1 not in quita]
+    f = {k: v for k, v in origen.items() if k not in NO_HEREDA}
+    f["beats"] = [beats[i] for i in quedan]
+    s = origen.get("senala")
+    f["senala"] = ({**s, "beat": quedan.index(s["beat"] - 1) + 1}
+                   if s and s.get("beat", 0) - 1 in quedan else None)
+    f.update({k: decl[k] for k in DECLARA if k in decl})
+    f["de_origen"] = [i + 1 for i in quedan]
+    return f
+
+
+def escribir_derivadas(ruta: str = FRAMES) -> list:
+    """Expande en `frames.json` las piezas que derivan de otra. Devuelve cuáles.
+
+    **La declaración es una línea**; lo demás se vuelve a generar desde su
+    origen cada vez, igual que `estado.json` publica lo que dice la base. Así
+    los quince sitios que leen `frames.json` ven una pieza entera sin que
+    ninguno tenga que saber qué es derivar, y un cambio en el origen llega solo.
+    Lo llama `db.migrar`, que corre al arrancar la línea.
+    """
+    texto = open(ruta, encoding="utf-8").read()
+    d = json.loads(texto)
+    cambian = []
+    for slug, f in d["reels"].items():
+        origen = d["reels"].get(f.get("deriva_de") or "")
+        if not origen or origen.get("deriva_de"):
+            continue
+        nuevo = derivada(origen, f)
+        if nuevo != f:
+            d["reels"][slug] = nuevo
+            cambian.append(slug)
+    if cambian:
+        with open(ruta, "w", encoding="utf-8", newline="\n") as h:
+            h.write(json.dumps(d, ensure_ascii=False, indent=1)
+                    + ("\n" if texto.endswith("\n") else ""))
+    return cambian
+
+
+def origen_de(slug: str) -> tuple:
+    """`(origen, {etapa del origen: etapa suya})`, o `(None, {})` si no deriva."""
+    try:
+        f = json.load(open(FRAMES, encoding="utf-8"))["reels"].get(slug) or {}
+    except (OSError, ValueError):
+        return None, {}
+    if not f.get("deriva_de"):
+        return None, {}
+    return f["deriva_de"], {o: j + 1 for j, o in enumerate(f.get("de_origen") or [])}
+
 
 class Libreto:
     """Lo que la pieza `n` tiene que decir, y en qué orden."""

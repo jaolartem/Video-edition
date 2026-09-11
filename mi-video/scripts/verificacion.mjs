@@ -12,7 +12,7 @@
  */
 import fs from "fs";
 import { rutas } from "./rutas.mjs";
-import { slugDe } from "./reels/material.mjs";
+import { marcoDe, slugDe } from "./reels/material.mjs";
 
 const LIBRETOS = "../docs/libretos.md";
 const FPS = 30;
@@ -158,7 +158,9 @@ de lo que hay que comprobar antes de publicar.
 
 ${cta.join("\n")}
 
-Un SELL lleva **exactamente uno**. ${r.cta ? "✅ uno" : "⚠️ ninguno"}
+${(marcoDe(slug)?.pilar ?? "SELL") === "SELL"
+  ? `Un SELL lleva **exactamente uno**. ${r.cta ? "✅ uno" : "⚠️ ninguno"}`
+  : `Un ${marcoDe(slug).pilar} lleva **cero**. ${r.cta ? "⚠️ lleva uno" : "✅ ninguno"}`}
 
 ## Cifras del libreto
 
