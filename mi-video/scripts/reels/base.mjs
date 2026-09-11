@@ -14,7 +14,8 @@
  * veces por corrida, una para las aprobaciones y otra para el resto.
  */
 import { DatabaseSync } from "node:sqlite";
-import { CONSTRUIDAS, revisarTablero } from "../formas.mjs";
+import { CONSTRUIDAS, revisarTablero, sinSujeto } from "../formas.mjs";
+import { marcoDe } from "./material.mjs";
 
 const db = new DatabaseSync("ads/decisiones.db");
 
@@ -164,6 +165,11 @@ export function tablerosDe(slug) {
     }).filter((b) => {
       for (const m of revisarTablero(b.kind, b.props))
         faltas.push(`${slug} e${b.beat}: ${m}`);
+      // **Y la regla de la cara, sólo donde la pieza la declara** (T-06): aquí
+      // se sabe de qué pieza es el tablero, en `formas.mjs` no.
+      if (marcoDe(slug)?.cara === "siempre")
+        for (const m of sinSujeto(b.kind, b.props))
+          faltas.push(`${slug} e${b.beat}: ${m}`);
       return true;
     }).filter((b) => {
       if (b.kind === "tipo") return false;

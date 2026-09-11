@@ -269,8 +269,14 @@ class ServicioDisenar(Servicio):
         # La ultima prueba se hace MIRANDO: el dossier dice lo que se pidio y
         # el frame lo que salio. El porque vive en `fotogramas.py`.
         mirar, _ = _fotogramas.sacar(pieza.n)
+        # **Si la pieza muestra su cara en todo tablero** (T-06): el prop
+        # `cara: "siempre"` del marco. Sin esto el diseñador compondría a pleno
+        # sin él y la línea se lo pararía después, cuando ya no puede corregir.
+        from dominio.libreto import Libreto
+        cara = Libreto(pieza.n).frame().get("cara") == "siempre"
         payload = {
             "pieza": pieza.slug,
+            "cara_en_todo_tablero": cara,
             "mira_estos_fotogramas": mirar,
             # **Y como suena cada corte.** Jaime, 7-9-2026: *«ambos que vean y
             # oigan; con eso el compositor sabe si estoy leyendo en una toma»*.

@@ -13,6 +13,8 @@ import { Techo, type TechoProps } from "./Techo";
 import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
 import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
+import { Recorte, type Lado } from "./Recorte";
+import { LadoDelSujeto, ZonaTablero } from "./ZonaTablero";
 import type { Mode } from "../brand/tokens";
 
 /**
@@ -60,9 +62,34 @@ export type CueDeTablero = {
  */
 export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
   const props = cue.props as Record<string, unknown>;
+  /**
+   * **Él dentro del tablero, puesto aquí para todas las formas** (T-06).
+   *
+   * Jaime, 10-9-2026: *«ahora todos los tableros deben mostrar mi cara en la
+   * composición; la base son los del R-02»*. Lo sabía dibujar sólo
+   * `PanelDentro`, así que `sujeto` declarado en cualquier otra forma no salía.
+   * Aquí se monta una vez, igual que el pie: el lado viaja por contexto hasta
+   * `ZonaTablero`, que deja libre su columna, y el recorte va encima, cortado
+   * en el techo de la franja. `PanelDentro` sigue pintando el suyo —su horario
+   * y su orden de capas son los que Jaime aprobó— y por eso no entra aquí.
+   */
+  const lado = props?.sujeto as Lado | undefined;
+  const src = props?.sujeto_src as string | undefined;
+  const conSujeto = Boolean(lado && src) && cue.kind !== "PanelDentro";
   return (
     <>
-      {laForma(cue, mode)}
+      <LadoDelSujeto.Provider value={conSujeto ? lado ?? null : null}>
+        {laForma(cue, mode)}
+      </LadoDelSujeto.Provider>
+      {conSujeto ? (
+        <ZonaTablero>
+          <Recorte
+            src={src as string}
+            lado={lado}
+            css={props?.sujeto_css as string | undefined}
+          />
+        </ZonaTablero>
+      ) : null}
       <PieTablero linea={props?.pie as string | undefined} />
     </>
   );

@@ -296,6 +296,13 @@ DISENO = Contrato(
                    " la cara.\n\n"
                    "                   `cc` es la opción por defecto del resto, no"
                    " un hueco: el subtítulo dinámico ya lleva la idea."),
+        # **Su lado, cuando el tablero lo lleva dentro** (T-06, C-383). Jaime,
+        # 10-9-2026: *«ahora todos los tableros deben mostrar mi cara»*. Es
+        # obligatoria a pleno cuando el pedido trae `cara_en_todo_tablero` —el
+        # prop `cara: "siempre"` del marco—, y la para `formas.mjs ::
+        # sinSujeto`; en las demás piezas es opcional. `abajo`, sólo en
+        # `PanelDentro`. Va en dos líneas por el techo de este fichero.
+        Clave("tablero.sujeto", dispara=(Aguja("src/components/Tablero.tsx", "<LadoDelSujeto.Provider value={conSujeto ? lado ?? null : null}>"), Aguja("scripts/formas.mjs", "export const sinSujeto = (kind, props) => {")), efecto="su recorte en el tablero y su columna libre", obligatoria=False, lista=("izquierda", "derecha", "abajo"), nota="T-06 (C-383): ver el comentario de encima."),
         Clave("tablero.volumen",
               dispara=(Aguja("scripts/reels/paneles.mjs", "export function faltaDelPanel(p) {"),
                        Aguja("src/components/SidePanel.tsx",

@@ -1,5 +1,19 @@
 import React from "react";
 import { franja } from "../brand/franja";
+import { COLUMNA } from "./panel/sitio";
+import type { Lado } from "./Recorte";
+
+/**
+ * **De qué lado está él, cuando el tablero lo lleva dentro.** Lo pone
+ * `dibujaTablero` y lo lee la caja de abajo: así cualquier forma que dibuje
+ * dentro de `ZonaTablero` deja libre su lado sin saber que existe.
+ *
+ * Jaime, 10-9-2026: *«ahora todos los tableros deben mostrar mi cara en la
+ * composición; la base son los del R-02»*. La medida es la de ese panel
+ * —`panel/sitio.ts :: COLUMNA`—, no otra: el contenido vive en la columna
+ * contraria a la suya.
+ */
+export const LadoDelSujeto = React.createContext<Lado | null>(null);
 
 /**
  * **La caja dentro de la que dibuja un tablero.** Del borde de arriba al techo
@@ -38,17 +52,51 @@ import { franja } from "../brand/franja";
  */
 export const ZonaTablero: React.FC<{ children: React.ReactNode }> = ({
   children,
-}) => (
-  <div
-    style={{
-      position: "absolute",
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: franja.reserva,
-      overflow: "hidden",
-    }}
-  >
-    {children}
-  </div>
-);
+}) => {
+  const lado = React.useContext(LadoDelSujeto);
+  const caja = {
+    position: "absolute" as const,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: franja.reserva,
+    overflow: "hidden" as const,
+  };
+  if (lado !== "izquierda" && lado !== "derecha")
+    return <div style={caja}>{children}</div>;
+  // **Y si él está dentro, la forma se encoge a la columna libre: no se corta.**
+  //
+  // La primera versión sólo estrechaba la caja, y las formas —maquetadas a
+  // 1080 con posiciones absolutas— se desplazaban y se cortaban: medido en
+  // reel-02 e3 (`acumulacion`), el título y las etiquetas salían por la
+  // derecha. Encoger conserva la composición entera en el ancho que queda, y
+  // se centra en alto para no dejar la mitad de abajo vacía.
+  const k = (LIENZO - COLUMNA.x) / LIENZO;
+  const alto = 1920 - franja.reserva;
+  return (
+    <div
+      style={{
+        ...caja,
+        left: lado === "izquierda" ? COLUMNA.x : 0,
+        right: lado === "derecha" ? COLUMNA.x : 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: Math.round((alto * (1 - k)) / 2),
+          width: LIENZO,
+          height: alto,
+          transform: `scale(${k})`,
+          transformOrigin: "top left",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
+/** El ancho para el que están maquetadas las formas: el cuadro entero. */
+const LIENZO = 1080;

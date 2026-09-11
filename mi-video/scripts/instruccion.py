@@ -184,6 +184,28 @@ INSTRUCCIONES = (
             Aguja("scripts/seleccionar.py", "pide_otra_toma(c.slug, b, toma, lect)"),
         ),
     ),
+    Instruccion(
+        codigo="T-06",
+        paso="disenar",
+        clase="tablero",
+        enunciado=(
+            "Ahora todos los tableros deben mostrar mi cara en la composicion; la"
+            " base son los del R-02 (Jaime, 10-9-2026). En las piezas que lo"
+            " declaran —cara: siempre— todo tablero a pleno lleva sujeto: su"
+            " recorte a un lado y la lamina en la columna contraria, con la"
+            " medida de PanelDentro. Sin sujeto, o con una forma que no deja la"
+            " columna libre, la pieza no se renderiza. Las siete de venta, igual."
+        ),
+        agujas=(
+            Aguja("scripts/formas.mjs", "export const sinSujeto = (kind, props) => {"),
+            Aguja("scripts/reels/base.mjs", 'if (marcoDe(slug)?.cara === "siempre")'),
+            Aguja("src/components/Tablero.tsx",
+                  "<LadoDelSujeto.Provider value={conSujeto ? lado ?? null : null}>"),
+            Aguja("src/components/ZonaTablero.tsx",
+                  "const lado = React.useContext(LadoDelSujeto);"),
+            Aguja("scripts/servicios/disenar.py", '"cara_en_todo_tablero": cara,'),
+        ),
+    ),
 )
 
 

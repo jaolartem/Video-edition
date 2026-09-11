@@ -368,6 +368,51 @@ export const figurasCerradas = (kind, props) => {
       ` Este tablero se compone con el dato o con la letra`);
 };
 
+/**
+ * **Las formas cuyo componente deja sitio a su cara**, leídas de quien dibuja.
+ *
+ * Una forma deja sitio si dibuja dentro de `ZonaTablero`: ahí `dibujaTablero`
+ * le estrecha la caja a la columna contraria a la suya. Las que componen a mano
+ * sobre el cuadro entero no se enteran, y el recorte les pisaría el texto. Se
+ * lee del despacho y de cada componente —como `CONSTRUIDAS`— para que construir
+ * la columna en uno lo saque de la falta sin tocar ninguna lista.
+ */
+const DEJAN_SITIO = (() => {
+  const t = fs.readFileSync(`${DIR_C}/Tablero.tsx`, "utf8");
+  const deja = new Set();
+  for (const m of t.matchAll(/if \(([^{;]*?)\)\s*return <(\w+)/g)) {
+    let src = "";
+    try { src = fs.readFileSync(`${DIR_C}/${m[2]}.tsx`, "utf8"); } catch { /* sin fichero, no deja */ }
+    if (!src.includes("<ZonaTablero")) continue;
+    for (const k of m[1].matchAll(/cue\.kind === "([^"]+)"/g)) deja.add(k[1]);
+  }
+  return deja;
+})();
+
+/**
+ * **En las piezas que lo declaran, todo tablero a pleno lleva su cara** (T-06).
+ *
+ * Jaime, 10-9-2026: *«ahora todos los tableros deben mostrar mi cara en la
+ * composición»*. Regla de lote como `figurasCerradas`, pero **de pieza**: la
+ * aplica quien sabe de qué pieza es el tablero —`reels/base.mjs`, con el prop
+ * `cara: "siempre"` del marco— y por eso las siete de venta salen igual. Un
+ * panel o una banda ya le dejan la cara; `cc` no tapa nada.
+ */
+export const sinSujeto = (kind, props) => {
+  const p = props ?? {};
+  if (kind === "tipo" || (p.cubre ?? "pleno") !== "pleno") return [];
+  if (!p.sujeto)
+    return [`«${kind}» va a pleno sin \`sujeto\`, y en esta pieza todo tablero` +
+      " muestra su cara (Jaime, 10-9: «todos los tableros deben mostrar mi" +
+      " cara»). Declara su lado —izquierda o derecha— y el copy va en la otra" +
+      " columna; o que acompañe (`panel`, `banda`)"];
+  if (CONSTRUIDAS.has(kind) && !DEJAN_SITIO.has(kind))
+    return [`«${kind}» lleva \`sujeto\` y su componente no dibuja dentro de` +
+      " `ZonaTablero`: no deja la columna libre y el recorte le pisaría el" +
+      " texto. Otra forma, o construirle la columna"];
+  return [];
+};
+
 export const revisarTablero = (kind, props) => {
   // **Una forma que no está en este catálogo NO es un error.** Se dibuja con
   // `TableroDeclarado` y punto. Esto devolvía una falta por cada una —42 en el
