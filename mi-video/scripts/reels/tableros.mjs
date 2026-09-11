@@ -146,6 +146,10 @@ export function armarTableros(
         // sobre ella, como hasta ahora.
         props: { ...conEscalera(b.props, `${slug} e${b.beat}`, faltas),
                  sound: true,
+                 // Las casillas de un tablero también se resuelven cuando se
+                 // dicen: sólo los paneles lo hacían, y reel-04 e5 salía sin tachar.
+                 ...(Array.isArray(b.props?.casillas)
+                   ? { casillas: cuandoSeDice(b.props.casillas, at, captions) } : {}),
                  placa: b.props?.placa ?? placaDe(slug),
                  // **A cuadro completo la placa LLENA el cuadro.**
                  //
