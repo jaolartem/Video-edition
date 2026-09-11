@@ -163,8 +163,15 @@ const camaraPorBeat = () => {
       // porque bajo un tablero a pleno no se ve. Un tablero ilegible no es
       // asunto de este paso: lo dice `base.mjs`.
       try {
-        if (!cam.detras && JSON.parse(f.tablero ?? "null")?.props?.sujeto)
+        const t = JSON.parse(f.tablero ?? "null");
+        if (!cam.detras && t?.props?.sujeto)
           cam.detras = "sujeto";
+        // **Y el canto sale de la forma** (C-384): el `cuadro` es un retrato
+        // de canto limpio; la pegatina, papel rasgado. Va aparte de `detras`
+        // porque `reels/imagen.mjs` compara `detras === "sujeto"` para no
+        // emitir la capa de detrás, y un valor nuevo ahí la colaría.
+        if (t?.props?.sujeto_forma === "cuadro")
+          cam.canto = "limpio";
       } catch { /* vacío a propósito: ver arriba */ }
       m.set(Number(f.etapa_orden), cam);
     }
@@ -316,6 +323,8 @@ for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
       // una silueta que aparece y desaparece dentro de la misma etapa lee como
       // un fallo de máscara. `null` = nada detrás, que es como salía todo.
       detras: cam.detras,
+      // Con qué canto se recorta lo de detrás. Lo lee `dominio/sujeto.py`.
+      canto: cam.canto,
       /**
        * **El movimiento dentro de la escena.** `punch-ins.py` calcula el
        * recorte final con los OJOS como punto fijo (aprendizaje 27), así que

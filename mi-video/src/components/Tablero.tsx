@@ -13,7 +13,7 @@ import { Techo, type TechoProps } from "./Techo";
 import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
 import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
-import { Recorte, type Lado } from "./Recorte";
+import { Recorte, type Forma, type Lado } from "./Recorte";
 import { LadoDelSujeto, ZonaTablero } from "./ZonaTablero";
 import type { Mode } from "../brand/tokens";
 
@@ -86,6 +86,7 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
           <Recorte
             src={src as string}
             lado={lado}
+            forma={props?.sujeto_forma as Forma | undefined}
             css={props?.sujeto_css as string | undefined}
           />
         </ZonaTablero>

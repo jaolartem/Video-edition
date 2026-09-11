@@ -1,5 +1,6 @@
 import React from "react";
 import { OffthreadVideo, staticFile } from "remotion";
+import { color } from "../brand/tokens";
 
 /**
  * **La pegatina: él recortado, en blanco y negro y con canto de papel rasgado.**
@@ -153,9 +154,33 @@ const SITIO: Record<Lado, Sitio> = {
   abajo: { ancho: 900, left: 110, top: 70 },
 };
 
+/**
+ * **Las dos formas de ponerlo, y no sólo la pegatina.**
+ *
+ * Jaime, 11-9-2026: *«debe haber más formatos de tablero, por ejemplo cuadrado y
+ * a color cuando sea un tablero más formal, también en sepia o a color como
+ * stiquer; no lo cierres a blanco y negro rasgado»*.
+ *
+ * - `pegatina` — la aprobada el 6-9: canto de papel rasgado y doce escalones.
+ *   El color lo pone el tratamiento (blanco y negro, sepia o color).
+ * - `cuadro` — el retrato formal: un cuadrado de canto limpio sobre el navy de
+ *   la paleta, con su filete de 1 px y **sin escalones**, que es lo que lo hace
+ *   foto y no collage. Pide su recorte con canto `limpio` (ver `sujeto.py`).
+ */
+export type Forma = "pegatina" | "cuadro";
+
+/** Dónde va el cuadro. Entero dentro del cuadro: es un retrato, no sangra. */
+const CUADRO: Record<Lado, Sitio> = {
+  izquierda: { ancho: 400, left: 54, top: 250 },
+  derecha: { ancho: 400, right: 54, top: 250 },
+  abajo: { ancho: 400, left: 340, top: 560 },
+};
+
 export type RecorteProps = {
   /** El recorte con alfa, relativo a `public/`. Lo produce `text-behind.py`. */
   src: string;
+  /** `pegatina` (por defecto) o `cuadro`. Lo elige quien diseña. */
+  forma?: Forma;
   /**
    * Uno de los tres sitios del panel. Lo elige quien compone según dónde esté
    * el hueco. Para cualquier otra lámina, `sitio`.
@@ -182,17 +207,51 @@ export type RecorteProps = {
 
 export const Recorte: React.FC<RecorteProps> = ({
   src,
+  forma = "pegatina",
   lado = "izquierda",
   sitio,
   css = "grayscale(1) contrast(1.06)",
   entra = 1,
 }) => {
+  const cuadro = forma === "cuadro";
   // El sitio explícito gana; si no, el del lado. `?? SITIO.izquierda` sigue
   // cubriendo un `lado` que llegue del spec sin ser ninguno de los tres.
   const { ancho, ...donde } = anclado(
-    sitio ?? SITIO[lado] ?? SITIO.izquierda,
+    sitio ?? (cuadro ? CUADRO[lado] : SITIO[lado]) ?? SITIO.izquierda,
     sitio ? "que le pasaron" : `«${lado}»`,
   );
+  if (cuadro) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          ...donde,
+          width: ancho,
+          height: ancho,
+          opacity: entra,
+          overflow: "hidden",
+          pointerEvents: "none",
+          backgroundColor: color.navy,
+          border: `1px solid ${color.lightNeutral}`,
+        }}
+      >
+        {/* El plano es vertical y el cuadro no: se encuadra por la cara, que
+            en el recorte vive en el tercio de arriba. */}
+        <OffthreadVideo
+          src={staticFile(src)}
+          transparent
+          muted
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "50% 22%",
+            filter: css,
+          }}
+        />
+      </div>
+    );
+  }
   return (
     <>
       {/**

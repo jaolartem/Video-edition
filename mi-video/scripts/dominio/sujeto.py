@@ -180,7 +180,10 @@ def _ventanas_detras(n):
     for e in escenas:
         dura = float(e.get("duracion") or 0)
         if e.get("detras"):
-            v = ventanas.setdefault(int(e["beat"]), [t, t, "papel"])
+            # El canto lo pide la forma del tablero: `cuadro` es un retrato de
+            # canto limpio, la pegatina es papel (C-384). Lo copia `plan-reel`.
+            canto = "limpio" if e.get("canto") == "limpio" else "papel"
+            v = ventanas.setdefault(int(e["beat"]), [t, t, canto])
             # **Y se pasa el SOLAPE.** Un tablero se estira 0,8 s por encima de
             # la costura para taparla (`reels/lectura.mjs`), asi que la capa
             # sigue en pantalla cuando la ventana del beat ya acabo. Sin este

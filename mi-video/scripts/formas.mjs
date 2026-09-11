@@ -71,6 +71,12 @@ const CROMO = {
   fondo: "la placa o el plano de color de debajo",
   source: "de dónde sale la cifra. Obligatorio si rotula una",
   filete: "los filetes de 1 px que separan, en vez de sombras",
+  sujeto: "izquierda | derecha: de qué lado va su recorte. La lámina se encoge a"
+    + " la otra columna. Obligatorio a pleno si la pieza es `cara: siempre`",
+  sujeto_forma: "pegatina (papel rasgado, collage) | cuadro (retrato formal,"
+    + " canto limpio sobre navy). Por defecto, pegatina",
+  sujeto_color: "bn | sepia | color. Si no se dice, lo decide el arco"
+    + " (`escena_desc.color`)",
 };
 
 /** Las formas que `src/Ad.tsx` sabe dibujar hoy. Lo demás es encargo de código. */

@@ -178,7 +178,8 @@ export function armarTableros(
                  // que pedirlo dos veces sería dejar que se contradigan.
                  ...(b.props?.sujeto
                    ? { sujeto_src: sujetoDe(slug, b.beat) ?? undefined,
-                       sujeto_css: tratoDelSujeto(desc?.[b.beat]?.color).css }
+                       sujeto_css: tratoDelSujeto(desc?.[b.beat]?.color,
+                                                  b.props?.sujeto_color).css }
                    : {}),
                  duracion: dur },
       };

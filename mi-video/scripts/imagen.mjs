@@ -136,10 +136,18 @@ export const TRATOS = {
   },
 };
 
-/** El tratamiento del recorte, resuelto desde `escena_desc.color`. */
-export const tratoDelSujeto = (color) => {
-  const nombre =
-    Object.keys(TRATOS).find((k) => TRATOS[k].de === color) ?? "bn";
+/**
+ * El tratamiento del recorte: **el que declare quien diseña**, y si no declara
+ * ninguno, el del arco (`escena_desc.color`).
+ *
+ * Jaime, 11-9-2026: *«debe haber más formatos de tablero… en sepia o a color
+ * como stiquer, no lo cierres a blanco y negro rasgado»*. El arco sigue siendo
+ * el valor por defecto —es de donde sale cuando nadie dice nada—, pero el
+ * diseñador puede elegirlo (`sujeto_color`) igual que elige la forma.
+ */
+export const tratoDelSujeto = (color, declarado) => {
+  const nombre = TRATOS[declarado] ? declarado
+    : Object.keys(TRATOS).find((k) => TRATOS[k].de === color) ?? "bn";
   return { tratamiento: nombre, css: TRATOS[nombre].css };
 };
 
