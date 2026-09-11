@@ -81,9 +81,15 @@ def main():
             # **Y se deja escrito a quién espera la pieza**, para que se vea sin
             # mirar esta consola: el estado de la pieza es el sitio donde eso
             # vive. Ver `dominio/estado.py`.
+            #
+            # **Con el nombre del buzon, no el de la fase.** Quien la limpia es
+            # `estado.marca`, llamada con el paso del pedido —`describir`, no
+            # `descrito`—; con la fase no casaban nunca y reel-04 llevaba tres
+            # dias «esperando» a un paso ya contestado.
             try:
                 from dominio import estado
-                estado.espera(slug, a.paso, os.path.basename(ruta))
+                estado.espera(slug, BUZON.get(a.paso, a.paso),
+                              os.path.basename(ruta))
             except Exception:                      # noqa: BLE001
                 pass
             print(ruta)

@@ -144,6 +144,10 @@ CICLO = [
     (13.5, "voz_entregada", "scripts/voz-limpia.py --exportar {n}"),
     (14, "voz_limpia", "scripts/voz-limpia.py {n}"),
     (15, "masterizado", "scripts/musica.sh {n}"),
+    # **Estaba en la tabla y no aqui.** La tabla `fase` la tenia en 15,5 y el
+    # motor la recorria —con `ServicioRespaldo` registrado—, pero el camino
+    # declarado no la nombraba: dos respuestas a «¿que camino hay?».
+    (15.5, "respaldado", None),      # servicio de IA: las fuentes de cada cifra
     (16, "publicado", "scripts/publicar.py --finales {n}"),
 ]
 

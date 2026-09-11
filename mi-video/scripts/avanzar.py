@@ -250,7 +250,11 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             registro.aviso("avanzar", "el paso revento",
                            detalle=f"{pieza.slug}: {motivo}"[:600], eco=True)
             break
-        if not r.ok:
+        # **Un «no» que dice adonde volver no es un fallo: es un camino.**
+        # `visto` contesta «no se enseña, vuelve a cosido» con `ok=False` y
+        # `volver_a`; esto se cortaba aqui antes de mirar `volver_a`, y reel-07
+        # se quedo dos veces en `medido` contada como atasco (10-9-2026).
+        if not r.ok and not r.volver_a:
             motivo = f"{siguiente['nombre']}: {r.motivo}"
             anotar(pieza.video_id, actual["id"], motivo)
             registro.aviso("avanzar", "la pieza no avanza",

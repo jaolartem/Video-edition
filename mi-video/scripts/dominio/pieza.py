@@ -147,16 +147,9 @@ class Pieza:
         con.close()
         return dict(r) if r else None
 
-    @property
-    def aprobada(self) -> bool:
-        v = self.version
-        if not v:
-            return False
-        con = self._con()
-        r = con.execute("select veredicto from aprobacion where version_id = ?",
-                        (v["id"],)).fetchone()
-        con.close()
-        return bool(r and r["veredicto"] == "aprobada")
+    # **Aqui vivia `aprobada`, y se va sin sustituto.** Leia `aprobacion` por
+    # version —una tercera respuesta a «¿esta aprobada?»— y no la llamaba nadie.
+    # La respuesta es una: `dominio.segmento.aprobada`.
 
     def __repr__(self):
         f = self.fase

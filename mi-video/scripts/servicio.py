@@ -83,8 +83,14 @@ def _marcador(slug):
     fichero abrir. La ruta es relativa a `mi-video`, que es el `cwd` con el que
     se le llama (ver `dominio/oficio.py :: CASA`).
 
-    `etapa` y `abiertos` los reescribe la base en cada vuelta; `hecho` es del
-    que trabaja, y es lo unico que se le pide que toque.
+    `etapa` y `abiertos` los reescribe la base en cada vuelta. **Lo del que
+    trabaja son los `segmentos`**: ahi propone la etiqueta de cada uno
+    (`propone` + `por`), y `estado.aplica` la lleva a la base.
+
+    Llevaba `hecho` y no `segmentos`, y los dos contratos trabajan sobre
+    `marcador.segmentos`: el oficio anotaba `hecho` a mano —con horas
+    inventadas— creyendo cerrar su turno, y el turno lo cierra la respuesta.
+    Medido el 10-9-2026 en reel-01, 03, 04 y 05.
     """
     try:
         from dominio import estado
@@ -93,7 +99,7 @@ def _marcador(slug):
         return {"fichero": os.path.relpath(estado.ruta(slug),
                                            estado.RAIZ).replace("\\", "/"),
                 "etapa": d.get("etapa"), "abiertos": d.get("abiertos") or [],
-                "hecho": d.get("hecho") or []}
+                "segmentos": d.get("segmentos") or []}
     except Exception:                              # noqa: BLE001
         return None
 
@@ -482,6 +488,19 @@ def pedir(paso, slug, prompt, payload, cli=True):
         # cola que miente sobre lo que falta es la misma averia por el otro
         # lado.
         _archivar(paso, slug)
+        # **Y aqui es donde se sabe que el oficio termino.** Es el unico sitio
+        # por el que la linea consume una respuesta, asi que es el que escribe
+        # `hecho` y limpia la espera. `estado.marca` no la llamaba nadie y el
+        # oficio lo anotaba a mano, con horas inventadas (10-9-2026).
+        #
+        # Sin disparar: esto corre DENTRO de un paso de `avanzar`, que sigue
+        # recorriendo la pieza al volver; encender otro salto seria reentrar.
+        try:
+            from dominio import estado as _estado
+            _estado.marca(slug, paso, "hecho",
+                          quien=_OFICIOS.get(paso, "servicio"), dispara=False)
+        except Exception:                          # noqa: BLE001
+            pass
     return r
 
 

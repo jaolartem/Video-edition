@@ -118,6 +118,13 @@ def veredicto(n, aprobada=True, notas=None, quien="jaime"):
     con.commit()
     con.close()
     if aprobada:
+        # **Y se firma donde lo miran las guardas: en cada segmento.** Desde el
+        # 10-9 «¿esta aprobada?» se contesta con `segmento.aprobada`, y esto
+        # solo escribia `aprobacion`: la pieza quedaba en «aprobado» y un
+        # tiquet de maquina la reabria en el acto. Medido en la prueba e2e.
+        from dominio.segmento import Segmento
+        for s in Segmento.de(slug):
+            s.aprueba(quien)
         _cerrar_lo_abierto(slug, quien)
     registro.nota("aprobar", "veredicto sobre una version",
                   detalle=f"{slug} v{v['n']}: "

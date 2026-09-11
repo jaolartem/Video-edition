@@ -70,7 +70,8 @@ def _guarda(slug, d):
     # **El log sólo baja de tamaño por el final.** Es el recorrido de la pieza y
     # es lo que se mira cuando algo salió mal; recortarlo por arriba perdería
     # justo el principio, que es donde empieza la explicación.
-    d["log"] = d.get("log", [])[-60:]
+    log = d.get("log", [])
+    d["log"] = log[:1] + log[-59:] if len(log) > 60 else log
     with open(r, "w", encoding="utf-8", newline="\n") as h:
         json.dump(d, h, ensure_ascii=False, indent=1)
     return d
@@ -133,9 +134,17 @@ def escribe(slug):
     return _guarda(slug, d)
 
 
-#: Que permiso hace falta para poner cada etiqueta. Lo que no esta aqui solo
-#: pide `medir`, que es lo que cualquier paso puede.
+#: Que permiso hace falta para poner cada etiqueta. Lo que no esta aqui pide
+#: «decidir criterio», que es lo que tienen los oficios —los unicos que
+#: escriben el marcador—.
+#:
+#: **Pedia «medir», y eso cerraba la puerta a quien la usa.** «medir» es de los
+#: pasos (tabla `agencia`), que etiquetan por `Segmento.mueve` y nunca por aqui;
+#: los oficios tienen «decidir criterio». Medido el 10-9-2026: ninguna propuesta
+#: de un oficio entraba en la base. Jaime: *«pueden etiquetar»*, todo menos
+#: `aprobado`, que sigue siendo suyo.
 PIDE = {"aprobado": "aprobar"}
+POR_DEFECTO = "decidir criterio"
 
 
 def _admite(quien, etiqueta):
@@ -155,7 +164,7 @@ def _admite(quien, etiqueta):
     a = Autor.de(quien)
     if a is None:
         return False, f"«{quien}» no es un autor declarado"
-    permiso = PIDE.get(etiqueta, "medir")
+    permiso = PIDE.get(etiqueta, POR_DEFECTO)
     if not a.puede(permiso):
         return False, f"{a} no tiene el permiso «{permiso}»"
     if a.tipo == "persona":
@@ -278,7 +287,7 @@ def espera(slug, quien, que):
     return _guarda(slug, d)
 
 
-def marca(slug, paso, resultado, quien="la linea", nota=""):
+def marca(slug, paso, resultado, quien="la linea", nota="", dispara=True):
     """**Un proceso completado, escrito por quien lo completó.**
 
     Aquí es donde un agente que sólo tiene `Read` y `Write` puede por fin decir
@@ -290,7 +299,10 @@ def marca(slug, paso, resultado, quien="la linea", nota=""):
     primera **deje rastro** — y un rastro es lo que puede disparar la segunda.
     """
     d = lee(slug)
-    if d.get("espera", {}) and (d.get("espera") or {}).get("quien") == quien:
+    # **La espera la pone el paso y la quita quien termina.** `turno.py` la
+    # escribe con el nombre del buzon y esto solo miraba el del oficio: no
+    # casaban nunca, y reel-04 «esperaba» desde el 7-9 a un paso contestado.
+    if (d.get("espera") or {}).get("quien") in (quien, paso):
         d["espera"] = None
     fila = {"paso": paso, "resultado": resultado, "quien": quien,
             "cuando": _ahora()}
@@ -306,7 +318,7 @@ def marca(slug, paso, resultado, quien="la linea", nota=""):
     # completado, un cambio de estado; un cambio de estado activa un nuevo
     # proceso»*. Ver `dominio/disparo.py` — un salto, y sin agente en medio:
     # los 18 pasos de codigo del ciclo se encadenan sin encender un modelo.
-    if resultado not in ("fallo", "espera"):
+    if dispara and resultado not in ("fallo", "espera"):
         try:
             from . import disparo
             disparo.dispara(slug, f"{paso} lo dejo en «{resultado}»")

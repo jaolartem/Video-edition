@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import modelo  # noqa: E402
 import servicio  # noqa: E402
 import rutas  # noqa: E402
+from dominio import segmento as _segmento  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
@@ -79,7 +80,12 @@ def estado(slug):
         "huella_hoy": h,
         "al_dia": bool(ult and ult["huella"] == h),
         "duracion": ult["duracion_s"] if ult else None,
-        "aprobada": ap["veredicto"] if ap else None,
+        # **Una sola respuesta a «¿esta aprobada?»: la de las guardas.** Esto
+        # leia `aprobacion` por version y decia «—» de reel-04 y reel-07 mientras
+        # `segmento.aprobada` —lo que protege la pieza— decia que si.
+        "aprobada": ("aprobada" if _segmento.aprobada(slug)
+                     else ap["veredicto"] if ap and ap["veredicto"] != "aprobada"
+                     else None),
         "audio_virgen": bool(au and au["virgen"]),
         "audio_limpio": bool(au and au["limpio"]),
         # **Y se compara, no se pregunta por la verdad del valor.** La columna
