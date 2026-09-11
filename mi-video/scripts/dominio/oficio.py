@@ -48,7 +48,12 @@ ESPERA = 900
 #: Qué oficio contesta cada buzón. Los nombres son los de `.claude/agents/`, y un
 #: buzón sin oficio declarado no se llama: existe y lo contesta quien pueda, que
 #: es el caso honesto mientras ese agente no esté escrito.
-DE = {"describir": "compositor", "disenar": "disenador", "visto": "disenador"}
+#:
+#: **Y la redundancia es del compositor** (Jaime, 11-9-2026: *«deberían ir con
+#: contrato del agente de composición»*). Iban por `claude -p` genérico, sin el
+#: contrato ni la capa de tiquets: la avería que ya describe `servicio.pedir`.
+DE = {"describir": "compositor", "disenar": "disenador", "visto": "disenador",
+      "redundancia": "compositor", "revisar": "compositor"}
 
 #: Si la línea lanza el CLI por bash para contestar. **Temporal, apagado.**
 #: Jaime, 11-9-2026: *«me quedé sin tokens, los pasos de los agentes no los
