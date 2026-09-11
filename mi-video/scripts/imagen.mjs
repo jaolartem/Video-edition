@@ -122,10 +122,16 @@ export const TRATOS = {
       + " color lo llevan las formas y él es material del collage",
     css: "grayscale(1) contrast(1.06)",
   },
+  // **El color no sale solo: sólo si quien diseña lo declara.** Jaime,
+  // 11-9-2026, viendo el cuadro a color sobre el collage de reel-02 e3: *«el
+  // que está a color no me gusta, no es para ese estilo de tablero, es para
+  // los planos»*. Esto lo ponía el arco en cada etapa «avivar», o sea en
+  // cualquier collage y sin que nadie lo pidiera. Ahora `avivar` cae en `bn`, y
+  // el color queda para una composición que lo pida —y que no sea collage—.
   color: {
-    de: "avivar",
-    que: "se queda en color, un punto por encima. Para la etapa que abre, la"
-      + " que promete o la que devuelve algo",
+    de: null,
+    que: "se queda en color, un punto por encima. **Sólo declarado**: el color"
+      + " es de los planos, no del recorte en un collage (C-385)",
     css: "saturate(1.08) contrast(1.04)",
   },
   sepia: {
