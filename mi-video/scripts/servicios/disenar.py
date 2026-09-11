@@ -198,9 +198,14 @@ def encargos(slug):
         " where video_slug = ?"
         " order by etapa_orden", (slug,))]
     con.close()
-    return [f for f in filas if _pide_tablero(f)
-            and (not f["tablero"] or _sin_copy(f) or _desfasado(f)
-                 or _abierto.abre(slug, "disenado", f))]
+    # **Y un tiquet abre su etapa aunque no lleve tablero.** El #297 de reel-07
+    # pedía corregir el precio en e7, que no tiene tablero, y la pieza cruzaba
+    # este paso sin pedido: lo que se atiende puede ser `corrige`, `voz` o
+    # `camara`, que `aplicar` ya sabe escribir sin `kind`.
+    return [f for f in filas
+            if (_pide_tablero(f)
+                and (not f["tablero"] or _sin_copy(f) or _desfasado(f)))
+            or _abierto.abre(slug, "disenado", f)]
 
 
 def resumen_pieza(slug):
