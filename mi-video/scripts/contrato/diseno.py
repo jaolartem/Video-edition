@@ -385,8 +385,8 @@ DISENO = Contrato(
                    " liso es una diapositiva. La alternancia es de pieza, no de"
                    " tablero: por eso vive aquí."),
         Clave("pieza.veredicto",
-              dispara=(Aguja("scripts/servicios/disenar.py", "return Resultado(False, motivo=",),),
-              efecto="para la pieza si el conjunto no se sostiene",
+              dispara=(Aguja("scripts/servicios/disenar.py", 'return devuelve(pieza, "diseño · la escena no cuadra:", por_que)',),),
+              efecto="devuelve la escena al compositor, con tiquet, si no cuadra (C-387)",
               obligatoria=True,
               lista=("monta", "rota"),
               nota="El que monta también puede parar: tres tableros seguidos con"
