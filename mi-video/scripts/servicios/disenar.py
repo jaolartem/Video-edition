@@ -410,8 +410,14 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
                    " vio — letras que no se leen, colores que no se ven,"
                    " composicion rota. Es parte del proceso, no un extra.")
     if veredicto == "rota":
+        # **Y la escena vuelve a quien la decide** (C-387). Jaime, 11-9-2026:
+        # *«lo que el compositor decide es la escena; si la escena no cuadra y el
+        # diseñador lo nota, la devuelve»*. Esto paraba la pieza con el motivo y
+        # nadie se lo decía al compositor: se quedaba atascada en `disenado`.
+        from .base import devuelve
+
         por_que = (respuesta.get("pieza") or {}).get("por_que") or "sin motivo"
-        return Resultado(False, motivo=f"el diseno para la pieza: {por_que}")
+        return devuelve(pieza, "diseño · la escena no cuadra:", por_que)
 
     con = _con()
     ahora = datetime.datetime.now().isoformat(timespec="seconds")

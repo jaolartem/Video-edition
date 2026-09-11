@@ -202,16 +202,8 @@ def aplicar(pieza: Pieza, veredicto) -> Resultado:
     # `vuelve_a` nombra el paso que lo atiende, como en cualquier tiquet; la
     # pieza se coloca justo antes (`antes_de`). Uno abierto por pieza: un «no»
     # repetido no abre otro.
-    from dominio import ticket
-    from dominio.fase import antes_de, camino
+    from .base import devuelve
 
-    atiende = v.get("vuelve_a")
-    if atiende not in {f["nombre"] for f in camino()}:
-        atiende = "descrito"
-    if not any((t.get("dijo") or "").startswith("visto ·")
-               for t in ticket.abiertos(pieza.slug)):
-        ticket.abrir(pieza.slug,
-                     f"visto · el diseñador no la enseña: {v.get('por_que') or 'sin motivo'}",
-                     etapa="pieza", tipo="objecion", vuelve_a=atiende)
-    return Resultado(False, motivo=f"no se enseña: {por_que}",
-                     volver_a=antes_de(atiende), salida=por_que)
+    return devuelve(pieza, "visto · el diseñador no la enseña:",
+                    v.get("por_que") or "sin motivo",
+                    v.get("vuelve_a") or "descrito")

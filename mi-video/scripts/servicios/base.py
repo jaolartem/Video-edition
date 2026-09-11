@@ -77,6 +77,32 @@ class Resultado:
 from dominio.pieza import Pieza  # noqa: E402,F401
 
 
+def devuelve(pieza, marca: str, por_que: str,
+             atiende: str = "descrito") -> Resultado:
+    """**Un «no» se le dice a quien lo arregla: es un tiquet.**
+
+    Lo usan los dos oficios que pueden parar una pieza: `visto` —«no se
+    enseña»— y `disenar` —«la escena no cuadra»—. Jaime, 11-9-2026: *«lo que
+    el compositor decide es la escena; si la escena no cuadra y el diseñador lo
+    nota, la devuelve»*. Parar sin decírselo a nadie era dejar la pieza
+    esperando a un paso que no sabía que tenía trabajo (C-381, C-387).
+
+    `atiende` es el paso que lo arregla, como en cualquier tiquet; la pieza se
+    coloca justo antes (`antes_de`). Uno abierto por pieza y por `marca`.
+    """
+    from dominio import ticket
+    from dominio.fase import antes_de, camino
+
+    if atiende not in {f["nombre"] for f in camino()}:
+        atiende = "descrito"
+    if not any((t.get("dijo") or "").startswith(marca)
+               for t in ticket.abiertos(pieza.slug)):
+        ticket.abrir(pieza.slug, f"{marca} {por_que}", etapa="pieza",
+                     tipo="objecion", vuelve_a=atiende)
+    return Resultado(False, motivo=f"{marca} {por_que}"[:300],
+                     volver_a=antes_de(atiende), salida=por_que[:200])
+
+
 class Servicio:
     """Lo que un paso promete al motor.
 
