@@ -178,6 +178,16 @@ def aplicar(pieza: Pieza, veredicto) -> Resultado:
     v = veredicto[0] if isinstance(veredicto, list) and veredicto else veredicto
     if not isinstance(v, dict):
         return Resultado(False, motivo="veredicto ilegible")
+    # **Sin `se_ensena` no hay veredicto, y la ausencia no es un «no».** El
+    # diseñador contestaba con la forma de `disenar` —`pieza`, `tableros`,
+    # `mirado`— porque el prompt compartido nunca le pidio otra, y esto lo leia
+    # como «no se enseña: sin motivo». Mientras el «no» no se atendia (C-376) la
+    # pieza solo se paraba; atendido, reel-01, 03, 04 y 05 volvieron a `cosido`
+    # el 11-9 por un no que nadie dijo. Una respuesta sin la clave se vuelve a
+    # pedir; no mueve la pieza.
+    if "se_ensena" not in v:
+        return Resultado(False, motivo="veredicto ilegible: la respuesta no trae"
+                                       " `se_ensena`")
     por_que = (v.get("por_que") or "sin motivo")[:200]
     if v.get("se_ensena"):
         return Resultado(True, salida=f"se puede enseñar: {por_que}")
