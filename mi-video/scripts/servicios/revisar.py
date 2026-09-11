@@ -79,14 +79,19 @@ class ServicioRevisar(Servicio):
                              salida=f"{uno.que}"[:140] + resto)
         for f in paran:
             _anota(pieza, f)
-        casos = r.preguntas()
-        if not casos:
+        # **Una devolución por tiquet lleva su tiquet, y nada más.** Jaime,
+        # 11-9-2026: *«si son devoluciones puntuales por tiquet, no un repaso
+        # general»*. Con la lista de casos entera, el compositor tenía que
+        # adivinar cuál era la queja, y el #126 ni viajaba en el pedido.
+        tiquets = _suyos(pieza.slug)
+        casos = [] if tiquets else r.preguntas()
+        if not (casos or tiquets):
             return Resultado(True, salida="revisada: nada que dictaminar")
-        datos = {
-            "pieza": pieza.slug,
-            "casos": [{"etapa": f.etapa, "que": f.que} for f in casos],
-            "montaje": _montaje(pieza.slug),
-        }
+        datos = {"pieza": pieza.slug, "montaje": _montaje(pieza.slug)}
+        if tiquets:
+            datos["tiquets"] = tiquets
+        else:
+            datos["casos"] = [{"etapa": f.etapa, "que": f.que} for f in casos]
         prompt = _prompt()
         v = contrato.pedir("revisar", pieza.slug, prompt, datos)
         if v is None:
@@ -101,6 +106,19 @@ def _prompt() -> str:
     p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                      "revisar.prompt.md")
     return open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+
+
+#: Los tiquets que atiende la revisión: lo que sobra se corta, y cortar es suyo.
+ATIENDE = ("sobra",)
+
+
+def _suyos(slug: str) -> list:
+    """Los tiquets abiertos de la pieza que esta revisión atiende."""
+    from dominio import ticket as tk
+
+    return [{"id": t["id"], "segundo": t.get("segundo"), "etapa": t.get("beat"),
+             "dijo": t.get("dijo")}
+            for t in tk.abiertos(slug) if t.get("tipo") in ATIENDE]
 
 
 def _montaje(slug: str) -> list:
@@ -151,6 +169,14 @@ def _aplicar(pieza: Pieza, veredictos) -> Resultado:
                 abiertos += 1
             continue
         grande = (v.get("ticket") or "").strip()
+        if grande and v.get("tiquet"):
+            # Contesta a un tiquet que ya existe: se queda abierto y se dice
+            # por qué, sin abrir su duplicado.
+            import registro
+
+            registro.aviso("revisar", f"tiquet #{v['tiquet']} sigue abierto",
+                           detalle=f"{pieza.slug}: {grande[:300]}", eco=False)
+            continue
         if grande:
             seg = v.get("segundo")
             try:
