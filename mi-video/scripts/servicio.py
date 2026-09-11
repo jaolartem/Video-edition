@@ -433,8 +433,8 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # Donde hay oficio declarado, llamarle es del disparador y contestar es
     # suyo: una sola puerta. Donde no lo hay —redundancia, fuentes— el CLI sigue
     # siendo la unica forma de que ese pedido se conteste.
-    from dominio.oficio import DE as _OFICIOS
-    if cli and paso not in _OFICIOS and _hay_cli():
+    from dominio.oficio import DE as _OFICIOS, POR_BASH
+    if cli and POR_BASH and paso not in _OFICIOS and _hay_cli():
         r = _por_cli(prompt, payload)
         if r is not None:
             json.dump(r, open(ruta_respuesta(paso, slug), "w", encoding="utf-8"),

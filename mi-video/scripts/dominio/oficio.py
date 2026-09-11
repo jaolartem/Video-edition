@@ -50,6 +50,14 @@ ESPERA = 900
 #: es el caso honesto mientras ese agente no esté escrito.
 DE = {"describir": "compositor", "disenar": "disenador", "visto": "disenador"}
 
+#: Si la línea lanza el CLI por bash para contestar. **Temporal, apagado.**
+#: Jaime, 11-9-2026: *«me quedé sin tokens, los pasos de los agentes no los
+#: mandemos por bash, sino por agentes… no como algo permanente sino como
+#: modificación menor»*. Apagado, el pedido se queda escrito y abierto —el lado
+#: seguro— y lo contestan los agentes de la sesión que vigila. Se vuelve a bash
+#: sin tocar código: lanzando el disparador con `OFICIOS_POR_BASH=1`.
+POR_BASH = bool(os.environ.get("OFICIOS_POR_BASH"))
+
 #: El encargo es siempre el mismo texto. Lo que hay que contestar viaja DENTRO
 #: del pedido —`prompt` es su contrato— y esto sólo dice qué fichero leer y en
 #: cuál escribir. Improvisar aquí sería un segundo contrato.

@@ -332,6 +332,7 @@ def _pregunta_quemada(h):
 
     de, disparo._LLAMADOS[Falso.huella] = oficio.Oficio.de, (0, 0.0)
     oficio.Oficio.de = staticmethod(lambda slug: Falso())
+    bash, oficio.POR_BASH = oficio.POR_BASH, True
     try:
         for _ in range(4):
             disparo.llama(PIEZA)
@@ -344,7 +345,7 @@ def _pregunta_quemada(h):
         h.mide("C-346", disparo._LLAMADOS[Falso.huella][0] == 1,
                f"y pasado el plazo ({disparo.REINTENTO // 60} min) repregunta")
     finally:
-        oficio.Oficio.de = de
+        oficio.Oficio.de, oficio.POR_BASH = de, bash
         disparo._LLAMADOS.pop(Falso.huella, None)
 
 

@@ -105,6 +105,13 @@ def llama(slug):
     quien = Oficio.de(slug)
     if not quien:
         return False
+    from .oficio import POR_BASH
+    if not POR_BASH:
+        # Se dice una vez por pregunta y se deja abierta para los agentes.
+        if quien.huella not in _LLAMADOS:
+            _LLAMADOS[quien.huella] = (0, time.time())
+            _anota(f"{slug}: pedido abierto para {quien} — {quien.pedido}")
+        return False
     # **A la misma pregunta se le llama dos veces seguidas, y luego con
     # plazo.** Con el motor
     # puesto, repetirla en cada vuelta seria despertar al oficio para contestar
