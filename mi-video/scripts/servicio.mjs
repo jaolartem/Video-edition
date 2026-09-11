@@ -45,8 +45,28 @@ export function dejaPedido(paso, slug, prompt, datos) {
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
   fs.writeFileSync(
     rutaPedido(paso, slug),
-    JSON.stringify({ paso, slug, prompt, marcador: marcador(slug), datos }, null, 1),
+    JSON.stringify({ paso, slug, prompt, ...contexto(paso, slug), datos }, null, 1),
   );
+}
+
+/**
+ * **Lo que viaja con todo pedido sale de un solo sitio: `servicio.contexto`.**
+ *
+ * Aquí sólo se metía el marcador, así que el pedido de `describir` llegaba sin
+ * lo ya decidido, sin el precio vigente y sin las instrucciones de Jaime —
+ * lo que `servicio.py` sí manda a los demás pasos. Copiar la lista aquí sería
+ * la segunda versión que diverge; se le pregunta a la primera. C-395.
+ */
+function contexto(paso, slug) {
+  try {
+    return JSON.parse(execFileSync("python", ["-c",
+      "import sys,json;sys.path.insert(0,'scripts');import servicio;"
+      + "print(json.dumps(servicio.contexto(sys.argv[1],sys.argv[2]),ensure_ascii=False))",
+      paso, slug], { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+      maxBuffer: 64 * 1024 * 1024 }));
+  } catch {
+    return { marcador: marcador(slug) };
+  }
 }
 
 /**

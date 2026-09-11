@@ -217,6 +217,49 @@ def ruta_respuesta(paso, slug):
     return os.path.join(_dir(paso), f"{slug}.respuesta.json")
 
 
+def contexto(paso, slug):
+    """Lo que viaja con TODO pedido, lo arme Python o JavaScript.
+
+    Una sola lista: `servicio.mjs` la pide aqui en vez de armar la suya, que
+    es como el pedido de `describir` se quedo sin lo ya decidido, sin el
+    precio y sin las instrucciones (C-395).
+    """
+    return {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),
+             # **Lo que Jaime ya dijo, para que no tenga que decirlo otra vez.**
+             # Guardarlo y no llevarlo al paso que debe obedecerlo es
+             # archivarlo. Ver `dominio/instruccion.py`.
+             "instrucciones_de_jaime": _instrucciones(paso, slug),
+             # **El precio vigente, en TODOS los pasos.** Llegaba solo a
+             # `repaso`, y los que no lo tenian dedujeron la ventana de las
+             # fechas de `datos_respaldados` — y se quedaron con la fila del
+             # Early Bird, que vence el 28 de agosto. **Tres agentes distintos
+             # cometieron el mismo error**, asi que no eran ellos: era el dato.
+             #
+             # El precio es cumplimiento y no puede depender de que paso lo
+             # mire.
+             "precio_vigente": _precio(),
+             # **Lo que Jaime ha dicho de ESTA pieza, colocado en su etapa.**
+             # Una objecion suya —«en el segundo 30 el tablero se queda sin
+             # sonido»— no se puede atender si el paso no sabe que etapa cae en
+             # el segundo 30. Ver `dominio/ticket.py`.
+             "lo_que_dijo_jaime_de_la_pieza": _tickets(slug),
+             # **Y lo que ya se decidió, que no se rediscute.** Ver
+             # `_decididos`: cerrado, el #282 dejaba de viajar.
+             "lo_ya_decidido_de_la_pieza": _decididos(slug),
+             # **El marcador que viaja con la pieza.** Jaime, 9-9-2026: *«los
+             # agentes deben poder leer y escribir en el Json, es lo que permite
+             # ver la etiqueta, y es lo que articula todo lo de la base de
+             # datos; el json debe ser el documento que se mueve por la cinta y
+             # mantiene el marcador»*.
+             #
+             # `dominio/estado.py` lo publica desde la base desde el 7-9 —con su
+             # frase: *«se necesita un JSON por video que diga el estado, y que
+             # cada agente pueda modificarlo conforme avanza»*— y **no llegaba
+             # al que trabaja**: `estado.marca` no la llamaba nadie y `hecho`
+             # estaba vacio en las siete piezas. Declarado y no implementado.
+             "marcador": _marcador(slug)}
+
+
 def pedir(paso, slug, prompt, payload, cli=True):
     """Deja el pedido y, si se puede, lo resuelve con el CLI.
 
@@ -258,40 +301,7 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # Va al primer nivel del pedido y no dentro de `datos` a proposito: `datos`
     # es una lista en unos pasos y un diccionario en otros, y lo que vale para
     # todos no puede depender de esa forma.
-    comun = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),
-             # **Lo que Jaime ya dijo, para que no tenga que decirlo otra vez.**
-             # Guardarlo y no llevarlo al paso que debe obedecerlo es
-             # archivarlo. Ver `dominio/instruccion.py`.
-             "instrucciones_de_jaime": _instrucciones(paso, slug),
-             # **El precio vigente, en TODOS los pasos.** Llegaba solo a
-             # `repaso`, y los que no lo tenian dedujeron la ventana de las
-             # fechas de `datos_respaldados` — y se quedaron con la fila del
-             # Early Bird, que vence el 28 de agosto. **Tres agentes distintos
-             # cometieron el mismo error**, asi que no eran ellos: era el dato.
-             #
-             # El precio es cumplimiento y no puede depender de que paso lo
-             # mire.
-             "precio_vigente": _precio(),
-             # **Lo que Jaime ha dicho de ESTA pieza, colocado en su etapa.**
-             # Una objecion suya —«en el segundo 30 el tablero se queda sin
-             # sonido»— no se puede atender si el paso no sabe que etapa cae en
-             # el segundo 30. Ver `dominio/ticket.py`.
-             "lo_que_dijo_jaime_de_la_pieza": _tickets(slug),
-             # **Y lo que ya se decidió, que no se rediscute.** Ver
-             # `_decididos`: cerrado, el #282 dejaba de viajar.
-             "lo_ya_decidido_de_la_pieza": _decididos(slug),
-             # **El marcador que viaja con la pieza.** Jaime, 9-9-2026: *«los
-             # agentes deben poder leer y escribir en el Json, es lo que permite
-             # ver la etiqueta, y es lo que articula todo lo de la base de
-             # datos; el json debe ser el documento que se mueve por la cinta y
-             # mantiene el marcador»*.
-             #
-             # `dominio/estado.py` lo publica desde la base desde el 7-9 —con su
-             # frase: *«se necesita un JSON por video que diga el estado, y que
-             # cada agente pueda modificarlo conforme avanza»*— y **no llegaba
-             # al que trabaja**: `estado.marca` no la llamaba nadie y `hecho`
-             # estaba vacio en las siete piezas. Declarado y no implementado.
-             "marcador": _marcador(slug)}
+    comun = contexto(paso, slug)
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
                         **comun, "datos": payload},
                        ensure_ascii=False, indent=1)
@@ -426,6 +436,14 @@ def pedir(paso, slug, prompt, payload, cli=True):
         igual = _pregunta(io.open(p, encoding="utf-8").read()) == _pregunta(nuevo)
     except OSError:
         igual = False
+    if igual and io.open(p, encoding="utf-8").read() != nuevo:
+        # **Y el contexto se refresca aunque la pregunta sea la misma.** Sin
+        # esto lo nuevo que viaja —lo ya decidido, un precio, una instruccion—
+        # no llegaba nunca a un pedido ya escrito. Se reescribe y se le
+        # devuelve su fecha, que significa cuando cambio la pregunta. C-395.
+        t = os.path.getmtime(p)
+        io.open(p, "w", encoding="utf-8").write(nuevo)
+        os.utime(p, (t, t))
     if not igual:
         io.open(p, "w", encoding="utf-8").write(nuevo)
         # **Y si la pregunta ya se hizo antes, se conserva CUANDO se hizo.**
