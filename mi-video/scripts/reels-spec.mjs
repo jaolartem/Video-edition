@@ -35,7 +35,7 @@ import { argumento, lecturaCorta } from "./reels/lectura.mjs";
 import { coherencia } from "./reels/coherencia.mjs";
 import { FPS, Reloj } from "./reels/reloj.mjs";
 // Las tres importaciones de `material.mjs` que había aquí eran una.
-import { FRAMES, caraDe, duracionDelCorte, edlDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
+import { FRAMES, caraDe, duracionDelCorte, edlDe, idDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
 import { colocaPaneles } from "./reels/paneles.mjs";
 import { pelado } from "./reels/pelado.mjs";
 import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
@@ -177,7 +177,7 @@ const spec = Object.keys(FRAMES.reels).map((slug) => {
   faltas.push(...armarGancho(caminos, imagen, slug));
 
   const pieza = {
-    id: `Reel-R${slug.slice(-1)}`,
+    id: idDe(slug),
     video: `${slug}.mp4`,
     // Los efectos suenan siempre: la puerta de aprobacion se quito.
     sonido: true,

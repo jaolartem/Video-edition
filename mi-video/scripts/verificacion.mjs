@@ -12,6 +12,7 @@
  */
 import fs from "fs";
 import { rutas } from "./rutas.mjs";
+import { slugDe } from "./reels/material.mjs";
 
 const LIBRETOS = "../docs/libretos.md";
 const FPS = 30;
@@ -100,8 +101,8 @@ const bloqueLibreto = (n) => {
 };
 
 for (const r of spec) {
-  const n = r.id.slice(-1);
-  const slug = `reel-0${n}`;
+  const slug = slugDe(r.id);
+  const n = Number(slug.slice(-2));
   const edl = JSON.parse(fs.readFileSync(`ads/${slug}/edl-sell.json`, "utf8"));
   const dicho = edl.detalle.map((u) => u.texto).join(" ");
   const guion = bloqueLibreto(n);

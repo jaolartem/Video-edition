@@ -13,7 +13,7 @@
  */
 import { FPS } from "./reloj.mjs";
 import { DICE } from "./texto.mjs";
-import { marcoDe } from "./material.mjs";
+import { marcoDe, slugDe } from "./material.mjs";
 import { sinTrato } from "./escenas.mjs";
 
 /**
@@ -64,7 +64,7 @@ export function informe(r, m) {
    * el 30** y es un tropiezo de cuatro segundos con cobertura -0,07. Así que la
    * cifra es aviso y la puerta baja a donde está la unidad de análisis.
    */
-  const exige = marcoDe(`reel-0${r.id.slice(-1)}`)?.debe_decir ?? [];
+  const exige = marcoDe(slugDe(r.id))?.debe_decir ?? [];
   const dicho = DICE(r.captions.map((c) => c.text).join(" "));
   // Mismo criterio que en `beats.py`: el termino admite alternativas con `|`,
   // porque lo que se comprueba es la intencion comunicativa y no la letra.

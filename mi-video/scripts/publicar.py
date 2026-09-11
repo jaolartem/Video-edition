@@ -89,7 +89,7 @@ def listas(con):
     ENCAJE = 0.14
     out = []
     dest = rutas.DESTINO
-    for n in (1, 2, 3, 4, 5, 6):
+    for n in rutas.piezas():
         slug, pieza = f"reel-{n:02d}", f"reel-R{n}"
         mp4 = os.path.join(dest, "entrega", f"{pieza}.mp4")
         ver = os.path.join(dest, f"Reel-R{n}.verification.md")

@@ -65,8 +65,9 @@ def main():
                   f" {l.get('que','')}")
         return
 
+    import rutas
     piezas = [f"reel-{int(r):02d}" for r in a.reels] or \
-             [f"reel-{n:02d}" for n in range(1, 8)]
+             [f"reel-{n:02d}" for n in rutas.piezas()]
     print(f"{'pieza':<9} {'':<9}  {'etapa':<16} espera / abiertos")
     for s in piezas:
         d = estado.lee(s)

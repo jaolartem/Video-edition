@@ -116,7 +116,7 @@ def sucios(slug):
 
 
 def main():
-    piezas = [int(x) for x in sys.argv[1:] if x.isdigit()] or range(1, 8)
+    piezas = [int(x) for x in sys.argv[1:] if x.isdigit()] or rutas.piezas()
     total = 0
     for n in piezas:
         slug = f"reel-{n:02d}"

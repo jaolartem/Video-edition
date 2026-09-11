@@ -235,11 +235,13 @@ def _lo_que_no_se_dibuja_no_se_renderiza(h):
     h.mide("C-372", "necesita" in out.stdout,
            "montar.sh lee `rompe` y para antes de pagar el render")
     # Y el spec lo trae de donde nace: las faltas de `revisarTablero`.
+    import rutas
+    slugs = json.dumps([f"reel-{n:02d}" for n in rutas.piezas()])
     dice = subprocess.run(
         ["node", "--input-type=module", "-e",
          "import {tablerosDe} from './scripts/reels/base.mjs';"
-         "const mal=[1,2,3,4,5,6,7].filter(n=>"
-         "tablerosDe('reel-0'+n).faltas.length).map(n=>'Reel-R'+n);"
+         "import {idDe} from './scripts/reels/material.mjs';"
+         f"const mal={slugs}.filter(s=>tablerosDe(s).faltas.length).map(s=>idDe(s));"
          "console.log(JSON.stringify(mal));"],
         capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:

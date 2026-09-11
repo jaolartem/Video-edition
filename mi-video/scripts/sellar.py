@@ -248,7 +248,8 @@ def main():
     ap.add_argument("--remedir", action="store_true",
                     help="vuelve a medir el audio de la ultima version")
     a = ap.parse_args()
-    for n in (a.reels or range(1, 8)):
+    import rutas
+    for n in (a.reels or rutas.piezas()):
         if a.remedir:
             print("  " + remedir(n))
             continue

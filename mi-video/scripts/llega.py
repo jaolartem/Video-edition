@@ -105,7 +105,8 @@ def revisar(piezas=None):
     con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row
     faltas = []
-    for n in piezas or range(1, 8):
+    import rutas
+    for n in piezas or rutas.piezas():
         slug = f"reel-{n:02d}"
         p = spec.get(f"Reel-R{n}")
         if not p:

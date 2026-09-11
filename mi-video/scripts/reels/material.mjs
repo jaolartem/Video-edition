@@ -20,6 +20,18 @@ export const FRAMES = JSON.parse(fs.readFileSync("ads/frames.json", "utf8"));
 
 export const marcoDe = (slug) => FRAMES.reels[slug];
 
+/**
+ * **El id de render de una pieza, y la pieza de un id. Con las dos cifras.**
+ *
+ * Se sacaban del ULTIMO digito (`slug.slice(-1)`) en cinco sitios: con reel-10
+ * el id seria «Reel-R0» y reel-11 chocaria con reel-01 — la huella de una
+ * casaria con el render de la otra. Python ya usa `int(slug[-2:])`; esto es la
+ * misma regla, escrita una vez.
+ */
+export const idDe = (slug) => `Reel-R${Number(String(slug).slice(-2))}`;
+export const slugDe = (id) =>
+  `reel-${String(Number(String(id).replace(/\D+/g, ""))).padStart(2, "0")}`;
+
 export const planDe = (slug) =>
   JSON.parse(fs.readFileSync(`work/scenes/${slug}/plan-full.json`, "utf8"));
 

@@ -12,6 +12,7 @@
  *   node scripts/ganchos-spec.mjs
  */
 import fs from "fs";
+import { idDe } from "./reels/material.mjs";
 
 const FPS = 30;
 
@@ -108,7 +109,7 @@ const spec = Object.entries(LINEAS).map(([reel, lineas]) => {
   const empieza = seDiceEn(reel, esc, "inicio");
   const corte = cedeEn(esc, dicho);
   return {
-    id: `Gancho-R${reel.slice(-1)}`,
+    id: idDe(reel).replace("Reel-", "Gancho-"),
     video: `hook-${reel}.mp4`,
     duracion: Number(duracion.toFixed(3)),
     dicho: dicho === null ? null : Number(dicho.toFixed(2)),

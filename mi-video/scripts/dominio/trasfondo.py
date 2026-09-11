@@ -198,7 +198,8 @@ def de_la_pieza(n):
 
 
 if __name__ == "__main__":
-    piezas = [int(a) for a in sys.argv[1:]] or list(range(1, 8))
+    import rutas
+    piezas = [int(a) for a in sys.argv[1:]] or rutas.piezas()
     for n in piezas:
         m = de_la_pieza(n)
         if not m:

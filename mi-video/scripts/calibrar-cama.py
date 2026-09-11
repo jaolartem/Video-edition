@@ -138,7 +138,8 @@ def _acta(slug, puntos, objetivo):
 
 
 def main():
-    ns = [int(x) for x in sys.argv[1:] if x.isdigit()] or list(range(1, 8))
+    import rutas
+    ns = [int(x) for x in sys.argv[1:] if x.isdigit()] or rutas.piezas()
     mal = 0
     for n in ns:
         musi, sep = calibrar(n)

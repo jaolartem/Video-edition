@@ -260,7 +260,7 @@ def main():
     ap.add_argument("--cuantos", type=int, default=CUANTOS)
     a = ap.parse_args()
     total = 0
-    for n in (a.reels or range(1, 8)):
+    for n in (a.reels or rutas.piezas()):
         hechas, mal = sacar(n, a.cuantos)
         if mal:
             print(f"  reel-{n:02d}: {mal}")

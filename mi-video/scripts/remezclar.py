@@ -289,7 +289,8 @@ def main():
     a = ap.parse_args()
     tmp = os.environ.get("TMPDIR", "F:/tmp-video")
     os.makedirs(tmp, exist_ok=True)
-    for n in (a.reels or range(1, 8)):
+    import rutas
+    for n in (a.reels or rutas.piezas()):
         s = f"reel-{n:02d}"
         # **La misma voz que se mezcla es la que se mide.** Aqui se cogia la
         # CRUDA y `mezclar()` usaba la limpia: dos referencias distintas, dos

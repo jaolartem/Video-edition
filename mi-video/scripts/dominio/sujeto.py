@@ -258,7 +258,9 @@ def main():
     if a.video and a.en:
         print(json.dumps(donde_esta(a.video, a.en), ensure_ascii=False))
         return
-    for n in a.piezas or range(1, 8):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import rutas
+    for n in a.piezas or rutas.piezas():
         m = de_la_pieza(n)
         r = recortes_de_la_pieza(n)
         print(f"R{n}: {json.dumps(m, ensure_ascii=False) if m else 'sin corte'}"

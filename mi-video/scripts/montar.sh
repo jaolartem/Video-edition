@@ -246,7 +246,10 @@ for a in "$@"; do
   PIEZAS_ARG+=("$a")
   REELS+=("$(printf %02d "$a")")
 done
-[ ${#REELS[@]} -eq 0 ] && REELS=(01 02 03 04 05 06)
+# Sin piezas nombradas, las que declara la base —`rutas.piezas()`—, no seis
+# escritas a mano: reel-07 no se montaba por defecto. El `tr` quita el `\r` que
+# Windows pone al final de la salida de Python.
+[ ${#REELS[@]} -eq 0 ] && REELS=($(python -c "import sys; sys.path.insert(0, 'scripts'); import rutas; print(' '.join(f'{n:02d}' for n in rutas.piezas()))" | tr -d '\r'))
 
 # **Lo que no se renderiza se cuenta al final, y el paso falla.**
 #

@@ -192,7 +192,8 @@ def main():
                                       else f"al dia — {por}"))
         return 0 if toca else 1
 
-    ns = [int(x) for x in sys.argv[1:] if x.isdigit()] or list(range(1, 8))
+    import rutas
+    ns = [int(x) for x in sys.argv[1:] if x.isdigit()] or rutas.piezas()
     sucias = 0
     for n in ns:
         d = desde(n)

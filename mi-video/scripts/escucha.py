@@ -203,7 +203,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
     a = ap.parse_args()
-    for n in (a.reels or range(1, 8)):
+    import rutas
+    for n in (a.reels or rutas.piezas()):
         slug = f"reel-{n:02d}"
         oir, mal = bordes(slug)
         if mal:
