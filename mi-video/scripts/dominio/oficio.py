@@ -54,7 +54,7 @@ ESPERA = 900
 #: contrato ni la capa de tiquets: la avería que ya describe `servicio.pedir`.
 DE = {"describir": "compositor", "disenar": "disenador", "visto": "disenador",
       "redundancia": "compositor", "revisar": "compositor",
-      "revalidar": "compositor"}
+      "revalidar": "compositor", "repaso": "compositor"}
 
 #: Si la línea lanza el CLI por bash para contestar. **Temporal, apagado.**
 #: Jaime, 11-9-2026: *«me quedé sin tokens, los pasos de los agentes no los
