@@ -15,7 +15,7 @@
  */
 import { DatabaseSync } from "node:sqlite";
 import { CONSTRUIDAS, revisarTablero, sinSujeto } from "../formas.mjs";
-import { marcoDe } from "./material.mjs";
+import { marcoDe, precioVigente } from "./material.mjs";
 
 const db = new DatabaseSync("ads/decisiones.db");
 
@@ -203,4 +203,16 @@ export const correccionesDe = (slug) =>
   db.prepare(
     "select corrige_dice, corrige_es from escena_desc" +
     " where video_slug = ? and corrige_dice is not null",
-  ).all(slug);
+  ).all(slug).map((c) => ({ ...c, corrige_es: conPrecio(c.corrige_es) }));
+
+/**
+ * **`{precio}` es el importe de hoy, no un literal.** Jaime, 11-9-2026:
+ * *«corrige el precio en pantalla»*. La voz de reel-04 y reel-07 dice «20
+ * dólares»; escrito «30», la corrección mentiría el 16, cuando sube a 40.
+ */
+export const MARCA_PRECIO = "{precio}";
+const conPrecio = (es) => {
+  if (typeof es !== "string" || !es.includes(MARCA_PRECIO)) return es;
+  const hoy = precioVigente()?.importe;
+  return hoy == null ? es : es.replaceAll(MARCA_PRECIO, String(hoy));
+};
