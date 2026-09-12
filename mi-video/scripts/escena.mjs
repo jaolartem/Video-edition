@@ -287,8 +287,12 @@ export const rotuloDe = (desc) => {
     const c = suelto ? r : r?.lineas;
     const ls = Array.isArray(c) ? c
       : (typeof c === "string" ? c.split(String.fromCharCode(10)) : []);
-    const lineas = ls.map((x) => String(x).trim()).filter(Boolean);
-    const o = suelto ? null : r?.oro;
+    // Una línea puede ser `{texto, acento}`: rotular el objeto sacaba
+    // «[OBJECT OBJECT]» en el gancho de reel-08 v2 (C-424).
+    const aTexto = (x) => String(x?.texto ?? x).trim();
+    const lineas = ls.map(aTexto).filter(Boolean);
+    const acento = ls.find((x) => x?.acento === true);
+    const o = suelto ? null : (r?.oro ?? (acento ? aTexto(acento) : undefined));
     const i = typeof o === "number" ? o : lineas.indexOf(String(o ?? "").trim());
     return lineas.length ? { lineas, oro: i >= 0 && i < lineas.length ? i : null } : null;
   } catch {
