@@ -455,8 +455,13 @@ const sinSusCampos = (kind, props) => {
   const campos = nombre ? camposDe(nombre) : null;
   if (!campos) return [];
   const p = props ?? {};
+  // **Salvo que el propio componente lo mida.** `Acumulacion` hace
+  // `assertShort(condicion, …)` y sin ella el render de reel-13 murió en
+  // `length` (C-434): ahí no la pone nadie más que quien diseña.
+  const fuente = fs.readFileSync(`src/components/${nombre}.tsx`, "utf8");
+  const exige = (c) => !DEL_MOTOR.has(c) || fuente.includes(`assertShort(${c},`);
   const faltan = Object.keys(campos).filter((c) => !c.endsWith("?") &&
-    !DEL_MOTOR.has(c) && (c.includes("[].")
+    exige(c) && (c.includes("[].")
       // Lo de dentro de una lista se exige a cada elemento (C-432).
       ? (() => {
           const [lista, dentro] = c.split("[].");
