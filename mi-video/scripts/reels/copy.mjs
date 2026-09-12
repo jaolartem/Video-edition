@@ -91,6 +91,11 @@ export const PROMESA = {
   // llegue al bolsillo, de manera legal»—, no escrita aquí de cero.
   "reel-07": "Que más plata le llegue al bolsillo.",
 };
+// **Una historia promete lo de su serie**, igual que respalda con sus cifras
+// (C-419): sin esto reel-15..17 —SELL, con CTA hablado— salieron sin tarjeta de
+// cierre, o sea sin fecha, precio ni link en pantalla (C-429).
+for (const [slug, r] of Object.entries(FRAMES.reels))
+  if (!PROMESA[slug] && PROMESA[r.respalda_de]) PROMESA[slug] = PROMESA[r.respalda_de];
 for (const [k, v] of Object.entries(PROMESA)) {
   if (v.length > 42) throw new Error(`promesa de ${k}: ${v.length} car (max 42)`);
 }
