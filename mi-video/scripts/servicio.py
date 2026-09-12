@@ -529,6 +529,18 @@ def pedir(paso, slug, prompt, payload, cli=True):
             # entera. Lo dijo el agente al que le toco: *«no lei ningun pedido;
             # un fichero inventado en esa ruta lo leeria el paso siguiente como
             # respuesta buena»*.
+            # **Pero lo que el visto aprobó no caduca con el pedido.** Jaime,
+            # 12-9: *«si un tramo esta bien nunca mas pasa por diseñador»*. Un
+            # render nuevo reescribe el pedido y la respuesta se archivaba
+            # entera: reel-09 y reel-11 aprobaron las mismas etapas dos veces
+            # (C-441). La aprobación va firmada contra el corte de hoy, y si ese
+            # corte cambia, caduca sola.
+            if paso == "visto" and isinstance(r, dict) and r.get("aprueba"):
+                from dominio.segmento import Segmento
+                segs = {s.n: s for s in Segmento.de(slug)}
+                for n in r["aprueba"]:
+                    if str(n).isdigit() and int(n) in segs:
+                        segs[int(n)].aprueba("disenador")
             _archivar(paso, slug, sufijo="desfasada", solo_respuesta=True)
             print(f"  {paso}/{slug}: la respuesta es anterior al pedido —"
                   f" contesta a otra pregunta. Se archiva y se vuelve a pedir.")
