@@ -222,6 +222,14 @@ def aplicar(pieza: Pieza, veredictos) -> str:
         import fijar
 
         fijar.aplicar(pieza.slug)
+    # **El que arregla el tiquet lo cierra**, como `disenar` (C-412). Sin esto
+    # los tiquets de corte seguían abiertos, viajaban en el pedido y la pieza
+    # volvía a `revalidar` con el trabajo ya hecho (reel-08 a 13, 12-9).
+    from dominio import abierto as _abierto
+
+    _abierto.cerrar(pieza.slug, "revalidado", "declaró los tramos que lo resuelven",
+                    [i for v in veredictos if isinstance(v, dict)
+                     for i in (v.get("tiquets") or [])])
     return (f"{cambiados} corte(s) cambiados, "
             f"{falsos} falso(s) positivo(s) a la siguiente candidata, "
             f"{cortados} entrecortada(s), {componen} con composicion")
