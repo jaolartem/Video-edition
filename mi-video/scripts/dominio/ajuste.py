@@ -227,5 +227,33 @@ def a_la_voz(toma, a, b, margen=0.12):
             # cayendo dentro de una palabra, y casi todos de entrada, que es el
             # lado que el `RETROCESO` mueve.
             x, y = a_la_palabra(toma, x, y, voz=voz)
-            trozos.append((round(x, 3), round(y, 3)))
+            trozos.append((round(x, 3), round(_al_silencio(toma, y), 3)))
     return trozos or None
+
+
+#: Cuanto se puede alargar una salida buscando silencio. Mas que esto ya no es
+#: la cola de la palabra: es la siguiente.
+HASTA_CALLAR = 0.45
+
+
+def _al_silencio(toma, fin):
+    """**La salida, llevada a donde la onda calla.**
+
+    Quien propone el borde lo copia del transcript, que miente justo ahi: el
+    compositor movio tres veces los de reel-10, 14 y 15 y la verificacion, que
+    mide la onda, los siguio parando «encima de la voz» (C-437). Medir es de la
+    maquina: se avanza de 20 en 20 ms hasta que `bordes.callado` diga que ya no
+    suena, con la misma vara del que juzga. Si no calla en `HASTA_CALLAR`, las
+    palabras van pegadas y el borde se queda donde estaba: eso ya no es medir,
+    es decidir, y vuelve al compositor.
+    """
+    from dominio import bordes as _bo
+
+    if _bo.callado(toma, fin):
+        return fin
+    t = fin
+    while t < fin + HASTA_CALLAR:
+        t += 0.02
+        if _bo.callado(toma, t):
+            return t
+    return fin
