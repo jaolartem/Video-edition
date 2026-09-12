@@ -605,11 +605,13 @@ def revisar(slug):
     # $189.000 en la etapa 3 y los vuelve a enseñar en el cierre, y eso no es una
     # cifra sin declarar — es la misma cifra. Lo que hay que impedir es que
     # aparezca en pantalla un importe que la pieza no declaró en ningún sitio.
+    # **Y las declara quien respalda la pieza, no sólo la pieza.** Una derivada
+    # o una historia respalda con las de su origen (C-396, C-419); leerlo aquí
+    # de otro sitio paró reel-09 por los $180,000 que reel-02 declara (C-425).
+    from servicio import _respaldos
     declarados = set()
-    for f in con.execute(
-            "select d.cifra, d.afirmacion from dato d"
-            "  join video v on v.id = d.video_id where v.slug = ?", (slug,)):
-        declarados |= _importes(f["cifra"]) | _importes(f["afirmacion"])
+    for f in _respaldos(slug):
+        declarados |= _importes(f.get("cifra")) | _importes(f.get("afirmacion"))
     for f in con.execute(
             "select etapa_orden, que_pasa, grafico, corrige_es from escena_desc"
             " where video_slug = ?", (slug,)):
