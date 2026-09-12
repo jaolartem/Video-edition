@@ -438,7 +438,23 @@ export const revisarTablero = (kind, props) => {
   // **tumban el render** si un texto se pasa de su tope.
   const cerradas = figurasCerradas(kind, props);
   const f = forma(kind);
-  return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props)];
+  return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props),
+          ...pilaQueDesborda(props)];
+};
+
+/**
+ * **Los tramos de una pila se reparten la altura: suman 1 como mucho.** El
+ * diseñador de reel-13 e6 los escribió acumulados (0,1 … 1,0, suma 5,5) y los
+ * años se montaron unos encima de otros desde el cuarto (C-448).
+ */
+const pilaQueDesborda = (props) => {
+  const t = props?.tramos;
+  if (!Array.isArray(t) || !t.every((x) => typeof x?.alto === "number")) return [];
+  const suma = t.reduce((s, x) => s + x.alto, 0);
+  return suma > 1.05
+    ? [`los \`tramos\` suman ${suma.toFixed(2)} de alto y la pila es 1: cada \`alto\`` +
+       " es la parte que ocupa ESE tramo, no la altura acumulada"]
+    : [];
 };
 
 /**
