@@ -226,7 +226,10 @@ def glosario(caps):
         if not isinstance(k, str) or not isinstance(dice, str)                 or not k.strip() or not dice.strip():
             rotas.append(k)
             continue
-        pares.append((k.split(), dice.split()))
+        # La entrada se compara con la MISMA vara que el subtitulo (`_limpia`):
+        # sin ella «Bultán» nunca casaba con «bultan» y su entrada no hacia nada
+        # (C-433).
+        pares.append(([_limpia(w) for w in k.split()], dice.split()))
     if rotas:
         print(f"    glosario: {len(rotas)} entrada(s) mal escritas, sin efecto:"
               f" {rotas}. El valor es un objeto con «es», y no puede ir vacio.")
