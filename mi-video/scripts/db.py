@@ -123,6 +123,14 @@ def migrar():
                  for j, o in enumerate(f.get("de_origen") or [])
                  if o - 1 < len(textos)])
             cx.commit()
+        # **Y una pieza nueva declara su libreto en su propia línea.** Las
+        # historias del 12-9 no derivan de nada y no había por dónde entrar.
+        elif f.get("libreto"):
+            cx.execute("DELETE FROM libreto WHERE video_id = ?", (vid,))
+            cx.executemany(
+                "INSERT INTO libreto (video_id, orden, texto) VALUES (?,?,?)",
+                [(vid, j + 1, t) for j, t in enumerate(f["libreto"])])
+            cx.commit()
         libreto = beats.beats_del_libreto(int(slug[-2:]))
         # `etapa_orden` apunta a la canónica; si la pieza declara una etapa que
         # no está en la secuencia canónica, se añade al final de ésta. Pasa con
