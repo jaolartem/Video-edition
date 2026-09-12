@@ -404,9 +404,16 @@ const DEJAN_SITIO = (() => {
  * `cara: "siempre"` del marco— y por eso las siete de venta salen igual. Un
  * panel o una banda ya le dejan la cara; `cc` no tapa nada.
  */
+/**
+ * Las formas que se dibujan **sobre su plano**: el rótulo va detrás o encima de
+ * él, así que su cara ya es la composición y un recorte aparte la duplicaría.
+ * `Gancho` faltaba y paró el primer render de reel-08 (12-9, C-417).
+ */
+const SOBRE_SU_PLANO = new Set(["tipo", "Gancho"]);
+
 export const sinSujeto = (kind, props) => {
   const p = props ?? {};
-  if (kind === "tipo" || (p.cubre ?? "pleno") !== "pleno") return [];
+  if (SOBRE_SU_PLANO.has(kind) || (p.cubre ?? "pleno") !== "pleno") return [];
   if (!p.sujeto)
     return [`«${kind}» va a pleno sin \`sujeto\`, y en esta pieza todo tablero` +
       " muestra su cara (Jaime, 10-9: «todos los tableros deben mostrar mi" +
