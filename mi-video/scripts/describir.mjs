@@ -261,7 +261,10 @@ function porPiezas(filas) {
 }
 
 const rehacer = process.argv.includes("--rehacer");
-const reels = process.argv.slice(2).filter((x) => /^\d$/.test(x));
+// **Una pieza es un número, no un dígito.** Con `/^\d$/` el «12» no casaba, la
+// lista salía vacía y el paso de reel-12 describía TODAS las piezas: esperaba
+// los pedidos de las demás y reel-10 a reel-17 no pasaban de «repasado» (C-423).
+const reels = process.argv.slice(2).filter((x) => /^\d+$/.test(x));
 const filas = JSON.parse(sql("escenas_por_describir", [reels, rehacer]));
 if (!filas.length) {
   console.log("nada que describir (usa --rehacer para volver a pedirlo)");
