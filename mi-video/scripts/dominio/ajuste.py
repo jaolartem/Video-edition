@@ -251,8 +251,21 @@ def _al_silencio(toma, fin):
 
     if _bo.callado(toma, fin):
         return fin
+    # **Y no se entra en la palabra siguiente.** Donde dos palabras van pegadas
+    # la onda no calla hasta despues de la segunda, y avanzar hasta ahi la
+    # devolvia: el «Usted» que el compositor corto en reel-08 e4 (C-447). El
+    # techo es el arranque de la palabra que empieza despues del borde.
+    tope = fin + HASTA_CALLAR
+    try:
+        import transcribir as _tr
+        sig = [w["start"] for w in _tr.exigir(toma)["segmentos"]
+               if w["start"] > fin + 0.03]
+        if sig:
+            tope = min(tope, min(sig) + 0.06)
+    except (SystemExit, Exception):  # noqa: BLE001 — sin transcript, sin techo
+        pass
     t = fin
-    while t < fin + HASTA_CALLAR:
+    while t < tope:
         t += 0.02
         if _bo.callado(toma, t):
             return t
