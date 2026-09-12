@@ -1,4 +1,5 @@
 import { limit } from "../../brand/copy";
+import CIFRAS from "../../../scripts/reels/cifras.json";
 
 /**
  * **Lo que el diseñador declaró, leído como líneas de copy.**
@@ -24,40 +25,24 @@ import { limit } from "../../brand/copy";
  *   pantalla. El «430» rotulado en reel-01 salió por ahí.
  */
 
-/** Props que son estructura, no texto en pantalla. */
-const NO_ES_TEXTO = new Set([
-  // **`duracion` la mete el motor, no quien compone.** `armarTableros` la anade
-  // a los props para saber cuanto dura el tablero, y esto la trataba como una
-  // linea mas: el tablero del precio del reel-01 salia rotulando **«430»** en
-  // versales, junto a $576 y $20. Un numero que nadie escribio, en el sitio
-  // donde una cifra de mas es una cifra falsa.
-  "duracion",
-  // **Y las otras claves de motor, por la misma razon.** `sfx`/`sound` los pone
-  // quien declara el movimiento que suena, `rotulo` es el texto del gancho que
-  // lleva `BigTitle`, y `camara` la declaracion de plano. Ninguna es copy.
-  "sfx", "rotulo", "camara", "motion",
-  "familia", "zona", "cubre", "oro", "sound", "fondo", "filete", "source",
-  "paso", "entrada", "giro", "placa", "cede_el_cuadro", "sin_pie", "anclas",
-  // Los otros tres props de `Fondo`: declarar como se recorta la placa —lo que
-  // separa el collage del papel pintado— habria rotulado «cuna» en versales.
-  "recorte", "fuerza", "deriva",
-  "ancla", "alinea", "a_la_vez", "no_rotular", "solo_si", "se_queda",
-  "al_entrar_la_siguiente", "abajo_se_tacha", "sin_cifra_en_pantalla",
-  "tachado", "corte", "eje", "saltos", "franja", "lastre", "suelo",
-  "fondo_filetes", "filetes", "flecha", "universo", "capas", "escalones",
-  "tramos", "marcas", "lineas", "palabras", "renglones", "condiciones_en_fila",
-  "etiquetas", "figura",
-  // **Y la condición que viaja para el copy del post, no para el frame.**
-  // `condicion_completa` se escribe para acompañar la publicación; rotularla
-  // metía cien palabras de nota de método dentro del tablero.
-  "condicion_completa", "numerada", "ventana",
-  // **Ni los sonidos ni su recorte.** reel-08 v1, 12-9, rotuló en pantalla
-  // MARK, LAND, DRAW, FORK, WHOOSH, DERECHA, PEGATINA y BN (C-422).
-  "sonidos", "sujeto", "sujeto_forma", "sujeto_color", "sujeto_src",
-  "sujeto_css", "barrido_final", "acento",
-  // Ni la ventana que tapa parte de la etapa (C-426).
-  "entra_con", "sale_con", "desde", "hasta", "cinta",
-]);
+/**
+ * **Props que son estructura, no texto en pantalla**, de la MISMA lista que
+ * lee quien cuenta las cifras (`scripts/reels/cifras.json`). Aquí había una
+ * copia a mano: se separaron, y la ventana de reel-08 e2 —que esta lista ya
+ * callaba— salió como cuatro cifras sin respaldo en el otro lado (C-427).
+ * `duracion` la mete el motor; `sfx`, `sonidos`, `sujeto*` y compañía los
+ * escribe quien compone para el render: el «430» de reel-01 y el MARK/LAND de
+ * reel-08 v1 salieron por aquí.
+ */
+const NO_ES_TEXTO = new Set<string>(CIFRAS.no_es_texto);
+
+/**
+ * **Y lo de motor no se aplana, venga como venga.** Un objeto bajo una clave de
+ * motor —`ventana: {entra_con, desde…}`, `sonidos: {…}`, `anclas: {…}`— es
+ * datos, no copy. Las listas sí se leen: `lineas` y `palabras` son texto.
+ */
+export const esMotor = (k: string, v: unknown) =>
+  NO_ES_TEXTO.has(k) && !Array.isArray(v);
 
 /**
  * **Lo que se dice al pie, y que este tablero ya no dibuja.**
@@ -132,7 +117,7 @@ export const leerDeclarado = (props: Record<string, unknown>): Declarado => {
       mete(v.texto.trim(), v.etiqueta?.trim());
       continue;
     }
-    if (NO_ES_TEXTO.has(k) && !Array.isArray(v) && typeof v !== "object") continue;
+    if (esMotor(k, v)) continue;
     for (const t of aLineas(v)) mete(t);
   }
 

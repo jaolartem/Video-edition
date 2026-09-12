@@ -126,7 +126,8 @@ export const cifrasDe = (props) => {
   const fuera = [];
   for (const [k, v] of Object.entries(props ?? {})) {
     if (AL_PIE.has(k)) continue;
-    if (NO_ES_TEXTO.has(k) && !Array.isArray(v) && typeof v !== "object") continue;
+    // Lo de motor no se aplana, tampoco si es un objeto (C-427).
+    if (NO_ES_TEXTO.has(k) && !Array.isArray(v)) continue;
     for (const t of aLineas(v)) {
       if (t.length > LEGAL) continue;
       fuera.push(...enTexto(t));

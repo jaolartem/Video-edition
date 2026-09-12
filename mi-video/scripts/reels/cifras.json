@@ -10,7 +10,8 @@
     "tachado", "corte", "eje", "saltos", "franja", "lastre", "suelo",
     "fondo_filetes", "filetes", "flecha", "universo", "capas", "escalones",
     "tramos", "marcas", "lineas", "palabras", "renglones", "condiciones_en_fila",
-    "etiquetas", "figura"
+    "etiquetas", "figura",
+    "sfx", "rotulo", "camara", "motion", "recorte", "fuerza", "deriva", "condicion_completa", "numerada", "ventana", "sonidos", "sujeto", "sujeto_forma", "sujeto_color", "sujeto_src", "sujeto_css", "barrido_final", "acento", "entra_con", "sale_con", "desde", "hasta", "cinta"
   ],
 
   "al_pie": ["pie", "source", "fuente", "condicion", "condition", "limitation", "legal", "condicion_completa"],
