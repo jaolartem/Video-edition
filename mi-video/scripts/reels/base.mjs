@@ -86,6 +86,18 @@ export const aprobadas = (() => {
 const DIBUJA = CONSTRUIDAS;
 
 /**
+ * **El nombre de la forma, como lo despacha `Tablero.tsx`.** «Comparacion» con
+ * mayúscula no es `comparacion` para el despacho y caía en `TableroDeclarado`,
+ * que rotula sus datos; y `Gancho` es el rótulo del gancho, o sea `tipo`
+ * (reel-08 v1, 12-9, C-422).
+ */
+export const canonico = (k) => {
+  const s = String(k ?? "");
+  if (s.toLowerCase() === "gancho") return "tipo";
+  return [...DIBUJA].find((d) => d.toLowerCase() === s.toLowerCase()) ?? s;
+};
+
+/**
  * **El tablero sale de la DESCRIPCIÓN, no de un literal por pieza.**
  *
  * `TABLEROS[slug]` era un objeto escrito a mano, uno por reel: el
@@ -144,7 +156,7 @@ export function tablerosDe(slug) {
         " and tablero is not null and tablero <> ''",
       ).all(slug).filter((f) => {
         try {
-          return JSON.parse(f.tablero)?.kind !== "tipo";
+          return canonico(JSON.parse(f.tablero)?.kind) !== "tipo";
         } catch {
           return true;
         }
@@ -161,7 +173,7 @@ export function tablerosDe(slug) {
       " order by etapa_orden",
     ).all(slug).map((f) => {
       const t = JSON.parse(f.tablero);
-      return { beat: Number(f.etapa_orden), kind: t.kind, props: t.props };
+      return { beat: Number(f.etapa_orden), kind: canonico(t.kind), props: t.props };
     }).filter((b) => {
       for (const m of revisarTablero(b.kind, b.props))
         faltas.push(`${slug} e${b.beat}: ${m}`);

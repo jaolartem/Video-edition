@@ -263,7 +263,7 @@ DISENO = Contrato(
         # ── nivel TABLERO: lo que se monta ───────────────────────────────────
         Clave("tablero.kind",
               dispara=(Aguja("scripts/reels/base.mjs",
-                             "return { beat: Number(f.etapa_orden), kind: t.kind, props: t.props };"),),
+                             "return { beat: Number(f.etapa_orden), kind: canonico(t.kind), props: t.props };"),),
               efecto="qué forma lo dibuja",
               obligatoria=True,
               exige_ademas=("tablero.props",),

@@ -51,6 +51,10 @@ const NO_ES_TEXTO = new Set([
   // `condicion_completa` se escribe para acompañar la publicación; rotularla
   // metía cien palabras de nota de método dentro del tablero.
   "condicion_completa", "numerada", "ventana",
+  // **Ni los sonidos ni su recorte.** reel-08 v1, 12-9, rotuló en pantalla
+  // MARK, LAND, DRAW, FORK, WHOOSH, DERECHA, PEGATINA y BN (C-422).
+  "sonidos", "sujeto", "sujeto_forma", "sujeto_color", "sujeto_src",
+  "sujeto_css", "barrido_final", "acento",
 ]);
 
 /**

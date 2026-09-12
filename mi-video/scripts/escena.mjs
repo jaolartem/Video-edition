@@ -280,7 +280,9 @@ export const rotuloDe = (desc) => {
     const d = typeof desc?.tablero === "string"
       ? JSON.parse(desc.tablero)
       : desc?.tablero;
-    const r = d?.props?.rotulo ?? d?.rotulo;
+    // `lineas` es como lo declara quien pone `kind: "Gancho"` (C-422).
+    const r = d?.props?.rotulo ?? d?.rotulo
+      ?? (d?.props?.lineas ? { lineas: d.props.lineas, oro: d.props.oro } : undefined);
     const suelto = Array.isArray(r) || typeof r === "string";
     const c = suelto ? r : r?.lineas;
     const ls = Array.isArray(c) ? c
