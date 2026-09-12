@@ -94,7 +94,13 @@ export function duracionDelCorte(slug) {
  */
 const PIEZAS = JSON.parse(fs.readFileSync("ads/fondos.json", "utf8")).pieza;
 
-export const placaDe = (slug) => PIEZAS?.[slug]?.placa;
+// **Una derivada o una historia pinta sobre la placa de su origen**, como ya
+// respalda con sus cifras y promete lo de su serie (C-396, C-419, C-429). Sin
+// esto reel-08..17 dibujaban sus tableros sobre negro (C-436).
+export const placaDe = (slug) => {
+  const r = FRAMES.reels?.[slug] ?? {};
+  return PIEZAS?.[slug]?.placa ?? PIEZAS?.[r.deriva_de ?? r.respalda_de]?.placa;
+};
 
 /**
  * **El recorte con alfa de una etapa**, si la pasada ya corrió.
