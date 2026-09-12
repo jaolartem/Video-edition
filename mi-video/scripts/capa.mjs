@@ -36,4 +36,7 @@ export const reparte = (n, desde, hasta) => {
  * movimiento, y aquí eso es que un `motion` nulo no produce nada.
  */
 export const sonar = (motion, at) =>
-  motion ? [{ tipo: "sonido", at, props: { motion } }] : [];
+  // **Y sin frame tampoco.** El gancho de reel-08 sin filete daba `at + regla`
+  // = NaN, el spec lo guardaba como `null` y el render moría en el frame 1
+  // («"from" … must be a number», 12-9, C-420).
+  motion && Number.isFinite(at) ? [{ tipo: "sonido", at, props: { motion } }] : [];
