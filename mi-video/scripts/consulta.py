@@ -350,6 +350,30 @@ def guardar_escena(slug, orden, d):
         raise SystemExit(str(e)) from e
 
 
+def declarar_tramos(slug, por_etapa):
+    """Los `tramos` que decidió el compositor, **aplicados como los de revalidar**.
+
+    El contrato de `describir` los pide —«lo que resuelvas va en `tramos`, con
+    los segundos exactos»— y nadie los leía: reel-08 e1 quedó diciendo el gancho
+    dos veces con la respuesta que lo quitaba ya consumida (11-9-2026).
+    """
+    import fijar
+
+    edl = Montaje(slug).edl or {}
+    hechos = []
+    for orden, tramos in (por_etapa or {}).items():
+        toma = next((d.get("toma") for d in edl.get("detalle", [])
+                     if d.get("beat") == int(orden)), None)
+        if toma and tramos:
+            vd = fijar.declarar(slug, int(orden), toma, tramos,
+                                "decidido al describir", quien="compositor")
+            if not (vd or {}).get("error"):
+                hechos.append(int(orden))
+    if hechos:
+        fijar.aplicar(slug)
+    return {"declaradas": hechos}
+
+
 def guardar_tablero(slug, orden, tablero):
     """Guarda SOLO el tablero de una etapa. Es la entrega del paso de diseño."""
     try:
@@ -396,6 +420,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "guardar_paneles": guardar_paneles,
           "lo_medido": lo_medido,
           "guardar_escena": guardar_escena,
+          "declarar_tramos": declarar_tramos,
           "guardar_tablero": guardar_tablero}
 
 

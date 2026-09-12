@@ -284,6 +284,8 @@ for (const [slug, suyas] of porPiezas(filas)) {
       continue;
     }
     const porOrden = new Map(ds.map((d) => [Number(d.etapa_orden), d]));
+    // Los `tramos` que decide quien compone se aplican como los de revalidar.
+    const tramos = {};
     for (const f of suyas) {
       const d = porOrden.get(Number(f.orden));
       if (!d) {
@@ -304,6 +306,7 @@ for (const [slug, suyas] of porPiezas(filas)) {
         continue;
       }
       sql("guardar_escena", [slug, f.orden, d]);
+      if (Array.isArray(d.tramos) && d.tramos.length) tramos[f.orden] = d.tramos;
       ok++;
       console.log(
         `  ${slug} e${f.orden} ${String(f.etapa).slice(0, 20).padEnd(20)} ` +
@@ -311,6 +314,7 @@ for (const [slug, suyas] of porPiezas(filas)) {
           `${(d.grafico || "").slice(0, 40)}`,
       );
     }
+    if (Object.keys(tramos).length) sql("declarar_tramos", [slug, tramos]);
     // **Y los tiquets que la respuesta dice haber atendido se cierran aqui.**
     //
     // No los cerraba nadie. El otro oficio si —`servicios/disenar.py` llama a
