@@ -157,6 +157,11 @@ def _audio(cx, version_id, slug):
                   (version_id,)).fetchone():
         return
     virgen = f"out/audio-puro/{slug}-voz.wav"
+    # **Sin la voz exportada todavía, no hay nada que anotar.** Una pieza nueva
+    # se sella al montarse, antes del paso de voz: `virgen` es NOT NULL y el
+    # sello de reel-08 moría ahí (12-9, C-421). Se anota cuando exista.
+    if not os.path.exists(virgen):
+        return
     limpio, limpio_s, integrada = _medida(slug)
     cx.execute(
         "insert into audio_version (version_id, virgen, virgen_s, limpio,"
