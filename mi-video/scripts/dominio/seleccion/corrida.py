@@ -365,4 +365,11 @@ def leidos_declarados(slug: str, por_beat: dict, transcribir) -> list:
                            por="el tramo declarado por Jaime")
         else:
             fuera.append(b)
+            # **Y se dice**: tirar en silencio lo que declaró el compositor dejó
+            # reel-10 e1 sin su «por qué» y nadie lo supo (12-9, C-413).
+            import registro
+            registro.aviso("seleccion", "tramo declarado que lee: no entra",
+                           detalle=f"{slug} e{b}: literal {lee:.0%} ≥"
+                                   f" {pesos.LEIDA:.0%}; queda lo que eligió la selección",
+                           eco=True)
     return fuera
