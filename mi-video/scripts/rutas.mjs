@@ -26,6 +26,19 @@ const deArg = (nombre) => {
 
 const barras = (p) => p.split(path.sep).join("/").replace(/\/+$/, "");
 
+/**
+ * **Una derivada usa la cinta de su origen** (C-388), igual que `rutas.py`.
+ * Sin esto `montar.sh` moría en `bruto('reel-08')` (C-416).
+ */
+const tomas = { ...(cfg.tomas ?? {}) };
+try {
+  const fr = JSON.parse(fs.readFileSync("ads/frames.json", "utf8")).reels ?? {};
+  for (const [s, f] of Object.entries(fr))
+    if (!tomas[s] && f.deriva_de && tomas[f.deriva_de]) tomas[s] = tomas[f.deriva_de];
+} catch {
+  /* sin frames.json no hay derivadas que resolver */
+}
+
 export const rutas = {
   /** Dónde vive el material bruto que se monta. */
   origen: barras(deArg("origen") ?? process.env.VIDEO_ORIGEN ?? cfg.origen),
@@ -43,7 +56,7 @@ export const rutas = {
   trabajo: cfg.trabajo ?? "work",
   publico: cfg.publico ?? "public",
   fuentes: cfg.fuentes ?? {},
-  tomas: cfg.tomas ?? {},
+  tomas,
 };
 
 /** Carpeta temporal propia, creada si hace falta. Nunca en C:. */
