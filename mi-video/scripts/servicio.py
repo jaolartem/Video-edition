@@ -214,8 +214,9 @@ def _respaldos(slug):
 
         origen, mapa = origen_de(slug)
         if not origen:  # una historia respalda con las de su serie (C-419)
-            origen = json.load(open("ads/frames.json", encoding="utf-8"))[
+            serie = json.load(open("ads/frames.json", encoding="utf-8"))[
                 "reels"].get(slug, {}).get("respalda_de")
+            return [dict(f, etapa=None) for f in (_respaldos(serie) if serie else [])]
         return [dict(f, etapa=mapa.get(f.get("etapa")))
                 for f in (_respaldos(origen) if origen else [])
                 if f.get("etapa") is None or f.get("etapa") in mapa]
