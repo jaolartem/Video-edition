@@ -67,6 +67,46 @@ const ficha = (fichero) => {
   };
 };
 
+/**
+ * **Los campos que el componente lee, de su propio tipo `<Nombre>Props`.**
+ *
+ * El catálogo decía qué hace cada forma y no con qué campos: el diseñador de
+ * reel-11 declaró `Fusion` con `a`, `b` y `resultado`, el componente lee
+ * `izquierda`, `derecha` y `fusion`, y el render murió en `fusion.length`
+ * (C-428). Vuelve `{campo: "tipo · lo que dice su comentario"}`; con `?` los
+ * opcionales. Sólo el primer nivel.
+ */
+export const camposDe = (nombre) => {
+  let t = fs.readFileSync(path.join(DIR, `${nombre}.tsx`), "utf8");
+  // Muchos lo declaran en su carpeta y lo re-exportan: `export type {
+  // ComparacionProps } from "./comparacion/tipos"`.
+  const re = t.match(new RegExp(`export type \\{[^}]*\\b${nombre}Props\\b[^}]*\\}\\s*from\\s*"(\\.[^"]+)"`));
+  if (re) {
+    const f = path.join(DIR, `${re[1]}.ts`);
+    if (fs.existsSync(f)) t = fs.readFileSync(f, "utf8");
+  }
+  const i = t.search(new RegExp(`export type ${nombre}Props\\s*=\\s*\\{`));
+  if (i < 0) return null;
+  const fuera = {};
+  let prof = 0;
+  let doc = "";
+  for (const l of t.slice(t.indexOf("{", i)).split("\n")) {
+    const antes = prof;
+    prof += (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
+    if (antes === 1) {
+      const d = l.match(/^\s*\/\*\*\s*(.*?)\s*(\*\/)?$/) || l.match(/^\s*\*\s+(.*)$/);
+      if (d && !doc) doc = d[1].replace(/\s*\*\/\s*$/, "").replace(/\*\*/g, "").trim();
+      const c = l.match(/^\s*(\w+)(\??):\s*(.+?);?\s*$/);
+      if (c) {
+        fuera[c[1] + c[2]] = doc ? `${c[3]} · ${doc}` : c[3];
+        doc = "";
+      }
+    }
+    if (prof <= 0 && antes > 0) break;
+  }
+  return fuera;
+};
+
 /** Los componentes que hay en disco, sin extensión. */
 export const piezas = () =>
   fs.readdirSync(DIR).filter((f) => f.endsWith(".tsx")).map((f) => f.slice(0, -4));
@@ -121,6 +161,7 @@ export const catalogo = () => {
   const idx = {};
   const sinClase = [];
   const mudos = [];
+  const campos = {};
   for (const n of Object.keys(ORDEN)) idx[n] = {};
   for (const nombre of piezas()) {
     const f = ficha(`${nombre}.tsx`);
@@ -130,10 +171,15 @@ export const catalogo = () => {
     }
     if (!f.hace) mudos.push(nombre);
     idx[f.clase][nombre] = f.hace;
+    const c = camposDe(nombre);
+    if (c && Object.keys(c).length) campos[nombre] = c;
   }
   return {
     clases: ORDEN,
     indice: idx,
+    // Con qué campos se declara cada forma: los nombres son los del
+    // componente, y otro nombre no llega a la pantalla (C-428).
+    campos,
     // Las variantes de cada familia: `CaptionBand` tiene Plana, Compuesta y
     // Corregida, y elegir entre ellas es composicion, no implementacion.
     subclases: subclases(),

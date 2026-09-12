@@ -45,6 +45,7 @@
 
 import fs from "node:fs";
 import { cerrada } from "./biblioteca.mjs";
+import { camposDe, piezas } from "./catalogo.mjs";
 
 const DIR_C = "src/components";
 
@@ -437,7 +438,28 @@ export const revisarTablero = (kind, props) => {
   // **tumban el render** si un texto se pasa de su tope.
   const cerradas = figurasCerradas(kind, props);
   const f = forma(kind);
-  return f ? [...cerradas, ...f.revisar(props)] : cerradas;
+  return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props)];
+};
+
+/**
+ * **Los campos obligatorios del componente, por su nombre.** `Fusion` de
+ * reel-11 llegó con `a`, `b` y `resultado` y el render murió en
+ * `fusion.length` tras cinco minutos de recorte (C-428). El pie lo pone el
+ * motor, así que `fuente` y `condicion` no se exigen aquí.
+ */
+// `props` y `kind` son de los que reciben la declaración entera (`Fichas`,
+// `TableroDeclarado`): ahí no hay nombres que exigir.
+const DEL_MOTOR = new Set(["fuente", "condicion", "source", "props", "kind"]);
+const sinSusCampos = (kind, props) => {
+  const nombre = piezas().find((n) => n.toLowerCase() === String(kind).toLowerCase());
+  const campos = nombre ? camposDe(nombre) : null;
+  if (!campos) return [];
+  const faltan = Object.keys(campos).filter((c) => !c.endsWith("?") &&
+    !DEL_MOTOR.has(c) && (props ?? {})[c] == null);
+  return faltan.length
+    ? [`«${nombre}» se declara con ${Object.keys(campos).join(", ")} y le faltan ` +
+       `${faltan.join(", ")}: con otro nombre no llega a la pantalla`]
+    : [];
 };
 
 const main = () => {
