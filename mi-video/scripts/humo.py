@@ -91,7 +91,7 @@ def _la_maquina_no_se_aprueba_sola(h):
            "una etiqueta de una persona cuenta como aprobacion")
     h.mide("C-354",
            not sg.es_suya("la linea") and not sg.es_suya("servicio")
-           and not sg.es_suya("disenador") and not sg.es_suya("")
+           and not sg.es_suya("compositor") and not sg.es_suya("")
            and not sg.es_suya("alguien que no existe"),
            "y una de un oficio, un paso o un desconocido, no")
     # **Y el derecho es del TIPO, no del nombre.** C-363: si entra otra
@@ -101,6 +101,8 @@ def _la_maquina_no_se_aprueba_sola(h):
     h.mide("C-363", (Autor.de("jaime") or Autor.de("x")).tipo == "persona"
            and puede("jaime", "aprobar") and not puede("compositor", "aprobar"),
            "la agencia cuelga del tipo, no del nombre")
+    h.mide("C-404", puede("disenador", "aprobar"),
+           "el diseñador aprueba tramos contra el vídeo (Jaime, 12-9)")
     h.mide("C-363", puede("compositor", "decidir criterio")
            and puede("la linea", "medir") and not puede("la linea", "decidir criterio"),
            "y cada tipo puede lo suyo: la linea mide, el oficio decide")

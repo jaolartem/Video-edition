@@ -539,7 +539,7 @@ def _quien_es_agencia(con):
     disenador desde que Jaime la separo de la variable.
     """
     pass  # el modelo lo declara `esquema-modelo.sql`
-    for n in ("persona", "oficio", "paso"):
+    for n in ("persona", "oficio", "paso", "revisor"):
         con.execute("insert or ignore into tipo_autor (nombre) values (?)", (n,))
     permisos = [
         ("aprobar", "Cerrar una pieza o un segmento. Lo unico que el motor no"
@@ -555,12 +555,19 @@ def _quien_es_agencia(con):
                     (n, p))
     dan = {"persona": ("aprobar", "decidir criterio", "abrir tiquet"),
            "oficio": ("decidir criterio", "abrir tiquet"),
-           "paso": ("medir", "abrir tiquet")}
+           "paso": ("medir", "abrir tiquet"),
+           # **El diseñador aprueba tramos contra el vídeo.** Jaime, 12-9-2026:
+           # *«el diseñador no aprueba videos, aprueba tramos contra video; si un
+           # tramo esta bien nunca mas pasa por diseñador; se aprueba y listo»*.
+           # Es un oficio que además revisa lo renderizado; el compositor, no.
+           "revisor": ("aprobar", "decidir criterio", "abrir tiquet")}
     for tipo, ps in dan.items():
         t = con.execute("select id from tipo_autor where nombre = ?", (tipo,)).fetchone()[0]
         for n in ps:
             pid = con.execute("select id from permiso where nombre = ?", (n,)).fetchone()[0]
             con.execute("insert or ignore into agencia values (?,?)", (t, pid))
+    con.execute("update autor set tipo_id = (select id from tipo_autor where"
+                " nombre = 'revisor') where nombre = 'disenador'")
     return True
 
 

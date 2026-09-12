@@ -202,8 +202,12 @@ def encargos(slug):
     # pedía corregir el precio en e7, que no tiene tablero, y la pieza cruzaba
     # este paso sin pedido: lo que se atiende puede ser `corrige`, `voz` o
     # `camara`, que `aplicar` ya sabe escribir sin `kind`.
+    # Un segmento aprobado contra su corte no vuelve al diseñador, salvo tiquet.
+    from dominio.segmento import Segmento
+
+    aprobados = {s.n for s in Segmento.de(slug) if s.aprobado}
     return [f for f in filas
-            if (_pide_tablero(f)
+            if (int(f["etapa_orden"]) not in aprobados and _pide_tablero(f)
                 and (not f["tablero"] or _sin_copy(f) or _desfasado(f)))
             or _abierto.abre(slug, "disenado", f)]
 

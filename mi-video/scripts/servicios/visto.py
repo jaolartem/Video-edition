@@ -76,6 +76,10 @@ def dossier(pieza: Pieza) -> dict | None:
         return None
 
     d = {"pieza": pieza.slug, "fichero": os.path.basename(mp4)}
+    # Lo que ya aprobaste contra este corte no se vuelve a mirar.
+    from dominio.segmento import Segmento
+
+    d["ya_aprobados"] = [s.n for s in Segmento.de(pieza.slug) if s.aprobado]
     # **Y los fotogramas, porque este paso es de mirar.** El prompt que recibe
     # cierra con «antes de contestar: MIRALO» y el pedido no traia una sola
     # imagen: se juzgaba con numeros la unica cosa que existe para verse.
@@ -189,6 +193,19 @@ def aplicar(pieza: Pieza, veredicto) -> Resultado:
         return Resultado(False, motivo="veredicto ilegible: la respuesta no trae"
                                        " `se_ensena`")
     por_que = (v.get("por_que") or "sin motivo")[:200]
+    # **Aprueba tramos, no la pieza.** Jaime, 12-9-2026: *«aprueba tramos
+    # contra video; si un tramo esta bien nunca mas pasa por diseñador»*. Lo
+    # aprobado queda firmado contra su corte (`huella`): sólo vuelve a estar en
+    # juego si ese corte cambia. Si la enseña entera, lo aprueba todo.
+    from dominio.segmento import Segmento
+
+    segs = {s.n: s for s in Segmento.de(pieza.slug)}
+    aprueba = v.get("aprueba")
+    if v.get("se_ensena") and aprueba is None:
+        aprueba = list(segs)
+    for n in aprueba or []:
+        if str(n).isdigit() and int(n) in segs:
+            segs[int(n)].aprueba("disenador")
     if v.get("se_ensena"):
         return Resultado(True, salida=f"se puede enseñar: {por_que}")
     # **Y el «no» se le dice a alguien: es un tiquet.** Devolver la pieza sin
