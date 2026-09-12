@@ -454,8 +454,16 @@ const sinSusCampos = (kind, props) => {
   const nombre = piezas().find((n) => n.toLowerCase() === String(kind).toLowerCase());
   const campos = nombre ? camposDe(nombre) : null;
   if (!campos) return [];
+  const p = props ?? {};
   const faltan = Object.keys(campos).filter((c) => !c.endsWith("?") &&
-    !DEL_MOTOR.has(c) && (props ?? {})[c] == null);
+    !DEL_MOTOR.has(c) && (c.includes("[].")
+      // Lo de dentro de una lista se exige a cada elemento (C-432).
+      ? (() => {
+          const [lista, dentro] = c.split("[].");
+          return Array.isArray(p[lista]) &&
+            p[lista].some((x) => x && typeof x === "object" && x[dentro] == null);
+        })()
+      : p[c] == null));
   return faltan.length
     ? [`«${nombre}» se declara con ${Object.keys(campos).join(", ")} y le faltan ` +
        `${faltan.join(", ")}: con otro nombre no llega a la pantalla`]

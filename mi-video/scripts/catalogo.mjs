@@ -85,7 +85,25 @@ export const camposDe = (nombre) => {
     const f = path.join(DIR, `${re[1]}.ts`);
     if (fs.existsSync(f)) t = fs.readFileSync(f, "utf8");
   }
-  const i = t.search(new RegExp(`export type ${nombre}Props\\s*=\\s*\\{`));
+  const fuera = tipoDe(t, `${nombre}Props`);
+  if (!fuera) return null;
+  // **Y lo de dentro de una lista.** `nodes: CausalNode[]` no dice que cada
+  // nodo lleva `stage` y `text`: el diseñador de reel-14 escribió `label` y
+  // `statement` (C-432). Si el tipo del elemento está en el mismo fichero, se
+  // añaden sus campos como `nodes[].stage`.
+  for (const [k, v] of Object.entries({ ...fuera })) {
+    const el = String(v).match(/^(\w+)\[\]/);
+    const dentro = el && (tipoDe(t, el[1]) ?? tipoDe(t, `${el[1]}Base`));
+    if (dentro)
+      for (const [k2, v2] of Object.entries(dentro))
+        fuera[`${k.replace("?", "")}[].${k2}`] = v2;
+  }
+  return fuera;
+};
+
+/** Los campos de primer nivel de `type <nombre> = { … }` en ese texto. */
+const tipoDe = (t, nombre) => {
+  const i = t.search(new RegExp(`(?:export )?type ${nombre}\\s*=\\s*\\{`));
   if (i < 0) return null;
   const fuera = {};
   let prof = 0;
