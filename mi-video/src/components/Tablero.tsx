@@ -149,7 +149,9 @@ const laForma = (cue: CueDeTablero, mode: Mode) => {
       cue.kind === "BandaFecha" || cue.kind === "ListaNumerada")
     return <Fichas props={props} numerada={cue.kind === "ListaNumerada"} />;
   /** **Casillas que se tachan cuando se dicen**, a cuadro completo. */
-  if (cue.kind === "tachadura" || cue.kind === "Casillas")
+  // Y por su propio nombre, que es el que da el catálogo: declarado así, reel-11
+  // e5 caía en la lista genérica sin tachar ni sellar nada (C-435).
+  if (cue.kind === "tachadura" || cue.kind === "Casillas" || cue.kind === "LaminaCasillas")
     return <LaminaCasillas props={props} />;
   /**
    * **Y lo demás también se dibuja.** Aquí caían diecinueve formas declaradas
