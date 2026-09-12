@@ -43,6 +43,9 @@ export const rutaRespuesta = (paso, slug) =>
  */
 export function dejaPedido(paso, slug, prompt, datos) {
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
+  // El prompt también en su fichero, por renglones: en el JSON es una línea
+  // de 46.000 caracteres y se leía cortado (C-445).
+  fs.writeFileSync(`${RAIZ}/${paso}/${slug}.prompt.md`, String(prompt ?? ""));
   fs.writeFileSync(
     rutaPedido(paso, slug),
     JSON.stringify({ paso, slug, prompt, ...contexto(paso, slug), datos }, null, 1),

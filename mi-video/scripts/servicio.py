@@ -274,6 +274,17 @@ def contexto(paso, slug):
              "marcador": _marcador(slug)}
 
 
+def _prompt_aparte(paso, slug, prompt):
+    """`<slug>.prompt.md` junto al pedido: el mismo prompt, legible por renglones."""
+    try:
+        os.makedirs(_dir(paso), exist_ok=True)
+        with open(os.path.join(_dir(paso), f"{slug}.prompt.md"), "w",
+                  encoding="utf-8") as f:
+            f.write(prompt)
+    except OSError:
+        pass
+
+
 def pedir(paso, slug, prompt, payload, cli=True):
     """Deja el pedido y, si se puede, lo resuelve con el CLI.
 
@@ -316,6 +327,10 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # es una lista en unos pasos y un diccionario en otros, y lo que vale para
     # todos no puede depender de esa forma.
     comun = contexto(paso, slug)
+    # **Y el prompt, además, en su propio fichero con sus renglones.** Dentro
+    # del JSON es una sola línea de 46.000 caracteres y quien contesta la leía
+    # cortada a mitad del formato de respuesta (reel-08, reel-17, 12-9, C-445).
+    _prompt_aparte(paso, slug, prompt)
     nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
                         **comun, "datos": payload},
                        ensure_ascii=False, indent=1)
