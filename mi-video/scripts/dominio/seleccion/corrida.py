@@ -317,6 +317,10 @@ def pide_otra_toma(slug: str, beat: int, toma: str, lectura: float,
         return ticket.abrir(slug, dijo, tipo="falta", vuelve_a="", etapa="pieza")
 
 
+#: Quién firma lo que decide quien compone: `revalidar` y `describir` (C-414).
+COMPONE = ("revalidado", "compositor")
+
+
 def leidos_declarados(slug: str, por_beat: dict, transcribir) -> list:
     """Los beats cuyo tramo DECLARADO lee y no lo fijó una persona: no entran.
 
@@ -352,7 +356,11 @@ def leidos_declarados(slug: str, por_beat: dict, transcribir) -> list:
             dicho += [w["text"] for w in pal
                       if transcribir.suena(w, f["desde"], f["hasta"])]
         lee = literal(libreto[b - 1], " ".join(dicho))
-        if lee < pesos.LEIDA:
+        # **Lo que declaró quien compone entra aunque mida lectura.** Jaime,
+        # 12-9: completar «por qué» o «nadie le» sube el literal; la lectura que
+        # se ve —mirar el papel— la juzga el diseñador en el `visto` (C-414).
+        if lee < pesos.LEIDA or any(
+                (f.get("quien") or "").split("·")[0].strip() in COMPONE for f in fs):
             continue
         suyo = any((a := Autor.de(f.get("quien") or "")) is not None
                    and a.tipo == "persona" for f in fs)
