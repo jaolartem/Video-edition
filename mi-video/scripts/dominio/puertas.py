@@ -44,6 +44,20 @@ def _fase_id(nombre):
     return r["id"] if r else None
 
 
+def _no_ha_llegado(n, vuelve) -> bool:
+    """Cierto si la pieza está todavía antes de `vuelve` en el camino."""
+    from .fase import camino
+    from .pieza import Pieza
+
+    ruta = [f["nombre"] for f in camino()]
+    try:
+        actual = (Pieza(int(n)).fase or {}).get("nombre")
+    except Exception:                              # noqa: BLE001
+        return False
+    return (actual in ruta and vuelve in ruta
+            and ruta.index(actual) < ruta.index(vuelve))
+
+
 def _video_id(slug):
     from .ticket import _con as _tc
 
@@ -108,6 +122,12 @@ def del_tiquet(piezas):
         # **Al punto desde el que ese paso vuelve a correr, no a su etiqueta.**
         # La etiqueta dice el paso YA HECHO; ver `fase.antes_de`.
         vuelve = antes_de(fase)
+        # **Y la puerta sólo devuelve: no adelanta.** El 12-9 tres tiquets hacia
+        # «revalidado» llevaron a reel-09, 10 y 11 de «depurado» a «recortado»,
+        # y la redundancia —ya contestada— no se cargó nunca. Si la pieza aún no
+        # ha llegado, el tiquet viaja en su pedido cuando llegue.
+        if _no_ha_llegado(n, vuelve):
+            continue
         destino, vid = _fase_id(vuelve), _video_id(slug)
         if destino is None or vid is None:
             dicho.append(f"  {slug}: {len(ids)} tiquet(s) piden «{fase}» y esa"
