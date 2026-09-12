@@ -44,6 +44,47 @@ def _fase_id(nombre):
     return r["id"] if r else None
 
 
+def por_atender(pieza):
+    """`(fase, ids)` de los abiertos que declaran paso y no han vuelto ya.
+
+    **Una vuelta por ticket, no una por corrida.** Es el mismo tope que el
+    repaso: devolver la pieza cada vez que el ticket sigue abierto es un bucle
+    que parece trabajo. Aquí se manda una vez, se anota que se mandó, y si el
+    ticket vuelve abierto lo que corresponde es pararla y decirlo — no volver a
+    mandarla. Vivía en `ticket.py`; su único lector es esta puerta.
+
+    **Y se atiende el que vuelve más atrás, no el primero de la lista** (C-410):
+    reel-08, 12-9, tenía el #312 a «descrito» y el #314 a «revalidado»; se cogía
+    el #312, la pieza no había llegado (C-407) y `vencidas` la retenía por el
+    #314.
+    """
+    from .fase import camino
+
+    abre = [t for t in ticket.abiertos(pieza)
+            if (t.get("vuelve_a") or "") and not t.get("devuelto")]
+    if not abre:
+        return "", []
+    ruta = [f["nombre"] for f in camino()]
+    fase = min((t["vuelve_a"] for t in abre),
+               key=lambda f: ruta.index(f) if f in ruta else len(ruta))
+    return fase, [t["id"] for t in abre if t["vuelve_a"] == fase]
+
+
+def del_tiquet_de(id_) -> None:
+    """La puerta de la pieza de ese tiquet. **Reencaminar también es el evento.**
+
+    Sólo se pasaba al abrir un tiquet: el #314 de reel-08 quedó reencaminado a
+    «revalidado» y la pieza parada horas en «cosido» (12-9, C-411).
+    """
+    from .ticket import _con as _tc
+
+    cx = _tc()
+    r = cx.execute("select pieza from ticket where id = ?", (id_,)).fetchone()
+    if r and r["pieza"]:
+        for linea in del_tiquet([int(str(r["pieza"])[-2:])]):
+            print(linea)
+
+
 def _no_ha_llegado(n, vuelve) -> bool:
     """Cierto si la pieza está todavía antes de `vuelve` en el camino."""
     from .fase import camino
@@ -101,7 +142,7 @@ def del_tiquet(piezas):
     dicho = []
     for n in piezas:
         slug = f"reel-{int(n):02d}"
-        fase, ids = ticket.por_atender(slug)
+        fase, ids = por_atender(slug)
         if not fase or not ids:
             continue
         # **Lo aprobado no lo reabre una puerta.** Jaime, 7-9-2026, viendo que

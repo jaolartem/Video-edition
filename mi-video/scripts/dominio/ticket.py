@@ -560,29 +560,6 @@ def recolocar(pieza):
     return n
 
 
-def por_atender(pieza):
-    """`(fase, ids)` de los abiertos que declaran paso y no han vuelto ya.
-
-    **Una vuelta por ticket, no una por corrida.** Es el mismo tope que el
-    repaso: devolver la pieza cada vez que el ticket sigue abierto es un bucle
-    que parece trabajo. Aquí se manda una vez, se anota que se mandó, y si el
-    ticket vuelve abierto lo que corresponde es pararla y decirlo — no volver a
-    mandarla.
-    """
-    abre = [t for t in abiertos(pieza)
-            if (t.get("vuelve_a") or "") and not t.get("devuelto")]
-    if not abre:
-        return "", []
-    # **El que vuelve más atrás, no el primero de la lista.** reel-08, 12-9:
-    # #312 pedía «descrito» y #314 «revalidado»; se cogía el #312, la pieza no
-    # había llegado a su paso (C-407) y `vencidas` la retenía por el #314.
-    from .fase import camino
-    ruta = [f["nombre"] for f in camino()]
-    fase = min((t["vuelve_a"] for t in abre),
-               key=lambda f: ruta.index(f) if f in ruta else len(ruta))
-    return fase, [t["id"] for t in abre if t["vuelve_a"] == fase]
-
-
 def encaminar(id_, fase):
     """Dice a qué paso vuelve la pieza por este ticket. Vuelve a poder volver.
 
@@ -596,6 +573,8 @@ def encaminar(id_, fase):
     cx.execute("update ticket set vuelve_a = ?, devuelto = null where id = ?",
                (fase or "", id_))
     cx.commit()
+    from dominio import puertas  # reencaminar también es el evento (C-411)
+    puertas.del_tiquet_de(id_)
 
 
 def devolver(ids):
