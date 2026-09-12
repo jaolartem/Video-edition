@@ -12,7 +12,7 @@
  */
 import fs from "node:fs";
 import { FPS } from "./reloj.mjs";
-import { anclaDeclarada, cuandoSeDice } from "./anclas.mjs";
+import { anclaDeclarada, cuandoSeDice, ventanaDeclarada } from "./anclas.mjs";
 import { empujaTablero } from "./ocupacion.mjs";
 import { ADELANTO, SOLAPE, duracionTablero } from "./lectura.mjs";
 import { placaDe, precioVigente, sujetoDe } from "./material.mjs";
@@ -98,7 +98,9 @@ export function armarTableros(
       //
       // Si no viene declarado, se ancla al beat como siempre: una pieza vieja no
       // se rompe porque el mecanismo nuevo exista.
-      const at = empuja(anclaDeclarada(b, reloj, captions) ?? reloj.anclaDe(b.beat));
+      const vent = ventanaDeclarada(b, reloj, captions);
+      const at = empuja(vent?.at ?? anclaDeclarada(b, reloj, captions)
+        ?? reloj.anclaDe(b.beat));
       // **Y no se come la etapa siguiente.**
       //
       // El `Math.max` dejaba que un tablero durase lo que su forma pide aunque
@@ -113,7 +115,8 @@ export function armarTableros(
       // forma, y eso lo dice la puerta de legibilidad — no se roba del beat de
       // al lado, donde se esta diciendo otra cosa.
       const suyo = reloj.duracionDe(b.beat) ?? duracionTablero(b.kind, b.props);
-      const dur = Math.min(suyo + SOLAPE, fin - at);
+      const dur = Math.min(suyo + SOLAPE, fin - at,
+        vent?.fin > at ? vent.fin - at : Infinity);
       return {
         at,
         duration: dur,

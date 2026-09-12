@@ -55,6 +55,8 @@ const NO_ES_TEXTO = new Set([
   // MARK, LAND, DRAW, FORK, WHOOSH, DERECHA, PEGATINA y BN (C-422).
   "sonidos", "sujeto", "sujeto_forma", "sujeto_color", "sujeto_src",
   "sujeto_css", "barrido_final", "acento",
+  // Ni la ventana que tapa parte de la etapa (C-426).
+  "entra_con", "sale_con", "desde", "hasta", "cinta",
 ]);
 
 /**

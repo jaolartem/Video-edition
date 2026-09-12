@@ -46,6 +46,30 @@ export function cuandoSeDice(casillas, at, captions) {
 }
 
 /**
+ * **La ventana que tapa sólo parte de la etapa**: `props.ventana` con
+ * `entra_con` / `sale_con` (texto, contra el corte de hoy) o `desde` / `hasta`
+ * (segundos de la pieza). reel-08 e2 tapa sólo los 4 s en que se le ve leyendo;
+ * sin esto el tablero se quedaba los 22 s de la etapa encima de su cara (C-426).
+ * Devuelve `{at, fin}` en frames, cualquiera de los dos puede faltar.
+ */
+export function ventanaDeclarada(b, reloj, captions) {
+  const v = b?.props?.ventana;
+  if (!v || typeof v !== "object") return null;
+  const inicio = reloj.anclaDe(b.beat);
+  const texto = (q) => (typeof q === "string" && q.trim()
+    ? (captions ?? []).filter((c) => c.at >= inicio && String(c.text ?? "")
+        .toLowerCase().includes(q.trim().toLowerCase())) : []);
+  const seg = (n) => (Number.isFinite(Number(n)) && n !== null
+    ? Math.round(Number(n) * FPS) : null);
+  const entra = texto(v.entra_con)[0];
+  const desde = seg(v.desde);
+  const at = entra ? entra.at : (desde == null ? null : Math.max(desde, inicio));
+  const sale = texto(v.sale_con).find((c) => at == null || c.at >= at);
+  const fin = sale ? sale.at + sale.duration : seg(v.hasta);
+  return at == null && fin == null ? null : { at, fin };
+}
+
+/**
  * El frame donde la capa tiene que entrar, si el diseño lo declaró.
  *
  * `props.anclas` son segundos de la PIEZA MONTADA —lo que se oye—, que es la
