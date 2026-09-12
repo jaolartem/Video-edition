@@ -356,8 +356,13 @@ def leidos_declarados(slug: str, por_beat: dict, transcribir) -> list:
             continue
         suyo = any((a := Autor.de(f.get("quien") or "")) is not None
                    and a.tipo == "persona" for f in fs)
-        pide_otra_toma(slug, b, fs[0].get("toma") or "?", lee,
-                       por="el tramo declarado" + (" por Jaime" if suyo else ""))
-        if not suyo:
+        # **Lo de la máquina sale sin tiquet**: entra lo que eligió la selección,
+        # que ya prohíbe lo leído, y si ella tampoco encontró otra toma lo dice
+        # `seleccionar` con su propio tiquet. Pedir la grabación aquí era falso:
+        # reel-10 e1 y reel-11 e3/e4 tenían tomas sin leer en su cinta (12-9).
+        if suyo:
+            pide_otra_toma(slug, b, fs[0].get("toma") or "?", lee,
+                           por="el tramo declarado por Jaime")
+        else:
             fuera.append(b)
     return fuera
