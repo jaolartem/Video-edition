@@ -9,6 +9,7 @@ import { Recuento, type RecuentoProps } from "./Recuento";
 import { Fusion, type FusionProps } from "./Fusion";
 import { Desvio, type DesvioProps } from "./Desvio";
 import { Fichas } from "./Fichas";
+import { LaminaCasillas } from "./LaminaCasillas";
 import { Techo, type TechoProps } from "./Techo";
 import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
 import { PieTablero } from "./PieTablero";
@@ -147,6 +148,9 @@ const laForma = (cue: CueDeTablero, mode: Mode) => {
   if (cue.kind === "Fichas" || cue.kind === "EvidenceCard" ||
       cue.kind === "BandaFecha" || cue.kind === "ListaNumerada")
     return <Fichas props={props} numerada={cue.kind === "ListaNumerada"} />;
+  /** **Casillas que se tachan cuando se dicen**, a cuadro completo. */
+  if (cue.kind === "tachadura" || cue.kind === "Casillas")
+    return <LaminaCasillas props={props} />;
   /**
    * **Y lo demás también se dibuja.** Aquí caían diecinueve formas declaradas
    * por el diseñador y no salía nada — ni en pantalla ni en el log. `TwoPaths`
