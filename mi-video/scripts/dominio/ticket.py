@@ -573,7 +573,13 @@ def por_atender(pieza):
             if (t.get("vuelve_a") or "") and not t.get("devuelto")]
     if not abre:
         return "", []
-    fase = abre[0]["vuelve_a"]
+    # **El que vuelve más atrás, no el primero de la lista.** reel-08, 12-9:
+    # #312 pedía «descrito» y #314 «revalidado»; se cogía el #312, la pieza no
+    # había llegado a su paso (C-407) y `vencidas` la retenía por el #314.
+    from .fase import camino
+    ruta = [f["nombre"] for f in camino()]
+    fase = min((t["vuelve_a"] for t in abre),
+               key=lambda f: ruta.index(f) if f in ruta else len(ruta))
     return fase, [t["id"] for t in abre if t["vuelve_a"] == fase]
 
 
