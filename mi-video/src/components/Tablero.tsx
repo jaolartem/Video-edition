@@ -16,6 +16,7 @@ import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
 import { Recorte, type Forma, type Lado } from "./Recorte";
 import { LadoDelSujeto, ZonaTablero } from "./ZonaTablero";
+import { COLUMNA } from "./panel/sitio";
 import type { Mode } from "../brand/tokens";
 
 /**
@@ -84,12 +85,26 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
       </LadoDelSujeto.Provider>
       {conSujeto ? (
         <ZonaTablero>
-          <Recorte
-            src={src as string}
-            lado={lado}
-            forma={props?.sujeto_forma as Forma | undefined}
-            css={props?.sujeto_css as string | undefined}
-          />
+          {/* **Y el recorte no sale de su columna.** La pegatina mide 980 px y
+              se comía la columna del copy: reel-08 e3, reel-09 e7 y reel-11 e3
+              salieron con la tarjeta de oro o las fichas tapadas (C-443). */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              [lado === "derecha" ? "right" : "left"]: 0,
+              width: COLUMNA.x,
+              overflow: "hidden",
+            }}
+          >
+            <Recorte
+              src={src as string}
+              lado={lado}
+              forma={props?.sujeto_forma as Forma | undefined}
+              css={props?.sujeto_css as string | undefined}
+            />
+          </div>
         </ZonaTablero>
       ) : null}
       <PieTablero linea={props?.pie as string | undefined} />
