@@ -468,7 +468,7 @@ def sin_recibo(pieza=None):
     ahi, diciendo que se atendio algo que nadie miro. Los lee `recibos.py`.
     """
     cx = _con()
-    q = ("select id, pieza, cuando, vuelve_a, cerrado from ticket"
+    q = ("select id, pieza, cuando, vuelve_a, cerrado, quien from ticket"
          " where estado <> 'abierto' and vuelve_a in (?, ?)")
     args = list(RECIBO)
     if pieza:
@@ -476,8 +476,10 @@ def sin_recibo(pieza=None):
         args.append(pieza)
     filas = cx.execute(q + " order by id", args).fetchall()
     cx.close()
+    from .autor import Autor  # lo que cierra una persona no pide recibo (C-415)
     return [dict(f) for f in filas
-            if not recibo(f["pieza"], f["vuelve_a"], f["cuando"])]
+            if not recibo(f["pieza"], f["vuelve_a"], f["cuando"])
+            and getattr(Autor.de(f["quien"] or ""), "tipo", None) != "persona"]
 
 
 def contestar(id_, respuesta, estado="contestado", quien="la linea", medida=""):
