@@ -6,7 +6,8 @@ import { Remate } from "./Remate";
 import type { Recorte } from "./Fondo";
 import { fontFamily } from "./../brand/fonts";
 import { assertShort } from "../brand/copy";
-import { color, duration, ease, readingFrames } from "../brand/tokens";
+import { color, duration, ease, layout, readingFrames } from "../brand/tokens";
+import { ZonaTablero } from "./ZonaTablero";
 
 /**
  * La creencia se tacha y la verdad entra en oro. **Dos cintas, nada más.**
@@ -116,49 +117,64 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
         <Fondo placa={placa} recorte={recorte} fuerza={0.85} deriva={total} />
       ) : null}
 
-      <div style={{ position: "relative", marginBottom: 26 }}>
-        <div
-          style={{
-            opacity: pCreencia,
-            transform: `translateY(${((1 - pCreencia) * 22).toFixed(1)}px)`,
-          }}
-        >
-          <Cinta tinte={color.lightNeutral} giro={-2.4} cuerpo={62}>
-            <span style={{ fontFamily: fontFamily.bloque }}>{creencia}</span>
-          </Cinta>
-        </div>
-        {/**
-         * El filete que la cruza. Va **encima de la cinta y no dentro del
-         * texto**: un `line-through` tipográfico se escala con la fuente y se
-         * pierde a tamaño de móvil; una barra de 8 px se ve siempre.
-         */}
+      {/* **Dentro de la zona del tablero**, para que su recorte tenga sitio:
+          con `sujeto` declarado la línea no lo montaba (reel-08 e2, C-438). */}
+      <ZonaTablero>
         <div
           style={{
             position: "absolute",
-            top: "48%",
-            left: 0,
-            height: 8,
-            width: `${(tacha * 100).toFixed(1)}%`,
-            background: color.richBlack,
-            transform: "rotate(-2.4deg)",
-            transformOrigin: "left center",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            padding: `0 ${layout.safe.left}px`,
           }}
-        />
-      </div>
+        >
+          <div style={{ position: "relative", marginBottom: 26 }}>
+            <div
+              style={{
+                opacity: pCreencia,
+                transform: `translateY(${((1 - pCreencia) * 22).toFixed(1)}px)`,
+              }}
+            >
+              <Cinta tinte={color.lightNeutral} giro={-2.4} cuerpo={62}>
+                <span style={{ fontFamily: fontFamily.bloque }}>{creencia}</span>
+              </Cinta>
+            </div>
+            {/**
+             * El filete que la cruza. Va **encima de la cinta y no dentro del
+             * texto**: un `line-through` tipográfico se escala con la fuente y se
+             * pierde a tamaño de móvil; una barra de 8 px se ve siempre.
+             */}
+            <div
+              style={{
+                position: "absolute",
+                top: "48%",
+                left: 0,
+                height: 8,
+                width: `${(tacha * 100).toFixed(1)}%`,
+                background: color.richBlack,
+                transform: "rotate(-2.4deg)",
+                transformOrigin: "left center",
+              }}
+            />
+          </div>
 
-      <div
-        style={{
-          opacity: pVerdad,
-          transform: `translateY(${((1 - pVerdad) * 22).toFixed(1)}px)`,
-        }}
-      >
-        {/* **`acento` porque aquí no hay otro oro.** Dos bloques planos y la
-            conclusión: si ésta va en claro, el tablero se queda sin sitio por
-            donde entrar. La regla es un acento, no ninguno. Ver `Remate.tsx`. */}
-        <Remate acento giro={1.9} cuerpo={68}>
-          <span style={{ fontFamily: fontFamily.bloque }}>{verdad}</span>
-        </Remate>
-      </div>
+          <div
+            style={{
+              opacity: pVerdad,
+              transform: `translateY(${((1 - pVerdad) * 22).toFixed(1)}px)`,
+            }}
+          >
+            {/* **`acento` porque aquí no hay otro oro.** Dos bloques planos y la
+                conclusión: si ésta va en claro, el tablero se queda sin sitio por
+                donde entrar. La regla es un acento, no ninguno. Ver `Remate.tsx`. */}
+            <Remate acento giro={1.9} cuerpo={68}>
+              <span style={{ fontFamily: fontFamily.bloque }}>{verdad}</span>
+            </Remate>
+          </div>
+        </div>
+      </ZonaTablero>
 
       {/* **La condición ya no se rotula dentro.** Va al pie, fuera de la zona
           segura y en una línea: la monta `dibujaTablero`. Ver
