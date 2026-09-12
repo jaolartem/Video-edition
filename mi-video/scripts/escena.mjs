@@ -281,8 +281,13 @@ export const rotuloDe = (desc) => {
       ? JSON.parse(desc.tablero)
       : desc?.tablero;
     // `lineas` es como lo declara quien pone `kind: "Gancho"` (C-422).
+    // Y `texto` con sus renglones separados por «|» o «/», que es como lo
+    // escribieron reel-11 y reel-17: el gancho salía sin rótulo (C-431).
+    const texto = typeof d?.props?.texto === "string"
+      ? d.props.texto.split(/\s*[|/\n]\s*/) : undefined;
     const r = d?.props?.rotulo ?? d?.rotulo
-      ?? (d?.props?.lineas ? { lineas: d.props.lineas, oro: d.props.oro } : undefined);
+      ?? ((d?.props?.lineas ?? texto)
+        ? { lineas: d.props.lineas ?? texto, oro: d.props.oro } : undefined);
     const suelto = Array.isArray(r) || typeof r === "string";
     const c = suelto ? r : r?.lineas;
     const ls = Array.isArray(c) ? c
@@ -293,7 +298,10 @@ export const rotuloDe = (desc) => {
     const lineas = ls.map(aTexto).filter(Boolean);
     const acento = ls.find((x) => x?.acento === true);
     const o = suelto ? null : (r?.oro ?? (acento ? aTexto(acento) : undefined));
-    const i = typeof o === "number" ? o : lineas.indexOf(String(o ?? "").trim());
+    const q = String(o ?? "").trim();
+    // El oro puede nombrar la palabra y no el renglón («INMIGRANTE»).
+    const i = typeof o === "number" ? o : (lineas.indexOf(q) >= 0 ? lineas.indexOf(q)
+      : (q ? lineas.findIndex((l) => l.includes(q)) : -1));
     return lineas.length ? { lineas, oro: i >= 0 && i < lineas.length ? i : null } : null;
   } catch {
     return null;
