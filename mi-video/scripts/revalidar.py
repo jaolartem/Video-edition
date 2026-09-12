@@ -492,6 +492,14 @@ def rondas(slug, beat, tramos=None, limite=INTENTOS, afinar_ok=True):
     return hist
 
 
+def _alrededor(pal, tramos, margen=12.0):
+    """Las palabras de ±12 s alrededor de la etapa, `palabra[desde-hasta]`."""
+    a = min(x for x, _ in tramos) - margen
+    b = max(y for _, y in tramos) + margen
+    return " ".join(f'{w["text"]}[{w["start"]:.2f}-{w["end"]:.2f}]'
+                    for w in pal if a <= w.get("start", -1) <= b)
+
+
 def dossier(slug):
     """Lo que el LLM necesita para decidir: el texto, sus números y las otras."""
     ruta = f"ads/{slug}/edl-sell.json"
@@ -569,6 +577,11 @@ def dossier(slug):
             # queda armonico o pegado. Ver `saltos`.
             "saltos": saltos(toma, pal, d["tramos"], ultimo),
             "texto": texto,
+            # **Y lo que se dice alrededor, con sus segundos.** Sin esto no se
+            # puede mover un borde fuera del tramo: el 12-9 tres compositores
+            # dejaron tiquets abiertos («falta "por qué"», «entra sin "el
+            # contador es"») por no tener dónde ubicar la palabra.
+            "alrededor": _alrededor(pal, d["tramos"]),
             # **Y las otras candidatas.** Sin esto solo se puede contestar «vale
             # o no vale»; con esto se puede elegir.
             "candidatas": candidatas(slug, beat),
