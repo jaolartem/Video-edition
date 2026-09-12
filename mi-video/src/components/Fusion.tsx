@@ -51,6 +51,8 @@ export type FusionProps = {
   placa?: string;
   recorte?: Recorte;
   sound?: boolean;
+  /** Frames desde el arranque en que se dice cada campo anclado. Lo pone el motor. */
+  tiempos?: Record<string, number | (number | undefined)[] | undefined>;
 };
 
 const ANCHO = layout.width - layout.safe.left * 2;
@@ -70,6 +72,7 @@ export const Fusion: React.FC<FusionProps> = ({
   placa,
   recorte = "lleno",
   sound = false,
+  tiempos,
 }) => {
   const entra = useEntrada();
 
@@ -77,11 +80,17 @@ export const Fusion: React.FC<FusionProps> = ({
   // si llega antes, el espectador no llegó a verlas separadas y no se fusiona
   // nada.
   const tDos = 0;
-  const tFusion = Math.max(24, readingFrames(`${izquierda} ${derecha}`));
+  // **Y si el diseño lo ancló, cuando él lo dice** (C-442): el reloj fijo
+  // metía las fichas 6 a 15 s antes de que se nombraran (reel-11 e3).
+  const t = tiempos ?? {};
+  const uno = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const tFusion = uno(t.fusion) ?? Math.max(24, readingFrames(`${izquierda} ${derecha}`));
   const tsExpone = expone.map(
-    (_e, i) => tFusion + 20 + i * Math.max(14, Math.round(0.6 * 30)),
+    (_e, i) => (Array.isArray(t.expone) ? uno(t.expone[i]) : undefined)
+      ?? tFusion + 20 + i * Math.max(14, Math.round(0.6 * 30)),
   );
-  const tVeredicto = (tsExpone[tsExpone.length - 1] ?? tFusion) + 34;
+  const tVeredicto = uno(t.veredicto)
+    ?? (tsExpone[tsExpone.length - 1] ?? tFusion) + 34;
   const pFusion = entra(tFusion);
 
   const mitad = (texto: string, lado: "izq" | "der") => {

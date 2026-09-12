@@ -46,6 +46,31 @@ export function cuandoSeDice(casillas, at, captions) {
 }
 
 /**
+ * **Cada campo anclado a su palabra, en frames desde el arranque del tablero.**
+ *
+ * `anclas: {fusion: "la misma cosa", expone: ["sus deudas", …]}` lo declaraba
+ * el diseñador y nadie lo resolvía: en reel-11 e3 las fichas entraban con un
+ * reloj fijo, 6 a 15 s antes de que él las nombrara (C-442). Vuelve
+ * `{campo: frames}` o `{campo: [frames]}`; lo que no se encuentra no está.
+ */
+export function tiemposDe(anclas, at, captions) {
+  if (!anclas || typeof anclas !== "object" || Array.isArray(anclas)) return undefined;
+  const cuando = (q) => {
+    if (typeof q !== "string" || !q.trim()) return undefined;
+    const t = q.trim().toLowerCase();
+    const cue = (captions ?? []).find((c) => c.at >= at &&
+      String(c.text ?? "").toLowerCase().includes(t));
+    return cue ? cue.at - at : undefined;
+  };
+  const fuera = {};
+  for (const [k, v] of Object.entries(anclas)) {
+    const r = Array.isArray(v) ? v.map(cuando) : cuando(v);
+    if (Array.isArray(r) ? r.some((x) => x != null) : r != null) fuera[k] = r;
+  }
+  return Object.keys(fuera).length ? fuera : undefined;
+}
+
+/**
  * **La ventana que tapa sólo parte de la etapa**: `props.ventana` con
  * `entra_con` / `sale_con` (texto, contra el corte de hoy) o `desde` / `hasta`
  * (segundos de la pieza). reel-08 e2 tapa sólo los 4 s en que se le ve leyendo;

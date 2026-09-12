@@ -12,7 +12,7 @@
  */
 import fs from "node:fs";
 import { FPS } from "./reloj.mjs";
-import { anclaDeclarada, cuandoSeDice, ventanaDeclarada } from "./anclas.mjs";
+import { anclaDeclarada, cuandoSeDice, tiemposDe, ventanaDeclarada } from "./anclas.mjs";
 import { empujaTablero } from "./ocupacion.mjs";
 import { ADELANTO, SOLAPE, duracionTablero } from "./lectura.mjs";
 import { placaDe, precioVigente, sujetoDe } from "./material.mjs";
@@ -153,6 +153,9 @@ export function armarTableros(
                  // dicen: sólo los paneles lo hacían, y reel-04 e5 salía sin tachar.
                  ...(Array.isArray(b.props?.casillas)
                    ? { casillas: cuandoSeDice(b.props.casillas, at, captions) } : {}),
+                 // Y cada campo anclado, cuando se dice (C-442).
+                 ...(tiemposDe(b.props?.anclas, at, captions)
+                   ? { tiempos: tiemposDe(b.props.anclas, at, captions) } : {}),
                  placa: b.props?.placa ?? placaDe(slug),
                  // **A cuadro completo la placa LLENA el cuadro.**
                  //
