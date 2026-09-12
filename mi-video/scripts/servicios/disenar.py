@@ -84,6 +84,11 @@ BASE = "ads/decisiones.db"
 #: contrato lo dice al comprobar la aguja.
 TIPO = ("versales", "el tipo es", "la frase entera", "solo texto", "nada mas")
 
+#: Lo de presentación que el diseñador declara a veces junto a `kind` y que el
+#: render lee de `props` (C-418).
+PRESENTACION = ("sujeto", "sujeto_forma", "sujeto_color", "cubre", "familia",
+                "placa", "recorte")
+
 
 def _con():
     c = basedatos.abrir(BASE)
@@ -546,6 +551,10 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
         # antiguas que solo lo tienen; `scripts/reels/cifras.mjs` lee los dos.
         if t.get("fuente") and t["fuente"] != "sin cifra":
             props = {**props, "source": t["fuente"], "pie": t["fuente"]}
+        # **Y lo de presentación entra en `props` venga donde venga.** reel-08
+        # e3 trajo `sujeto` junto a `kind`, no dentro de `props`: se perdió su
+        # cara y el render se paró por T-06 (12-9, C-418).
+        props = {**{k: t[k] for k in PRESENTACION if k in t}, **props}
         # **Y se guarda CONTRA QUÉ encargo se compuso.** La huella va dentro de
         # la misma escritura —`guardar_tablero`— porque separarlas es cómo se
         # olvida: un tablero sin huella es un tablero que nadie puede saber si
