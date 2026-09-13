@@ -158,8 +158,21 @@ class Habla:
                 # trabajo el uno al otro.
                 if p.acaba - x <= ATAQUE + 0.005:
                     return x
-                return p.empieza if (x - p.empieza) / max(p.dura, 1e-6) < 0.5 \
-                    else p.acaba
+                # **Y la entrada también la juzga la onda** (C-481). Si justo
+                # antes ya no suena, la palabra de delante acabó: el transcript
+                # la estiraba sobre el silencio y esto movía 272,30 —dentro del
+                # silencio antes de «sin» en reel-16— a 272,528, comiéndose
+                # «si-».
+                if _bo.callado_antes(self.cinta, x):
+                    return x
+                if (x - p.empieza) / max(p.dura, 1e-6) >= 0.5:
+                    return p.acaba
+                # Llevarla al arranque de la palabra, pero **al arranque que se
+                # oye**: dos palabras dichas de un tirón vienen pegadas en el
+                # transcript y su frontera puede caer aún en la de delante. Se
+                # busca la caída de energía en los primeros 80 ms.
+                q = _bo.mas_quieto(self.cinta, p.empieza, p.empieza + ATAQUE)
+                return q if q is not None and q < p.acaba else p.empieza
             return p.acaba if (x - p.empieza) / max(p.dura, 1e-6) > 0.5 \
                 else p.empieza
         return x

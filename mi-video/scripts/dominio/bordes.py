@@ -82,6 +82,46 @@ def callado(toma, t):
     return db is not None and db <= VOZ
 
 
+def callado_antes(toma, t):
+    """¿La cinta está callada justo ANTES de `t`? La otra mitad de `callado`.
+
+    Para una entrada: si ahí ya no suena, la palabra anterior acabó, diga lo que
+    diga el transcript, que la estira sobre el silencio (C-481).
+    """
+    mp4 = rutas.cinta(toma) if toma else None
+    if not mp4 or not os.path.exists(mp4):
+        return False
+    db = _db(mp4, t - MIRADA, MIRADA)
+    return db is not None and db <= VOZ
+
+
+def mas_quieto(toma, desde, hasta, ventana=0.02, paso=0.005):
+    """El instante más callado de la cinta entre `desde` y `hasta`, a 16 kHz.
+
+    Para una entrada entre dos palabras dichas de un tirón: el transcript las da
+    pegadas y su frontera puede caer todavía en la anterior. En reel-16 e2 ponía
+    «porque» en 217,091 con «presta» sonando a -14,5 dB, y la caída real —el
+    cierre de la /p/— estaba en 217,14 (-20,8 dB). `None` si no se pudo medir.
+    """
+    mp4 = rutas.cinta(toma) if toma else None
+    if not mp4 or not os.path.exists(mp4) or hasta <= desde:
+        return None
+    crudo = subprocess.run(
+        ["ffmpeg", "-v", "error", "-ss", f"{max(0.0, desde):.3f}",
+         "-t", f"{hasta - desde + ventana:.3f}", "-i", mp4, "-vn", "-ac", "1",
+         "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
+    import numpy as np
+
+    x = np.frombuffer(crudo, dtype=np.int16).astype(float) / 32768
+    w, h = int(ventana * 16000), int(paso * 16000)
+    if len(x) < w:
+        return None
+    rms = [(float(np.sqrt((x[i:i + w] ** 2).mean())), i)
+           for i in range(0, len(x) - w + 1, h)]
+    _, i = min(rms)
+    return round(desde + (i + w / 2) / 16000, 3)
+
+
 def sucios(slug):
     """Los cortes que caen encima de la voz. Lista vacía = ninguno.
 
