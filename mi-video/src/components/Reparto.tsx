@@ -2,6 +2,7 @@ import React from "react";
 import { assertShort } from "../brand/copy";
 import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
+import { cuerpoQueCabe } from "../brand/medida";
 import { color } from "../brand/tokens";
 import { MotionSound } from "./MotionSound";
 
@@ -180,8 +181,13 @@ export const Reparto: React.FC<{
                 top: 22,
                 width: Math.max(w - TAJO, 0),
                 textAlign: "center",
+                whiteSpace: "nowrap",
                 fontFamily: fontFamily.bloque,
-                fontSize: 84,
+                // **La cifra cabe en su porción.** Con el «%» detrás (C-454)
+                // «46,47%» se salía por la derecha de su caja (reel-15 e3,
+                // C-469): el cuerpo baja hasta caber, con 84 de tope.
+                fontSize: cuerpoQueCabe({ ancho: Math.max(w - TAJO - 16, 40),
+                  largo: cifra.length, registro: "anton", tope: 84 }),
                 lineHeight: 1,
                 color: p.foco ? color.richBlack : color.lightNeutral,
                 opacity: abre,

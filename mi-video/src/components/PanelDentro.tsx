@@ -300,15 +300,22 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
             el gancho, y la lámina deja de ser dos columnas que se ignoran.
             Sangra por su borde: entero dentro del cuadro sería pegatina. */}
         {sujeto_src ? (
-          <Recorte
-            src={sujeto_src}
-            lado={sujeto}
-            css={sujeto_css}
-            // **Él no se barre.** El remate lo fundía al 10 % y quedaba su
-            // sombra: reel-15 e3 pasó 6 s con un fantasma de su cara (C-461).
-            // Desde el 10-9 todo tablero lleva su cara, también en el remate.
-            entra={entra(H.el, 18)}
-          />
+          // **Y lo suyo de debajo de la banda se recoge con el remate.** La
+          // banda (C-467) le cortaba por la cintura y dejaba sueltos la pierna y
+          // la manta bajo ella (reel-15 e3, 23,8–28,3 s; C-469): se recorta por
+          // arriba del remate a medida que entra, y la cabeza sigue entera.
+          <div style={{ position: "absolute", inset: 0,
+                        clipPath: `inset(0 0 calc((100% - 620px) * ${barre.toFixed(3)}) 0)` }}>
+            <Recorte
+              src={sujeto_src}
+              lado={sujeto}
+              css={sujeto_css}
+              // **Él no se barre.** El remate lo fundía al 10 % y quedaba su
+              // sombra: reel-15 e3 pasó 6 s con un fantasma de su cara (C-461).
+              // Desde el 10-9 todo tablero lleva su cara, también en el remate.
+              entra={entra(H.el, 18)}
+            />
+          </div>
         ) : null}
       </ZonaTablero>
 
