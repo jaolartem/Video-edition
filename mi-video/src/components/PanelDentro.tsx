@@ -300,7 +300,10 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
             src={sujeto_src}
             lado={sujeto}
             css={sujeto_css}
-            entra={entra(H.el, 18) * (1 - barre * 0.9)}
+            // **Él no se barre.** El remate lo fundía al 10 % y quedaba su
+            // sombra: reel-15 e3 pasó 6 s con un fantasma de su cara (C-461).
+            // Desde el 10-9 todo tablero lleva su cara, también en el remate.
+            entra={entra(H.el, 18)}
           />
         ) : null}
       </ZonaTablero>
