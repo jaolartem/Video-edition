@@ -148,6 +148,13 @@ class ServicioVisto(Servicio):
         d = dossier(pieza)
         if d is None:
             return Resultado(False, motivo="no hay fichero entregado")
+        # **Con todos sus tramos aprobados no hay nada que mirar.** Jaime: *«si un
+        # tramo está bien nunca más pasa por diseñador»*. reel-11 volvió a pedir
+        # visto con las seis etapas firmadas (C-456).
+        from dominio.segmento import Segmento
+        segs = Segmento.de(pieza.slug)
+        if segs and all(s.aprobado for s in segs):
+            return Resultado(True, salida="todos sus tramos están aprobados")
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
         # **Y va por su propia carpeta, no por la de `disenar`.**
