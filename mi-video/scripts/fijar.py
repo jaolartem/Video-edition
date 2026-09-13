@@ -103,7 +103,7 @@ def fijados(slug):
     from dominio.libreto import origen_de
 
     sql = ("select cf.id, cf.orden beat, cf.desde, cf.hasta, cf.toma, cf.por_que,"
-           " cf.huella, cf.quien"
+           " cf.huella, cf.quien, cf.fecha"
            "  from corte_fijo cf join video v on v.id = cf.video_id"
            " where v.slug = ? and cf.papel = 'etapa' order by cf.orden, cf.desde")
     con = _con()
@@ -521,11 +521,22 @@ def aplicar(slug, solo=None):
     # Con el id se distinguen los dos casos que hay que distinguir: si en el EDL
     # estan todas las declaraciones de hoy, la etapa esta hecha —y lo que otro
     # paso haya recortado por dentro se respeta—; si falta una, es nueva y entra.
+    #
+    # **Y el id no basta: la base lo reutiliza** (C-484). `declarar` borra y
+    # vuelve a insertar, y sin AUTOINCREMENT las filas nuevas heredan los ids
+    # de las que acaba de borrar. En reel-16 e2 la declaración de las 16:36
+    # (217,161 y 272,30) salió con los mismos 4917 y 4918 que la anterior, y
+    # esto la dio por puesta: el EDL siguió con 217,091 y 272,528 y el render
+    # volvió a decir «presta». Así que se compara también la fecha de la
+    # declaración, que se estampa al aplicar. Un EDL de antes, sin fecha, se da
+    # por bueno como hasta ahora: no se rehace lo aprobado por una marca nueva.
     ya = set()
     for b_, fs in por_beat.items():
         suyos = [d for d in edl["detalle"] if d.get("beat") == b_]
         puestas = {d.get("fijado") for d in suyos}
-        if suyos and {f["id"] for f in fs} <= puestas:
+        vigentes = all(d.get("fijado_fecha") in (None, f.get("fecha"))
+                       for f in fs for d in suyos if d.get("fijado") == f["id"])
+        if suyos and {f["id"] for f in fs} <= puestas and vigentes:
             ya.add(b_)
     for b_ in ya:
         por_beat.pop(b_, None)
@@ -552,7 +563,8 @@ def aplicar(slug, solo=None):
                              if transcribir.suena(w, f["desde"], f["hasta"]))
             segs.append([round(f["desde"], 3), round(f["hasta"], 3)])
             det.append({**d, "toma": toma, "texto": texto,
-                        "fijado": f["id"], "por_que": f["por_que"]})
+                        "fijado": f["id"], "fijado_fecha": f.get("fecha"),
+                        "por_que": f["por_que"]})
         puestos.add(b)
         hechos.append(b)
     # Las etapas fijadas que no estaban en el EDL —las que se habían quedado sin
@@ -570,7 +582,7 @@ def aplicar(slug, solo=None):
                              if transcribir.suena(w, f["desde"], f["hasta"]))
             segs.append([round(f["desde"], 3), round(f["hasta"], 3)])
             det.append({"beat": b, "toma": toma, "texto": texto, "fijado": f["id"],
-                        "por_que": f["por_que"]})
+                        "fijado_fecha": f.get("fecha"), "por_que": f["por_que"]})
         hechos.append(b)
     # **Una etapa que vuelve al EDL vuelve con su camino.**
     #

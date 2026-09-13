@@ -21,12 +21,8 @@ toca aquí.
     python scripts/avanzar.py --paso 1   # un salto por pieza
 """
 import argparse
-import datetime
 import os
-import shutil
-import subprocess
-import sqlite3
-import basedatos
+import basedatos  # noqa: F401 — se abre la base al importar el lanzador
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
