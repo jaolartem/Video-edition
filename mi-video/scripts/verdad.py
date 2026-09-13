@@ -198,7 +198,7 @@ VERDADES = (
         decision="Una cifra que sale en pantalla",
         vive_en="tabla `dato`, con su fuente y su condición",
         lee=(Aguja("scripts/verificar.py", "y ninguna fila de"),
-             Aguja("scripts/reels/cifras.mjs", "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d"),),
+             Aguja("scripts/reels/cifras.mjs", "servicio._respaldos(sys.argv[1])"),),
         copia="La descripción puede nombrarla en prosa, pero **no puede"
               " rotular un importe que `dato` no declare**: la puerta lo para.",
         costo="Jaime cerró $14.000 —«los 300 los quité porque complica las"
