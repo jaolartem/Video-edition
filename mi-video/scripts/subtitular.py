@@ -51,6 +51,14 @@ def trozos(wav):
     4,17 y 4,24 s, y el subtítulo del gancho se quedó congelado cuatro segundos
     y se saltó una línea. Los mismos diez segundos transcritos solos salen con
     cada palabra en su sitio, medidos contra los silencios del audio.
+
+    **Y cada trozo empieza donde empieza su silencio, no en su medio** (C-486).
+    Partido en el medio, el trozo de reel-12 arrancaba 0,4 s antes de «No
+    excepcional» y whisper estiraba las primeras palabras: «más que nunca» salía
+    a 24,46 s cuando la voz lo dice a 21,4, y la línea anterior se quedaba cinco
+    segundos quieta. Con el silencio entero delante, cae a 21,38. El anterior
+    sigue acabando en el medio, así que lo que comparten es silencio: ninguna
+    palabra sale dos veces.
     """
     r = subprocess.run(["ffmpeg", "-v", "info", "-i", wav, "-af",
                         "silencedetect=noise=-35dB:d=0.3", "-f", "null", "-"],
@@ -58,14 +66,15 @@ def trozos(wav):
     ini = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", r.stderr)]
     fin = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", r.stderr)]
     dura = os.path.getsize(wav) / 32000        # 16 kHz, mono, 16 bit
-    medios = [(a + b) / 2 for a, b in zip(ini, fin)]
+    silencios = [(a, (a + b) / 2) for a, b in zip(ini, fin)]
     cortes, desde = [], 0.0
     while dura - desde > TROZO:
-        dentro = [m for m in medios if desde + 4 < m <= desde + TROZO]
-        desde = dentro[-1] if dentro else desde + TROZO
-        cortes.append(desde)
-    bordes = [0.0] + cortes + [dura]
-    return list(zip(bordes, bordes[1:]))
+        dentro = [s for s in silencios if desde + 4 < s[1] <= desde + TROZO]
+        entra, desde = dentro[-1] if dentro else (desde + TROZO, desde + TROZO)
+        cortes.append((entra, desde))
+    entradas = [0.0] + [e for e, _ in cortes]
+    salidas = [m for _, m in cortes] + [dura]
+    return list(zip(entradas, salidas))
 
 
 def transcribir(mp4, wav, base):
