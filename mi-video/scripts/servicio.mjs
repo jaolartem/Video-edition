@@ -101,9 +101,11 @@ export function leeRespuesta(paso, slug, abiertos = []) {
   // pregunta** (C-487). reel-12, 13-9: el #457 la mandó a «descrito» y aquí
   // esperaba la respuesta del 12-9, anterior al tiquet. Se aplicó, la pieza
   // siguió y el tiquet quedó varado. Se aparta y se vuelve a preguntar.
-  const cubre = new Set(hecha.flatMap((d) => d?.tiquets ?? [])
-    .map((t) => Number(typeof t === "object" ? t?.id : t)));
-  if (abiertos.some((i) => !cubre.has(Number(i)))) {
+  // Los ids viajan como `457` en la respuesta y como `t457` en el pedido (los
+  // de la tabla `ticket`), así que se comparan por su número.
+  const num = (t) => String(typeof t === "object" ? t?.id : t).replace(/\D/g, "");
+  const cubre = new Set(hecha.flatMap((d) => d?.tiquets ?? []).map(num));
+  if (abiertos.some((i) => !cubre.has(num(i)))) {
     apartaRespuesta(paso, slug, "desfasada");
     return null;
   }
