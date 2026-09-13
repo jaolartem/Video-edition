@@ -651,6 +651,18 @@ def _devuelve(slug: str, paso: str) -> None:
             return
     except Exception:                              # noqa: BLE001
         pass
+    # **Y devolver no adelanta** (C-483), la misma regla que la puerta del
+    # tiquet (`puertas._no_ha_llegado`). Si un tiquet mandó la pieza más atrás
+    # que el paso de esta respuesta, llegará a él sola y la leerá entonces.
+    # Moverla aquí la saltaba por encima del paso del tiquet, y el tiquet se
+    # quedaba «ya devuelto» y sin atender: reel-16 #421 y reel-12 #449
+    # (13-9), las dos paradas con «su paso ya quedo atras» y sin pedido.
+    try:
+        from dominio.puertas import _no_ha_llegado
+        if _no_ha_llegado(int(slug[-2:]), fase):
+            return
+    except Exception:                              # noqa: BLE001
+        pass
     con = _con()
     destino = con.execute("select id from fase where nombre = ?",
                           (fase,)).fetchone()
