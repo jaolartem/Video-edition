@@ -157,6 +157,12 @@ export function armarTableros(
                  ...(tiemposDe(b.props?.anclas, at, captions)
                    ? { tiempos: tiemposDe(b.props.anclas, at, captions) } : {}),
                  placa: b.props?.placa ?? placaDe(slug),
+                 // **Sobre collage su recorte es pegatina, no cuadro.** Jaime,
+                 // 11-9: el cuadro es de los tableros formales. Desde C-436
+                 // todo tablero de estas piezas lleva placa, y el cuadro se
+                 // devolvía en cada visto (reel-10 e3, reel-13 e5; C-453).
+                 ...(b.props?.sujeto_forma === "cuadro" && (b.props?.placa ?? placaDe(slug))
+                   ? { sujeto_forma: "pegatina" } : {}),
                  // **A cuadro completo la placa LLENA el cuadro.**
                  //
                  // El recorte geometrico —cuna, columna, esquina— es canon
