@@ -199,6 +199,8 @@ export function armarTableros(
                        // tablero anclado a mitad de etapa enseñaba otro momento
                        // (desfasado de la voz), y `sujeto_desde` deja elegir uno
                        // en que no esté leyendo (reel-08 e2, C-451).
+                       sujeto_quieto: Number.isFinite(Number(b.props?.sujeto_desde))
+                         && b.props?.sujeto_desde !== null,
                        sujeto_trim: Math.max(0, Math.round(
                          (Number.isFinite(Number(b.props?.sujeto_desde))
                            ? Number(b.props.sujeto_desde) * FPS : at)

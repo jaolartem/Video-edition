@@ -17,6 +17,7 @@ import { TableroDeclarado } from "./TableroDeclarado";
 import { Recorte, type Forma, type Lado } from "./Recorte";
 import { LadoDelSujeto, ZonaTablero } from "./ZonaTablero";
 import { COLUMNA } from "./panel/sitio";
+import { Freeze } from "remotion";
 import type { Mode } from "../brand/tokens";
 
 /**
@@ -98,13 +99,19 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
               overflow: "hidden",
             }}
           >
-            <Recorte
-              src={src as string}
-              lado={lado}
-              forma={props?.sujeto_forma as Forma | undefined}
-              css={props?.sujeto_css as string | undefined}
-              trim={props?.sujeto_trim as number | undefined}
-            />
+            {/* **Y si el diseño eligió su momento, se queda en él.** Con
+                `sujeto_desde` el recorte arrancaba bien y seguía corriendo hasta
+                la lectura que venía a tapar (reel-08 e2, C-459): quieto es una
+                pegatina, que es lo que pide el collage. */}
+            <Freeze frame={0} active={props?.sujeto_quieto === true}>
+              <Recorte
+                src={src as string}
+                lado={lado}
+                forma={props?.sujeto_forma as Forma | undefined}
+                css={props?.sujeto_css as string | undefined}
+                trim={props?.sujeto_trim as number | undefined}
+              />
+            </Freeze>
           </div>
         </ZonaTablero>
       ) : null}
