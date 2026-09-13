@@ -225,6 +225,15 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
         vistos[x] = (x, y, tk)
         orden.append(x)
     tramos = [vistos[k] for k in orden]
+    # **Y el ajuste no cruza al vecino** (C-488). `_a_la_voz` mueve cada tramo
+    # sin ver el de al lado: en reel-12 e4 llevó la entrada de 335,927 a
+    # 335,807, 9 ms antes de la salida del anterior (335,816), y verificar paró
+    # la pieza dos vueltas por «tramos que se pisan». Si el siguiente de la misma
+    # cinta empieza dentro del anterior, entra donde aquel sale.
+    for i in range(1, len(tramos)):
+        (pa, pb, pk), (x, y, tk) = tramos[i - 1], tramos[i]
+        if tk == pk and pa < x < pb < y:
+            tramos[i] = (pb, y, tk)
     if not tramos:
         return {"error": f"{slug} e{beat}: los tramos propuestos no tienen voz"}
     # La medida se hace sobre la cinta principal —la que mas segundos aporta—,
