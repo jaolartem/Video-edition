@@ -16,11 +16,20 @@
  */
 import { FPS } from "./reloj.mjs";
 
-/** El primer subtítulo que dice `q`, o `null`. `q` ya viene en minúsculas. */
+/**
+ * **Un ancla y un subtítulo se comparan escritos igual** (C-476). El ancla es lo
+ * que se DICE —«250 mil»— y el subtítulo escribe la cifra —«250.000»—, así que
+ * el ancla de la cifra de reel-13 e6 no casaba con nada y se perdía en silencio:
+ * la cifra seguía cayendo al 34 % del tablero. Minúsculas, y las cifras sin
+ * separador de miles y con «mil» desplegado.
+ */
+export const plano = (s) => String(s ?? "").toLowerCase()
+  .replace(/(\d)[.,\s](?=\d{3}\b)/g, "$1")
+  .replace(/(\d+)\s*mil\b/g, (_, n) => `${n}000`);
+
+/** El primer subtítulo que dice `q`, o `null`. */
 const donde = (captions, q) =>
-  (captions ?? []).find((c) =>
-    String(c.text ?? "").toLowerCase().includes(q),
-  ) ?? null;
+  (captions ?? []).find((c) => plano(c.text).includes(plano(q))) ?? null;
 
 /**
  * **Cada casilla se resuelve CUANDO SE DICE, no a tiempo de lectura.**
@@ -57,9 +66,8 @@ export function tiemposDe(anclas, at, captions) {
   if (!anclas || typeof anclas !== "object" || Array.isArray(anclas)) return undefined;
   const cuando = (q) => {
     if (typeof q !== "string" || !q.trim()) return undefined;
-    const t = q.trim().toLowerCase();
-    const cue = (captions ?? []).find((c) => c.at >= at &&
-      String(c.text ?? "").toLowerCase().includes(t));
+    const t = plano(q.trim());
+    const cue = (captions ?? []).find((c) => c.at >= at && plano(c.text).includes(t));
     return cue ? cue.at - at : undefined;
   };
   const fuera = {};
@@ -82,8 +90,8 @@ export function ventanaDeclarada(b, reloj, captions) {
   if (!v || typeof v !== "object") return null;
   const inicio = reloj.anclaDe(b.beat);
   const texto = (q) => (typeof q === "string" && q.trim()
-    ? (captions ?? []).filter((c) => c.at >= inicio && String(c.text ?? "")
-        .toLowerCase().includes(q.trim().toLowerCase())) : []);
+    ? (captions ?? []).filter((c) => c.at >= inicio
+        && plano(c.text).includes(plano(q.trim()))) : []);
   const seg = (n) => (Number.isFinite(Number(n)) && n !== null
     ? Math.round(Number(n) * FPS) : null);
   const entra = texto(v.entra_con)[0];
