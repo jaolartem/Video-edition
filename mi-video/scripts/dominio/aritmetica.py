@@ -147,6 +147,13 @@ class Aritmetica:
                 vad[b.t.cinta] = Cinta(b.t.cinta).habla()
             pisos = [y + 0.01 for _, y in vad[b.t.cinta]
                      if y <= b.t.desde + 0.001]
+            # **Sin silencio detrás no hay ataque que respirar** (C-470). La voz
+            # de 215,35 a 219,40 cruzaba la entrada declarada de reel-16 e2 en
+            # 217,091, y los 80 ms fueron a la cola de «presta»: el subtítulo
+            # quedó en «No, le presta porque…», que dice lo contrario.
+            if any(x < b.t.desde - 0.01 and y > b.t.desde
+                   for x, y in vad[b.t.cinta]):
+                pisos.append(b.t.desde)
             if i and tij.tramo(i - 1).cinta == b.t.cinta:
                 pisos.append(tij.tramo(i - 1).hasta + 0.01)
             hecho = b.con_ataque(max(pisos) if pisos else None)
