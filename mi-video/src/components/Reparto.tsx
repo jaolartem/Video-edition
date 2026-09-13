@@ -146,7 +146,11 @@ export const Reparto: React.FC<{
         // Cada porción entra después de la anterior, y ninguna antes de que el
         // riel esté trazado del todo.
         const abre = entra(desde + 14 + i * PASO, 12);
-        const cifra = `${signo}${p.valor}`;
+        // **El porcentaje va detrás y con coma**: «53,53%», no «%53.53» —
+        // `signo` se escribió para «$», que va delante (reel-15 e3, C-454).
+        const cifra = signo === "%"
+          ? `${String(p.valor).replace(".", ",")}%`
+          : `${signo}${p.valor}`;
         return (
           <React.Fragment key={p.rotulo}>
             <div
