@@ -92,11 +92,14 @@ export const camposDe = (nombre) => {
   // `statement` (C-432). Si el tipo del elemento está en el mismo fichero, se
   // añaden sus campos como `nodes[].stage`.
   for (const [k, v] of Object.entries({ ...fuera })) {
-    const el = String(v).match(/^(\w+)\[\]/);
-    const dentro = el && (tipoDe(t, el[1]) ?? tipoDe(t, `${el[1]}Base`));
+    const el = String(v).match(/^(\w+)(\[\])?/);
+    const dentro = el && /^[A-Z]/.test(el[1]) &&
+      (tipoDe(t, el[1]) ?? tipoDe(t, `${el[1]}Base`));
+    // `[]` si es lista (`nodes[].stage`); si es un objeto, `izquierda.titulo`:
+    // la columna de `Comparacion` se declaró con `etiqueta` y `nota` (C-457).
     if (dentro)
       for (const [k2, v2] of Object.entries(dentro))
-        fuera[`${k.replace("?", "")}[].${k2}`] = v2;
+        fuera[`${k.replace("?", "")}${el[2] ? "[]" : ""}.${k2}`] = v2;
   }
   return fuera;
 };

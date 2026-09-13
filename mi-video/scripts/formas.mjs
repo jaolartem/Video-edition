@@ -484,7 +484,13 @@ const sinSusCampos = (kind, props) => {
           return Array.isArray(p[lista]) &&
             p[lista].some((x) => x && typeof x === "object" && x[dentro] == null);
         })()
-      : p[c] == null));
+      // Y lo de dentro de un objeto declarado, si está (C-457).
+      : c.includes(".")
+        ? (() => {
+            const [obj, dentro] = c.split(".");
+            return p[obj] && typeof p[obj] === "object" && p[obj][dentro] == null;
+          })()
+        : p[c] == null));
   return faltan.length
     ? [`«${nombre}» se declara con ${Object.keys(campos).join(", ")} y le faltan ` +
        `${faltan.join(", ")}: con otro nombre no llega a la pantalla`]
