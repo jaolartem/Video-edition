@@ -75,7 +75,15 @@ def dossier(pieza: Pieza) -> dict | None:
     if not os.path.exists(mp4):
         return None
 
-    d = {"pieza": pieza.slug, "fichero": os.path.basename(mp4)}
+    # **Y de qué render es.** Los fotogramas se reescriben con el mismo nombre,
+    # así que un render nuevo dejaba el pedido idéntico y una respuesta mirada
+    # sobre el anterior se aplicaba al nuevo (reel-08, 13-9: «el recorte sigue
+    # corriendo» sobre fotogramas de las 23:20 con el de las 00:05 ya quieto;
+    # C-460). La fecha del fichero lo hace otra pregunta.
+    import time
+    d = {"pieza": pieza.slug, "fichero": os.path.basename(mp4),
+         "render_de": time.strftime("%Y-%m-%d %H:%M:%S",
+                                    time.localtime(os.path.getmtime(mp4)))}
     # Lo que ya aprobaste contra este corte no se vuelve a mirar.
     from dominio.segmento import Segmento
 
