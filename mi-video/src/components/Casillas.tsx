@@ -162,14 +162,16 @@ export const Casillas: React.FC<CasillasProps> = ({
     : desde;
   for (const c of casillas) {
     const conSuPalabra = conVoz && typeof c.en === "number";
-    const entraEn = conSuPalabra
-      ? Math.max(t, desde + (c.en as number) - duration.entry) : t;
+    // **Entra en su palabra, no antes** (C-480): arrancar la entrada 0,4 s antes
+    // del ancla dejaba «CRECER CON ESTRATEGIA» entera en pantalla con el
+    // subtítulo todavía en «usted tiene que conocer las».
+    const entraEn = conSuPalabra ? Math.max(t, desde + (c.en as number)) : t;
     t = entraEn + paso(c);
     // **Y la que entra con su palabra se resuelve con ella, no una lectura
     // después** (C-477): en reel-14 e5 el sello de «crecer» caía tras el final
-    // de la etapa y la casilla de oro no llegaba a verse en oro.
+    // de la etapa. La sellada entra ya en oro.
     r = conSuPalabra
-      ? Math.max(r, entraEn + duration.entry, desde + (c.en as number))
+      ? Math.max(r, entraEn)
       : Math.max(r, t, typeof c.en === "number" ? desde + c.en : 0);
     horario.push({ entra: entraEn, resuelve: r });
     r += TACHA;
