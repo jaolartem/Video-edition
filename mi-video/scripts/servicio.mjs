@@ -93,10 +93,21 @@ export function marcador(slug) {
 }
 
 /** Lo que el servicio dejó contestado, o `null` si todavía no hay nada. */
-export function leeRespuesta(paso, slug) {
+export function leeRespuesta(paso, slug, abiertos = []) {
   const r = rutaRespuesta(paso, slug);
   if (!fs.existsSync(r)) return null;
-  return desenvuelve(JSON.parse(fs.readFileSync(r, "utf8")));
+  const hecha = desenvuelve(JSON.parse(fs.readFileSync(r, "utf8")));
+  // **Y la que no nombra los tiquets abiertos de su paso contesta a otra
+  // pregunta** (C-487). reel-12, 13-9: el #457 la mandó a «descrito» y aquí
+  // esperaba la respuesta del 12-9, anterior al tiquet. Se aplicó, la pieza
+  // siguió y el tiquet quedó varado. Se aparta y se vuelve a preguntar.
+  const cubre = new Set(hecha.flatMap((d) => d?.tiquets ?? [])
+    .map((t) => Number(typeof t === "object" ? t?.id : t)));
+  if (abiertos.some((i) => !cubre.has(Number(i)))) {
+    apartaRespuesta(paso, slug, "desfasada");
+    return null;
+  }
+  return hecha;
 }
 
 /**
@@ -136,14 +147,14 @@ export function desenvuelve(d) {
  * Se aparta con su marca para poder mirarla, y el pedido se queda: la pregunta
  * sigue siendo buena, lo que falló fue la contestación.
  */
-export function apartaRespuesta(paso, slug) {
+export function apartaRespuesta(paso, slug, marca = "rechazada") {
   const dir = `${RAIZ}/${paso}/usadas`;
   const r = rutaRespuesta(paso, slug);
   if (!fs.existsSync(r)) return null;
   fs.mkdirSync(dir, { recursive: true });
   let n = 1;
-  while (fs.existsSync(`${dir}/${slug}.${n}.rechazada.json`)) n += 1;
-  const destino = `${dir}/${slug}.${n}.rechazada.json`;
+  while (fs.existsSync(`${dir}/${slug}.${n}.${marca}.json`)) n += 1;
+  const destino = `${dir}/${slug}.${n}.${marca}.json`;
   fs.renameSync(r, destino);
   return destino;
 }

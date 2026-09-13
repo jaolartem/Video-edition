@@ -92,7 +92,8 @@ function describePieza(slug, filas) {
   // entero —`escucha.py`, cinco fotogramas por etapa de la cinta 4K, el montaje
   // en fotogramas—, o sea minutos y decenas de subprocesos para un fichero que
   // ya estaba en disco. Recoger pasa a costar cero.
-  const hecha = leeRespuesta(PASO, slug);
+  const hecha = leeRespuesta(PASO, slug,
+    JSON.parse(sql("tiquets_de", [slug, "descrito"]) || "[]").map((t) => t.id));
   if (hecha) return hecha.map(valida).map((d) => ({ ...d, quien: "servicio" }));
   // `quien` tiene que decir QUIEN contesto. Puso «gemini» cuando esa via ni
   // existia, y decir «cli» de lo que contesto la sesion es el mismo error con
