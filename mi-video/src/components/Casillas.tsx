@@ -161,10 +161,16 @@ export const Casillas: React.FC<CasillasProps> = ({
     ? desde + casillas.length * PASO_UNIDAD + duration.entry
     : desde;
   for (const c of casillas) {
-    const entraEn = conVoz && typeof c.en === "number"
-      ? Math.max(t, desde + c.en - duration.entry) : t;
+    const conSuPalabra = conVoz && typeof c.en === "number";
+    const entraEn = conSuPalabra
+      ? Math.max(t, desde + (c.en as number) - duration.entry) : t;
     t = entraEn + paso(c);
-    r = Math.max(r, t, typeof c.en === "number" ? desde + c.en : 0);
+    // **Y la que entra con su palabra se resuelve con ella, no una lectura
+    // después** (C-477): en reel-14 e5 el sello de «crecer» caía tras el final
+    // de la etapa y la casilla de oro no llegaba a verse en oro.
+    r = conSuPalabra
+      ? Math.max(r, entraEn + duration.entry, desde + (c.en as number))
+      : Math.max(r, t, typeof c.en === "number" ? desde + c.en : 0);
     horario.push({ entra: entraEn, resuelve: r });
     r += TACHA;
   }
