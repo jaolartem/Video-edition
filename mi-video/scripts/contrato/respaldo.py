@@ -80,7 +80,7 @@ RESPALDO = Contrato(
     ),
     claves=(
         Clave("etapa",
-              dispara=(Aguja("scripts/reels/cifras.mjs", "where v.slug = ? and d.etapa_orden = ?"),),
+              dispara=(Aguja("scripts/reels/cifras.mjs", ".filter((r) => r.etapa == null || Number(r.etapa) === Number(beat))"),),
               efecto="engancha el pie al beat",
               obligatoria=True,
               nota="Si falta o no es número entra como 0: la fila se guarda, no"

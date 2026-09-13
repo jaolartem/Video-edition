@@ -37,6 +37,7 @@
  * para que no pueda ser otra cosa.
  */
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
 const CAMPOS = JSON.parse(
@@ -138,14 +139,33 @@ export const cifrasDe = (props) => {
 
 const db = new DatabaseSync("ads/decisiones.db", { readOnly: true });
 
+/**
+ * **El respaldo de una pieza, de donde lo lee el pedido.** Una derivada o una
+ * historia respalda con las cifras de su origen (C-396, C-419): preguntarlo
+ * aquí sólo a la pieza dejaba los $180,000 de reel-08 «sin fila en `dato`»
+ * teniendo la de reel-01 (C-452). Una llamada por pieza y corrida.
+ */
+const RESPALDOS = new Map();
+const respaldosDe = (slug) => {
+  if (!RESPALDOS.has(slug)) {
+    let filas = [];
+    try {
+      filas = JSON.parse(execFileSync("python", ["-c",
+        "import sys,json;sys.path.insert(0,'scripts');import servicio;" +
+        "print(json.dumps(servicio._respaldos(sys.argv[1]),ensure_ascii=False))",
+        slug], { encoding: "utf8",
+                 env: { ...process.env, PYTHONIOENCODING: "utf-8" } }));
+    } catch { /* sin respaldo legible, como sin filas */ }
+    RESPALDOS.set(slug, filas);
+  }
+  return RESPALDOS.get(slug);
+};
+
 /** Las filas de `dato` de una etapa, con su cifra ya normalizada. */
 const datos = (slug, beat) =>
-  db.prepare(
-    "select f.rotulo, d.condiciones, d.cifra, d.respalda from dato d" +
-    "  left join fuente f on f.id = d.fuente_id" +
-    "  join video v on v.id = d.video_id" +
-    " where v.slug = ? and d.etapa_orden = ?",
-  ).all(slug, beat).map((r) => ({ ...r, tokens: enTexto(r.cifra ?? "") }));
+  respaldosDe(slug)
+    .filter((r) => r.etapa == null || Number(r.etapa) === Number(beat))
+    .map((r) => ({ ...r, tokens: enTexto(r.cifra ?? "") }));
 
 /**
  * **Los importes de la escalera son de la casa.** Mismo criterio que `propias()`
