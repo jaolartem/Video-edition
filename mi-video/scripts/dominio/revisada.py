@@ -152,12 +152,18 @@ class SuenaLoQueDice(Comprobacion):
                 except Exception:                  # noqa: BLE001
                     continue
             try:
-                habla = sum(min(b, tr.hasta) - max(a, tr.desde)
-                            for a, b in c.habla()
-                            if b > tr.desde and a < tr.hasta)
+                voz = sorted((max(a, tr.desde), min(b, tr.hasta))
+                             for a, b in c.habla()
+                             if b > tr.desde and a < tr.hasta)
             except Exception:                      # noqa: BLE001
                 continue
-            mudo = tr.dura - habla
+            # **El hueco más largo, no la suma de las pausas.** Sumadas, las
+            # pausas naturales de un trozo de 15 s daban 1,36 s y reel-11 e3
+            # volvía al cosido en cada vuelta sin que el cosido tuviera nada que
+            # partir: seis pausas de 0,1 a 0,7 s no son aire muerto (C-463).
+            bordes = [tr.desde] + [x for par in voz for x in par] + [tr.hasta]
+            mudo = max((bordes[i + 1] - bordes[i]
+                        for i in range(0, len(bordes) - 1, 2)), default=tr.dura)
             if mudo > self.MUDO_MAX:
                 fuera.append(Falta(
                     f"la etapa {d.get('beat')} tiene {mudo:.1f} s sin voz dentro"
