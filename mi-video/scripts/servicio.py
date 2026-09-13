@@ -556,6 +556,19 @@ def pedir(paso, slug, prompt, payload, cli=True):
                 for n in r["aprueba"]:
                     if str(n).isdigit() and int(n) in segs:
                         segs[int(n)].aprueba("disenador")
+            # **Y lo que devolvió tampoco se pierde: pasa a tiquet.** reel-08,
+            # 12-9: el visto devolvió e2 y e3, la línea volvió a renderizar
+            # antes de leerlo y la devolución se archivó entera (C-455).
+            if (paso == "visto" and isinstance(r, dict) and r.get("se_ensena") is False
+                    and r.get("por_que")):
+                try:
+                    from dominio import ticket as _tq
+                    _tq.abrir(slug, "visto (respuesta desfasada) · el diseñador no"
+                              f" la enseña: {r['por_que'][:900]}", None, "objecion",
+                              vuelve_a=r.get("vuelve_a") or "descrito", etapa="pieza")
+                except Exception as e:  # noqa: BLE001 — se dice y se sigue
+                    print(f"  visto/{slug}: la devolución desfasada no pudo"
+                          f" abrirse como tiquet: {e}")
             _archivar(paso, slug, sufijo="desfasada", solo_respuesta=True)
             print(f"  {paso}/{slug}: la respuesta es anterior al pedido —"
                   f" contesta a otra pregunta. Se archiva y se vuelve a pedir.")
