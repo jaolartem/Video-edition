@@ -54,8 +54,12 @@ import { MotionSound } from "./MotionSound";
 export type Porcion = {
   /** Cuánto vale, en las mismas unidades que `total`. */
   valor: number;
-  /** Lo que se lee sobre la porción. Va en versales. */
-  rotulo: string;
+  /**
+   * Lo que se lee sobre la porción, en versales. **Opcional**: sin él la porción es sólo su
+   * cifra — reel-15 e3 lo quitó para no tener dos oros y el render murió en
+   * `assertShort(undefined)` (C-466).
+   */
+  rotulo?: string;
   /** La que importa. **Sólo una**: es la que se lleva el oro. */
   foco?: boolean;
 };
@@ -152,7 +156,7 @@ export const Reparto: React.FC<{
           ? `${String(p.valor).replace(".", ",")}%`
           : `${signo}${p.valor}`;
         return (
-          <React.Fragment key={p.rotulo}>
+          <React.Fragment key={p.rotulo ?? `p${i}`}>
             <div
               style={{
                 position: "absolute",
@@ -201,7 +205,7 @@ export const Reparto: React.FC<{
                 opacity: abre,
               }}
             >
-              {assertShort(p.rotulo, "label", "Reparto.porcion")}
+              {p.rotulo ? assertShort(p.rotulo, "label", "Reparto.porcion") : null}
             </div>
             {/* El tajo suena cuando se abre, no cuando la porción termina de
                 crecer: el sonido va en el frame del movimiento. */}
