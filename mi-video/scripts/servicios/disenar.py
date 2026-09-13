@@ -86,8 +86,10 @@ TIPO = ("versales", "el tipo es", "la frase entera", "solo texto", "nada mas")
 
 #: Lo de presentación que el diseñador declara a veces junto a `kind` y que el
 #: render lee de `props` (C-418).
+# `anclas`, `ventana` y `sujeto_desde` también: el diseñador de reel-15 puso
+# `anclas` junto a `cubre` y el tablero entró con reloj fijo (C-458).
 PRESENTACION = ("sujeto", "sujeto_forma", "sujeto_color", "cubre", "familia",
-                "placa", "recorte")
+                "placa", "recorte", "anclas", "ventana", "sujeto_desde")
 
 
 def _con():

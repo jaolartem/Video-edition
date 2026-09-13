@@ -60,6 +60,8 @@ export type RepartoDeclarado = {
 };
 
 export type PanelDentroProps = {
+  /** Frames desde el arranque en que se dice cada campo anclado. Lo pone el motor (C-458). */
+  tiempos?: Record<string, number | (number | undefined)[] | undefined>;
   /** Placa de `public/fondos/`, a sangre. */
   placa?: string;
   /** Dónde va él: donde esté el hueco. Lo elige quien compone. */
@@ -103,8 +105,22 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
   fuente,
   condicion,
   duracion,
+  tiempos,
 }) => {
   const entra = useEntrada();
+  // **Y cada bloque entra con su palabra, si el diseño lo ancló** (C-458):
+  // con el reloj fijo el reparto de reel-15 e3 salía 2 s y el remate lo barría
+  // antes de que él dijera la cifra. Lo que no está anclado sigue en `T`.
+  const tq = tiempos ?? {};
+  const nu = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const rq = Array.isArray(tq.repartos) ? tq.repartos : [nu(tq.repartos)];
+  const H = { ...T,
+    premisa: nu(tq.premisa) ?? T.premisa,
+    unoA: nu(rq[0]) ?? nu(tq.cifra) ?? T.unoA,
+    unoB: nu(rq[1]) ?? (nu(rq[0]) != null ? (nu(rq[0]) as number) + (T.unoB - T.unoA) : T.unoB),
+    remate: nu(tq.remate) ?? T.remate,
+    pregunta: nu(tq.pregunta) ?? (nu(tq.remate) != null ? (nu(tq.remate) as number) + (T.pregunta - T.remate) : T.pregunta),
+  };
 
   if (premisa) assertShort(premisa, "title", "PanelDentro.premisa");
   if (cifra) assertShort(cifra, "outcome", "PanelDentro.cifra");
@@ -118,7 +134,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
   if (condicion) assertShort(condicion, "legal", "PanelDentro.condicion");
 
   cabeElSujeto(sujeto, repartos.length, Boolean(pregunta));
-  const barre = entra(T.remate, 16);
+  const barre = entra(H.remate, 16);
 
   const x = columnaDe(sujeto);
 
@@ -169,7 +185,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
             // que hay que leer, y el remate es lo último de la columna.
             height: COLUMNA.salto + 400,
             backgroundColor: color.richBlack,
-            opacity: 0.93 * entra(T.unoA - 4, 16) * (1 - barre),
+            opacity: 0.93 * entra(H.unoA - 4, 16) * (1 - barre),
             transform: "rotate(-3deg)",
           }}
         />
@@ -187,7 +203,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
         {premisa ? (
           <Bloque
             ancho={820}
-            abre={entra(T.premisa, 14)}
+            abre={entra(H.premisa, 14)}
             style={{ position: "absolute", left: 0, top: 24, opacity: 1 - barre }}
           >
             <div
@@ -212,7 +228,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
               position: "absolute",
               left: x,
               top: COLUMNA.arriba + i * COLUMNA.salto,
-              opacity: entra(i ? T.unoB : T.unoA, 14) * (1 - barre),
+              opacity: entra(i ? H.unoB : H.unoA, 14) * (1 - barre),
             }}
           >
             <Reparto
@@ -220,7 +236,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
               porciones={r.porciones}
               ancho={COLUMNA.ancho}
               signo={signo}
-              desde={i ? T.unoB : T.unoA}
+              desde={i ? H.unoB : H.unoA}
               etiqueta={assertShort(r.etiqueta, "label", "PanelDentro.etiqueta")}
               source={fuente}
             />
@@ -264,7 +280,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
                   letterSpacing: "0.01em",
                   textTransform: "uppercase",
                   color: color.lightNeutral,
-                  opacity: entra(T.pregunta, 14),
+                  opacity: entra(H.pregunta, 14),
                 }}
               >
                 {pregunta}
@@ -284,7 +300,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
             src={sujeto_src}
             lado={sujeto}
             css={sujeto_css}
-            entra={entra(T.el, 18) * (1 - barre * 0.9)}
+            entra={entra(H.el, 18) * (1 - barre * 0.9)}
           />
         ) : null}
       </ZonaTablero>
