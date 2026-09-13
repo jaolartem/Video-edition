@@ -63,6 +63,17 @@ export type CueDeTablero = {
  * allí —`fuente` en unos, `resultado.source` en otros, `limitation` en los de
  * más allá— existía justo porque cada componente lo leía por su cuenta.
  */
+/**
+ * **Su recorte cabe entero en su columna, no se corta en su borde.** El sitio
+ * del panel (980 px desde −200) está pensado para sangrar por el cuadro; dentro
+ * de `ZonaTablero` la columna mide 470 y el canto recto le partía la pierna o
+ * la mano (reel-10 e3, reel-11 e3; C-462). Más estrecho, entra la figura.
+ */
+const SITIO_EN_TABLERO = {
+  izquierda: { ancho: 720, left: -110, top: 40 },
+  derecha: { ancho: 720, right: -110, top: 40 },
+} as const;
+
 export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
   const props = cue.props as Record<string, unknown>;
   /**
@@ -107,6 +118,7 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
               <Recorte
                 src={src as string}
                 lado={lado}
+                sitio={lado ? SITIO_EN_TABLERO[lado as "izquierda" | "derecha"] : undefined}
                 forma={props?.sujeto_forma as Forma | undefined}
                 css={props?.sujeto_css as string | undefined}
                 trim={props?.sujeto_trim as number | undefined}
