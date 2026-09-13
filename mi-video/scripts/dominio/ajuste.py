@@ -43,11 +43,25 @@ def a_la_palabra(toma, ini, fin, cerca=0.45, voz=None):
     # Al entrar: si el borde cae dentro de una palabra, o justo despues de que
     # empiece, se entra donde empieza. Si esa palabra ya va por la mitad, se
     # entra cuando acaba.
+    # **Y la entrada también la juzga la onda** (C-482), con las mismas dos
+    # preguntas que `Habla.fuera_de_palabra` (C-481). Aquí solo se preguntaba
+    # por la salida, así que lo que el compositor midió en reel-16 e2 —217,14,
+    # el cierre de la /p/ de «porque», y 272,30, el silencio antes de «sin»— se
+    # guardaba como 217,091 y 272,528: la cola de «presta» y «sin» sin «si-».
+    from dominio import bordes as _bo
     for w in pal:
         x, y = w["start"], w["end"]
         if x < ini < y and y - x < 2.0:
-            ini = x if (ini - x) < (y - ini) and (ini - x) <= cerca else (
-                y if (y - ini) <= cerca else ini)
+            if _bo.callado_antes(toma, ini):
+                break                       # la palabra de delante ya acabó
+            if (ini - x) < (y - ini) and (ini - x) <= cerca:
+                # Desde un poco ANTES del arranque que da el transcript: si ya
+                # era exacto, la caída está justo antes y no dentro de la palabra
+                # (reel-10 e2: sin esto entraba 85 ms dentro, en 38,992).
+                q = _bo.mas_quieto(toma, x - 0.04, x + 0.08)
+                ini = q if q is not None and q < y else x
+            elif (y - ini) <= cerca:
+                ini = y
             break
     for w in pal:
         x, y = w["start"], w["end"]
@@ -80,7 +94,6 @@ def a_la_palabra(toma, ini, fin, cerca=0.45, voz=None):
         # no suena, la palabra acabo y el borde se queda donde esta. Ni se
         # alarga —no hay nada que cerrar— ni se retrocede al principio de la
         # palabra, que es lo que dejaba «550» sin decir y «mas» sin su «y».
-        from dominio import bordes as _bo
         if _bo.callado(toma, fin):
             pass
         elif (real - fin) <= cerca:

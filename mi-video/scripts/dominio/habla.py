@@ -171,7 +171,7 @@ class Habla:
                 # oye**: dos palabras dichas de un tirón vienen pegadas en el
                 # transcript y su frontera puede caer aún en la de delante. Se
                 # busca la caída de energía en los primeros 80 ms.
-                q = _bo.mas_quieto(self.cinta, p.empieza, p.empieza + ATAQUE)
+                q = _bo.mas_quieto(self.cinta, p.empieza - 0.04, p.empieza + ATAQUE)
                 return q if q is not None and q < p.acaba else p.empieza
             return p.acaba if (x - p.empieza) / max(p.dura, 1e-6) > 0.5 \
                 else p.empieza
