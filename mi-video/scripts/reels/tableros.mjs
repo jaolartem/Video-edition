@@ -115,8 +115,17 @@ export function armarTableros(
       // forma, y eso lo dice la puerta de legibilidad — no se roba del beat de
       // al lado, donde se esta diciendo otra cosa.
       const suyo = reloj.duracionDe(b.beat) ?? duracionTablero(b.kind, b.props);
-      const dur = Math.min(suyo + SOLAPE, fin - at,
+      let dur = Math.min(suyo + SOLAPE, fin - at,
         vent?.fin > at ? vent.fin - at : Infinity);
+      // **Y la pieza no acaba tapada por un tablero que ya dijo lo suyo** (C-478).
+      // Techo de reel-13 e6 anclaba la cifra y el alcance a la voz, pero duraba
+      // la etapa entera y llegaba al último fotograma: él no volvía a verse en
+      // «…porque no tenía la información completa». Si llega al final y tiene
+      // anclas, se retira tres segundos después de la última. Un tablero que no
+      // llega al final no cambia: ahí lo retira la etapa siguiente.
+      const tq = tiemposDe(b.props?.anclas, at, captions);
+      const ultimo = tq ? Math.max(0, ...Object.values(tq).flat().filter(Number.isFinite)) : 0;
+      if (ultimo && at + dur >= fin - SOLAPE && ultimo + 3 * FPS < dur) dur = ultimo + 3 * FPS;
       return {
         at,
         duration: dur,
