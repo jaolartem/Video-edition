@@ -135,6 +135,18 @@ export const Reparto: React.FC<{
   // reserva el hueco: son 92 px que en un panel caen sobre la cabeza.
   const abajo = etiqueta ?? (pie ? source : null);
 
+  // **El porcentaje va detrás y con coma**: «53,53%», no «%53.53» —
+  // `signo` se escribió para «$», que va delante (reel-15 e3, C-454).
+  const cifraDe = (p: Porcion) => signo === "%"
+    ? `${String(p.valor).replace(".", ",")}%`
+    : `${signo}${p.valor}`;
+  // **Todas las cifras del reparto con el mismo cuerpo, el que cabe en la
+  // porción más apretada** (C-471). Cada una a su medida daba dos tamaños en
+  // la misma barra, y con el avance de letras el «%» se salía igual.
+  const cuerpo = Math.min(...porciones.map((p) => cuerpoQueCabe({
+    ancho: Math.max((p.valor / total) * ancho - TAJO - 16, 40),
+    largo: cifraDe(p).length, registro: "antonCifra", tope: 84 })));
+
   let recorrido = 0;
   return (
     <div
@@ -151,11 +163,7 @@ export const Reparto: React.FC<{
         // Cada porción entra después de la anterior, y ninguna antes de que el
         // riel esté trazado del todo.
         const abre = entra(desde + 14 + i * PASO, 12);
-        // **El porcentaje va detrás y con coma**: «53,53%», no «%53.53» —
-        // `signo` se escribió para «$», que va delante (reel-15 e3, C-454).
-        const cifra = signo === "%"
-          ? `${String(p.valor).replace(".", ",")}%`
-          : `${signo}${p.valor}`;
+        const cifra = cifraDe(p);
         return (
           <React.Fragment key={p.rotulo ?? `p${i}`}>
             <div
@@ -183,11 +191,8 @@ export const Reparto: React.FC<{
                 textAlign: "center",
                 whiteSpace: "nowrap",
                 fontFamily: fontFamily.bloque,
-                // **La cifra cabe en su porción.** Con el «%» detrás (C-454)
-                // «46,47%» se salía por la derecha de su caja (reel-15 e3,
-                // C-469): el cuerpo baja hasta caber, con 84 de tope.
-                fontSize: cuerpoQueCabe({ ancho: Math.max(w - TAJO - 16, 40),
-                  largo: cifra.length, registro: "anton", tope: 84 }),
+                // **La cifra cabe en su porción** (C-469, C-471): ver `cuerpo`.
+                fontSize: cuerpo,
                 lineHeight: 1,
                 color: p.foco ? color.richBlack : color.lightNeutral,
                 opacity: abre,

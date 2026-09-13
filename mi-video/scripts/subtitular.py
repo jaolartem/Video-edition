@@ -20,7 +20,6 @@ import difflib
 import json
 import os
 import re
-import unicodedata
 import subprocess
 import sys
 
@@ -40,17 +39,60 @@ TOPE = 36
 TRAMO = 3
 
 
+#: Largo máximo de cada trozo que se transcribe, en segundos (C-472).
+TROZO = 20
+
+
+def trozos(wav):
+    """Dónde partir el montaje para transcribirlo: en silencios, cada `TROZO` s.
+
+    **De una pasada, whisper apelmaza los tiempos** (C-472). En reel-14 metió
+    doce palabras —«para otros Canadá es la tierra de las oportunidades»— entre
+    4,17 y 4,24 s, y el subtítulo del gancho se quedó congelado cuatro segundos
+    y se saltó una línea. Los mismos diez segundos transcritos solos salen con
+    cada palabra en su sitio, medidos contra los silencios del audio.
+    """
+    r = subprocess.run(["ffmpeg", "-v", "info", "-i", wav, "-af",
+                        "silencedetect=noise=-35dB:d=0.3", "-f", "null", "-"],
+                       capture_output=True, text=True, errors="replace")
+    ini = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", r.stderr)]
+    fin = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", r.stderr)]
+    dura = os.path.getsize(wav) / 32000        # 16 kHz, mono, 16 bit
+    medios = [(a + b) / 2 for a, b in zip(ini, fin)]
+    cortes, desde = [], 0.0
+    while dura - desde > TROZO:
+        dentro = [m for m in medios if desde + 4 < m <= desde + TROZO]
+        desde = dentro[-1] if dentro else desde + TROZO
+        cortes.append(desde)
+    bordes = [0.0] + cortes + [dura]
+    return list(zip(bordes, bordes[1:]))
+
+
 def transcribir(mp4, wav, base):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", mp4,
                     "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav],
                    check=True)
-    subprocess.run(gpu.whisper() + [
-                    "-m", os.path.join(W, "ggml-medium.bin"),
-                    "-l", "es", "-mc", "0", "-ml", "1", "-sow",
-                    "-oj", "-of", base, "-f", wav],
-                   capture_output=True, check=True)
-    with open(base + ".json", encoding="utf-8") as fh:
-        d = json.load(fh)
+    todas = []
+    for k, (a, b) in enumerate(trozos(wav)):
+        pieza = f"{base}.t{k}"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}",
+                        "-t", f"{b - a:.3f}", "-i", wav, "-c:a", "pcm_s16le",
+                        pieza + ".wav"], check=True)
+        subprocess.run(gpu.whisper() + [
+                        "-m", os.path.join(W, "ggml-medium.bin"),
+                        "-l", "es", "-mc", "0", "-ml", "1", "-sow",
+                        "-oj", "-of", pieza, "-f", pieza + ".wav"],
+                       capture_output=True, check=True)
+        with open(pieza + ".json", encoding="utf-8") as fh:
+            for s in json.load(fh)["transcription"]:
+                off = s["offsets"]
+                todas.append({**s, "offsets": {"from": off["from"] + a * 1000,
+                                               "to": off["to"] + a * 1000}})
+        for ext in (".wav", ".json"):
+            os.remove(pieza + ext)
+    d = {"transcription": todas}
+    with open(base + ".json", "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
     out = []
     for s in d["transcription"]:
         t = s["text"].strip()
