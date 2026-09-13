@@ -254,6 +254,10 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
               backgroundColor: color.richBlack,
               opacity: barre,
               transform: `translateY(${(1 - barre) * 28}px)`,
+              // **Encima de él.** Desde C-461 su recorte no se barre, y dibujado
+              // después tapaba el remate entero: reel-15 e3 dejaba ver «ÓN,» de
+              // «MISMA FACTURACIÓN, OTRA ESTRUCTURA» (C-467).
+              zIndex: 2,
             }}
           >
             <div
