@@ -280,9 +280,10 @@ export function armarTableros(
 // La lista de lo que va al pie ya existe y la escribe `reels/cifras.json`: es la
 // misma con la que `cifrasDe` decide qué NO cuenta como cifra rotulada. Se lee
 // de ahí y no se copia — dos listas de lo mismo divergen a la primera.
-const AL_PIE = JSON.parse(
+const CIFRAS = JSON.parse(
   fs.readFileSync(new URL("./cifras.json", import.meta.url), "utf8"),
-).al_pie;
+);
+const AL_PIE = CIFRAS.al_pie;
 
 const NO_TEXTO = new Set(["familia", "zona", "cubre", "oro", "sound", "fondo",
                           "filete", "source", "paso", "entrada", "eje",
@@ -296,7 +297,11 @@ const NO_TEXTO = new Set(["familia", "zona", "cubre", "oro", "sound", "fondo",
                           // declaraban la traían en segundos y por eso no se
                           // veía: un número no pasa el `typeof v === "string"`.
                           "anclas",
-                          ...AL_PIE]);
+                          ...AL_PIE,
+                          // **Y la lista común de lo que no es copy** (C-464):
+                          // `lado: "arriba"` salía como bloque «ARRIBA» en el
+                          // panel de reel-11 e2 porque esta copia no lo tenía.
+                          ...CIFRAS.no_es_texto]);
 
 /**
  * **Un prop cuyo valor es el NOMBRE de otro prop es un puntero, no copy.**
