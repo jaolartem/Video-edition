@@ -72,7 +72,11 @@ ESLABONES = [
     # silencio — que es justo el parentesco deducido contra el que avisa la nota
     # de arriba, con el signo cambiado.
     ("spec",        "src/reels.json",                     "reels-spec.mjs",     ("huecos", "trasfondo")),
-    ("render",      "out/reels/reel-R{n}.mp4",            "render.mjs",         "spec"),
+    # **Y el render come también de `src/`** (C-475): los componentes son el
+    # código que dibuja. Con sólo `render.mjs`, arreglar un componente no
+    # caducaba nada — reel-14 se volvió a entregar a las 14:00 con el render de
+    # las 13:47, de antes de C-474, y las casillas seguían entrando solas.
+    ("render",      "out/reels/reel-R{n}.mp4",            "render.mjs · src/",  "spec"),
     ("efectos",     "out/audio-voz/reel-R{n}-efectos.wav", "efectos.mjs",       "render"),
     ("entrega",     "out/entrega/reel-R{n}.mp4",          "voz-limpia.py · musica.sh", "efectos"),
 ]
@@ -99,11 +103,20 @@ def _codigo(quien):
     apunte para leer. Aquí se convierte en dependencia de verdad.
     """
     ts = []
+    aqui = os.path.dirname(os.path.abspath(__file__))
     for parte in quien.split("·"):
         nombre = parte.strip().split()[0]
+        # Una carpeta (`src/`) cuenta por su fichero más reciente.
+        if nombre.endswith("/"):
+            raiz = os.path.join(aqui, "..", nombre)
+            t = max((os.path.getmtime(os.path.join(d, f))
+                     for d, _, fs in os.walk(raiz) for f in fs
+                     if f.endswith((".ts", ".tsx", ".json"))), default=None)
+            if t is not None:
+                ts.append((t, nombre))
+            continue
         if "." not in nombre:
             continue
-        aqui = os.path.dirname(os.path.abspath(__file__))
         # `sujeto.py` vive en `dominio/`, y buscarlo solo en `scripts/`
         # dejaba ese eslabon sin productor: la comprobacion se saltaba en
         # silencio, que es la forma de fallar que este proyecto ya conoce.
