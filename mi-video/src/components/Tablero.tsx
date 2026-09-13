@@ -103,6 +103,7 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
               lado={lado}
               forma={props?.sujeto_forma as Forma | undefined}
               css={props?.sujeto_css as string | undefined}
+              trim={props?.sujeto_trim as number | undefined}
             />
           </div>
         </ZonaTablero>

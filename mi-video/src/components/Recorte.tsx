@@ -203,6 +203,8 @@ export type RecorteProps = {
   css?: string;
   /** 0 a 1. Lo pone quien lo hospeda con su propio horario. */
   entra?: number;
+  /** Frames del recorte que se saltan: desde qué momento de su etapa sale (C-451). */
+  trim?: number;
 };
 
 export const Recorte: React.FC<RecorteProps> = ({
@@ -212,6 +214,7 @@ export const Recorte: React.FC<RecorteProps> = ({
   sitio,
   css = "grayscale(1) contrast(1.06)",
   entra = 1,
+  trim = 0,
 }) => {
   const cuadro = forma === "cuadro";
   // El sitio explícito gana; si no, el del lado. `?? SITIO.izquierda` sigue
@@ -239,6 +242,7 @@ export const Recorte: React.FC<RecorteProps> = ({
             en el recorte vive en el tercio de arriba. */}
         <OffthreadVideo
           src={staticFile(src)}
+          trimBefore={trim > 0 ? trim : undefined}
           transparent
           muted
           style={{
@@ -312,6 +316,7 @@ export const Recorte: React.FC<RecorteProps> = ({
          */}
         <OffthreadVideo
           src={staticFile(src)}
+          trimBefore={trim > 0 ? trim : undefined}
           transparent
           muted
           style={{

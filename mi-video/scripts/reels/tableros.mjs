@@ -188,6 +188,15 @@ export function armarTableros(
                  // que pedirlo dos veces sería dejar que se contradigan.
                  ...(b.props?.sujeto
                    ? { sujeto_src: sujetoDe(slug, b.beat) ?? undefined,
+                       // **Y desde qué segundo de su etapa sale.** El recorte
+                       // cubre la etapa entera y empezaba en su frame 0: un
+                       // tablero anclado a mitad de etapa enseñaba otro momento
+                       // (desfasado de la voz), y `sujeto_desde` deja elegir uno
+                       // en que no esté leyendo (reel-08 e2, C-451).
+                       sujeto_trim: Math.max(0, Math.round(
+                         (Number.isFinite(Number(b.props?.sujeto_desde))
+                           ? Number(b.props.sujeto_desde) * FPS : at)
+                         - reloj.anclaDe(b.beat))),
                        sujeto_css: tratoDelSujeto(desc?.[b.beat]?.color,
                                                   b.props?.sujeto_color).css }
                    : {}),
