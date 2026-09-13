@@ -190,6 +190,10 @@ export const Fusion: React.FC<FusionProps> = ({
               alignItems: "center",
               justifyContent: "center",
               opacity: pFusion,
+              // **Y el bloque fundido es UNO: se pinta entero.** Sin fondo, la
+              // rendija del filete (1-2 px) dejaba ver la placa y partía LA
+              // MISMA COSA entre la M y la A (reel-11 e3, C-449).
+              backgroundColor: color.gold,
               pointerEvents: "none",
             }}
           >
