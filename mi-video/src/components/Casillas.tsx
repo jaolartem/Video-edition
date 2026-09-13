@@ -146,6 +146,13 @@ export const Casillas: React.FC<CasillasProps> = ({
   // siguiente sin ancla, la segunda se tachaba ANTES que la primera y la lista
   // dejaba de leerse como una secuencia.
   const horario: { entra: number; resuelve: number }[] = [];
+  // **Una casilla anclada que no se tacha solo puede querer decir una cosa:
+  // que entra cuando se dice** (C-474). El `en` sólo movía la resolución, así
+  // que en reel-14 e5 —cuatro casillas ancladas a «país», «corporativo»,
+  // «quién» y «crecer», ninguna tachada— la lista entera estaba montada a
+  // 48,8 s, ocho segundos antes de que la voz la acabara. Con una sola así, la
+  // lámina entra con la voz; la lista que se tacha según se nombra no cambia.
+  const conVoz = casillas.some((c) => typeof c.en === "number" && !c.tacha && !c.sella);
   let t = desde;
   // **En la tira, primero está la serie entera y después se sella.** Un sello
   // que cae con la mitad de los días todavía por trazar no marca un día de una
@@ -154,8 +161,9 @@ export const Casillas: React.FC<CasillasProps> = ({
     ? desde + casillas.length * PASO_UNIDAD + duration.entry
     : desde;
   for (const c of casillas) {
-    const entraEn = t;
-    t += paso(c);
+    const entraEn = conVoz && typeof c.en === "number"
+      ? Math.max(t, desde + c.en - duration.entry) : t;
+    t = entraEn + paso(c);
     r = Math.max(r, t, typeof c.en === "number" ? desde + c.en : 0);
     horario.push({ entra: entraEn, resuelve: r });
     r += TACHA;
