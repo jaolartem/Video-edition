@@ -69,6 +69,12 @@ export type TechoProps = {
   /** Lo que dura el tablero, en frames. Sólo para la deriva del fondo. */
   duracion?: number;
   sound?: boolean;
+  /**
+   * Frames, desde el arranque del tablero, en que se dice cada campo. Los pone
+   * el spec a partir de `anclas` (`tiemposDe`); con `cifra` anclada, la cifra
+   * entra con su palabra y el alcance detrás (C-473).
+   */
+  tiempos?: Record<string, number | (number | undefined)[] | undefined>;
 };
 
 /** La cinta del marco, dentro de la zona segura de arriba. */
@@ -140,6 +146,7 @@ export const Techo: React.FC<TechoProps> = ({
   recorte = "lleno",
   duracion = 240,
   sound = false,
+  tiempos,
 }) => {
   const entra = useEntrada();
 
@@ -147,7 +154,20 @@ export const Techo: React.FC<TechoProps> = ({
   assertShort(cifra, "outcome", "Techo.cifra");
   assertShort(alcance, "statement", "Techo.alcance");
 
-  const t = horarioDe(titulo, cifra, alcance, duracion);
+  // **Si el diseño ancló la cifra a su palabra, entra con ella** (C-473). Por
+  // reparto caía al 34 % del tablero: en reel-13 e6, 5 s después de que él
+  // dijera «entre 250 mil y 300 mil». Sin ancla, el reparto de siempre.
+  const base = horarioDe(titulo, cifra, alcance, duracion);
+  const primero = (v: unknown) => (typeof v === "number" ? v
+    : Array.isArray(v) ? v.find((x) => typeof x === "number") : undefined);
+  const golpe = Math.max(duration.entry, primero(tiempos?.cifra) ?? base.golpe);
+  const tecleo = Math.max(golpe + duration.entry,
+    primero(tiempos?.alcance) ?? (tiempos?.cifra != null ? golpe + duration.entry : base.tecleo));
+  const t = {
+    ...base, golpe, tecleo,
+    teclea: Math.min(readingFrames(alcance),
+      Math.max(duration.entry, duracion - tecleo - duration.entry)),
+  };
   // La cinta se pega de golpe: entra en seis frames y se queda. La escala baja
   // de 1,02 a 1 —monótona, sin rebote— que es lo que hace que se lea como una
   // pegatina y no como un fundido.

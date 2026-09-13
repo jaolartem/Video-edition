@@ -69,6 +69,28 @@ export type CueDeTablero = {
  * de `ZonaTablero` la columna mide 470 y el canto recto le partía la pierna o
  * la mano (reel-10 e3, reel-11 e3; C-462). Más estrecho, entra la figura.
  */
+/**
+ * **Y donde la columna le corta, el canto es de papel rasgado, no recto.**
+ *
+ * En esta cinta él sale sentado con las piernas cruzadas y se sale del cuadro:
+ * medido en reel-13 e5 y e6, la figura toca el borde de su imagen en todos los
+ * fotogramas (C-473). Así que en cualquier sitio que se ponga, la columna le
+ * parte el muslo o la rodilla con un corte recto en x=470. Con este canto el
+ * corte se lee como la pegatina que el collage pide, no como un recorte fallido.
+ * Los dientes van fijos y no al azar: el mismo tablero sale igual cada vez.
+ */
+const DIENTES = [0, 14, 5, 19, 8, 3, 16, 10, 1, 13, 6, 18, 9, 2, 15, 7, 12, 4, 17, 11, 0];
+const cantoRasgado = (lado?: string) => {
+  const n = DIENTES.length - 1;
+  const borde = DIENTES.map((d, i) => {
+    const y = ((i / n) * 100).toFixed(1);
+    return lado === "derecha" ? `${d}px ${y}%` : `calc(100% - ${d}px) ${y}%`;
+  });
+  return lado === "derecha"
+    ? `polygon(100% 0, ${borde.join(", ")}, 100% 100%)`
+    : `polygon(0 0, ${borde.join(", ")}, 0 100%)`;
+};
+
 const SITIO_EN_TABLERO = {
   izquierda: { ancho: 720, left: -110, top: 40 },
   derecha: { ancho: 720, right: -110, top: 40 },
@@ -108,6 +130,7 @@ export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
               [lado === "derecha" ? "right" : "left"]: 0,
               width: COLUMNA.x,
               overflow: "hidden",
+              clipPath: props?.sujeto_forma === "cuadro" ? undefined : cantoRasgado(lado),
             }}
           >
             {/* **Y si el diseño eligió su momento, se queda en él.** Con
