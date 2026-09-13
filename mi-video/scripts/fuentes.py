@@ -43,6 +43,7 @@ import sys
 import rutas  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from dominio.escena import correcciones as _correcciones  # noqa: E402
 
 BASE = "ads/decisiones.db"
 PROMPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -164,8 +165,10 @@ def dossier(slug):
                     "ya_respaldadas": propia,
                     "libreto": f["libreto"], "trato": f["trato"],
                     "grafico": f["grafico"], "que_pasa": f["que_pasa"],
-                    "corrige": ({"dice": f["corrige_dice"], "es": f["corrige_es"]}
-                                if f["corrige_dice"] else None)})
+                    # Una o varias (C-465).
+                    "corrige": ([{"dice": d, "es": e} for d, e in
+                                 _correcciones(f["corrige_dice"], f["corrige_es"])]
+                                or None)})
     return out
 
 

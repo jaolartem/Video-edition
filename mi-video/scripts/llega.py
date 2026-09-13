@@ -175,7 +175,8 @@ def revisar(piezas=None):
                             f"{slug} e{b}: declara {k}={suyos[k]!r} y llega"
                             f" {llegan.get(k)!r}")
             # 3 · Una correccion declarada tiene que colocarse en un subtitulo.
-            if f["corrige_dice"] and f["corrige_es"]:
+            from dominio.escena import correcciones as _pares
+            for c_dice, c_es in _pares(f["corrige_dice"], f["corrige_es"]):
                 # **Se compara flojo a proposito.** La correccion puede salir
                 # con otra redaccion que la declarada —`frames.json` gana sobre
                 # `escena_desc` y escribe «FINANZAS» donde la base dice «Ministro
@@ -187,15 +188,15 @@ def revisar(piezas=None):
                     if not x:
                         return False
                     a_ = str(x.get("es", "")).lower()
-                    b_ = str(f["corrige_es"]).lower()
+                    b_ = str(c_es).lower()
                     return (a_ in b_ or b_ in a_
                             or str(x.get("dice", "")).lower()
-                            == str(f["corrige_dice"]).lower())
+                            == str(c_dice).lower())
                 puesta = any(_casa(c) for c in p.get("captions") or [])
                 if not puesta:
                     faltas.append(
                         f"{slug} e{b}: declara la correccion"
-                        f" «{f['corrige_dice']}» -> «{f['corrige_es']}»"
+                        f" «{c_dice}» -> «{c_es}»"
                         f" y NO sale en ningun subtitulo")
             # 3b · **Un tablero anclado por segundo no se re-deriva.**
             #

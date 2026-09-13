@@ -41,6 +41,8 @@ const META = /[\\^$.*+?()[\]{}|]/;
  * veces serían dos reglas con el mismo nombre, que es la avería que este
  * proyecto ya pagó cuatro veces con `limpio`/`norm`.
  */
+import { expandeCorrecciones } from "./base.mjs";
+
 export function noSePintaBien(dice, es) {
   const d = String(dice ?? "").trim();
   const e = String(es ?? "").trim();
@@ -80,7 +82,7 @@ export function noSePintaBien(dice, es) {
 function correcciones(pieza, filas) {
   const motivos = [];
   const cues = pieza.captions.filter((c) => c.corrige);
-  for (const f of filas) {
+  for (const f of expandeCorrecciones(filas)) {
     if (!f.corrige_dice) continue;
     const mal = noSePintaBien(f.corrige_dice, f.corrige_es);
     if (mal) {

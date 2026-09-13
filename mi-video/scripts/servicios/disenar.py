@@ -510,12 +510,14 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
                     tratadas += 1
                 else:
                     destratadas += 1
-        corr = t.get("corrige")
-        if isinstance(corr, dict) and corr.get("dice") and corr.get("es"):
+        # Una o varias: una lista va a las mismas columnas (C-465).
+        from dominio.escena import columnas_de_corrige
+        c_dice, c_es = columnas_de_corrige(t.get("corrige"))
+        if c_dice:
             con.execute(
                 "update escena_desc set corrige_dice = ?, corrige_es = ?,"
                 " fecha = ? where video_slug = ? and etapa_orden = ?",
-                (corr["dice"], corr["es"], ahora, pieza.slug, int(beat)))
+                (c_dice, c_es, ahora, pieza.slug, int(beat)))
             corregidos += 1
         # **Y un tablero se puede RETIRAR, no solo escribir.**
         #
@@ -535,7 +537,7 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
             retirados += 1
             continue
         kind, props = t.get("kind"), t.get("props")
-        if not kind and not props and (t.get("camara") or corr or comp
+        if not kind and not props and (t.get("camara") or c_dice or comp
                                        or "voz" in t):
             continue          # etapa que solo pide camara: es una entrega valida
         if not kind or not isinstance(props, dict) or not props:

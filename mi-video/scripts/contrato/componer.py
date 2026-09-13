@@ -168,7 +168,7 @@ COMPONE = Contrato(
               nota="Texto libre: lo que `sonidoDe` no reconozca cae en silencio."
                    " O es lista cerrada, o `sonidoDe` avisa."),
         Clave("corrige",
-              dispara=(Aguja("scripts/reels/base.mjs", "select corrige_dice, corrige_es from escena_desc"),
+              dispara=(Aguja("scripts/reels/base.mjs", "select etapa_orden, corrige_dice, corrige_es from escena_desc"),
                        Aguja("scripts/fuentes.py", "d.corrige_dice, d.corrige_es")),
               efecto="coloca la corrección sobre la línea de CC y falla el build"
                      " si no encuentra las palabras",

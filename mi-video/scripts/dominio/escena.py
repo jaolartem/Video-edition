@@ -118,7 +118,7 @@ class Escena:
             raise EscenaInvalida(
                 f"{self.slug} e{self.orden}: una descripción sin `que_pasa` no"
                 f" describe nada")
-        corrige = d.get("corrige") or {}
+        corrige_dice, corrige_es = columnas_de_corrige(d.get("corrige"))
         tablero = d.get("tablero")
         valores = {
             "video_slug": self.slug, "etapa_orden": self.orden,
@@ -126,8 +126,8 @@ class Escena:
             "grafico": d.get("grafico"), "trato": d.get("trato"),
             "trato_porque": d.get("trato_porque"),
             "prioridad": d.get("prioridad"), "integridad": d.get("integridad"),
-            "remedio": d.get("remedio"), "corrige_dice": corrige.get("dice"),
-            "corrige_es": corrige.get("es"), "sobre_texto": self.sobre_texto(),
+            "remedio": d.get("remedio"), "corrige_dice": corrige_dice,
+            "corrige_es": corrige_es, "sobre_texto": self.sobre_texto(),
             # `quien` decía «gemini» y esa vía se descartó —*«no quiero a
             # Google»*—, así que el campo mentía sobre quién decidió.
             "quien": d.get("quien", "cli"), "fecha": _ahora(),
@@ -349,3 +349,33 @@ class Escena:
 
 def _ahora() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+def columnas_de_corrige(c):
+    """**Una o varias correcciones, en las dos columnas de siempre** (C-465).
+
+    reel-09 e1 necesita dos —44→46 y 56→54— y `escena_desc` guardaba una. Un
+    objeto `{dice, es}` se guarda como hasta ahora; una lista se guarda como dos
+    listas JSON paralelas. `correcciones()` es quien las vuelve a separar.
+    """
+    lista = [c] if isinstance(c, dict) else (c if isinstance(c, list) else [])
+    pares = [(str(x["dice"]), str(x["es"])) for x in lista
+             if isinstance(x, dict) and x.get("dice") and x.get("es")]
+    if not pares:
+        return None, None
+    if len(pares) == 1:
+        return pares[0]
+    return (json.dumps([p[0] for p in pares], ensure_ascii=False),
+            json.dumps([p[1] for p in pares], ensure_ascii=False))
+
+
+def correcciones(dice, es):
+    """Las parejas `(dice, es)` que guardan las dos columnas, una o varias."""
+    if not dice or not es:
+        return []
+    if str(dice).startswith("["):
+        try:
+            return list(zip(json.loads(dice), json.loads(es)))
+        except (ValueError, TypeError):
+            return []
+    return [(dice, es)]

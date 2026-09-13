@@ -212,10 +212,27 @@ export const descDe = (slug) =>
  * `subtitulos.mjs`, que es quien las coloca.
  */
 export const correccionesDe = (slug) =>
-  db.prepare(
-    "select corrige_dice, corrige_es from escena_desc" +
+  expandeCorrecciones(db.prepare(
+    "select etapa_orden, corrige_dice, corrige_es from escena_desc" +
     " where video_slug = ? and corrige_dice is not null",
-  ).all(slug).map((c) => ({ ...c, corrige_es: conPrecio(c.corrige_es) }));
+  ).all(slug)).map((c) => ({ ...c, corrige_es: conPrecio(c.corrige_es) }));
+
+/**
+ * **Una fila por corrección, aunque la etapa guarde varias** (C-465). Con dos,
+ * las columnas llevan dos listas JSON paralelas (`dominio/escena.py ::
+ * columnas_de_corrige`); quien lee las necesita separadas.
+ */
+export const expandeCorrecciones = (filas) => filas.flatMap((f) => {
+  const d = f.corrige_dice;
+  if (typeof d !== "string" || !d.startsWith("[")) return [f];
+  try {
+    const dice = JSON.parse(d);
+    const es = JSON.parse(f.corrige_es);
+    return dice.map((x, i) => ({ ...f, corrige_dice: x, corrige_es: es[i] }));
+  } catch {
+    return [f];
+  }
+});
 
 /**
  * **`{precio}` es el importe de hoy, no un literal.** Jaime, 11-9-2026:

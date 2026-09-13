@@ -136,7 +136,7 @@ VOZ = (
 #: no es un tablero, es una decision sobre la toma.
 LO_DICHO = (
 Clave("corrige",
-          dispara=(Aguja("scripts/servicios/disenar.py", 'corr = t.get("corrige")'),
+          dispara=(Aguja("scripts/servicios/disenar.py", 'c_dice, c_es = columnas_de_corrige(t.get("corrige"))'),
                    Aguja("src/components/captionBand/Corregida.tsx", "const { dice: palabra, es } = corrige;"),),
           efecto="pone la palabra buena donde suena la equivocada, y la"
                  " enfatiza",
