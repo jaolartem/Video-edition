@@ -38,21 +38,6 @@ import { tratoDelSujeto } from "../imagen.mjs";
 const ESCALERA = precioVigente();
 
 /**
- * **El instante de su recorte, en frames de la pieza: un segundo o una palabra**
- * (C-485). Se leía sólo como segundo, y `sujeto_desde: "empieza"` —lo que el
- * diseño de reel-12 e6 declaró, porque el corte de la etapa acababa de cambiar—
- * daba `NaN`: el recorte ni se congelaba ni salía de ese instante. Una palabra
- * se resuelve como un ancla, contra el subtítulo de hoy desde el arranque de la
- * etapa, que es lo que sobrevive a un cambio de corte. `null` si no hay.
- */
-const desdeDelSujeto = (v, inicio, captions) => {
-  if (v === null || v === undefined || v === "") return null;
-  if (Number.isFinite(Number(v))) return Number(v) * FPS;
-  const t = tiemposDe({ desde: String(v) }, inicio, captions);
-  return t?.desde != null ? inicio + t.desde : null;
-};
-
-/**
  * Sustituye `escalera: true` por los peldaños de hoy.
  *
  * Si ya no hay escalón vigente la clave **se retira y se dice**: dejarla puesta
@@ -218,17 +203,14 @@ export function armarTableros(
                  // que pedirlo dos veces sería dejar que se contradigan.
                  ...(b.props?.sujeto
                    ? { sujeto_src: sujetoDe(slug, b.beat) ?? undefined,
-                       // **Y desde qué segundo de su etapa sale.** El recorte
-                       // cubre la etapa entera y empezaba en su frame 0: un
-                       // tablero anclado a mitad de etapa enseñaba otro momento
-                       // (desfasado de la voz), y `sujeto_desde` deja elegir uno
-                       // en que no esté leyendo (reel-08 e2, C-451).
-                       sujeto_quieto: desdeDelSujeto(b.props?.sujeto_desde,
-                         reloj.anclaDe(b.beat), captions) != null,
-                       sujeto_trim: Math.max(0, Math.round(
-                         (desdeDelSujeto(b.props?.sujeto_desde,
-                           reloj.anclaDe(b.beat), captions) ?? at)
-                         - reloj.anclaDe(b.beat))),
+                       // **Y sale del instante que hay debajo del tablero, con
+                       // su voz** (C-493). El recorte cubre la etapa entera y
+                       // empezaba en su frame 0, desfasado de la voz (C-451).
+                       // `sujeto_desde` lo sacaba de otro momento o lo congelaba
+                       // (C-459, C-485), y Jaime, 14-9: *«la cara es un activo
+                       // solo cuando habla y expresa, nunca puede ser un
+                       // estiquer»* — *«pásalos todos a video hablando»*.
+                       sujeto_trim: Math.max(0, Math.round(at - reloj.anclaDe(b.beat))),
                        sujeto_css: tratoDelSujeto(desc?.[b.beat]?.color,
                                                   b.props?.sujeto_color).css }
                    : {}),
