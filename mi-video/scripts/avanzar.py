@@ -644,6 +644,12 @@ def _devuelve(slug: str, paso: str) -> None:
                 "avanzar", "respuesta tardia sobre una pieza aprobada",
                 detalle=f"{slug}: llego «{paso}» y esta firmada; no se devuelve",
                 eco=True)
+            # **Y se archiva, no se deja en la cola** (C-491). Quedarse en el
+            # buzón la dejaba viva para cuando Jaime reabriera la pieza: reel-13,
+            # 14-9, volvió de «revisado» a «medido» por un visto del 13-9 que ya
+            # no hablaba de nada.
+            __import__("servicio")._archivar(paso, slug, sufijo="tardia",
+                                            solo_respuesta=True)
             return
     except Exception:                              # noqa: BLE001
         pass

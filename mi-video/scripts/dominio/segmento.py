@@ -196,6 +196,16 @@ class Segmento:
             " (select id from video where slug = ?)", (self.n, self.slug))
         cx.commit()
         cx.close()
+        # **Y reabrir también es el evento de la puerta** (C-492). Su tiquet se
+        # abrió con la pieza firmada y la puerta no la movió; al reabrir el
+        # segmento nadie volvía a preguntarle. reel-13, 14-9: #460 y #461 sin
+        # devolver y la pieza parada en «verificado».
+        try:
+            from . import puertas
+            for linea in puertas.del_tiquet([int(str(self.slug)[-2:])]):
+                print(linea)
+        except Exception:                          # noqa: BLE001
+            pass
         return True
 
     @property
