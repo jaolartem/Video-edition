@@ -647,9 +647,10 @@ def _devuelve(slug: str, paso: str) -> None:
             # **Y se archiva, no se deja en la cola** (C-491). Quedarse en el
             # buzón la dejaba viva para cuando Jaime reabriera la pieza: reel-13,
             # 14-9, volvió de «revisado» a «medido» por un visto del 13-9 que ya
-            # no hablaba de nada.
+            # no hablaba de nada. **Con su pedido**, que también es viejo: sin
+            # respuesta, el pedido se contaba como trabajo abierto.
             __import__("servicio")._archivar(paso, slug, sufijo="tardia",
-                                            solo_respuesta=True)
+                                            solo_respuesta=False)
             return
     except Exception:                              # noqa: BLE001
         pass
