@@ -162,6 +162,15 @@ def vencidas(slug, fase_actual, orden):
     aqui = orden.get(fase_actual)
     if aqui is None:
         return []
+    # **Y una pieza aprobada entera no se para por lo que la puerta ya no
+    # reabre** (C-489). `puertas.del_tiquet` deja abiertos sus tiquets y los
+    # sube a Jaime; esto la paraba igual con «su paso ya quedó atrás». reel-12,
+    # 13-9: sus ocho etapas aprobadas y dos tiquets de subtítulos para «montado»,
+    # y se quedó en «visto» sin llegar a la revisión de Jaime, que es donde esos
+    # tiquets tienen que verse.
+    from .segmento import aprobada as _entera
+    if _entera(slug):
+        return []
     # **Estrictamente ANTES, no «hasta aqui».** Con `<=`, una pieza sentada en la
     # fase que atiende su correccion se declaraba bloqueada por lo que habia
     # venido a arreglar: el 7-9-2026 el despachador dio vueltas sin mover nada
