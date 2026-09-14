@@ -434,6 +434,20 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
 
         por_que = (respuesta.get("pieza") or {}).get("por_que") or "sin motivo"
         return devuelve(pieza, "diseño · la escena no cuadra:", por_que)
+    # **Y su cara en un tablero es él hablando, nunca una pegatina quieta**
+    # (C-490). Jaime, 14-9-2026, sobre reel-13 en el segundo 36: *«la cara es un
+    # activo solo cuando habla y expresa, nunca puede ser un estiquer»*.
+    # `sujeto_desde` congela su recorte o lo saca de otro instante (C-451,
+    # C-459, C-485), así que una respuesta que lo traiga no se aplica.
+    quietos = [t.get("etapa_orden") for t in tableros if isinstance(t, dict)
+               and "sujeto_desde" in {**t, **(t.get("props") if isinstance(t.get("props"), dict) else {})}]
+    if quietos:
+        return Resultado(
+            False,
+            motivo=f"etapa(s) {quietos} declaran `sujeto_desde`: su cara en un"
+                   " tablero es él hablando, sincronizado con su voz, nunca una"
+                   " pegatina quieta (Jaime, 14-9). Quita `sujeto_desde`; si"
+                   " debajo no habla, compón sin `sujeto` o pide otra toma.")
 
     con = _con()
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
