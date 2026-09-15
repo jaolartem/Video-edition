@@ -518,6 +518,7 @@ def main():
               _un_buzon_sin_oficio_no_existe,
               _un_seguro_que_no_puede_fallar_no_es_un_seguro,
               _el_segundo_dice_de_que_video_es,
+              _del_corte._lo_publicado_queda_escrito,
               _del_corte._lo_firmado_se_puede_volver_a_poner,
               _del_corte._el_corte_nace_derivado):
         try:

@@ -1,4 +1,4 @@
-"""La prueba de humo **del corte**: lo que se firmó y lo que se deriva.
+"""La prueba de humo **de la pieza**: su corte, su firma y su salida.
 
 `humo.py` mide la línea —el marcador, los buzones, las guardas, el motor— y
 esto mide el otro sustantivo: **el montaje de una pieza**. Estaban juntas
@@ -80,3 +80,23 @@ def _el_corte_nace_derivado(h):
                f"y derivar sobre lo ya derivado no mueve el corte ({antes})")
     finally:
         shutil.move(copia, ruta)
+
+
+def _lo_publicado_queda_escrito(h):
+    """La tabla `publicacion` se llena cuando algo sale. C-511.
+
+    Estuvo declarada desde el principio con **cero filas**: nadie la escribía y
+    `donde.py` la leía, así que preguntaba «¿se publicó?» a un sitio que no
+    podía contestar nunca.
+    """
+    import inspect
+
+    import basedatos
+    import publicar
+
+    cx = basedatos.abrir("ads/decisiones.db")
+    n = cx.execute("select count(*) from publicacion").fetchone()[0]
+    cx.close()
+    h.mide("C-511", n > 0, f"{n} publicacion(es) escritas en la base")
+    h.mide("C-511", "anotar(" in inspect.getsource(publicar.main),
+           "y publicar la anota, no solo copia el fichero")

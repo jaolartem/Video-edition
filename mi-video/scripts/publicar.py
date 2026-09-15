@@ -162,6 +162,38 @@ def listas(con):
     return out
 
 
+def anotar(slug, destino, con=None):
+    """**Queda escrito que esa pieza salió, y adónde.**
+
+    La tabla `publicacion` estaba declarada desde el principio y **con cero
+    filas**: nadie la escribía. `donde.py` tiene una columna que la lee, así que
+    preguntaba «¿se publicó?» a un sitio que no podía contestar nunca — un
+    consumidor sin productor, que es la avería de C-207 con el signo cambiado.
+
+    Y se nota cuando algo sale por fuera: R-13 se publicó el 15-9 y la línea
+    seguía diciendo `aprobado`. Jaime: *«pues ya salió y ya lo publiqué»*. Una
+    pieza que está en la calle y que el sistema cree parada es exactamente el
+    estado que este proyecto existe para no perder.
+
+    Devuelve la versión anotada, o `None` si la pieza no tiene ninguna.
+    """
+    cerrar = con is None
+    con = con or basedatos.abrir(BASE)
+    v = con.execute(
+        "select ve.id from version ve join video vi on vi.id = ve.video_id"
+        " where vi.slug = ? order by ve.n desc limit 1", (slug,)).fetchone()
+    if v:
+        con.execute(
+            "insert or replace into publicacion (version_id, destino, fecha)"
+            " values (?,?,?)",
+            (v[0], destino,
+             datetime.datetime.now().isoformat(timespec="seconds")))
+        con.commit()
+    if cerrar:
+        con.close()
+    return v[0] if v else None
+
+
 def subir(origen, destino, seco):
     if seco:
         return False
@@ -174,6 +206,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fragmentos", action="store_true")
     ap.add_argument("--finales", action="store_true")
+    # **Lo que sale por fuera de la linea tambien se anota.** Jaime publica a
+    # mano cuando hace falta —R-13, el 15-9— y sin esto la pieza se queda en
+    # `aprobado` para siempre: en la calle y el sistema creyendola parada.
+    ap.add_argument("--ya-esta", nargs="+", metavar="PIEZA", dest="ya_esta",
+                    help="anota que esas piezas ya salieron, sin subir nada")
+    ap.add_argument("--en", default="a mano, destino sin declarar",
+                    metavar="DONDE", help="adonde salieron")
     ap.add_argument("--revision", action="store_true",
                     help="sube LAS SEIS a FINALES/_revision para verlas montadas."
                          " No es publicar: es enseñar")
@@ -183,6 +222,26 @@ def main():
 
     con = basedatos.abrir(BASE)
     con.execute("PRAGMA foreign_keys = ON")
+
+    if a.ya_esta:
+        from dominio import fase as _fa
+
+        fid = con.execute("select id from fase where nombre = 'publicado'"
+                          ).fetchone()
+        for x in a.ya_esta:
+            n = int("".join(c for c in str(x) if c.isdigit()))
+            slug = f"reel-{n:02d}"
+            v = anotar(slug, a.en, con)
+            vid = con.execute("select id from video where slug = ?",
+                              (slug,)).fetchone()
+            # La etiqueta tambien, que es lo que mira la linea para no volver
+            # a trabajar sobre ella.
+            if fid and vid:
+                _fa.anotar(vid[0], fid[0], f"salio {a.en}"[:400])
+            print(f"{slug}: " + (f"anotada como publicada (v{v}) en {a.en}"
+                                 if v else "no tiene version que anotar"))
+        con.close()
+        return
 
     # **Aquí es donde el motivo pesa, y no antes.**
     #
@@ -295,6 +354,10 @@ def main():
                 subir(mp4, os.path.join(raiz, f"{pieza}.mp4"), seco)
                 subir(ver, os.path.join(raiz, f"{pieza}.verificacion.md"), seco)
                 registro.nota("publicar", "pieza subida", detalle=pieza)
+                # Y en la base, no solo en el log: el registro se lee con los
+                # ojos y la tabla la lee `donde.py`.
+                anotar(pieza.lower().replace("reel-r", "reel-").replace(
+                    "reel-", "reel-").strip(), raiz, con)
         if not hay:
             print("  nada listo para salir.")
 
