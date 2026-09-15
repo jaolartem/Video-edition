@@ -103,8 +103,28 @@ def listas(con):
             edl = json.load(open(edl_p, encoding="utf-8"))
             # Un tablero ejecuta la etapa: sin_toma con `copy` es una lectura
             # plana trasladada a proposito, no un hueco.
-            faltan = [h for h in edl.get("sin_toma", [])
-                      if h.get("obligatorio") and not h.get("copy")]
+            # **Y lo que el aprobo no se vuelve a discutir aqui.** Regla suya,
+            # 1-9-2026: *«lo que ya se aprobo no se vuelve a discutir: se revisa
+            # que este como se dijo»*. Las dos comprobaciones de abajo —etapa
+            # sin material y segmentos que no encajan— son criterio editorial:
+            # existen para que nadie publique una pieza que nadie miro. Cuando
+            # el ya la miro y la aprobo, seguir oponiendolas es pedirle una
+            # segunda opinion sobre su propia decision.
+            #
+            # Lo que NO cede es lo mecanico —sin EDL, EDL del proceso anterior,
+            # entrega anterior al EDL, verificacion anterior a la entrega—:
+            # eso no es opinion, es «¿esta como se dijo?», y una aprobacion de
+            # ayer no responde por un fichero que cambio despues.
+            #
+            # Medido el 14-9-2026: reel-13 aprobada por el, con su musica y su
+            # voz limpia, y la puerta la paraba por la etapa 4 —cobertura 0,333
+            # sobre 0,889—, que es exactamente lo que el habia decidido dejar
+            # como esta. C-499.
+            from dominio.segmento import aprobada as _aprobada
+
+            suya = _aprobada(slug)
+            faltan = [] if suya else [h for h in edl.get("sin_toma", [])
+                                      if h.get("obligatorio") and not h.get("copy")]
             if faltan:
                 pega.append("etapa obligatoria sin material: " +
                             ", ".join(f"{h['beat']} ({h['etapa']})" for h in faltan))
@@ -112,10 +132,11 @@ def listas(con):
             # dato declarado o si se acerca a lo alcanzable en su etapa. La
             # cobertura absoluta medía literalidad contra el libreto, no si el
             # segmento cumple.
-            flojos = [d["beat"] for d in edl.get("detalle", [])
-                      if not (d.get("dice")
-                              or (d.get("cobertura") or 0)
-                              >= max(ENCAJE, 0.5 * (d.get("cubre_max") or 0)))]
+            flojos = [] if suya else [
+                d["beat"] for d in edl.get("detalle", [])
+                if not (d.get("dice")
+                        or (d.get("cobertura") or 0)
+                        >= max(ENCAJE, 0.5 * (d.get("cubre_max") or 0)))]
             if flojos:
                 pega.append(f"segmentos que no encajan: {flojos}")
             # **Un EDL del proceso viejo no puede pasar por la puerta nueva.**

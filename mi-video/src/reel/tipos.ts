@@ -58,6 +58,16 @@ export type ReelSpec = {
   entra: number;
   /** Frames que se sostiene dentro del cuadro antes de salir. */
   sostiene: number;
+  /**
+   * La portada de la pieza, si la declara. La pinta `Cover` sobre su propio
+   * fotograma; no se saca del render, que traeria el rotulo y el CC quemados.
+   */
+  portada?: {
+    titulo: string;
+    subtitulo?: string;
+    fotograma: string;
+    por_que?: string;
+  } | null;
   cta: {
     at: number;
     dur: number;

@@ -66,6 +66,46 @@ def nivel(slug):
     d = leer()
     return d["piezas"].get(slug, d["por_defecto"])
 
+
+def medido_contra(slug):
+    """Contra qué objetivo se midió el nivel de esa pieza. `None` si no consta."""
+    return leer().get("medido_contra", {}).get(slug)
+
+
+def al_dia(slug) -> bool:
+    """Si su `MUSI` responde al objetivo que rige HOY.
+
+    **Un nivel no caduca por viejo, caduca por cambiar la pregunta.** El 15-9
+    se movió `objetivo_db` de 18 a 26 y los ocho niveles guardados siguieron
+    siendo números perfectamente medidos — sólo que contra otra separación. Sin
+    esto, el fichero decía 26 y el audio sonaba a 18 y no había forma de verlo
+    salvo volviendo a mezclar las catorce.
+
+    Se contesta comparando, no recalculando: mover el nivel sin medirlo es
+    escribir un número que dice «medido» y no lo está. C-501.
+    """
+    c = medido_contra(slug)
+    return c is not None and abs(c - objetivo(slug)) < 0.05
+
+
+def objetivo(slug=None):
+    """Cuántos dB bajo la voz tiene que quedar SU cama.
+
+    **Por pieza, igual que el nivel, y por el mismo motivo.** `por_defecto` no
+    podía servir a siete obras distintas y `objetivo_db` tampoco: la separación
+    que hace que una guitarra sola acompañe deja una cuerda entera encima de la
+    voz. Jaime, 14-9-2026, oyendo reel-13 entregada a los 18 dB de lote:
+    *«bájale un poco a la música del video, quedó muy alta»*.
+
+    Y va aquí y no como un número suelto en quien mezcla: bajarlo sin
+    declararlo lo habría deshecho `calibrar-cama.py` en la siguiente vuelta,
+    que busca justamente hasta caer en el objetivo. C-500.
+    """
+    d = leer()
+    if slug is None:
+        return d["objetivo_db"]
+    return d.get("objetivos", {}).get(slug, d["objetivo_db"])
+
 #: Ventana de análisis, en segundos. Tres es lo que la norma de sonoridad llama
 #: «corto plazo»: por debajo persigue notas sueltas y por encima difumina el
 #: crescendo, que es justo lo que hay que ver.
@@ -166,7 +206,7 @@ def main():
         if que == "nivel":
             print(nivel(sys.argv[2]))
         elif que == "objetivo":
-            print(leer()["objetivo_db"])
+            print(objetivo(sys.argv[2] if len(sys.argv) > 2 else None))
         elif que == "cola":
             print(leer().get("cola_s", 0.6))
         else:

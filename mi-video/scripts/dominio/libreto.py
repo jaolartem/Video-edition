@@ -49,7 +49,11 @@ FRAMES = os.path.join("ads", "frames.json")
 CIERRE = ("promesa", "urgencia", "registro", "aplicación", "aplicacion")
 
 #: Lo que declara una pieza derivada. Lo demás se hereda de su origen.
-DECLARA = ("_deriva", "deriva_de", "pilar", "cara", "lectura", "quita")
+#: `portada` está aquí porque **es suya y no de su origen**: lleva el fotograma
+#: de SU corte. reel-13 y reel-06 dicen lo mismo y se ven distinto, así que
+#: heredar la portada seria poner la cara de otro montaje en la miniatura.
+DECLARA = ("_deriva", "deriva_de", "pilar", "cara", "lectura", "quita",
+           "portada")
 
 #: Lo del origen que una derivada NO hereda: todo es del cierre que se corta.
 #: `debe_decir` de pieza lleva las cifras de ese cierre (reel-01: «550|576»).

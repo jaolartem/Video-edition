@@ -211,6 +211,17 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
     entra: caminos.find((c) => c.tipo === "titular" || c.tipo === "rotulo")?.at
       ?? entra,
     sostiene: SOSTIENE,
+    /**
+     * **La portada, si la pieza la declara.** Va tal cual de `frames.json` a
+     * `Cover`: título, subtítulo y el fotograma de SU corte.
+     *
+     * No se compone aquí ni se saca del render: una portada sacada del vídeo
+     * arrastra el rótulo y el subtítulo quemados, y entonces la miniatura
+     * cuenta media frase del segundo 2 en vez de decir de qué va la pieza.
+     * Jaime, 14-9-2026: *«el título debe ser el del vídeo y el cc puede servir
+     * de subtítulo más centrado, y así no sea un CC»*. C-498.
+     */
+    portada: FRAMES.reels[slug].portada ?? null,
     cta,
     captions: marca.captions,
     // Y el plano que suena dos veces va en gris la primera: `reels/eco.mjs`.

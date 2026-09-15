@@ -116,6 +116,28 @@ export const MyComposition = () => {
         />
       ))}
       {/**
+       * **La portada de cada pieza que la declara**, sobre su propio plano.
+       *
+       * Las de arriba son las muestras del sistema; éstas son las de verdad, y
+       * salen del spec —o sea de `frames.json`— igual que todo lo demás. Un
+       * fotograma con la fecha correcta y el texto centrado no es lo mismo que
+       * una captura del vídeo: la captura trae el CC del segundo en que se
+       * hizo. C-498.
+       */}
+      {REELS.filter((r) => r.portada).map((r) => (
+        <Pieza
+          key={`portada-${r.id}`}
+          id={`Portada-${r.id}`}
+          componente={Cover}
+          dura={90}
+          props={{
+            hook: r.portada!.titulo,
+            subtitulo: r.portada!.subtitulo,
+            fotograma: r.portada!.fotograma,
+          }}
+        />
+      ))}
+      {/**
        * Los seis reels completos: montaje + subtítulos + rótulo + CTA.
        * La duración sale del spec generado, no de un número escrito a mano.
        */}

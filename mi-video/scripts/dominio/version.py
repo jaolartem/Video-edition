@@ -33,6 +33,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -98,3 +99,85 @@ def registrar_version(slug, fichero=None, commit=None):
     vid = cur.lastrowid
     con.close()
     return vid
+
+#: Cuanto puede alejarse la entrega del corte declarado, en tanto por uno.
+#:
+#: **Medido, no elegido.** El 14-9-2026 se compararon las diecisiete piezas
+#: contra su `duracion_montada_s`: once caian dentro de ±1,6% —las costuras y
+#: las transiciones mueven decimas— y seis estaban a −4,6% o peor, hasta el
+#: −14,7% de reel-13. Entre 1,6 y 4,6 no hay ninguna, asi que el 2% parte los
+#: dos grupos sin rozar a ninguno. Si un dia una pieza sana cae en el 2%, se
+#: sube el numero con la medida delante, no a ojo.
+MARGEN = 0.02
+
+
+def _dura(fichero):
+    """Lo que dura un fichero segun ffprobe, o `None` si no se puede medir."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", fichero],
+            capture_output=True, text=True, timeout=60)
+        return float(r.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def cuadra_con_el_json(slug, fichero, margen=MARGEN):
+    """**Lo que se entrega tiene que durar lo que el corte dice que dura.**
+
+    Jaime, 14-9-2026: *«solo hay una fuente de verdad, el Json, todo se
+    contrasta con el Json»*, y el porque de que esto exista: *«porque los
+    ficheros se modificaron sin criterio y sin tener en cuenta al Json»*.
+
+    `duracion_montada_s` estaba escrita en el EDL y la leian seis ficheros del
+    dominio, **todos del lado de construir el corte**. Del lado de sacarlo no la
+    miraba nadie —ni `verificar.py`, ni `cadena.py`, ni `montar.sh`, ni
+    `musica.sh`—, asi que ningun paso llegaba a preguntar «¿lo que acabo de
+    escribir dura lo que el JSON dice?». Por eso reel-13 se entrego con 51,90 s
+    de un corte de 60,83 sin que fallara nada: se escribio el fichero fuera de
+    su fase y no habia quien lo desmintiera.
+
+    Devuelve `None` cuando **cuadra o no se puede medir**, y el aviso cuando no.
+    No medir no es aprobar: se dice, igual que hace la separacion de la cama con
+    un stem de otro corte (C-243), porque un numero falso es peor que ninguno.
+    """
+    e = _edl(slug)
+    dice = (e or {}).get("duracion_montada_s")
+    if not dice:
+        return None
+    # **Y se contrasta en el reloj de la entrega, no en el del corte.**
+    #
+    # `duracion_montada_s` mide el corte a 1x. Cuando la voz limpia entra, la
+    # entrega sale a `VELOCIDAD` —decision de Jaime oyendo el lote, *«la
+    # velocidad vamos a aumentarla a 1.15»*—, asi que restarle el corte sin
+    # dividir acusa de -14,4% a una pieza que esta a -1,6%: eso le paso a
+    # reel-13 el 14-9-2026 y paro la linea con la pieza bien hecha.
+    #
+    # Medido el mismo dia sobre las diecisiete: las cuatro que habian pasado
+    # por `acelerar` —reel-02, -06, -12, -13— salian entre -9,6% y -14,4%, y
+    # las trece que no, dentro de +-1,6%. O sea que el desvio no era de las
+    # piezas: era de comparar dos relojes. Dividir solo las aceleradas deja a
+    # las diecisiete dentro del margen. C-495.
+    #
+    # Quien sabe si esta acelerada es la pieza, que es de quien es el dato; y
+    # `VELOCIDAD` se importa de `beats`, su dueno. Los dos imports van aqui
+    # dentro porque `beats` come del dominio: al reves es un ciclo.
+    from beats import VELOCIDAD
+    from dominio.pieza import Pieza
+
+    acelerada = Pieza(int(slug.rsplit("-", 1)[1])).acelerada
+    debe = dice / VELOCIDAD if acelerada else dice
+    hay = _dura(fichero)
+    if hay is None:
+        return (f"{slug}: NO SE PUDO MEDIR {fichero} — el JSON dice"
+                f" {dice:.2f}s y no hay con que contrastarlo")
+    d = hay - debe
+    if abs(d) <= debe * margen:
+        return None
+    reloj = (f" (el corte declara {dice:.2f}s a 1x y esta sale a {VELOCIDAD}x)"
+             if acelerada else "")
+    return (f"{slug}: la entrega dura {hay:.2f}s y deberia durar {debe:.2f}s"
+            f"{reloj} ({d:+.2f}s, {d / debe * 100:+.1f}%). Manda el JSON: o el"
+            f" fichero se escribio fuera de su paso, o el corte cambio y nadie"
+            f" lo volvio a sacar.")
