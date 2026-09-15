@@ -472,6 +472,33 @@ def _un_seguro_que_no_puede_fallar_no_es_un_seguro(h):
            "y montar.sh ya no tiene la rama que nunca corria")
 
 
+def _el_segundo_dice_de_que_video_es(h):
+    """Las dos escalas, y una sola VELOCIDAD en todo Python. C-501.
+
+    La entrega va acelerada y el montaje no —medido sobre las siete piezas, un
+    factor de 1,13 a 1,20—, así que «el segundo 30» son dos sitios distintos.
+    Había tres constantes llamadas `VELOCIDAD`: una en 1,15 que sí acelera, y
+    dos en 1,0 que sólo dividían por uno.
+    """
+    import glob
+
+    import beats
+    from dominio import ticket as _tk
+
+    con_nombre = []
+    for f in glob.glob(os.path.join("scripts", "**", "*.py"), recursive=True):
+        for l in io.open(f, encoding="utf-8", errors="replace"):
+            if l.startswith("VELOCIDAD ="):
+                con_nombre.append(f.replace(chr(92), "/"))
+    h.mide("C-501", con_nombre == ["scripts/beats.py"],
+           f"una sola VELOCIDAD en Python: {con_nombre or 'ninguna'}")
+    treinta, movido = _tk.a_montaje(30, "entrega")
+    h.mide("C-501", abs(treinta - 30 * beats.VELOCIDAD) < 1e-6 and movido > 0,
+           f"30s de la entrega son {treinta}s del montaje ({movido:+}s)")
+    h.mide("C-501", _tk.a_montaje(30, "montaje") == (30.0, 0.0),
+           "y 30s del montaje no se mueven")
+
+
 def main():
     import humo_del_corte as _del_corte
 
@@ -490,6 +517,7 @@ def main():
               _ilegible_vuelve_a_la_cola,
               _un_buzon_sin_oficio_no_existe,
               _un_seguro_que_no_puede_fallar_no_es_un_seguro,
+              _el_segundo_dice_de_que_video_es,
               _del_corte._lo_firmado_se_puede_volver_a_poner,
               _del_corte._el_corte_nace_derivado):
         try:

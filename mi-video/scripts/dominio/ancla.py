@@ -25,15 +25,19 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# **1, no 1,15: no hay que acelerar nada.** Jaime, al ver las duraciones reales:
-# *«ninguno hay que acelerar la verdad, todos estan por debajo de los 120 y en
-# el rango de los 90s»*. A velocidad natural el lote va de 47,6 a 118,5 s, con
-# cuatro de seis entre 72 y 89 — que es formato corto sin forzar nada.
-#
-# Y quita de la cadena la resintesis mas grande. `rubberband` no es un filtro:
-# reconstruye la senal. Con la voz limpiada fuera eran **dos resintesis
-# encadenadas**, y ahi es donde empezo a sonar a papilla.
-VELOCIDAD = 1.0
+#: **Aquí no hay factor de velocidad, y decirlo importa.**
+#:
+#: Esta constante estuvo en 1,15 —el montaje se aceleraba— y bajó a 1,0 cuando
+#: dejó de acelerarse en esta escala. Lo que quedó fue una constante que vale
+#: 1 dividiendo en cinco sitios: **identidad disfrazada de conversión**. Y con
+#: el mismo nombre que `beats.VELOCIDAD`, que vale 1,15 y sí hace algo: acelera
+#: la entrega. Dos constantes con un nombre y dos significados es la avería que
+#: este proyecto ya conoce con `limpio`, con `norm` y con `VOCABULARIOS`.
+#:
+#: El EDL, el plan y el render viven todos en tiempo de cinta, así que aquí no
+#: se convierte nada. **Lo que sí hay que convertir es un tiempo dictado
+#: mirando la ENTREGA**, que va a `beats.VELOCIDAD`, y eso se hace donde ese
+#: tiempo entra —`dominio/ticket.py`—, no repartido por las fórmulas.
 
 
 def slug_de(edl):
@@ -52,9 +56,9 @@ def montado_a_cinta(edl, t_montado):
     """
     t = 0.0
     for i, (a, b) in enumerate(edl["segmentos"]):
-        dur = (b - a) / VELOCIDAD
+        dur = b - a
         if t_montado <= t + dur + 1e-6:
-            return i, a + (t_montado - t) * VELOCIDAD
+            return i, a + (t_montado - t)
         t += dur
     return len(edl["segmentos"]) - 1, edl["segmentos"][-1][1]
 
@@ -113,10 +117,10 @@ def por_ancla(edl, ancla, slug="", cual=1):
             # **el corte cae donde no es**. Reel-01 perdio media etapa 2 y el
             # cierre entero por esto.
             if _tr.suena(w, rango[0], rango[1]):
-                dentro = (w["start"] - rango[0]) / VELOCIDAD
+                dentro = w["start"] - rango[0]
                 linea.append((limpio(w["text"]).strip(), t + dentro,
-                              t + (w["end"] - rango[0]) / VELOCIDAD))
-        t += (rango[1] - rango[0]) / VELOCIDAD
+                              t + (w["end"] - rango[0])))
+        t += rango[1] - rango[0]
     pal = [x[0] for x in linea]
     visto = 0
     for i in range(len(pal) - len(obj) + 1):

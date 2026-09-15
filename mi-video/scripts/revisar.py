@@ -46,7 +46,6 @@ RAIZ = os.path.join("work", "revision")
 # Y quita de la cadena la resintesis mas grande. `rubberband` no es un filtro:
 # reconstruye la senal. Con la voz limpiada fuera eran **dos resintesis
 # encadenadas**, y ahi es donde empezo a sonar a papilla.
-VELOCIDAD = 1.0
 
 
 # El apodo lo hace `dominio.texto`, que es el dueño de cómo se normaliza un
@@ -109,7 +108,7 @@ def main():
 
         for orden, etapa, a0, b0, escenas, fid in filas:
             cinta = cinta_de(fid)
-            ini, dur = a0 / VELOCIDAD, (b0 - a0) / VELOCIDAD
+            ini, dur = a0, b0 - a0
             salida = os.path.join(carpeta, f"{orden:02d}-{apodo(etapa)}.mp4")
             r = subprocess.run(
                 ["ffmpeg", "-v", "error", "-y", "-ss", f"{ini:.3f}",

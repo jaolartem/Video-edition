@@ -169,82 +169,10 @@ def _con():
 
 
 #: «No pude mirar», que no es «no cae en ninguna etapa». Ver `beat_en`.
-SIN_EDL = object()
-
-
-def _por_el_plan(pieza, segundo):
-    """El beat según **el plan**, que es la línea que se renderiza.
-
-    Devuelve `None` si no hay plan que leer, para que el EDL siga de respaldo.
-    """
-    ruta = os.path.join(RAIZ, "work", "scenes", pieza, "plan-full.json")
-    if not os.path.exists(ruta):
-        return None
-    try:
-        escenas = json.load(open(ruta, encoding="utf-8")).get("escenas") or []
-    except (OSError, ValueError):
-        return None
-    for e in escenas:
-        a = float(e.get("montado_desde", 0.0))
-        if a <= segundo < a + float(e.get("duracion", 0.0)):
-            b = e.get("beat", e.get("etapa_orden"))
-            return None if b is None else int(b)
-    return None
-
-
-def beat_en(pieza, segundo):
-    """Qué etapa cae en ese segundo de la pieza montada.
-
-    ## El reloj es el del PLAN, no el del EDL
-
-    Se recorría el EDL sumando duraciones, y el EDL **no es el reloj de la
-    pieza**: `plan-reel` le quita el aire a cada corte antes de repartirlo en
-    escenas —regla de Jaime, *«lo de los silencios también puede ser
-    aritmético»*— así que la imagen corre sobre una línea más corta. Está medido
-    en `reels/reloj.mjs`: 6,83 s en reel-01, y **el desfase crece hacia el
-    final**.
-
-    Consecuencia, medida el 6-9-2026 al abrir tres tickets sobre reel-07: el del
-    segundo 38 se archivó en la etapa 3 teniendo que ser la 4, y el del 63 en la
-    5 teniendo que ser la 6. Dos de tres, y las dos al final de la pieza, que es
-    donde vive el CTA.
-
-    Y no es un error de etiqueta: `dominio/abierto.py` empareja ticket y etapa
-    **por beat**, así que un ticket mal colocado abre en el pedido de diseño la
-    lámina de al lado. Es justo lo que este fichero declara que viene a evitar —
-    *«atender la objeción en la etapa equivocada es peor que no atenderla»*— y
-    lo hacía con la lista equivocada. Aprendizaje 33 otra vez: **manda la que se
-    renderiza**.
-
-    El EDL se queda de respaldo para la pieza que todavía no tiene plan: ahí es
-    la única referencia que hay, y una aproximación declarada vale más que un
-    `None`.
-
-    **Y distingue dos «no» que no son el mismo.** `None` es «ese segundo no cae
-    en ninguna etapa», que es una respuesta; `SIN_EDL` es «no pude leer el EDL»,
-    que no lo es. Confundirlos es lo que hacia que `recolocar` borrase el beat
-    bueno de cinco tickets por abrir un fichero en la ruta equivocada: borrar un
-    dato porque no se pudo comprobar es peor que no comprobarlo.
-    """
-    if segundo is None:
-        return None
-    porPlan = _por_el_plan(pieza, segundo)
-    if porPlan is not None:
-        return porPlan
-    ruta = os.path.join(RAIZ, "ads", pieza, "edl-sell.json")
-    if not os.path.exists(ruta):
-        return SIN_EDL
-    try:
-        edl = json.load(open(ruta, encoding="utf-8"))
-    except (OSError, ValueError):
-        return SIN_EDL
-    t = 0.0
-    for (a, b), det in zip(edl.get("segmentos", []), edl.get("detalle", [])):
-        dur = float(b) - float(a)
-        if t <= segundo < t + dur:
-            return det.get("beat")
-        t += dur
-    return None
+#: Lo que era de aquí y hoy es del reloj. Se reexporta porque medio
+#: proyecto lo pide como `ticket.SIN_EDL`, y mover una constante no tiene
+#: por qué romper a sus lectores.
+from .reloj import SIN_EDL, a_montaje, beat_en  # noqa: E402,F401
 
 
 def _beat(pieza, segundo):
@@ -253,12 +181,26 @@ def _beat(pieza, segundo):
     return None if b is SIN_EDL else b
 
 
+#: Las dos escalas en que puede venir un segundo dictado, y cuánto vale cada
+#: una en tiempo de montaje —que es la escala del EDL, del plan y de `beat_en`.
+#:
+#: **La entrega va acelerada y el montaje no.** Medido sobre las siete piezas:
+#: el corte declarado y el fichero entregado se llevan un factor de 1,13 a 1,20
+#: (reel-04: 79,2 s de corte, 68,5 s entregados). Así que «el segundo 30» no
+#: quiere decir lo mismo mirando `out/entrega` que mirando `out/reels`, y la
+#: diferencia crece hacia el final de la pieza, que es donde vive el CTA.
+#:
+#: Jaime, 14-9-2026, al preguntarle qué mira cuando dicta un segundo: *«unas
+#: veces una y otras otra»*. Con eso, adivinarlo es apostar: se declara.
+ESCALAS = {"entrega": None, "montaje": 1.0}
+
+
 class SinEscena(Exception):
     """Un tiquet que no dice a que escena va. Ver `abrir`."""
 
 
 def abrir(pieza, dijo, segundo=None, tipo="objecion",
-          vuelve_a=None, cierra_con=None, etapa=None):
+          vuelve_a=None, cierra_con=None, etapa=None, de="montaje"):
     """Apunta una observación suya, **con quién la atiende y quién la cierra**.
 
     Los dos se declaran aquí y no se deducen después: un ticket sin paso al que
@@ -285,6 +227,15 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     # o «la pieza entera» a proposito— y **no se admite el silencio**, que era
     # lo unico que no se distinguia de un descuido. La pieza entera es legitima:
     # «no explica el mecanismo» no es de una escena.
+    # **El segundo se trae a la escala del montaje antes de buscar su etapa.**
+    # La columna dice «en la pieza montada» y `beat_en` busca en el reloj del
+    # plan, que es esa escala; lo que Jaime dicta suele ser de la entrega, que
+    # va acelerada. Sin esta linea el tiquet se archivaba en la etapa de al
+    # lado y el pedido de diseno abria la lamina equivocada.
+    segundo, movido = a_montaje(segundo, de)
+    if movido:
+        print(f"  {pieza}: el segundo dictado sobre la {de} cae en el"
+              f" {segundo:.1f} del montaje ({movido:+.1f}s)")
     beat = _beat(pieza, segundo)
     if beat is None or beat is SIN_EDL:
         from . import abierto as _ab
@@ -653,6 +604,15 @@ def main():
     ap.add_argument("--cerrar", nargs=2, metavar=("ID", "RESPUESTA"))
     ap.add_argument("--ruta", nargs=2, metavar=("ID", "FASE"))
     ap.add_argument("--estado", default="arreglado")
+    # **De cuál de las dos piezas es el segundo.** No hay valor por defecto a
+    # propósito: la entrega va acelerada y el montaje no —medido en las siete,
+    # factor 1,13 a 1,20— así que «el segundo 30» son dos sitios distintos y la
+    # diferencia crece hacia el final. Jaime, al preguntárselo: *«unas veces una
+    # y otras otra»*. Lo que no se puede adivinar se declara, igual que la
+    # escena.
+    ap.add_argument("--de", choices=("entrega", "montaje"), default=None,
+                    help="de qué vídeo es el segundo: la entrega (out/entrega,"
+                         " acelerada) o el montaje (out/reels)")
     a = ap.parse_args()
 
     if a.ruta:
@@ -675,8 +635,12 @@ def main():
         # **El segundo es opcional, el texto no.** Un ticket sin sus palabras no
         # es un ticket: es una marca que nadie sabe atender.
         ap.error("hace falta la pieza y lo que dice; el segundo es opcional")
+    if a.segundo is not None and a.de is None:
+        ap.error("di de qué vídeo es el segundo: `--de entrega` (lo que se"
+                 " publica, acelerado) o `--de montaje` (out/reels). Se llevan"
+                 " un 15%, y a los 60 s son 9 segundos de diferencia.")
     seg = float(str(a.segundo).replace(",", ".")) if a.segundo else None
-    i = abrir(a.pieza, a.dijo, seg, a.tipo, vuelve_a=a.paso)
+    i = abrir(a.pieza, a.dijo, seg, a.tipo, vuelve_a=a.paso, de=a.de or "montaje")
     t = [x for x in historia(a.pieza) if x["id"] == i][0]
     print("apuntado:")
     print(_texto(t))

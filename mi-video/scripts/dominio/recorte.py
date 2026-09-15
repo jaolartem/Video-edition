@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import basedatos  # noqa: E402
 
-from .ancla import VELOCIDAD, montado_a_cinta  # noqa: E402
+from .ancla import montado_a_cinta  # noqa: E402
 
 
 def dar_por_hecha(slug, nota_id):
@@ -142,7 +142,7 @@ def guardar(ruta, edl, hechos, ya):
     # dura.
     edl["duracion_s"] = round(sum(b - a for a, b in edl["segmentos"]), 2)
     edl["duracion_montada_s"] = round(
-        sum((b - a) / VELOCIDAD for a, b in edl["segmentos"]), 2)
+        sum(b - a for a, b in edl["segmentos"]), 2)
     rev = dict(edl.get("revision") or {})
     rev["revision_final"] = " · ".join(
         f"{d:.0f}-{h:.0f}s: {q[:70]}" for _, d, h, q in hechos)

@@ -59,7 +59,7 @@ CLAVES = (
           nota="No obligatoria: un ticket sin etapa sigue siendo un ticket, y"
                " `ticket.beat_en` lo recoloca desde el segundo en cada corrida."),
     Clave("segundo",
-          dispara=(Aguja("scripts/dominio/ticket.py", "def beat_en(pieza, segundo):"),),
+          dispara=(Aguja("scripts/dominio/reloj.py", "def beat_en(pieza, segundo):"),),
           efecto="traduce a la etapa donde cae hoy, aunque el corte cambie",
           nota="El segundo de la pieza MONTADA, que es lo que se ve. Es el dato"
                " que hace utilizable la objeción: sin él hay que volver a"
