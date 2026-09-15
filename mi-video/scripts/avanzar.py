@@ -40,6 +40,7 @@ BASE = "ads/decisiones.db"
 # importan con su nombre de siempre porque `donde.py` y `aprobar.py` ya
 # los llaman así, y mover algo no tiene por qué romper a quien lo usa.
 from dominio import abierto as _abierto  # noqa: E402
+from dominio import oficio as _oficio  # noqa: E402
 from dominio.fase import (  # noqa: E402,F401
     _con, _fallo_antes, _render_caduco, ESLABON_DE, VUELVE_SI_CADUCO, anotar,
     antes_de, camino, fase_de)
@@ -578,9 +579,10 @@ def _una_vuelta(a) -> int:
     return sum(total.values())
 
 
-DE_QUIEN = {"disenar": "disenado", "describir": "descrito", "repaso": "repasado",
-            "redundancia": "sin_redundancia", "revalidar": "revalidado",
-            "revisar": "revisado", "visto": "visto", "fuentes": "respaldado"}
+#: Qué fase mueve cada buzón. **Se pregunta, no se copia**: la tabla vive en
+#: `dominio/oficio.py`, que es quien sabe de buzones. Escrita aquí eran dos
+#: listas, y estas dos ya habían divergido.
+DE_QUIEN = _oficio.LA_FASE
 
 
 def _contestadas_tarde() -> list:

@@ -52,9 +52,34 @@ ESPERA = 900
 #: **Y la redundancia es del compositor** (Jaime, 11-9-2026: *«deberían ir con
 #: contrato del agente de composición»*). Iban por `claude -p` genérico, sin el
 #: contrato ni la capa de tiquets: la avería que ya describe `servicio.pedir`.
-DE = {"describir": "compositor", "disenar": "disenador", "visto": "disenador",
-      "redundancia": "compositor", "revisar": "compositor",
-      "revalidar": "compositor", "repaso": "compositor"}
+#: **Un buzon, y las dos cosas que se saben de el: quien lo atiende y que fase
+#: mueve.** Estaba escrito tres veces —aqui el oficio, en `avanzar.DE_QUIEN` la
+#: fase, y `turno.BUZON` dandole la vuelta a la segunda importando el motor
+#: entero para eso—. Ya habian divergido una vez: `revisar` estaba en una y no
+#: en la otra, y un oficio suscrito a un paso real se quedaba sin buzon.
+#:
+#: **Y `fuentes` entra.** Estaba en la tabla de fases y no en la de oficios, asi
+#: que su pedido se escribia y no habia a quien llamar: un buzon que nadie
+#: atiende es una pieza esperando a nadie. Va al compositor por lo mismo que la
+#: redundancia (Jaime, 11-9-2026: *«deberian ir con contrato del agente de
+#: composicion»*): lo que se comprueba es de donde sale una cifra del texto, y
+#: el texto es suyo.
+BUZONES = {
+    "describir":   ("compositor", "descrito"),
+    "disenar":     ("disenador",  "disenado"),
+    "visto":       ("disenador",  "visto"),
+    "redundancia": ("compositor", "sin_redundancia"),
+    "revisar":     ("compositor", "revisado"),
+    "revalidar":   ("compositor", "revalidado"),
+    "repaso":      ("compositor", "repasado"),
+    "fuentes":     ("compositor", "respaldado"),
+}
+
+#: Qué oficio contesta cada buzón. Los nombres son los de `.claude/agents/`.
+DE = {b: quien for b, (quien, _f) in BUZONES.items()}
+
+#: Qué fase mueve cada buzón. La misma tabla, leída por la otra columna.
+LA_FASE = {b: fase for b, (_q, fase) in BUZONES.items()}
 
 #: Si la línea lanza el CLI por bash para contestar. **Temporal, apagado.**
 #: Jaime, 11-9-2026: *«me quedé sin tokens, los pasos de los agentes no los

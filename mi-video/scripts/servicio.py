@@ -646,8 +646,30 @@ def recoger(paso, slug):
     if not os.path.exists(p):
         return None
     try:
-        d = json.load(open(p, encoding="utf-8"))
+        # **Con `with`, y no es estilo.** `json.load(open(...))` deja el fichero
+        # abierto cuando el JSON revienta —el `open` nunca se cierra—, y en
+        # Windows un fichero abierto no se puede mover: el archivado de abajo
+        # moria con `PermissionError` y se llevaba por delante al paso entero.
+        # O sea que el arreglo del atasco causaba uno peor.
+        with io.open(p, encoding="utf-8") as h:
+            d = json.load(h)
     except json.JSONDecodeError:
+        # **Una respuesta ilegible se aparta; no se deja donde esta.**
+        #
+        # Devolver `None` y dejar el fichero es la forma mas cara de fallar que
+        # tiene este protocolo: `pendientes()` cuenta un pedido como servido
+        # **porque existe su respuesta al lado**, no porque se pueda leer. Con
+        # el JSON roto ahi, el pedido deja de salir en la cola, `turno.py` no lo
+        # ofrece a nadie y `Oficio.de` no encuentra a quien llamar: **la pieza
+        # queda esperando a nadie**, sin una linea que lo diga. Es exactamente
+        # «lo lee y no hace nada».
+        #
+        # El mecanismo ya existia del otro lado —`servicio.mjs` la aparta como
+        # `rechazada` cuando el esquema la tumba, y su comentario cuenta que
+        # dejarla en su sitio tuvo a reel-03 y reel-05 dos dias parados—. Aqui
+        # se hace lo mismo: se archiva solo la respuesta, el pedido se queda en
+        # pie, y la pregunta vuelve a la cola de quien sabe contestarla.
+        _archivar(paso, slug, "rechazada", solo_respuesta=True)
         return None
     if (isinstance(d, dict) and isinstance(d.get("elementos"), list)
             and set(d) <= {"pieza", "elementos"}):

@@ -35,14 +35,14 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import avanzar as _avanzar  # noqa: E402
+from dominio import oficio as _oficio  # noqa: E402
 
-#: Qué carpeta de pedidos es de cada paso. Es el mismo reparto que ya usa
-#: `avanzar.DE_QUIEN`, leído en la otra dirección: de la fase a su buzón.
-#: Y se deriva del reparto que ya existe, no se copia: escrito dos veces son dos
-#: listas, y estas dos ya habian divergido —`revisar` estaba en una y no en la
-#: otra—, con lo que un oficio suscrito a un paso real se quedaba sin buzon.
-BUZON = {fase: buzon for buzon, fase in _avanzar.DE_QUIEN.items()}
+#: Qué carpeta de pedidos es de cada paso: la tabla de `dominio/oficio.py`
+#: leída de la fase al buzón. Se derivaba de `avanzar.DE_QUIEN`, y para eso
+#: había que **importar el motor entero desde un script que no lo usa** — el
+#: precio de que la tabla viviera en quien la consumía en vez de en quien sabe
+#: de buzones.
+BUZON = {fase: buzon for buzon, fase in _oficio.LA_FASE.items()}
 
 
 def hay(paso):
@@ -61,9 +61,54 @@ def hay(paso):
     return fuera
 
 
+def contestados(paso):
+    """Los pedidos de ese paso que YA tienen respuesta al lado. `[slug]`."""
+    carpeta = os.path.join("work", "servicio", BUZON.get(paso, paso))
+    fuera = []
+    for p in sorted(glob.glob(os.path.join(carpeta, "*.pedido.json"))):
+        slug = os.path.basename(p)[: -len(".pedido.json")]
+        if os.path.exists(os.path.join(carpeta, f"{slug}.respuesta.json")):
+            fuera.append(slug)
+    return fuera
+
+
+def hecho(paso):
+    """**Contesté: sigue.** Consume lo respondido y da su salto a cada pieza.
+
+    Es la mitad que faltaba de la suscripción. `turno.py <paso>` ofrece el
+    trabajo y el oficio escribe su respuesta; hasta aquí, bien. Lo que no había
+    era cómo decir que ya está — Jaime: *«siempre hay que hacer pasos manuales,
+    lo que hay no lee el json y si lo lee no hace nada»*.
+
+    Y era exacto. El salto lo enciende `estado.marca`, que corre **dentro** de
+    Python; un oficio con sólo `Read` y `Write` escribe su respuesta y no pasa
+    por ahí, así que el estado quedaba correcto —la respuesta está— y no
+    encendía nada. Quedaba esperando a que alguien se acordara de correr la
+    línea, que en este proyecto significa que no pasa.
+
+    No se inventa mecanismo: `disparo.dispara` ya es el que da un salto y llama
+    al oficio siguiente si la pieza queda esperando. Lo único que faltaba era
+    una puerta para tocarlo desde fuera de Python.
+
+        python scripts/turno.py disenado --hecho
+    """
+    from dominio import disparo
+
+    slugs = contestados(paso)
+    if not slugs:
+        print(f"turno: no hay respuestas sin consumir en «{paso}»")
+        return 1
+    for slug in slugs:
+        salto = disparo.dispara(slug, f"{paso} contestado a mano")
+        print(f"  {slug}: {salto or 'sin salto — mira el log'}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("paso", help="la fase de la que eres el oficio")
+    ap.add_argument("--hecho", action="store_true",
+                    help="ya contesté: consume la respuesta y sigue la línea")
     ap.add_argument("--ya", action="store_true",
                     help="mira una vez y sale, en vez de esperar")
     ap.add_argument("--cada", type=int, default=10,
@@ -72,6 +117,8 @@ def main():
     if a.paso not in BUZON:
         raise SystemExit(f"«{a.paso}» no tiene buzon. Los que hay:"
                          f" {', '.join(sorted(BUZON))}")
+    if a.hecho:
+        raise SystemExit(hecho(a.paso))
 
     dicho = False
     while True:
@@ -93,6 +140,8 @@ def main():
             except Exception:                      # noqa: BLE001
                 pass
             print(ruta)
+            print(f"  al terminar: python scripts/turno.py {a.paso} --hecho",
+                  file=sys.stderr)
             return
         if a.ya:
             print("")

@@ -14,6 +14,7 @@ puesta y la funcion hacer lo contrario.
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import sys
@@ -387,6 +388,65 @@ def _camino_lleva_el_adelanto(h):
                f"el plan abre por el adelanto ({len(p['escenas'])} escenas)")
 
 
+def _ilegible_vuelve_a_la_cola(h):
+    """Una respuesta que no se puede leer no puede dejar a la pieza sin cola.
+
+    `pendientes()` cuenta un pedido como servido **porque existe su respuesta al
+    lado**, no porque se pueda leer. Con el JSON roto ahi, el pedido desaparecia
+    de la cola, `turno.py` no lo ofrecia y nadie tenia a quien llamar: la pieza
+    esperaba a nadie y sin una linea que lo dijera. C-496.
+    """
+    import glob
+    import shutil
+
+    import servicio
+
+    carpeta = os.path.join("work", "servicio", "disenar")
+    os.makedirs(carpeta, exist_ok=True)
+    pedido = os.path.join(carpeta, "humo-99.pedido.json")
+    respuesta = os.path.join(carpeta, "humo-99.respuesta.json")
+    try:
+        io.open(pedido, "w", encoding="utf-8").write('{"paso": "disenar"}')
+        io.open(respuesta, "w", encoding="utf-8").write('{"roto": ')
+        antes = [s for p, s, _ in servicio.pendientes() if s == "humo-99"]
+        h.mide("C-496", not antes,
+               "con la respuesta rota ahi, el pedido NO sale en la cola")
+        h.mide("C-496", servicio.recoger("disenar", "humo-99") is None,
+               "y recoger no se inventa una respuesta")
+        despues = [s for p, s, _ in servicio.pendientes() if s == "humo-99"]
+        h.mide("C-496", bool(despues),
+               "pero la aparta y el pedido vuelve a la cola")
+        h.mide("C-496", bool(glob.glob(os.path.join(
+            carpeta, "usadas", "humo-99.*.rechazada.respuesta.json"))),
+            "y queda archivada como rechazada, no borrada")
+    finally:
+        for f in (pedido, respuesta):
+            if os.path.exists(f):
+                os.remove(f)
+        for f in glob.glob(os.path.join(carpeta, "usadas", "humo-99.*")):
+            os.remove(f)
+        if os.path.isdir(carpeta) and not os.listdir(carpeta):
+            shutil.rmtree(carpeta, ignore_errors=True)
+
+
+def _un_buzon_sin_oficio_no_existe(h):
+    """Cada buzon declarado dice quien lo atiende y que fase mueve.
+
+    Estaba escrito en tres sitios y el mismo hueco se abrio tres veces: C-394
+    por `revalidar`, C-397 por `repaso` y `fuentes`, que llego hasta hoy. Un
+    buzon sin oficio escribe su pedido y no llama a nadie. C-496.
+    """
+    import avanzar
+    import turno
+    from dominio import oficio
+
+    h.mide("C-496", all(len(v) == 2 and all(v) for v in oficio.BUZONES.values()),
+           f"los {len(oficio.BUZONES)} buzones declaran oficio Y fase")
+    h.mide("C-496", set(oficio.DE) == set(avanzar.DE_QUIEN)
+           == set(turno.BUZON.values()),
+           "y las tres vistas salen de la misma tabla")
+
+
 def main():
     h = Humo()
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
@@ -399,7 +459,9 @@ def main():
               _prueba_movida_va_al_compositor,
               _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
-              _camino_lleva_el_adelanto):
+              _camino_lleva_el_adelanto,
+              _ilegible_vuelve_a_la_cola,
+              _un_buzon_sin_oficio_no_existe):
         try:
             f(h)
         except Exception as e:                     # noqa: BLE001
