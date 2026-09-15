@@ -121,3 +121,93 @@ def registrar_version(slug, fichero=None, commit=None):
     vid = cur.lastrowid
     con.close()
     return vid
+
+def firmada(slug):
+    """La versión que Jaime aprobó, o `None`. `(n, huella, edl)`."""
+    con = _con()
+    r = con.execute(
+        "select ve.n, ve.huella, ve.edl from aprobacion a"
+        " join version ve on ve.id = a.version_id"
+        " join video vi on vi.id = ve.video_id"
+        " where vi.slug = ? and a.veredicto = 'aprobada'"
+        " order by ve.n desc limit 1", (slug,)).fetchone()
+    con.close()
+    return (r["n"], r["huella"], r["edl"]) if r else None
+
+
+def restaurar(slug, n=None, quien=""):
+    """Devuelve al EDL vivo el corte de esa versión. `(n, motivo)`.
+
+    **Por qué se puede, y por qué hasta ahora se reconstruía.** `reconstruir.py`
+    existe porque *«la tabla `version` guarda la huella y la duración, no los
+    tramos»*, así que para volver a una entrega había que **transcribir el vídeo
+    y buscar cada frase en la cinta** — una propuesta medida, no el corte. Desde
+    C-205 la columna `edl` guarda el montaje entero: volver a una versión es
+    copiar un JSON, y es exacto.
+
+    Sin `n`, la versión que Jaime firmó. Y no se escribe nada sin comprobar que
+    el corte guardado es el que la fila dice ser: un EDL que no case con su
+    huella no es esa versión, y restaurar «algo parecido» encima de un corte
+    bueno es peor que no restaurar.
+    """
+    v = None
+    if n is None:
+        f = firmada(slug)
+        if not f:
+            return None, "no hay ninguna versión aprobada"
+        v = {"n": f[0], "huella": f[1], "edl": f[2]}
+    else:
+        con = _con()
+        r = con.execute(
+            "select ve.n, ve.huella, ve.edl from version ve"
+            " join video vi on vi.id = ve.video_id"
+            " where vi.slug = ? and ve.n = ?", (slug, n)).fetchone()
+        con.close()
+        if not r:
+            return None, f"{slug} no tiene versión {n}"
+        v = dict(r)
+    if not v["edl"]:
+        return None, (f"la versión {v['n']} es anterior a C-205: guarda su"
+                      " huella y no sus tramos")
+    try:
+        e = json.loads(v["edl"])
+    except ValueError:
+        return None, f"el montaje guardado de la versión {v['n']} no se lee"
+    h = huella_de(e)
+    if h != v["huella"]:
+        return None, (f"el montaje guardado da {h} y la fila dice"
+                      f" {v['huella']}: no es esa versión")
+    ruta = f"ads/{slug}/edl-sell.json"
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(e, f, ensure_ascii=False, indent=1)
+    if quien:
+        _sella(slug, quien)
+    return v["n"], None
+
+
+def _sella(slug, quien):
+    """Las etapas de este corte quedan firmadas por quien firmó la versión.
+
+    **Por qué hace falta, y es la avería que destapó restaurar reel-02.** La
+    firma vive en dos sitios que no se hablan: la tabla `aprobacion` dice que
+    Jaime aprobó la versión 11, y la tabla `segmento` guarda una etiqueta por
+    etapa **estampada contra la huella del corte que tenía cuando se puso**. Al
+    devolver el corte de la v11, las etiquetas de las etapas 1 y 3 dejaron de
+    casar y `segmento.aprobada` dijo que no — o sea que **restaurar el corte que
+    él firmó hacía que la pieza dejara de contar como firmada**, y volvía a la
+    línea.
+
+    Y no eran dos opiniones igual de válidas: esas etiquetas se habían puesto
+    contra el corte de 20 tramos, que es el que se le hizo **después** de su
+    firma y que no aprobó nadie. La firma manda; la etiqueta es su registro por
+    etapa, no una segunda decisión.
+
+    Es la misma regla que `aprobar._cerrar_lo_abierto`: *«su firma es la
+    respuesta»*. Aprobar viendo la pieza es aprobar sus etapas tal y como
+    estaban.
+    """
+    from .segmento import Segmento
+
+    for seg in Segmento.de(slug):
+        seg.aprueba(quien)

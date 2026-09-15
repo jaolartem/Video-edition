@@ -447,6 +447,37 @@ def _un_buzon_sin_oficio_no_existe(h):
            "y las tres vistas salen de la misma tabla")
 
 
+def _lo_firmado_se_puede_volver_a_poner(h):
+    """El corte que Jaime firmó está guardado y casa con su huella.
+
+    Es lo que hace que «volver a lo aprobado» sea copiar un JSON en vez de
+    reconstruirlo del vídeo. Y que la pieza siga contando como firmada después:
+    la etiqueta de cada etapa se estampa contra su corte, así que devolver el
+    corte firmado sin volver a sellarlas dejaba a reel-02 fuera de «aprobada»
+    —restaurar lo que él aprobó la sacaba de aprobada—. C-498.
+    """
+    import json as _json
+
+    from dominio import segmento as _sg
+    from dominio import version as _v
+
+    firmadas = [s for s in (f"reel-{n:02d}" for n in range(1, 18))
+                if _v.firmada(s)]
+    h.mide("C-498", bool(firmadas),
+           f"{len(firmadas)} pieza(s) con firma de Jaime en la base")
+    sanas = []
+    for slug in firmadas:
+        n, huella, edl = _v.firmada(slug)
+        try:
+            sanas.append(_v.huella_de(_json.loads(edl)) == huella)
+        except (ValueError, TypeError):
+            sanas.append(False)
+    h.mide("C-498", all(sanas),
+           "y el montaje guardado de cada una casa con su huella")
+    h.mide("C-498", all(_sg.aprobada(s) for s in firmadas),
+           "y todas siguen contando como aprobadas con el corte que tienen")
+
+
 def main():
     h = Humo()
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
@@ -461,7 +492,8 @@ def main():
               _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
               _camino_lleva_el_adelanto,
               _ilegible_vuelve_a_la_cola,
-              _un_buzon_sin_oficio_no_existe):
+              _un_buzon_sin_oficio_no_existe,
+              _lo_firmado_se_puede_volver_a_poner):
         try:
             f(h)
         except Exception as e:                     # noqa: BLE001

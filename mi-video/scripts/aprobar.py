@@ -154,9 +154,24 @@ def main():
     ap.add_argument("--rehacer", metavar="MOTIVO",
                     help="devuelve la pieza, con el motivo")
     ap.add_argument("--ver", action="store_true")
+    ap.add_argument("--al-firmado", action="store_true", dest="al_firmado",
+                    help="devuelve la pieza al corte que Jaime aprobó")
     a = ap.parse_args()
     if a.ver or not a.reels:
         ver()
+        return
+    if a.al_firmado:
+        # **Volver al corte firmado es copiar un JSON, no reconstruirlo.**
+        # `version.edl` guarda el montaje entero desde C-205; antes de eso
+        # había que transcribir el vídeo entregado y buscar cada frase en la
+        # cinta (`reconstruir.py`), que da una propuesta medida y no el corte.
+        from dominio import version as _v
+
+        for n in a.reels:
+            slug = f"reel-{n:02d}"
+            v, err = _v.restaurar(slug, quien="jaime")
+            print(f"{slug}: " + (f"vuelve al corte de la v{v}, el que firmó"
+                                 if v else f"no se puede — {err}"))
         return
     for n in a.reels:
         v, err = veredicto(n, aprobada=not a.rehacer, notas=a.rehacer)
