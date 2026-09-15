@@ -447,6 +447,31 @@ def _un_buzon_sin_oficio_no_existe(h):
            "y las tres vistas salen de la misma tabla")
 
 
+def _un_seguro_que_no_puede_fallar_no_es_un_seguro(h):
+    """Los dos que prometían parar y no podían. C-500.
+
+    `pipeline.sh` llama a `modelo.py` con `|| exit 1` y `main()` devolvía
+    `None`: salía con 0 dijera lo que dijera. Y `montar.sh` tenía una rama
+    `if [ "$FINAL" = "1" ]` con `FINAL=` sin asignar en ningún sitio del repo.
+    Los dos llevaban meses escritos como si protegieran.
+    """
+    import inspect
+
+    import modelo
+
+    fuente = inspect.getsource(modelo.main)
+    h.mide("C-500", "return 1" in fuente and "return 0" in fuente,
+           "modelo.main() sale con codigo, que es lo que pipeline.sh esperaba")
+    # Mirando CODIGO, no el comentario que cuenta la historia: el propio
+    # aviso de montar.sh cita la rama, y buscarla en el texto entero se caza
+    # a si misma.
+    guion = [l for l in io.open(os.path.join("scripts", "montar.sh"),
+                                encoding="utf-8").read().splitlines()
+             if not l.lstrip().startswith("#")]
+    h.mide("C-500", not any("$FINAL" in l for l in guion),
+           "y montar.sh ya no tiene la rama que nunca corria")
+
+
 def main():
     import humo_del_corte as _del_corte
 
@@ -464,6 +489,7 @@ def main():
               _camino_lleva_el_adelanto,
               _ilegible_vuelve_a_la_cola,
               _un_buzon_sin_oficio_no_existe,
+              _un_seguro_que_no_puede_fallar_no_es_un_seguro,
               _del_corte._lo_firmado_se_puede_volver_a_poner,
               _del_corte._el_corte_nace_derivado):
         try:

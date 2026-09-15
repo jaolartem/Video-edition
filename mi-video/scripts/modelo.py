@@ -108,9 +108,13 @@ def validar():
             if "video_id" not in cols:
                 mal.append(f"«{t}» refiere al video por texto y no por clave"
                            f" (2NF)")
-    vivas = [t for t in MUERTAS if t in hay]
-    if vivas:
-        mal.append(f"tablas vacias y sin uso, confunden el esquema: {vivas}")
+    # **Las tablas declaradas y vacias NO se cuentan aqui.** C-356 lo decidio:
+    # una tabla que el esquema declara y nadie llena es una **promesa
+    # pendiente**, y su sitio es `conectado.py`, que para eso esta. Contarla
+    # tambien aqui tenia dos costes: el aviso salia dos veces, y —peor— dejaba
+    # a `validar()` devolviendo siempre algo, asi que el `|| exit 1` con el que
+    # `pipeline.sh` lo llama no podia dispararse nunca. Un guarda que avisa y
+    # sigue no es un guarda; uno que no puede fallar tampoco.
     cf = {r[1] for r in con.execute("pragma table_info(corte_fijo)")}
     if cf and "toma" not in cf:
         mal.append("«corte_fijo» solo sabe de apertura y cierre: no hay donde"
@@ -148,16 +152,22 @@ def main():
             slug = f"reel-{n:02d}"
             v = registrar_version(slug)
             print(f"{slug}: version {v}" if v else f"{slug}: sin EDL")
-        return
+        return 0
     mal = validar()
     if not mal:
         print("modelo: entero")
-        return
+        return 0
+    # **Y sale con codigo, que es lo que `pipeline.sh` esperaba.** Estaba
+    # cableado como `python scripts/modelo.py || exit 1` y `main()` devolvia
+    # `None`: el paso salia con 0 dijera lo que dijera. Es la misma averia que
+    # `tamano.py` describe como ya corregida en su propio caso — imprimir el
+    # problema y seguir es tenerlo contado, no cerrado.
     print(f"modelo: {len(mal)} cosa(s) que arreglar")
     for m in mal:
         print(f"    · {m}")
     print("\n  python scripts/modelo.py --migrar")
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

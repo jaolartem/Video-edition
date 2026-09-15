@@ -59,13 +59,20 @@ source "$(dirname "$0")/entorno.sh"
 # video por un problema del codigo — hoy una sola aguja tuvo cinco piezas
 # paradas mientras dos ya habian renderizado.
 #
-# En el render FINAL siguen parando, y ahi es donde tienen que hacerlo: es lo
-# ultimo antes de publicar, y una correccion perdida ahi sale al mundo.
+# **Y el bloqueo del final vive en `publicar.py`, no aqui.** Aqui habia una
+# rama que decia hacerlo —preguntaba por una variable FINAL y salia— y
+# **`FINAL=` no se asignaba en ningun sitio del repo**: la unica aparicion es
+# una variable local de `sonoridad.sh`, que es otra cosa. O sea que la mitad
+# que debia parar no paraba, y llevaba meses escrita como si si.
+#
+# Un seguro que no protege es peor que no tenerlo: se confia en el. Se quita,
+# y se dice donde esta el de verdad — `publicar.py :: --finales` se niega con
+# motivos abiertos, que es la regla de Jaime (*«pon el bloqueo en el paso
+# final, no aca»*, *«verlas y aprobarlas si; soltarlas al mundo, no»*).
 _guardas() {
   local salida
   salida=$(node scripts/guardas.mjs 2>&1) || {
     echo "$salida"
-    if [ "$FINAL" = "1" ]; then return 1; fi
     # **Una aguja rota es UN ticket, no siete por corrida.**
     #
     # Esto abria uno por pieza cada vez que corria, y `montar.sh` corre una vez
