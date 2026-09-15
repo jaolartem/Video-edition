@@ -166,45 +166,17 @@ export function guardaRespuesta(paso, slug, arr) {
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
   fs.writeFileSync(rutaRespuesta(paso, slug), JSON.stringify(arr, null, 1));
 }
-
-/**
- * El CLI, si tiene credencial aqui. `null` si no la tiene: **eso no es un
- * fallo, es una espera**, y el motor distingue las dos cosas. Un fallo del
- * prompt si sube, porque ese hay que arreglarlo.
- *
- * El CLI usa **la credencial de la terminal que lo lanza**: lanzado desde la
- * terminal de Jaime funciona; lanzado desde un shell abierto dentro de una
- * sesión de Claude Code dice `Not logged in`. Ver la cabecera de
- * `describir.mjs`, que es donde está la instrucción de qué hacer entonces.
- */
-export function porCli(prompt, entrada) {
-  let salida;
-  try {
-    salida = execFileSync(
-      "claude",
-      ["-p", `${prompt}\n\n---\n\n${entrada}\nResponde SOLO el array JSON.`,
-       "--output-format", "json"],
-      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
-        stdio: ["ignore", "pipe", "pipe"] },
-    );
-  } catch {
-    return null;                       // ni siquiera arranco: no hay CLI aqui
-  }
-  const d = JSON.parse(salida);
-  const txt = String(d.result ?? "");
-  if (d.is_error) {
-    if (/revoked|authenticat|401|not logged in|please run \/login/i.test(txt)) {
-      return null;
-    }
-    throw new Error(txt.slice(0, 200));
-  }
-  const m = txt.match(/\[[\s\S]*\]/);
-  if (!m) throw new Error("el CLI no devolvio un array JSON");
-  const arr = JSON.parse(m[0]);
-  if (!Array.isArray(arr)) throw new Error("la respuesta no es un array");
-  return arr;
-}
-
+// **`porCli` se fue, y con ella la unica puerta que se saltaba el
+// interruptor.** Lanzaba `claude -p` generico —sin `--agent`, sin el contrato
+// del compositor y sin la capa de tiquets— y **no miraba `POR_BASH`**, que es
+// la decision de Jaime del 11-9 despues de quedarse sin tokens: *«los pasos de
+// los agentes no los mandemos por bash, sino por agentes»*. El lado Python si
+// lo respeta (`servicio.py :: pedir`), asi que los dos protocolos decidian
+// distinto sobre lo mismo y el que no lo respetaba era el que podia gastar.
+//
+// No la llamaba nadie: `describir.mjs` dejo de usarla cuando el paso paso a
+// dejar la pregunta escrita y pararse. Eran 37 lineas que solo podian hacer
+// dano.
 
 /**
  * **Archiva el par pedido/respuesta cuando la respuesta ya se aplico.**
