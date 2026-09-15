@@ -27,7 +27,7 @@ def _lo_firmado_se_puede_volver_a_poner(h):
     reconstruirlo del vídeo. Y que la pieza siga contando como firmada después:
     la etiqueta de cada etapa se estampa contra su corte, así que devolver el
     corte firmado sin volver a sellarlas dejaba a reel-02 fuera de «aprobada»
-    —restaurar lo que él aprobó la sacaba de aprobada—. C-498.
+    —restaurar lo que él aprobó la sacaba de aprobada—. C-506.
     """
     import json as _json
 
@@ -36,7 +36,7 @@ def _lo_firmado_se_puede_volver_a_poner(h):
 
     firmadas = [s for s in (f"reel-{n:02d}" for n in range(1, 18))
                 if _v.firmada(s)]
-    h.mide("C-498", bool(firmadas),
+    h.mide("C-506", bool(firmadas),
            f"{len(firmadas)} pieza(s) con firma de Jaime en la base")
     sanas = []
     for slug in firmadas:
@@ -45,9 +45,9 @@ def _lo_firmado_se_puede_volver_a_poner(h):
             sanas.append(_v.huella_de(_json.loads(edl)) == huella)
         except (ValueError, TypeError):
             sanas.append(False)
-    h.mide("C-498", all(sanas),
+    h.mide("C-506", all(sanas),
            "y el montaje guardado de cada una casa con su huella")
-    h.mide("C-498", all(_sg.aprobada(s) for s in firmadas),
+    h.mide("C-506", all(_sg.aprobada(s) for s in firmadas),
            "y todas siguen contando como aprobadas con el corte que tienen")
 def _el_corte_nace_derivado(h):
     """Escribir el EDL vuelve a poner lo que ya se había decidido.
@@ -56,7 +56,7 @@ def _el_corte_nace_derivado(h):
     tramos declarados y los recortes ya aplicados. De ahí salían dos fases cuya
     única razón era reponerlos. Ahora la reposición es parte de escribir, y se
     comprueba de la única forma que vale: **derivar dos veces no cambia nada**.
-    C-499.
+    C-507.
     """
     import inspect
     import json as _json
@@ -65,18 +65,18 @@ def _el_corte_nace_derivado(h):
     import modelo
     from dominio.seleccion import edl as _edl
 
-    h.mide("C-499", "derivar(slug)" in inspect.getsource(_edl.escribir),
+    h.mide("C-507", "derivar(slug)" in inspect.getsource(_edl.escribir),
            "escribir termina derivando, no dejando el corte crudo")
     ruta = os.path.join("ads", PIEZA, "edl-sell.json")
     if not os.path.exists(ruta):
-        h.mide("C-499", False, f"no hay EDL de {PIEZA} que derivar")
+        h.mide("C-507", False, f"no hay EDL de {PIEZA} que derivar")
         return
     copia = ruta + ".humo"
     shutil.copy2(ruta, copia)
     try:
         antes = modelo.huella_edl(PIEZA)
         _edl.derivar(PIEZA)
-        h.mide("C-499", modelo.huella_edl(PIEZA) == antes,
+        h.mide("C-507", modelo.huella_edl(PIEZA) == antes,
                f"y derivar sobre lo ya derivado no mueve el corte ({antes})")
     finally:
         shutil.move(copia, ruta)

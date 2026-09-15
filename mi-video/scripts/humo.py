@@ -394,7 +394,7 @@ def _ilegible_vuelve_a_la_cola(h):
     `pendientes()` cuenta un pedido como servido **porque existe su respuesta al
     lado**, no porque se pueda leer. Con el JSON roto ahi, el pedido desaparecia
     de la cola, `turno.py` no lo ofrecia y nadie tenia a quien llamar: la pieza
-    esperaba a nadie y sin una linea que lo dijera. C-496.
+    esperaba a nadie y sin una linea que lo dijera. C-504.
     """
     import glob
     import shutil
@@ -409,14 +409,14 @@ def _ilegible_vuelve_a_la_cola(h):
         io.open(pedido, "w", encoding="utf-8").write('{"paso": "disenar"}')
         io.open(respuesta, "w", encoding="utf-8").write('{"roto": ')
         antes = [s for p, s, _ in servicio.pendientes() if s == "humo-99"]
-        h.mide("C-496", not antes,
+        h.mide("C-504", not antes,
                "con la respuesta rota ahi, el pedido NO sale en la cola")
-        h.mide("C-496", servicio.recoger("disenar", "humo-99") is None,
+        h.mide("C-504", servicio.recoger("disenar", "humo-99") is None,
                "y recoger no se inventa una respuesta")
         despues = [s for p, s, _ in servicio.pendientes() if s == "humo-99"]
-        h.mide("C-496", bool(despues),
+        h.mide("C-504", bool(despues),
                "pero la aparta y el pedido vuelve a la cola")
-        h.mide("C-496", bool(glob.glob(os.path.join(
+        h.mide("C-504", bool(glob.glob(os.path.join(
             carpeta, "usadas", "humo-99.*.rechazada.respuesta.json"))),
             "y queda archivada como rechazada, no borrada")
     finally:
@@ -434,21 +434,21 @@ def _un_buzon_sin_oficio_no_existe(h):
 
     Estaba escrito en tres sitios y el mismo hueco se abrio tres veces: C-394
     por `revalidar`, C-397 por `repaso` y `fuentes`, que llego hasta hoy. Un
-    buzon sin oficio escribe su pedido y no llama a nadie. C-496.
+    buzon sin oficio escribe su pedido y no llama a nadie. C-504.
     """
     import avanzar
     import turno
     from dominio import oficio
 
-    h.mide("C-496", all(len(v) == 2 and all(v) for v in oficio.BUZONES.values()),
+    h.mide("C-504", all(len(v) == 2 and all(v) for v in oficio.BUZONES.values()),
            f"los {len(oficio.BUZONES)} buzones declaran oficio Y fase")
-    h.mide("C-496", set(oficio.DE) == set(avanzar.DE_QUIEN)
+    h.mide("C-504", set(oficio.DE) == set(avanzar.DE_QUIEN)
            == set(turno.BUZON.values()),
            "y las tres vistas salen de la misma tabla")
 
 
 def _un_seguro_que_no_puede_fallar_no_es_un_seguro(h):
-    """Los dos que prometían parar y no podían. C-500.
+    """Los dos que prometían parar y no podían. C-508.
 
     `pipeline.sh` llama a `modelo.py` con `|| exit 1` y `main()` devolvía
     `None`: salía con 0 dijera lo que dijera. Y `montar.sh` tenía una rama
@@ -460,7 +460,7 @@ def _un_seguro_que_no_puede_fallar_no_es_un_seguro(h):
     import modelo
 
     fuente = inspect.getsource(modelo.main)
-    h.mide("C-500", "return 1" in fuente and "return 0" in fuente,
+    h.mide("C-508", "return 1" in fuente and "return 0" in fuente,
            "modelo.main() sale con codigo, que es lo que pipeline.sh esperaba")
     # Mirando CODIGO, no el comentario que cuenta la historia: el propio
     # aviso de montar.sh cita la rama, y buscarla en el texto entero se caza
@@ -468,12 +468,12 @@ def _un_seguro_que_no_puede_fallar_no_es_un_seguro(h):
     guion = [l for l in io.open(os.path.join("scripts", "montar.sh"),
                                 encoding="utf-8").read().splitlines()
              if not l.lstrip().startswith("#")]
-    h.mide("C-500", not any("$FINAL" in l for l in guion),
+    h.mide("C-508", not any("$FINAL" in l for l in guion),
            "y montar.sh ya no tiene la rama que nunca corria")
 
 
 def _el_segundo_dice_de_que_video_es(h):
-    """Las dos escalas, y una sola VELOCIDAD en todo Python. C-501.
+    """Las dos escalas, y una sola VELOCIDAD en todo Python. C-509.
 
     La entrega va acelerada y el montaje no —medido sobre las siete piezas, un
     factor de 1,13 a 1,20—, así que «el segundo 30» son dos sitios distintos.
@@ -490,12 +490,12 @@ def _el_segundo_dice_de_que_video_es(h):
         for l in io.open(f, encoding="utf-8", errors="replace"):
             if l.startswith("VELOCIDAD ="):
                 con_nombre.append(f.replace(chr(92), "/"))
-    h.mide("C-501", con_nombre == ["scripts/beats.py"],
+    h.mide("C-509", con_nombre == ["scripts/beats.py"],
            f"una sola VELOCIDAD en Python: {con_nombre or 'ninguna'}")
     treinta, movido = _tk.a_montaje(30, "entrega")
-    h.mide("C-501", abs(treinta - 30 * beats.VELOCIDAD) < 1e-6 and movido > 0,
+    h.mide("C-509", abs(treinta - 30 * beats.VELOCIDAD) < 1e-6 and movido > 0,
            f"30s de la entrega son {treinta}s del montaje ({movido:+}s)")
-    h.mide("C-501", _tk.a_montaje(30, "montaje") == (30.0, 0.0),
+    h.mide("C-509", _tk.a_montaje(30, "montaje") == (30.0, 0.0),
            "y 30s del montaje no se mueven")
 
 
