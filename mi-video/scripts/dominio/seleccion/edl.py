@@ -127,7 +127,47 @@ def escribir(slug: str, plan, ventanas, libreto, frame) -> tuple[str, float]:
     os.makedirs(os.path.dirname(ruta), exist_ok=True)
     json.dump(out, open(ruta, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
+    derivar(slug)
     return ruta, voz
+
+
+def derivar(slug):
+    """Las decisiones ya tomadas vuelven a estar puestas. Devuelve qué se hizo.
+
+    **Escribir el corte no puede dejarlo sin lo que ya se decidió.** Esta
+    función rehace el EDL desde el reparto, y eso borra lo que pusieron otros:
+    los tramos que Jaime declaró (`corte_fijo`) y los recortes de redundancia
+    que ya se aplicaron (`revision`). Por eso existían **dos fases enteras cuya
+    única razón era reponerlos** —2.5 `fijar --aplicar` y 5.2 `revision
+    --aplicar`— y, colgando de ellas, cuatro mecanismos más para que no se
+    pisaran entre sí (`recorte.retirar_fijados`, `Tijera.fijado`,
+    `consulta.fijos`, `declarado.conPausa`). Seis piezas para un problema que
+    nace aquí.
+
+    Lo caro no era el trabajo repetido: era **la ventana**. Entre escribir el
+    EDL y correr la fase 2.5 el corte estaba sin lo declarado, y cualquiera que
+    mirase en medio veía una pieza que nadie había decidido. Medido en su día:
+    reel-01 e2 declarada en dos tramos (16,2 + 11 s) se quedó con uno de 6,2;
+    reel-05 pasó de 105 a 157 s; catorce tramos de reel-03 retrocedieron 0,12 s
+    cada uno.
+
+    Así que la reposición deja de ser un paso que hay que acordarse de correr y
+    pasa a ser **parte de escribir**: el corte nace derivado. Las dos fases
+    siguen en el ciclo y siguen siendo útiles —aplican lo que se decida
+    *después*—, pero ya no reponen nada, porque no hay nada que reponer.
+
+    **El orden no es indiferente y es el de C-105:** primero las declaraciones y
+    luego los recortes. Al revés, `fijar` vuelve a meter lo que `revision`
+    acababa de quitar y la pieza se alarga sola.
+
+    Y no se calla si falla: un corte sin lo que Jaime declaró es un corte que
+    nadie aprobó, y seguir con él cuesta más que parar.
+    """
+    import fijar
+    import revision
+
+    fijar.aplicar(slug)
+    revision.aplicar(slug)
 
 
 def _revision(base: dict, segs) -> dict:
