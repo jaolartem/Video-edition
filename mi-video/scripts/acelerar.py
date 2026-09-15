@@ -77,8 +77,12 @@ def _acelerar(n) -> bool:
         # capa contra 13,6 en la entrega de reel-06, con el mismo valor—. Aqui
         # la pieza esta acelerada y aun muda: guardarlo hace que mezclar sea
         # idempotente. Ver C-233.
-        _sin = _ru.salida("entrega", ".sin-musica", f"reel-R{n}.mp4")
-        os.makedirs(os.path.dirname(_sin), exist_ok=True); shutil.copy2(final, _sin)
+        # **Y la ruta se le pregunta a la pieza.** Estaba escrita aqui y en
+        # otros cinco sitios; el que la lee para decidir si la entrega va
+        # acelerada es `cuadra_con_el_json`, y dos maneras de nombrar el mismo
+        # fichero son dos respuestas en cuanto una cambie. C-495.
+        from dominio.pieza import Pieza
+        shutil.copy2(final, Pieza(n).muda)
     except (OSError, subprocess.SubprocessError) as e:
         registro.aviso("voz-limpia", "no se pudo acelerar",
                        detalle=f"R{n}: {type(e).__name__}", eco=True)

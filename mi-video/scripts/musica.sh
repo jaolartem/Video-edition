@@ -283,7 +283,28 @@ for n in "${REELS[@]}"; do
   [ -f "$SINMUS/reel-R$n.mp4" ] || cp "out/entrega/reel-R$n.mp4" "$SINMUS/reel-R$n.mp4"
   SRC="$SINMUS/reel-R$n.mp4"
   fi
-  MP3="public/musica/reel-0$n.mp3"
+  # **Dos digitos, y si no tiene musica propia usa la de su origen.**
+  #
+  # Estaba escrito `reel-0$n`, que compone el nombre concatenando un cero: vale
+  # para las siete primeras y **para la nº 13 busca `reel-013.mp3`**. Con el
+  # lote vivo en reel-08..reel-17, las diez piezas nuevas entraban siempre por
+  # la rama «no hay mp3 para esta pieza» sin que nadie lo notara, porque esa
+  # rama es legitima y el paso termina bien.
+  #
+  # Y la segunda mitad es la misma regla que ya vale para la cinta: **una
+  # derivada usa lo de su origen** (C-388). reel-13 es reel-06 recortado —misma
+  # toma, misma estructura, mismo libreto— asi que su musica es la de reel-06.
+  # Copiar el mp3 con otro nombre seria tener el mismo audio diez veces y diez
+  # sitios donde cambiarlo. Quien sabe de quien deriva es `libreto.origen_de`,
+  # que ya lo contesta para el resto de la linea. C-497.
+  MP3="public/musica/reel-$(printf %02d "$n").mp3"
+  if [ ! -f "$MP3" ]; then
+    ORIGEN=$(python -c "import sys;sys.path.insert(0,'scripts');from dominio.libreto import origen_de;print(origen_de('reel-%02d' % $n)[0] or '')" 2>/dev/null || echo "")
+    if [ -n "$ORIGEN" ] && [ -f "public/musica/$ORIGEN.mp3" ]; then
+      MP3="public/musica/$ORIGEN.mp3"
+      echo "  R$n: sin mp3 propio; usa el de $ORIGEN, del que deriva"
+    fi
+  fi
   [ -f "$SRC" ] || { echo "R$n: falta $SRC"; continue; }
   # **Sin musica tambien hay que masterizar.** Antes se saltaba la pieza entera
   # si faltaba el mp3, asi que se quedaba sin entrega — y el paso de audio no es
@@ -690,7 +711,18 @@ for n in "${REELS[@]}"; do
     MALAS="$MALAS R$n(corta)"
   fi
 
-  OBJ=$(python scripts/cama.py --objetivo 2>/dev/null || echo "")
+  # **Y contra el JSON, que es la unica fuente de verdad.** La comprobacion de
+  # arriba contrasta la entrega con SU FUENTE MUDA: dos ficheros. Si el que
+  # entro ya venia corto, los dos cuadran y la pieza sale corta igual. Jaime,
+  # 14-9-2026: *«solo hay una fuente de verdad, el Json, todo se contrasta con
+  # el Json»*. Aqui se le pregunta al corte, no al fichero de al lado.
+  JSON_DICE=$(python -c "import sys;sys.path.insert(0,'scripts');from dominio.version import cuadra_con_el_json as c;m=c('reel-'+'$n'.zfill(2), 'out/entrega/reel-R$n.mp4');print(m or '')" 2>/dev/null || echo "")
+  if [ -n "$JSON_DICE" ]; then
+    echo "R$n  $JSON_DICE"
+    MALAS="$MALAS R$n(no-cuadra-con-el-json)"
+  fi
+
+  OBJ=$(python scripts/cama.py --objetivo "reel-$(printf %02d "$n")" 2>/dev/null || echo "")
   # **La referencia es `$SRC`, que es la voz que ENTRO en esta mezcla.**
   # Con el stem del bruto, cinco de las siete contestaban «no se puede medir»
   # —basta recortar un segundo para que el stem sea de otro montaje—, asi que
@@ -698,11 +730,19 @@ for n in "${REELS[@]}"; do
   # Aqui el mismo corte esta garantizado por construccion: es el fichero que
   # acaba de entrar por `-i`. El reloj lo deduce `distancia` de la duracion.
   SEP=$(python -c "import sys;sys.path.insert(0,'scripts');import remezclar as R;d=R.distancia('out/entrega/reel-R$n.mp4','$SRC');print('' if d is None else round(d,1))" 2>/dev/null || echo "")
-  awk -v s="${SEP:-}" -v o="${OBJ:-}" -v n="$n" 'BEGIN{
+  # **Y si el nivel no responde al objetivo de hoy, se dice cual es el arreglo.**
+  # Mover `objetivo_db` no cambia ninguna mezcla: `MUSI` sigue siendo el que se
+  # midio contra el objetivo ANTERIOR, y el numero es correcto respondiendo a
+  # una pregunta que ya no se hace. Sin esta linea, la unica senal era un
+  # «FUERA» que sonaba a que la pieza esta mal mezclada. C-501.
+  ALDIA=$(python -c "import sys;sys.path.insert(0,'scripts');import cama;print('1' if cama.al_dia('reel-%02d' % $n) else '0')" 2>/dev/null || echo "1")
+  awk -v s="${SEP:-}" -v o="${OBJ:-}" -v n="$n" -v ald="${ALDIA:-1}" 'BEGIN{
     if (s == "" || o == "") { print "    ojo: NO SE PUDO MEDIR la separacion de la cama — casi siempre es que el stem de voz es de otro corte, y entonces la medida se niega a contestar en vez de dar un numero falso (C-243). Mira las duraciones antes de tocar el nivel."; exit }
     d = s - o; if (d < 0) d = -d
     printf "R%s  cama a %s dB de la voz (objetivo %s)%s\n", n, s, o,
-      (d > 1.5 ? "  · FUERA: sube o baja su MUSI en src/brand/cama.json" : "")
+      (d <= 1.5 ? "" : (ald == "0"
+        ? "  · FUERA: su MUSI se midio contra otro objetivo, no esta mal mezclada — `python scripts/calibrar-cama.py " n "`"
+        : "  · FUERA: sube o baja su MUSI en src/brand/cama.json"))
   }'
 
   awk -v c="${CLIP:-0}" 'BEGIN{

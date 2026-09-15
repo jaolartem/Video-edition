@@ -80,11 +80,17 @@ def _mide(n, musi):
                                f"out/entrega/.sin-musica/reel-R{n}.mp4")
 
 
-def _guardar(slug, musi, por_que):
-    """Deja el nivel de esa pieza en el fichero, con lo que se midió."""
+def _guardar(slug, musi, por_que, objetivo=None):
+    """Deja el nivel de esa pieza en el fichero, con lo que se midió.
+
+    **Y contra qué objetivo se midió**, que es lo que permite saber después si
+    sigue valiendo sin volver a mezclar. Ver `cama.al_dia`. C-501.
+    """
     with open(cama.FICHERO, encoding="utf-8") as f:
         d = json.load(f)
     d.setdefault("piezas", {})[slug] = round(musi, 1)
+    if objetivo is not None:
+        d.setdefault("medido_contra", {})[slug] = objetivo
     d[f"_{slug.replace('-', '_')}_medido"] = por_que
     with open(cama.FICHERO, "w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(d, ensure_ascii=False, indent=1) + "\n")
@@ -93,7 +99,7 @@ def _guardar(slug, musi, por_que):
 def calibrar(n, objetivo=None):
     """Busca el nivel de reel-n hasta caer en el objetivo. Devuelve (musi, sep)."""
     slug = f"reel-{n:02d}"
-    objetivo = objetivo if objetivo is not None else cama.leer()["objetivo_db"]
+    objetivo = objetivo if objetivo is not None else cama.objetivo(slug)
     musi = float(cama.nivel(slug))
     puntos = []
     for vuelta in range(VUELTAS):
@@ -106,7 +112,7 @@ def calibrar(n, objetivo=None):
         puntos.append((musi, sep))
         if abs(sep - objetivo) <= TOLERA:
             if len(puntos) > 1:
-                _guardar(slug, musi, _acta(slug, puntos, objetivo))
+                _guardar(slug, musi, _acta(slug, puntos, objetivo), objetivo)
             return musi, sep
         if len(puntos) == 1:
             # Primer tanteo: hacia donde hay que ir lo dice el signo. Más nivel

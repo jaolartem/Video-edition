@@ -417,13 +417,38 @@ def integrar(n, ver=False):
     # Es C-308 en el audio: lo que no sabe de que corte es, sobrevive al corte.
     # Y aqui se prefiere la voz cruda EN SU SITIO a una limpia de otro montaje,
     # que es la misma regla que ya aplica `distancia` al negarse a medir.
+    #
+    # **Pero la fecha no es el corte: es cuando se escribio el fichero.** Jaime,
+    # 14-9-2026, despues de que esto le tumbara la misma voz tres veces:
+    # *«cambia la guarda pero compara que sea la misma»*. Un re-render por un
+    # cambio VISUAL —aquel dia, el recorte de e6 a blanco y negro— reescribe
+    # `public/reel-NN.mp4` con los mismos 149.348.250 bytes y los mismos
+    # 58,621 s, y con eso la fecha acusa a una voz que corresponde al corte
+    # hasta la decima de milisegundo. Tres vueltas de Adobe para nada.
+    #
+    # Asi que cuando la fecha sospecha, se MIDE: `_corresponde` compara las dos
+    # ondas y ya estaba en este fichero —corriendo mas abajo, donde nunca se
+    # llegaba porque esto cortaba antes—. No es aflojar el seguro: es cambiarlo
+    # de senal. Medido el mismo dia sobre reel-13: la voz buena da 0,98 contra
+    # su corte y la de otra pieza 0,11, con el umbral en 0,24. La fecha no
+    # separaba nada; la onda separa por 8,7 veces.
+    #
+    # Y si no se puede medir, se rechaza: no medir no es aprobar (C-243).
     if os.path.getmtime(wav) < os.path.getmtime(f"public/reel-{n:02d}.mp4"):
-        print(f"R{n}: la voz limpia es MAS VIEJA que el corte — se hizo sobre"
-              f" otro montaje. No se sustituye: sale con su voz cruda, en su"
-              f" sitio. Vuelve a limpiarla desde el corte de hoy.")
-        registro.aviso("voz-limpia", "voz limpiada de otro corte",
-                       detalle=f"R{n}: {os.path.basename(wav)}", eco=False)
-        return False
+        casa = _corresponde(f"public/reel-{n:02d}.mp4", wav)
+        if casa is None or casa < PARECIDO:
+            print(f"R{n}: la voz limpia es mas vieja que el corte Y no es la"
+                  f" misma onda ({'no se pudo medir' if casa is None else f'parecido {casa:.2f}, hace falta {PARECIDO}'}):"
+                  f" se hizo sobre otro montaje. No se sustituye: sale con su"
+                  f" voz cruda, en su sitio. Vuelve a limpiarla desde el corte"
+                  f" de hoy.")
+            registro.aviso("voz-limpia", "voz limpiada de otro corte",
+                           detalle=f"R{n}: {os.path.basename(wav)}"
+                                   f" (parecido {casa})", eco=False)
+            return False
+        print(f"R{n}: la voz limpia es mas vieja que el corte, pero es la misma"
+              f" onda (parecido {casa:.2f}): el corte se reescribio sin cambiar"
+              f" el sonido. Sigue.")
     # **Primero se pone en su sitio, y despues se mide si cabe.**
     #
     # El orden importa y estaba al reves. Las guardas de duracion de abajo

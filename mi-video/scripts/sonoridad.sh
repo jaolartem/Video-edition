@@ -34,8 +34,17 @@
 #
 #   bash scripts/sonoridad.sh          # los seis
 #   bash scripts/sonoridad.sh 2 5      # sólo esos
-set -e
+set -eE
 cd "$(dirname "$0")/.."
+
+# **Y si este script muere, lo dice en stdout.** Mismo acuerdo que `montar.sh`:
+# la ULTIMA LINEA DE STDOUT es el motivo (ver `servicios/base.py`). Sin esto,
+# `set -e` mata el fichero en la linea que falla sin imprimir nada y el motor
+# guarda «sin salida», que no es un diagnostico: es el hueco donde deberia
+# haber uno. Paso el 14-9-2026 — reel-13 fallo dos veces seguidas en
+# «nivelado», las dos con cero bytes en stdout y en stderr, y `avanzar` la dejo
+# en «pieza atascada» sin nada que mirar. C-495.
+trap 'c=$?; echo "sonoridad.sh: murio en la linea $LINENO (codigo $c) al correr: $BASH_COMMAND"; exit $c' ERR
 
 export TMPDIR="F:/tmp-video"
 export TEMP="$TMPDIR"
@@ -60,6 +69,25 @@ mkdir -p out/entrega out/revision
 for n in "${REELS[@]}"; do
   SRC="out/reels/reel-R$n.mp4"
   [ -f "$SRC" ] || { echo "R$n: falta $SRC — hay que renderizar antes"; continue; }
+
+  # **Y la entrega de una pieza con voz limpia no es suya.**
+  #
+  # Este paso escribe `out/entrega/reel-RN.mp4` desde el render: a 1x, sin
+  # música y con la voz de cámara. Cuando la voz limpia ya entró, esa misma
+  # ruta la escribe `musica.sh` desde la copia muda —acelerada a 1,15x y con
+  # la voz de Adobe—, así que correr aquí encima no nivela: sustituye.
+  #
+  # Medido el 14-9-2026: reel-13 estaba entregada en 51,60 s con su voz limpia
+  # y sincronía 0,00 s, y una pasada de este script la dejó en 58,70 s con la
+  # voz de cámara. Nada falló — las dos mitades hicieron su trabajo sobre la
+  # misma ruta. El nivelado va ANTES de aprobar; si la voz limpia ya llegó, la
+  # pieza pasó de largo y aquí sólo se dice.
+  #
+  # Quién sabe si pasó es la pieza, no una ruta escrita otra vez. C-495.
+  if python -c "import sys;sys.path.insert(0,'scripts');from dominio.pieza import Pieza;sys.exit(0 if Pieza($n).acelerada else 1)"; then
+    echo "R$n: su entrega la escribe musica.sh —acelerada y con la voz limpia—; el nivelado no la toca"
+    continue
+  fi
 
   # ── pasada 1: medir ────────────────────────────────────────────────────
   M=$(ffmpeg -hide_banner -i "$SRC" \

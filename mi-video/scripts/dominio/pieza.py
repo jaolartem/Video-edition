@@ -52,6 +52,56 @@ class Pieza:
     def existe(self) -> bool:
         return self.edl is not None
 
+    # ── lo que la pieza ENTREGA ──────────────────────────────────────────
+    #
+    # **La entrega no siempre corre al reloj del corte.** Cuando la voz limpia
+    # entra, `acelerar` saca la pieza a `VELOCIDAD` y `musica.sh` mezcla encima;
+    # cuando no, la entrega es el render nivelado, a 1x. Son dos relojes sobre
+    # la misma ruta, y hasta hoy nadie podía decir en cuál estaba un fichero.
+    #
+    # Medido el 14-9-2026 sobre las diecisiete: cuatro corrían acelerado
+    # —reel-02, reel-06, reel-12 y reel-13— y eran exactamente las cuatro que
+    # `cuadra_con_el_json` marcaba fuera de rango, por restarle al corte una
+    # entrega que ya venía dividida por 1,15. C-495.
+    #
+    # **Y no se pregunta por la copia muda.** Fue lo primero que probé y es
+    # falso: `.sin-musica` guarda las diecisiete, incluidas las que nunca se
+    # aceleraron, así que existir no prueba nada — sólo prueba que alguna vez
+    # pasó por ahí. Lo que distingue es a qué reloj mide el fichero de HOY.
+    @property
+    def muda(self) -> str:
+        """La copia acelerada y todavía sin música. Sobre ella mezcla `musica.sh`."""
+        return rutas.salida("entrega", ".sin-musica", f"reel-R{self.n}.mp4")
+
+    @property
+    def render(self) -> str:
+        return f"out/reels/reel-R{self.n}.mp4"
+
+    @property
+    def entrega(self) -> str:
+        return f"out/entrega/reel-R{self.n}.mp4"
+
+    @property
+    def acelerada(self) -> bool:
+        """Si su entrega de hoy corre a `VELOCIDAD` en vez de al reloj del corte.
+
+        Se decide midiendo, que es lo único que no se puede quedar viejo: de las
+        dos duraciones posibles —la del render y la del render entre
+        `VELOCIDAD`— gana la que se parece a lo que el fichero mide. Sin render
+        o sin entrega no hay pregunta que hacer, y se contesta que no.
+
+        Esto NO es la comprobación: la comprobación sigue siendo contra el JSON
+        (C-494). Esto sólo dice en qué reloj leerla.
+        """
+        from beats import VELOCIDAD
+        from dominio.version import _dura
+
+        r = _dura(self.render)
+        e = _dura(self.entrega)
+        if r is None or e is None or not r:
+            return False
+        return abs(e - r / VELOCIDAD) < abs(e - r)
+
     @property
     def cintas(self) -> set:
         """De qué grabaciones está hecha. **La dependencia real de la pieza.**
