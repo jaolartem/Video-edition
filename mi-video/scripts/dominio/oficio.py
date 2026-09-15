@@ -81,13 +81,20 @@ DE = {b: quien for b, (quien, _f) in BUZONES.items()}
 #: Qué fase mueve cada buzón. La misma tabla, leída por la otra columna.
 LA_FASE = {b: fase for b, (_q, fase) in BUZONES.items()}
 
-#: Si la línea lanza el CLI por bash para contestar. **Temporal, apagado.**
-#: Jaime, 11-9-2026: *«me quedé sin tokens, los pasos de los agentes no los
-#: mandemos por bash, sino por agentes… no como algo permanente sino como
-#: modificación menor»*. Apagado, el pedido se queda escrito y abierto —el lado
-#: seguro— y lo contestan los agentes de la sesión que vigila. Se vuelve a bash
-#: sin tocar código: lanzando el disparador con `OFICIOS_POR_BASH=1`.
-POR_BASH = bool(os.environ.get("OFICIOS_POR_BASH"))
+#: Si la línea lanza el CLI por bash para contestar. **Encendido desde el
+#: 15-9-2026**, que es lo que hace que la línea ande sola: sin esto el pedido
+#: se queda escrito y abierto esperando a que un agente de la sesión que vigila
+#: lo vea — o sea, esperando a que alguien se acuerde.
+#:
+#: Estuvo apagado cuatro días por una razón que no era de diseño. Jaime,
+#: 11-9-2026: *«me quedé sin tokens, los pasos de los agentes no los mandemos
+#: por bash, sino por agentes… **no como algo permanente sino como modificación
+#: menor**»*. Y el 15-9: *«ya se puede prender el bash»*.
+#:
+#: **Se apaga sin tocar código**, que es lo que lo hizo reversible entonces y lo
+#: sigue haciendo: `OFICIOS_POR_BASH=0`. El valor por defecto es el estado
+#: normal de la línea, no el de la semana pasada.
+POR_BASH = os.environ.get("OFICIOS_POR_BASH", "1") not in ("0", "", "no")
 
 #: El encargo es siempre el mismo texto. Lo que hay que contestar viaja DENTRO
 #: del pedido —`prompt` es su contrato— y esto sólo dice qué fichero leer y en
