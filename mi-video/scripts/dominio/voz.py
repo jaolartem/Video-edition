@@ -35,8 +35,13 @@ from .neutralidad import _hablado
 # que solo vive en un comentario no la puede usar nadie: la segunda valoracion
 # necesita descontar por costura audible, y para eso el umbral tiene que ser un
 # dato del modulo, no una frase.
-SALTO_TONO = 2.0        # semitonos de diferencia de altura media
-SALTO_RITMO = 1.5       # palabras por segundo
+#: **La vara de «se oye una unión» no vive aquí: vive en la costura.**
+#: Estuvieron aquí en 2,0 y 1,5 mientras `dominio/costura.py` declaraba 2,5 y
+#: 3,0 para lo mismo, y el único que las consumía —`revalidar`— descartaba
+#: candidatas por uniones que el paso que las arregla considera limpias. Se
+#: reexportan de su dueño para no romper a quien las pida por este nombre.
+from .costura import RITMO_OK as SALTO_RITMO  # noqa: E402
+from .costura import TONO_OK as SALTO_TONO  # noqa: E402
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

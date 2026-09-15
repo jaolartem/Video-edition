@@ -49,6 +49,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
+from dominio import costura as _cs  # noqa: E402
 import depurar  # noqa: E402
 import transcribir  # noqa: E402
 import rutas  # noqa: E402
@@ -213,8 +214,15 @@ def marca(m, sal=None):
     duras = 0
     for x in (sal or []):
         t, r = x.get("tono"), x.get("ritmo")
-        if (t is not None and abs(t) > beats.SALTO_TONO) or \
-           (r is not None and abs(r) > beats.SALTO_RITMO):
+        # **La vara de «se oye una union» es de la costura, y es una sola.**
+        # Aqui se penalizaba con 2,0 y 1,5 mientras `costuras.py` —el paso que
+        # las arregla— y `suena.py` —el que las mide— usan 2,5 y 3,0. Con la
+        # vara mas estrecha se descartaban candidatas por uniones que el paso
+        # siguiente considera limpias: un defecto que no existe, pagado en la
+        # eleccion de toma. Lo dice el propio `dominio/costura.py`: *«dos varas
+        # para "se oye" son dos verdades»*.
+        if (t is not None and abs(t) > _cs.TONO_OK) or \
+           (r is not None and abs(r) > _cs.RITMO_OK):
             duras += 1
     return round(base - duras * beats.PASO_VOZ, 3)
 

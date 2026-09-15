@@ -132,13 +132,31 @@ def a_la_voz(toma, a, b, margen=0.12):
 
     Devuelve `None` si en ese tramo no se habla en absoluto.
     """
-    import rutas as _ru
+    # **Se le pregunta a la cinta, que es su dueña.** Esto abría
+    # `work/cuts/<toma>.json` a mano y leía `["segmentos"]`, que es lo mismo
+    # que `Cinta.habla()` — uno de los 32 sitios que se sirven solos del disco.
+    #
+    # **Y hay que saber cuál de las dos se está pidiendo.** `Cinta` declara dos
+    # respuestas a «dónde suena» que se llevan `HOLGURA` = 0,285 s a cada lado:
+    # `habla()` es lo que el detector conservó —con el silencio pegado— y
+    # `voz()` es donde de verdad ataca la voz. Esta función usa la primera y se
+    # llama `a_la_voz`, mientras `plan-reel::conHabla` usa la segunda para
+    # recortar lo mismo. Por eso lo que este paso deja, aquél lo vuelve a
+    # recortar: dos definiciones de dónde empieza la voz sobre el mismo tramo.
+    #
+    # **Cambiarlo mueve todos los bordes** —0,285 menos `MARGEN` = 0,225 s por
+    # extremo— y eso no se decide sin oírlo: se mide corriendo la línea con
+    # `Cinta.voz()` aquí y comparando las costuras con `suena.py`. Queda
+    # declarado, no hecho. Lo que sí cambia hoy es que la definición se pide en
+    # vez de leerse del disco, así que el día que se mueva, se mueve en un
+    # sitio.
+    from .cinta import Cinta
 
-    f = os.path.join(_ru.TRABAJO, "cuts", f"{toma}.json")
-    if not os.path.exists(f):
+    cinta = Cinta(str(toma))
+    if not os.path.exists(cinta.cortes):
         return (a, b)
     try:
-        voz = json.load(open(f, encoding="utf-8"))["segmentos"]
+        voz = cinta.habla()
     except (OSError, KeyError, json.JSONDecodeError):
         return (a, b)
     dentro = [(max(a, x), min(b, y)) for x, y in voz if min(b, y) - max(a, x) > 0.01]
