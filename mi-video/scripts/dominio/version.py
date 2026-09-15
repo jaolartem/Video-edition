@@ -54,15 +54,38 @@ def _edl(slug):
     return json.load(open(p, encoding="utf-8"))
 
 
-def huella_edl(slug):
-    """La huella del corte de una pieza. Ver la cabecera de este fichero."""
-    e = _edl(slug)
+def huella_de(e):
+    """La huella de un corte **que ya se tiene en la mano**.
+
+    Existe porque la misma cuenta hacia falta sobre el corte VIVO —el fichero—
+    y sobre un corte GUARDADO —la columna `version.edl`—, y la segunda se
+    estaba haciendo aparte: `sellar.py` calculaba `sha1(edl + sha_del_mp4)` y
+    lo guardaba en la misma columna `huella` que esta funcion llena con la del
+    corte.
+
+    **Dos escritores, una columna, dos significados.** El esquema dice, en un
+    comentario encima de la columna, *«la huella es del CORTE, no del
+    fichero»*, y lo que habia dentro era de la entrega: medido sobre las 95
+    versiones de la base, **ninguna** coincidia con la huella de su corte. Con
+    eso `donde.py` decia «CAMBIO» en las siete piezas **siempre**, hubiera
+    cambiado el corte o no — un aviso que no puede ser nunca negativo no avisa
+    de nada, y era el unico sitio donde mirar si lo que Jaime firmo seguia en
+    pie.
+
+    Lo que identifica una entrega distinta del mismo corte es el fichero, y eso
+    ya tiene columna: `sha_entrega`.
+    """
     if e is None:
         return None
     return hashlib.sha1(json.dumps(
         [[round(a, 3), round(b, 3), d.get("toma"), d.get("beat")]
          for (a, b), d in zip(e["segmentos"], e["detalle"])],
         ensure_ascii=False).encode("utf-8")).hexdigest()[:12]
+
+
+def huella_edl(slug):
+    """La huella del corte vivo de una pieza. Ver la cabecera de este fichero."""
+    return huella_de(_edl(slug))
 
 
 def registrar_version(slug, fichero=None, commit=None):

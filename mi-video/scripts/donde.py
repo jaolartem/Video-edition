@@ -34,6 +34,8 @@ import modelo  # noqa: E402
 import servicio  # noqa: E402
 import rutas  # noqa: E402
 from dominio import segmento as _segmento  # noqa: E402
+from dominio.pieza import Pieza as _Pieza  # noqa: E402
+from dominio.oficio import DE as _DE  # noqa: E402
 
 BASE = "ads/decisiones.db"
 
@@ -97,6 +99,12 @@ def estado(slug):
         "publicada": pu["destino"] if pu else None,
         "cortes_pendientes": pend,
         "pedidos_ia": [p for p, sl, _ in servicio.pendientes() if sl == slug],
+        # **En que fase esta, que es la pregunta del titulo.** La tabla decia
+        # version, corte, duracion y audio — todo menos donde esta la pieza, que
+        # es lo unico que no se puede deducir mirando ficheros. Sale de `Pieza`,
+        # que ya es su duena; preguntarlo aqui con otro SQL seria la segunda
+        # copia de la regla.
+        "fase": (_Pieza(int(slug[-2:])).fase or {}).get("nombre"),
     }
 
 
@@ -104,8 +112,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.parse_args()
     print(f"commit {_commit()}\n")
-    print(f"{'pieza':<9} {'ver':>3} {'corte':>7} {'dur':>7}  "
-          f"{'aprobada':<9} {'audio':<22} {'pendiente'}")
+    print(f"{'pieza':<9} {'fase':<15} {'ver':>3} {'corte':>7} {'dur':>7}  "
+          f"{'aprobada':<9} {'audio':<22} {'espera / pendiente'}")
     for n in rutas.piezas():
         slug = f"reel-{n:02d}"
         e = estado(slug)
@@ -123,10 +131,17 @@ def main():
         pend = []
         if e["cortes_pendientes"]:
             pend.append(f"{e['cortes_pendientes']} corte(s)")
-        if e["pedidos_ia"]:
-            pend.append("IA: " + ",".join(e["pedidos_ia"]))
+        # **Y se dice a quien espera, no que «hay un pedido».** «IA: visto» no
+        # dice que hacer; «espera a disenador (visto)» si. Es la diferencia
+        # entre un informe y una instruccion, y era lo que obligaba a ir a
+        # buscarlo a mano cada vez.
+        for paso in e["pedidos_ia"]:
+            quien = _DE.get(paso)
+            pend.append(f"espera a {quien} ({paso})" if quien
+                        else f"espera {paso} — sin oficio declarado")
         dur = f"{e['duracion']:.0f}s" if e["duracion"] else "—"
-        print(f"{slug:<9} {str(e['version'] or '-'):>3} {corte:>7} {dur:>7}"
+        print(f"{slug:<9} {(e['fase'] or '—'):<15}"
+              f" {str(e['version'] or '-'):>3} {corte:>7} {dur:>7}"
               f"  {(e['aprobada'] or '-'):<9} {audio:<22}"
               f" {'; '.join(pend) or '-'}")
     # **Y el material que todavia no es pieza.** Esto es lo que hacia que la
@@ -155,6 +170,15 @@ def main():
             print(f"    · {t}: {falta}")
 
     print("\nY lo que dice la puerta ahora mismo:")
+    # **Y lo que este fichero imprime va DELANTE de lo que imprime un hijo.**
+    #
+    # Los `print` de aqui se guardan en el buffer y el subproceso escribe
+    # directo al descriptor, asi que el informe salia al reves: las 47
+    # lineas de deuda del esquema primero y la tabla de las piezas en la
+    # linea 48 de 61. El comando que contesta «¿donde esta cada pieza?»
+    # enterraba su respuesta debajo de la salud del codigo, que es otra
+    # pregunta.
+    sys.stdout.flush()
     subprocess.run([sys.executable, "scripts/verificar.py", "--avisa"])
     # **Y si el sistema esta conectado, que es lo primero que hay que saber.**
     #
@@ -167,7 +191,17 @@ def main():
     # inadvertido al empezar**. Un productor sin consumidor no da error nunca;
     # sale cuando el mira la entrega y echa en falta lo que pidio.
     print()
-    subprocess.run([sys.executable, "scripts/conectado.py"])
+    # **Y la salud del sistema se dice en una linea, con donde mirarla.**
+    # Las 47 de `conectado.py` son trabajo pendiente del codigo, no de la
+    # pieza; leerlas cada vez que se pregunta por las piezas es lo que
+    # hace que se dejen de leer las dos cosas.
+    sys.stdout.flush()
+    _r = subprocess.run([sys.executable, "scripts/conectado.py"],
+                        capture_output=True, text=True,
+                        encoding="utf-8", errors="replace")
+    _dicho = [x for x in (_r.stdout or "").strip().splitlines() if x.strip()]
+    print(_dicho[-1] if _dicho else "conectado: sin respuesta")
+    print("  python scripts/conectado.py   para verlos uno a uno")
 
 
 if __name__ == "__main__":

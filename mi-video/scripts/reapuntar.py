@@ -171,6 +171,24 @@ def revisar(hazlo=False):
                 real = literal.replace(comilla_escapada, '"')
                 if ruta in cuerpos and real in cuerpos[ruta]:
                     continue
+                # **Una aguja `prohibido` no se muda: se cumple.**
+                #
+                # `verdad.py` declara dos clases de aguja y esto las trataba
+                # igual. En una `lee` el literal TIENE que estar, asi que no
+                # encontrarlo significa que el mecanismo se movio. En una
+                # `prohibido` es al reves: **no encontrarlo es el exito**, y
+                # que aparezca en un solo fichero no dice «se mudo», dice «la
+                # copia esta ahi».
+                #
+                # Mudarla al unico sitio donde el literal vive es apuntar la
+                # prohibicion contra la copia tolerada y declarar rota una
+                # verdad que estaba entera: paso con «Cuando es el evento»,
+                # cuya aguja salto de `reels/cta.mjs` —donde se habia quitado,
+                # que era el objetivo— a `src/muestras.ts`, que la propia
+                # declaracion describe como fixture que no entra en ninguna
+                # pieza. `verdad.py` empezo a fallar y con el `montar.sh`.
+                if "prohibido=" in s[:m.start()].rsplit("lee=", 1)[-1]:
+                    continue
                 vive = donde_vive(real, cuerpos)
                 if len(vive) == 1:
                     s = s.replace('Aguja("' + ruta + '", ' + comilla + literal,

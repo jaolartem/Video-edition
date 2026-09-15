@@ -41,6 +41,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import basedatos  # noqa: E402
 from dominio import ticket  # noqa: E402
 
+from dominio import version as _version  # noqa: E402
+
 BASE = "ads/decisiones.db"
 ENTREGA = "out/entrega"
 
@@ -111,13 +113,23 @@ def sellar(n, carpeta=ENTREGA):
         "insert into version (video_id, n, huella, duracion_s, fichero,"
         " commit_git, fecha, edl, spec, sha_entrega)"
         " values (?,?,?,?,?,?,?,?,?,?)",
-        # **La huella identifica la ENTREGA, no solo el corte.** Era el sha del
-        # EDL y la tabla exige `(video_id, huella)` unico, asi que sellar una
-        # entrega nueva del mismo corte —el audio corregido sobre la misma
-        # imagen, que es justo lo que hace `remezclar.py`— chocaba con la
-        # anterior. Y son dos entregas distintas: suenan distinto.
+        # **La huella es la del CORTE, que es lo que la columna dice ser.**
+        #
+        # Aqui se guardaba `sha1(edl + sha_del_mp4)` —la entrega— porque la
+        # tabla exigia `(video_id, huella)` unico y dos entregas del mismo
+        # corte chocaban. El precio de esa salida era que la columna significaba
+        # una cosa y su comentario en el esquema otra: *«la huella es del CORTE,
+        # no del fichero»*. Medido sobre las 95 versiones de la base, **ninguna**
+        # coincidia con la huella de su corte, asi que `donde.py` decia «CAMBIO»
+        # en las siete piezas siempre — y era el unico sitio donde mirar si el
+        # corte que Jaime firmo seguia en pie.
+        #
+        # Lo que de verdad distingue dos entregas del mismo corte es el fichero,
+        # y eso ya tiene columna: `sha_entrega`, que ademas es la que este mismo
+        # paso usa dos lineas mas arriba para no duplicar. El unico se mueve
+        # ahi (`migraciones._huella_del_corte`) y la huella vuelve a ser suya.
         (vid, ult + 1,
-         hashlib.sha1((edl + sha).encode()).hexdigest()[:12], _dura(mp4),
+         _version.huella_de(json.loads(edl)), _dura(mp4),
          mp4.replace("\\", "/"), _git(), datetime.datetime.now().isoformat(),
          edl, spec, sha))
     # **Y el audio de esa version, que es la otra mitad de poder rehacerla.**

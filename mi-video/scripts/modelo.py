@@ -79,7 +79,10 @@ from migraciones import MUERTAS, POR_SLUG, migrar  # noqa: E402,F401
 # de crear, que es lo que Jaime pidio. Un vocabulario en una tabla es un sitio
 # donde el valor esta escrito bien; el mismo vocabulario repetido como cadena en
 # cuatro sitios son cuatro sitios donde puede estar mal.
-VOCABULARIOS = ("tipo_medicion", "estado_decision", "decidido_por")
+#: Y el nombre dice cual de los dos es: `entidades.VOCABULARIOS` es «que columna
+#: es que catalogo» y esto es «que catalogos tienen que tener filas». Con el
+#: mismo nombre en los dos, una aguja no sabia a cual apuntaba.
+VOCABULARIOS_SEMBRADOS = ("tipo_medicion", "estado_decision", "decidido_por")
 
 
 def validar():
@@ -123,7 +126,7 @@ def validar():
     if "medicion" not in hay:
         mal.append("falta «medicion»: lo que se mide de cada render no se guarda"
                    " en ningun sitio, asi que no se puede comparar entre tandas")
-    sin_usar = [t for t in VOCABULARIOS if t in hay and not con.execute(
+    sin_usar = [t for t in VOCABULARIOS_SEMBRADOS if t in hay and not con.execute(
         f"select count(*) from {t}").fetchone()[0]]
     if sin_usar:
         mal.append(f"vocabularios vacios: {sin_usar}")
