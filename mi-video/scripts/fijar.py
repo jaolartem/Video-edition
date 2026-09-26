@@ -73,23 +73,20 @@ def huella(toma, a, b):
     transcripts en su paso `afinado` y los tiempos se mueven unas milesimas sin
     que cambie una palabra. Lo que invalida una declaracion no es que el fichero
     sea mas nuevo: es que **ahi ahora se dice otra cosa**.
-    """
-    import hashlib
-    import unicodedata
 
+    La regla de reducir esta en `dominio.texto.huella_de_texto`, no aqui: la
+    misma normalizacion estaba escrita dos veces —esta y `Tramo.huella_de`— y
+    dos copias de una regla no son copias mucho tiempo.
+    """
     import transcribir as _tr
+    from dominio.texto import huella_de_texto
 
     try:
         pal = _tr.exigir(toma)["segmentos"]
     except (SystemExit, Exception):                # noqa: BLE001
         return None
-    dentro = [w["text"] for w in pal if _tr.suena(w, a, b)]
-    if not dentro:
-        return None
-    t = unicodedata.normalize("NFD", " ".join(dentro).lower())
-    t = "".join(c for c in t if unicodedata.category(c) != "Mn"
-                and (c.isalnum() or c == " "))
-    return hashlib.sha1(" ".join(t.split()).encode("utf-8")).hexdigest()[:12]
+    return huella_de_texto(" ".join(w["text"] for w in pal
+                                    if _tr.suena(w, a, b)))
 
 
 def fijados(slug):

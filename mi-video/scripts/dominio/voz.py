@@ -44,6 +44,23 @@ from .costura import RITMO_OK as SALTO_RITMO  # noqa: E402
 from .costura import TONO_OK as SALTO_TONO  # noqa: E402
 
 
+def media(*valores):
+    """La media de lo que SÍ se midió. `None` si no se midió nada.
+
+    **La regla de este fichero, aplicada a varias medidas a la vez**: aquí
+    `None` es «no lo sé» y cualquier float es una medida de verdad, así que un
+    lado sin medir no entra con un cero — se cae del promedio. Con el cero
+    delante, una media de dos donde sólo se midió uno sale a la mitad **y parece
+    medida**: es la familia de C-63, y ya costó un empalme bueno descartado.
+
+    Estaba escrita una vez, dentro de `costura._voz`, y los otros cuatro sitios
+    que hacen lo mismo ponían el cero. Vive aquí porque es de la medida, no de
+    la costura.
+    """
+    hay = [float(x) for x in valores if x is not None]
+    return sum(hay) / len(hay) if hay else None
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Voz:
     """Lo que se oye entre `desde` y `hasta` de la cinta `cinta`.

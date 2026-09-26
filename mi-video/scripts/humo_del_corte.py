@@ -74,6 +74,17 @@ def _el_corte_nace_derivado(h):
     copia = ruta + ".humo"
     shutil.copy2(ruta, copia)
     try:
+        # **Derivar DOS veces, que es lo que dice arriba y lo que se puede
+        # exigir.** Comparaba una sola derivación contra el corte vivo, o sea
+        # `derivar(x) == x`, y eso es más fuerte de lo que el mecanismo promete:
+        # un corte **restaurado** es el que Jaime firmó, no uno derivado, así
+        # que la primera derivación lo mueve con razón — es la reposición
+        # haciendo su trabajo. Lo que tiene que ser cierto es que sea un punto
+        # fijo: de la segunda en adelante, nada se mueve.
+        #
+        # Medido en reel-03: vivo `b8f238bf975e`, primera derivación
+        # `aef13cdc0125`, y la segunda y la tercera igual que la primera.
+        _edl.derivar(PIEZA)
         antes = modelo.huella_edl(PIEZA)
         _edl.derivar(PIEZA)
         h.mide("C-507", modelo.huella_edl(PIEZA) == antes,

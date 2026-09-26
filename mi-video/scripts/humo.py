@@ -492,9 +492,17 @@ def _el_segundo_dice_de_que_video_es(h):
                 con_nombre.append(f.replace(chr(92), "/"))
     h.mide("C-509", con_nombre == ["scripts/beats.py"],
            f"una sola VELOCIDAD en Python: {con_nombre or 'ninguna'}")
+    # **Se comprueba la conversion, no la velocidad.** Esto exigia `movido > 0`,
+    # o sea daba por ley que la entrega va acelerada. El 16-9-2026 Jaime la puso
+    # en 1,0 y la prueba fallo diciendo «MAL» de algo correcto: las dos escalas
+    # coinciden porque el decidio que coincidieran. Lo que esta prueba defiende
+    # es que la conversion pase por la UNICA constante y que mueva exactamente
+    # cuando esa constante acelera — no cuanto vale.
     treinta, movido = _tk.a_montaje(30, "entrega")
-    h.mide("C-509", abs(treinta - 30 * beats.VELOCIDAD) < 1e-6 and movido > 0,
-           f"30s de la entrega son {treinta}s del montaje ({movido:+}s)")
+    h.mide("C-509", abs(treinta - 30 * beats.VELOCIDAD) < 1e-6
+           and (movido > 0) == (beats.VELOCIDAD > 1.0),
+           f"30s de la entrega son {treinta}s del montaje ({movido:+}s),"
+           f" con VELOCIDAD {beats.VELOCIDAD}")
     h.mide("C-509", _tk.a_montaje(30, "montaje") == (30.0, 0.0),
            "y 30s del montaje no se mueven")
 

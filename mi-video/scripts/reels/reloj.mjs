@@ -22,6 +22,8 @@
  * manda es la que se renderiza**, y esa es el plan.
  */
 
+import fs from "node:fs";
+
 export const FPS = 30;
 
 /**
@@ -154,7 +156,21 @@ export class Reloj {
    * 33 s sin decir por qué.
    */
   cuadraCon(slug, duracion) {
-    const previsto = this.previsto;
+    /**
+     * **Y lo que la pieza baila no es sobrante: esta declarado.** Desde el
+     * 17-9-2026 una pieza puede llevar pausas en `src/brand/compas.json` para
+     * que sus costuras caigan en el beat de su cancion —reel-14 son 3,28 s en
+     * siete pausas—. Sin contarlas aqui, la pieza que baila avisa de que le
+     * sobra corte en cada corrida, y una alarma que suena siempre deja de
+     * leerse: es la misma razon que el `deriva` de dos lineas mas abajo.
+     */
+    let baila = 0;
+    try {
+      const j = JSON.parse(fs.readFileSync("src/brand/compas.json", "utf8"));
+      baila = Object.values(j?.[slug]?.pausas ?? {})
+        .reduce((n, x) => n + Number(x || 0), 0);
+    } catch { baila = 0; }
+    const previsto = this.previsto + baila;
     const deriva = this.escenas.length / 30;
     if (duracion + 0.1 < previsto - deriva) {
       console.error(

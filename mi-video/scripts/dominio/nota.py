@@ -323,6 +323,35 @@ class Nota:
         return aplicables, huerfanas
 
 
+    # ── lo que sube a Jaime ─────────────────────────────────────────────────
+    @classmethod
+    def subidas(cls, slug: str) -> list:
+        """Lo que subió y Jaime todavía no ha cerrado. **Sin filtrar por huella.**
+
+        Filtrar por el montaje de hoy es la guarda que se autodestruye, y en este
+        fichero ya está contada: aplicar un corte cambia el EDL, o sea la huella,
+        o sea que lo escrito contra el corte anterior queda fuera para siempre —
+        0 de 482. Aquí sería peor que en `cortar`, porque lo que caducaría es
+        **cumplimiento**: bastaría tocar el corte para que una cifra sin fuente
+        dejara de parar la pieza.
+
+        Una nota `sube` no caduca con el montaje: caduca cuando Jaime la cierra,
+        con `python scripts/revision.py --cerrar <id> --como aplicada`.
+
+        **Aquí sólo se lee.** Quien las escribe es `servicio._escala`, en el
+        paso: C-198 sacó de este fichero el import del paso justo para que el
+        dominio no lo llamara, y la guarda de esa corrección me lo paró en
+        cuanto lo puse otra vez. Medir y decidir es de aquí; escribir, no.
+        """
+        con = basedatos.abrir()
+        con.row_factory = sqlite3.Row
+        filas = con.execute(
+            "select * from revision where video_slug = ? and estado = 'sube'"
+            " order by id", (slug,)).fetchall()
+        con.close()
+        return [cls(f) for f in filas]
+
+
 def _edl(slug: str):
     ruta = os.path.join("ads", slug, "edl-sell.json")
     if not os.path.exists(ruta):

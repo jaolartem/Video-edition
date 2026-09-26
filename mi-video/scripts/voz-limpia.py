@@ -209,6 +209,15 @@ def exportar(n):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", corte, "-vn",
                         "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1", out],
                        check=True)
+        # **Y sin las pausas del baile.** Van en el corte, asi que salian dentro
+        # de lo que Jaime manda a limpiar — y con eso, mover el ritmo tiraba su
+        # pasada de Adobe: le paso tres veces. Una pausa es silencio y el
+        # silencio se le devuelve DESPUES a un fichero ya limpio (C-527).
+        import pausas as _pa
+        tmp = out.replace(".wav", "-seguida.wav")
+        if _pa.quitar(out, tmp, slug):
+            os.replace(tmp, out)
+            print(f"    {slug}: sin las pausas del baile — se devuelven al integrar")
         return _repartir(out)
     trozos = []
     for i, (r, d) in enumerate(pares):
@@ -352,48 +361,10 @@ def _corresponde(video, wav):
     return float(np.abs(np.correlate(largo, corto, mode="full")).max())
 
 
+# Cual de los ficheros de la carpeta es su voz limpia: `candidato.py`.
 def candidato(n):
-    """El WAV limpiado del reel n, si lo hay.
-
-    Por la convencion de nombres: el limpiado es el que **empieza por el nombre
-    base y es mas largo** — `reel-01-voz.wav` -> `reel-01-voz-enhanced-v2.wav`.
-    Entre varios, el mas reciente.
-    """
-    base = BASE_VOZ.format(slug=f"reel-{n:02d}").lower()
-    vistos = []
-    for carpeta in CARPETAS:
-        if not os.path.isdir(carpeta):
-            continue
-        for f in glob.glob(os.path.join(carpeta, "*.wav")):
-            nom = os.path.basename(f).lower()[:-4]
-            # **Lo que produce ESTE script no es una respuesta.** `-norm` es la
-            # copia con cabecera que se exporta junto a la voz cruda; comparte
-            # base y es mas reciente, asi que ganaba el `max` y entraba como si
-            # fuera la pista limpiada. La pieza habria salido con la voz SIN
-            # limpiar y sonando igual de bien de nivel: invisible.
-            #
-            # Lo que vuelve de Adobe trae su propia marca (`-enhanced-v2`). Lo
-            # nuestro se excluye por nombre y no por fecha, que es lo unico que
-            # no depende de en que orden se hagan las cosas.
-            if "-norm" in nom:
-                continue
-            # **Y `-sin-cola` / `-con-cola` tampoco son respuestas: los hace ESTE
-            # script.**
-            #
-            # Son el recorte y el relleno con que el propio paso cuadra la pista
-            # al video. Al no excluirlos, cada corrida elegia el ajuste de la
-            # anterior y le hacia otro encima: reel-07 llego a
-            # `-con-cola-sin-cola-sin-cola-sin-cola`, cuatro capas de la misma
-            # pista, y cada capa arrastraba el redondeo de la anterior.
-            #
-            # Es exactamente el mismo fallo que `-norm` de arriba, con otro
-            # sufijo. Lo de Adobe trae su marca; lo nuestro se excluye por
-            # nombre, que es lo unico que no depende del orden.
-            if "-sin-cola" in nom or "-con-cola" in nom:
-                continue
-            if nom.startswith(base) and len(nom) > len(base):
-                vistos.append(f)
-    return max(vistos, key=os.path.getmtime) if vistos else None
+    import candidato as _c
+    return _c.de(n, CARPETAS, BASE_VOZ)
 
 
 def integrar(n, ver=False):
@@ -404,6 +375,10 @@ def integrar(n, ver=False):
     if not wav:
         print(f"R{n}: sin audio limpiado todavia")
         return False
+    # Salio a limpiar seguida, asi que se le devuelven las pausas del baile
+    # antes de mirar si encaja, con el reparto de HOY: `pausas.py` (C-527).
+    import pausas as _pa
+    wav = _pa.poner_si_baila(wav, n)
     # **Y la voz limpia tiene que ser DE ESTE corte.**
     #
     # La limpieza se exporta desde `public/reel-NN.mp4`, asi que una que sea mas

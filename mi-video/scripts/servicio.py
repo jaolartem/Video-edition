@@ -75,6 +75,29 @@ def _piso():
     return _piso_cache
 
 
+#: Los campos del pedido que hoy NO se pudieron construir, con por qué.
+#: Se vacía al empezar cada `contexto()` y viaja dentro del pedido.
+_HUECOS: dict = {}
+
+
+def _falta(nombre, e, vacio):
+    """Apunta el hueco y devuelve el vacío. La regla vive en `docs/piso.md`.
+
+    **Un productor que disfraza su fallo de dato legítimo.** `onda`, `se_ve` y
+    `cierres_en_corpus` mandaban `[]` cuando la consulta reventaba; `precio`
+    mandaba `None` tanto si no hay escalón como si la llamada falla. Quien
+    contesta no puede distinguir «no hay» de «no se pudo mirar», y las dos
+    llevan a decisiones opuestas: con lo primero se sigue, con lo segundo hay
+    que parar.
+
+    No son seis arreglos: es un mecanismo, y vive aquí porque `pedir()` es la
+    única puerta por la que pasa todo pedido — igual que `docs/piso.md` se
+    antepone aquí para que el criterio siga siendo uno.
+    """
+    _HUECOS[nombre] = f"{type(e).__name__}: {e}"[:160]
+    return vacio
+
+
 def _marcador(slug):
     """Donde esta la pieza y en que fichero lo escribe quien la mueve.
 
@@ -100,8 +123,8 @@ def _marcador(slug):
                                            estado.RAIZ).replace("\\", "/"),
                 "etapa": d.get("etapa"), "abiertos": d.get("abiertos") or [],
                 "segmentos": d.get("segmentos") or []}
-    except Exception:                              # noqa: BLE001
-        return None
+    except Exception as e:                        # noqa: BLE001
+        return _falta("marcador", e, None)
 
 
 def _dir(paso):
@@ -124,8 +147,8 @@ def _tickets(slug):
 
         ticket.recolocar(slug)
         return ticket.abiertos(slug)
-    except Exception:                              # noqa: BLE001
-        return []
+    except Exception as e:                        # noqa: BLE001
+        return _falta("tiquets", e, [])
 
 
 def _decididos(slug):
@@ -151,8 +174,8 @@ def _decididos(slug):
 
         origen, mapa = origen_de(slug)
         return de(slug) + (de(origen, mapa) if origen else [])
-    except Exception:                              # noqa: BLE001
-        return []
+    except Exception as e:                        # noqa: BLE001
+        return _falta("lo_ya_decidido", e, [])
 
 
 def _precio():
@@ -161,18 +184,38 @@ def _precio():
         import consulta
 
         return consulta.precio_vigente()
-    except Exception:                              # noqa: BLE001
-        return None
+    except Exception as e:                        # noqa: BLE001
+        return _falta("precio_vigente", e, None)
+
+
+#: Para no repetir el aviso en cada pedido de la misma corrida.
+_dicho = False
 
 
 def _instrucciones(paso, slug):
     """Lo que Jaime dijo y sigue aplicando a este paso y esta pieza."""
+    global _dicho
     try:
         from dominio import instruccion
 
+        # **Y una etiqueta que no apunta a ningun paso se dice, no se arregla
+        # sola.** 22 instrucciones llevan `paso` con nombres que no son los de
+        # ningun paso de servicio —`montaje`, `corte`, `audio`, `revalidado`—,
+        # asi que el filtro por paso no se puede encender sin dejarlas sin
+        # destinatario. Juntar los dos vocabularios es una decision; que el
+        # desajuste no se vea, no.
+        if not _dicho:
+            _dicho = True
+            h = instruccion.etiquetas_huerfanas()
+            if h:
+                import registro
+
+                registro.aviso(
+                    "instruccion", "etiqueta de paso que no existe",
+                    detalle=", ".join(f"{k}: {v}" for k, v in sorted(h.items())))
         return instruccion.para(paso, slug)
-    except Exception:                              # noqa: BLE001
-        return []
+    except Exception as e:                        # noqa: BLE001
+        return _falta("instrucciones_de_jaime", e, [])
 
 
 def _respaldos(slug):
@@ -237,8 +280,14 @@ def contexto(paso, slug):
     Una sola lista: `servicio.mjs` la pide aqui en vez de armar la suya, que
     es como el pedido de `describir` se quedo sin lo ya decidido, sin el
     precio y sin las instrucciones (C-395).
+
+    **Y lo que no se pudo construir viaja dicho, en `huecos`.** Un `[]` que
+    significa «no hay» y un `[]` que significa «revento la consulta» son
+    decisiones opuestas para quien contesta, y hasta ahora llegaban con la
+    misma cara. Ver `_falta` y `docs/piso.md`.
     """
-    return {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),
+    _HUECOS.clear()
+    d = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),
              # **Lo que Jaime ya dijo, para que no tenga que decirlo otra vez.**
              # Guardarlo y no llevarlo al paso que debe obedecerlo es
              # archivarlo. Ver `dominio/instruccion.py`.
@@ -272,6 +321,7 @@ def contexto(paso, slug):
              # al que trabaja**: `estado.marca` no la llamaba nadie y `hecho`
              # estaba vacio en las siete piezas. Declarado y no implementado.
              "marcador": _marcador(slug)}
+    return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 
 def _prompt_aparte(paso, slug, prompt):
@@ -673,8 +723,68 @@ def recoger(paso, slug):
         return None
     if (isinstance(d, dict) and isinstance(d.get("elementos"), list)
             and set(d) <= {"pieza", "elementos"}):
-        return d["elementos"]
+        d = d["elementos"]
+    # **Y lo que sube a Jaime se escribe aqui, no en los cinco consumidores.**
+    #
+    # Esta es la puerta por la que entra TODA respuesta, igual que `pedir()` es
+    # la unica por la que sale todo pedido. Ponerlo en cada servicio son cinco
+    # copias, y la que se olvide de copiarla deja pasar una cifra sin fuente.
+    _escala(slug, d)
     return d
+
+
+#: Las claves de respuesta cuyo efecto declarado es parar la pieza. `sube` lo
+#: dice así —*«la pieza no pasa la puerta hasta que Jaime la mire»*— y
+#: `rotulo_falso` lo dice más corto: *«para la pieza»*. Son el mismo hecho con
+#: dos nombres, así que comparten camino en vez de tener dos puertas: un
+#: rótulo que no es lo que dice la fuente cambia el mensaje, y lo que cambia el
+#: mensaje lo decide Jaime.
+PARAN = ("sube", "rotulo_falso")
+
+
+def _escala(slug, datos) -> int:
+    """Una nota por cada cosa que la respuesta manda a Jaime.
+
+    **Va aquí y no en el dominio.** `Nota` sabe leer lo que subió
+    —`Nota.subidas`—, pero escribirlo es del paso: C-198 sacó de `dominio/nota.py`
+    el `import revision` precisamente para que el dominio no llamara al paso, y
+    su guarda me paró al intentarlo. Medir y decidir es del dominio; escribir es
+    de aquí.
+
+    Y aquí dentro, en `recoger()`, porque es la puerta por la que entra TODA
+    respuesta — igual que `pedir()` es la única por la que sale todo pedido.
+    Repartido por los cinco servicios son cinco copias, y la que se olvide deja
+    pasar una cifra sin fuente.
+
+    Es idempotente sin esfuerzo: `revision.anotar` deduplica lo que sube por sus
+    palabras de contenido, así que recoger dos veces no apila una segunda nota.
+    """
+    import revision
+
+    n = 0
+    for x in datos if isinstance(datos, list) else []:
+        if not isinstance(x, dict):
+            continue
+        # **Y cada hallazgo dice de que clase es.** Los dos criterios no son
+        # simetricos: lo de composicion casi siempre se puede contrastar —una
+        # duracion, una repeticion, una cifra contra la tabla `dato`— y lo
+        # estetico no. Sin marcarlo, la puerta trata igual «el tablero no
+        # rotula su fuente», que se comprueba, y «tres tableros seguidos pesan»,
+        # que es criterio y no lo contradice ninguna herramienta.
+        #
+        # Va delante del texto y no en una columna nueva: se lee de un vistazo
+        # en la lista de lo que sube, y se cuenta con un `like`.
+        clase = str(x.get("clase") or "").strip().lower()
+        marca = f"[{clase}] " if clase in ("comprobable", "criterio") else ""
+        for k in PARAN:
+            que = str(x.get(k) or "").strip()
+            if not que:
+                continue
+            revision.anotar(slug, "otro", None, None,
+                            marca + (que if k == "sube" else f"{k}: {que}"),
+                            estado="sube")
+            n += 1
+    return n
 
 
 def _espera():

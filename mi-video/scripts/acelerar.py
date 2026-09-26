@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import registro  # noqa: E402
 import rutas  # noqa: E402
-from beats import VELOCIDAD  # noqa: E402
+from beats import velocidad as _velocidad  # noqa: E402
 # **Lo que mide se le pide a quien lo mide.** `duracion` vive en `voz-limpia`, y
 # copiarla aqui seria tener dos respuestas para «cuanto dura esto». El import va
 # dentro de la funcion porque `voz-limpia` importa de aqui: al reves es un ciclo.
@@ -25,8 +25,41 @@ def _acelerar(n) -> bool:
     # seria la quinta version de «cuanto dura esto» en este repositorio.
     from sincronia import _cuanto as duracion
     v = f"out/reels/reel-R{n}.mp4"
-    if not os.path.exists(v) or VELOCIDAD == 1.0:
+    if not os.path.exists(v):
         return False
+    # **La velocidad es de la pieza, no del lote.** Jaime, 16-9: *«cada pieza
+    # tiene su propia logica»*. `beats.velocidad(slug)` contesta la suya si la
+    # tiene y la del lote si no; el resto de este fichero no cambia.
+    VELOCIDAD = _velocidad(f"reel-{n:02d}")
+    # **A 1,0 no se sale: la entrega ES el render, y hay que escribirla.**
+    #
+    # Esto hacia TRES cosas —acelerar, escribir `out/entrega/` y sembrar la
+    # copia muda sobre la que mezcla `musica.sh`— y con la velocidad en 1,0 se
+    # saltaba las tres. El nombre engana: el docstring del fichero dice
+    # «convierte el render en entrega», y a velocidad natural esa conversion es
+    # una copia, no un no-hacer-nada.
+    #
+    # Medido el 16-9, la misma tarde en que Jaime puso `VELOCIDAD = 1.0`
+    # (C-513): reel-10 se quedo con la entrega de la corrida anterior —34,81 s
+    # contra los 34,17 del render nuevo—, `out/entrega/.sin-musica/` sin
+    # sembrar, y con eso `calibrar-cama.py` se nego a medir («su stem de voz no
+    # corresponde a la entrega», C-243) y el nivelado salio con codigo 1. O
+    # sea: bajar la velocidad dejaba la pieza sin master, y el sintoma aparecia
+    # tres pasos mas abajo con otro nombre.
+    if VELOCIDAD == 1.0:
+        import rutas as _ru
+        from dominio.pieza import Pieza
+        final = _ru.salida("entrega", f"reel-R{n}.mp4")
+        try:
+            shutil.copy2(v, final)
+            shutil.copy2(final, Pieza(n).muda)
+        except OSError as e:
+            registro.aviso("voz-limpia", "no se pudo escribir la entrega",
+                           detalle=f"R{n}: {type(e).__name__}", eco=True)
+            return False
+        print(f"R{n}: sin acelerar (velocidad 1,0): la entrega es el render"
+              f"  ({duracion(final):.2f}s)  ->  {final}")
+        return True
     # **Y no se acelera dos veces.** Esto sobreescribe el render EN SU SITIO,
     # asi que una segunda pasada de `voz-limpia` lo vuelve a estirar: reel-01
     # paso de 93,4 s a 81,2 s y el render original se perdio — no hay vuelta

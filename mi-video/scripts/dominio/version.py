@@ -184,6 +184,23 @@ def restaurar(slug, n=None, quien=""):
         json.dump(e, f, ensure_ascii=False, indent=1)
     if quien:
         _sella(slug, quien)
+    elif n is None:
+        # **Restaurar el corte firmado SIN decir quién lo firmó deja la pieza
+        # rota y callada.** El corte vuelve bien, pero las etiquetas de etapa
+        # siguen estampadas contra el corte de después, así que `aprobada()`
+        # dice que no y la pieza se va a la línea sin que nadie sepa por qué.
+        # Es literalmente el síntoma de C-506, y el arreglo de entonces dependía
+        # de que el llamante se acordara de pasar `quien` — o sea que no era un
+        # arreglo, era una costumbre. Pasó con reel-02: etapas 1 y 3 sin sello
+        # durante semanas, y lo destapó la prueba de humo, no la línea.
+        import registro
+
+        registro.aviso("version", "corte firmado restaurado sin sellar",
+                       toma=slug,
+                       detalle="sin `quien`, las etiquetas de etapa no se"
+                               " re-sellan y la pieza deja de contar como"
+                               " aprobada: `python scripts/aprobar.py"
+                               f" {str(slug)[-2:].lstrip('0')} --al-firmado`")
     return v["n"], None
 
 
@@ -276,17 +293,41 @@ def cuadra_con_el_json(slug, fichero, margen=MARGEN):
     # Quien sabe si esta acelerada es la pieza, que es de quien es el dato; y
     # `VELOCIDAD` se importa de `beats`, su dueno. Los dos imports van aqui
     # dentro porque `beats` come del dominio: al reves es un ciclo.
-    from beats import VELOCIDAD
+    from beats import velocidad as _vel
     from dominio.pieza import Pieza
 
     acelerada = Pieza(int(slug.rsplit("-", 1)[1])).acelerada
+    VELOCIDAD = _vel(slug)
     debe = dice / VELOCIDAD if acelerada else dice
     hay = _dura(fichero)
     if hay is None:
         return (f"{slug}: NO SE PUDO MEDIR {fichero} — el JSON dice"
                 f" {dice:.2f}s y no hay con que contrastarlo")
+    # **Y la cola declarada entra en la tolerancia, no en el objetivo.**
+    #
+    # `musica.sh` le anade `cama.cola_s` —0,6 s— al mezclar y lo dice en voz
+    # alta. Es parte del fichero que esto mide, pero **no todas las entregas la
+    # llevan**: las que no pasaron por la mezcla con musica salen sin ella. Por
+    # eso se ensancha el margen en vez de mover `debe`: sumarsela a todas hacia
+    # fallar a reel-09, que estaba sana y sin cola, justo al arreglar reel-10.
+    #
+    # Y el porcentaje solo no basta porque la cola es FIJA: 0,6 s son el 0,9%
+    # de una pieza de 70 s y el 1,8% de una de 34. Medido el 16-9: reel-10
+    # recien mezclada daba +2,4% —fuera— con las largas del mismo lote pasando
+    # con la misma cola dentro. Lo que se colaba no era el margen: era que un
+    # tope relativo no cubre algo que se suma en segundos.
+    #
+    # Sigue cogiendo lo que vino a coger: reel-12, -13 y -14 estan entre -10,5%
+    # y -15,3%, o sea entre siete y nueve segundos, muy lejos de una cola.
+    # **Y lo que la pieza baila tambien cuenta.** Las pausas de `compas.json`
+    # congelan frames a proposito para que la costura caiga en el beat: son
+    # parte del fichero, declaradas y medidas, no un descuadre.
+    import cama as _cama
+    import compas as _compas
+
+    debe += _compas.total(slug)
     d = hay - debe
-    if abs(d) <= debe * margen:
+    if abs(d) <= debe * margen + _cama.cola(slug):
         return None
     reloj = (f" (el corte declara {dice:.2f}s a 1x y esta sale a {VELOCIDAD}x)"
              if acelerada else "")

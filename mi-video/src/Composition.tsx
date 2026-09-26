@@ -134,6 +134,7 @@ export const MyComposition = () => {
             hook: r.portada!.titulo,
             subtitulo: r.portada!.subtitulo,
             fotograma: r.portada!.fotograma,
+            forma: (r.portada as {forma?: "velo" | "bloque"}).forma,
           }}
         />
       ))}

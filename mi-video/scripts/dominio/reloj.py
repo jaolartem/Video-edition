@@ -101,7 +101,7 @@ def beat_en(pieza, segundo):
             return det.get("beat")
         t += dur
     return None
-def a_montaje(segundo, de="entrega"):
+def a_montaje(segundo, de="entrega", pieza=None):
     """El segundo dictado, traído a la escala del montaje. `(s, cuánto movió)`.
 
     `de="montaje"` es el render sin acelerar —lo que hay en `out/reels`, y la
@@ -118,6 +118,11 @@ def a_montaje(segundo, de="entrega"):
             os.path.abspath(__file__))))
         import beats
 
-        factor = beats.VELOCIDAD
+        # **La de SU pieza.** Desde el 16-9 la velocidad puede ser por pieza
+        # (reel-10 va a 1,13 y el lote a 1,0), asi que un segundo dictado sobre
+        # la entrega se convierte con la que esa pieza lleva de verdad. Sin
+        # `pieza` contesta la del lote, que es lo que preguntan los pasos que no
+        # miran una en concreto.
+        factor = beats.velocidad(pieza)
     return round(float(segundo) * factor, 3), round(
         float(segundo) * (factor - 1.0), 3)

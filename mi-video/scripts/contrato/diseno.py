@@ -27,6 +27,7 @@ from .aguja import Aguja, Prompt
 from .material import CAMARA, CAMPOS, LO_DICHO, VOZ
 from .comun import CUMPLIMIENTO, REDUNDANCIA
 from .marca import MARCA
+from .diseno_pieza import NIVEL_PIEZA
 from .piezas import Campo, Clave, Contrato, Momento
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -374,24 +375,7 @@ DISENO = Contrato(
               nota="**Ya no es un rótulo: es el texto que se dibuja** — fuera de"
                    " la zona segura, una línea, mono, afirmativo, tope 97 en"
                    " `src/brand/pie.json`; pasarse no abrevia: sale falta."),
-        # ── nivel PIEZA: lo que sólo se ve mirándolos todos ──────────────────
-        Clave("pieza.alternancia",
-              dispara=(Aguja("scripts/reels/capas.mjs", "export function repartirPorCubre(declarados) {",
-                             pendiente="leer la familia declarada por tablero en vez"
-                                       " de dejar que cada uno salga con la suya"),),
-              efecto="qué tableros van cargados y cuáles tranquilos",
-              lista=("cargada", "tranquila"),
-              nota="Una tabla sobre fotomontaje no se lee; una tesis sobre negro"
-                   " liso es una diapositiva. La alternancia es de pieza, no de"
-                   " tablero: por eso vive aquí."),
-        Clave("pieza.veredicto",
-              dispara=(Aguja("scripts/servicios/disenar.py", 'return devuelve(pieza, "diseño · la escena no cuadra:", por_que)',),),
-              efecto="devuelve la escena al compositor, con tiquet, si no cuadra (C-387)",
-              obligatoria=True,
-              lista=("monta", "rota"),
-              nota="El que monta también puede parar: tres tableros seguidos con"
-                   " la misma forma, o el oro gastado en todo, no es un defecto de"
-                   " un tablero — es de la pieza, y no se ve mirando uno."),
+        *NIVEL_PIEZA,
     ),
     bloques=(MARCA, REDUNDANCIA, CUMPLIMIENTO),
     repite=None,

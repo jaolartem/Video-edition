@@ -69,6 +69,9 @@ BASE = "ads/decisiones.db"
 #:   distinguirlos es entender, no medir.
 NO_PARAN = ("habla de otro texto", "sin contestar: ['describir']",
             "dos veces seguidas",
+            # La regla de plano nacio el 25-9 y la incumplen nueve de diez
+            # piezas del lote: se anota en cada verificacion y no para.
+            "regla de plano ·",
             # El trabajo grafico: ticket en la entrega, obligatorio en la final.
             # `separa()` lo deja pasar sólo mientras la pieza no esté aprobada.
             "obligatorio en la final",
@@ -283,6 +286,30 @@ def revisar(slug):
                    f" la voz — se come una palabra")
     edl = json.load(open(ruta, encoding="utf-8"))
     mal += _fecha_ajena(slug, edl)
+    # **Lo que subio a Jaime para la pieza hasta que el lo mire.**
+    #
+    # El contrato lo declara desde que existe el bloque de cumplimiento —*«la
+    # pieza no pasa la puerta hasta que Jaime la mire»*— y la puerta no lo
+    # contaba. Con eso un agente podia contestar «esta cifra no tiene fuente» y
+    # la pieza salia igual: la prioridad 1 del proyecto, escrita y sin efecto.
+    #
+    # No entra en NO_PARAN a proposito. Todo lo que es blando ahi tiene arreglo
+    # despues —un borde, un tablero que falta—; esto no: lo que sube es lo que
+    # cambia el mensaje, y quien decide es el.
+    from dominio.nota import Nota
+
+    # **Los planos se sostienen, y por ahora se anota.** Regla de Jaime del
+    # 25-9. Entra en `NO_PARAN` a proposito: medido sobre el lote vivo la
+    # incumplen nueve de diez piezas —reel-12, 19 reparos de 21 bloques— asi que
+    # pararlas seria parar el lote por una regla que nacio hoy. Se ve en cada
+    # verificacion y solo puede bajar; cuando el lote este limpio, se saca de
+    # ahi y pasa a parar. Ver `dominio/plano.py`.
+    from dominio import plano as _pl
+
+    mal += [f"{slug}: {r}" for r in _pl.reparos(slug)]
+    for n in Nota.subidas(slug):
+        mal.append(f"{slug}: subio a Jaime y sigue abierto —"
+                   f" #{n.id} «{str(n.que)[:90]}»")
     con = basedatos.abrir(BASE)
     con.row_factory = sqlite3.Row
 

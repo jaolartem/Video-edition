@@ -31,6 +31,7 @@
  *
  *   node scripts/guardas.mjs
  */
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { comprobar as comprobarCamara } from "./camara.mjs";
@@ -312,4 +313,19 @@ console.log(
   `${fallos.length ? `${fallos.length} ROTAS` : "todas en pie"}`,
 );
 for (const f of fallos) console.error(`  ${f}`);
-if (fallos.length) process.exit(1);
+// **Y queda fila.** Jaime: *«no solo necesito que pare, necesito un log»*.
+// Parar se ve en la terminal de quien estaba mirando; el log es lo unico que
+// deja verlo despues, y sobre todo cuantas veces — que es donde se nota la
+// diferencia entre una guarda que salto una vez y una que lleva semanas
+// saltando sin que nadie la mire.
+//
+// Por la CLI de `registro.py` y no con otro escritor: la tabla ya existe con
+// 41.396 filas y 23 scripts escribiendo en ella, y un segundo camino hasta la
+// misma tabla es la averia que este proyecto paga mas cara.
+if (fallos.length) {
+  spawnSync("python", [
+    "scripts/registro.py", "--anota", "error", "guardas", "agujas rotas",
+    `${fallos.length}: ${fallos.join(" | ")}`,
+  ], { stdio: "ignore" });
+  process.exit(1);
+}

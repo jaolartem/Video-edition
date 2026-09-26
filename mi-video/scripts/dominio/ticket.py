@@ -232,7 +232,7 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     # plan, que es esa escala; lo que Jaime dicta suele ser de la entrega, que
     # va acelerada. Sin esta linea el tiquet se archivaba en la etapa de al
     # lado y el pedido de diseno abria la lamina equivocada.
-    segundo, movido = a_montaje(segundo, de)
+    segundo, movido = a_montaje(segundo, de, pieza)
     if movido:
         print(f"  {pieza}: el segundo dictado sobre la {de} cae en el"
               f" {segundo:.1f} del montaje ({movido:+.1f}s)")

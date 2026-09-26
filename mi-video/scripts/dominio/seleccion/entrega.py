@@ -83,14 +83,23 @@ class Entrega:
         dice si dentro del tramo la voz se mueve, que es otra cosa distinta de
         estar lejos del punto cero.
         """
+        # **Y si no se midio nada, `None`.** `voz_st` ya se declara
+        # `float | None` en `ventana.py` y el paso de tablero de mas abajo ya
+        # lo trata asi; lo que ponia el cero era este `except`, y un cero aqui
+        # es «la peor entrega posible» dicho de una toma que nadie midio.
+        inten = exp = None
         try:
             i = beats.intensidad(v.toma, v.a, v.b, self.corpus.dichos(v.toma))
-            medida = (float(i.get("intensidad") or 0.0)
-                      + float(beats.expresividad(v.toma, v.a, v.b) or 0.0) / 4.0)
-            v.intensidad = i.get("intensidad")
+            inten = i.get("intensidad")
+            exp = beats.expresividad(v.toma, v.a, v.b)
+            v.intensidad = inten
             v.altura_st = i.get("altura")
         except Exception:                             # noqa: BLE001
-            medida = 0.0
+            pass
+        if inten is None and exp is None:
+            v.voz_st = None
+            return None
+        medida = float(inten or 0.0) + float(exp or 0.0) / 4.0
         v.voz_st = round(medida, 2)
         return medida
 
@@ -153,7 +162,14 @@ class Entrega:
             prioridades = self.prioridades
             manda_limpieza = (prioridades or {}).get(s0 + 1) == "limpieza"
 
+            # **Sin medida no se compara.** `vale` restaba sobre `voz_st`, asi
+            # que un `None` reventaba y un cero inventado hacia perder a la toma
+            # que nadie pudo medir. Ahora la que no tiene medida no entra en la
+            # comparacion: no gana ni pierde por algo que no se sabe, y si
+            # ninguna se pudo medir la etapa se queda como estaba.
             def vale(x):
+                if vs[x].voz_st is None:
+                    return None
                 # El handicap NO toca `voz_st`: lo medido se guarda como se
                 # midió y sólo la comparación lo descuenta. Si se guardara
                 # descontado, el informe diría que la toma tiene menos voz de la
@@ -165,7 +181,10 @@ class Entrega:
                 # comunica pero se cae a pedazos tampoco.
                 return (vs[x].limpieza * 10 + v) if manda_limpieza else (v + vs[x].limpieza)
 
-            mejor = max(cerca, key=vale)
+            medidas = [x for x in cerca if vale(x) is not None]
+            if len(medidas) < 2 or vale(k) is None:
+                continue
+            mejor = max(medidas, key=vale)
             # No se pisa con lo que ya ocupa otra etapa.
             choca = any(o is not None and o != k and vs[mejor].solapa(vs[o])
                         for o in plan)

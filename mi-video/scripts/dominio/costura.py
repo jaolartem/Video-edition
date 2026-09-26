@@ -164,12 +164,25 @@ class Costura:
         inicios = {round(a1, 3)} | {round(p.empieza, 3) for p in ws
                                     if a1 <= p.empieza <= a1 + MARGEN
                                     and b1 - p.empieza > 0.8}
-        suelo = self._voz(a0, b0, a1, b1) - PIERDE_VOZ
+        # **Y si no se pudo medir no hay suelo que defender.**
+        #
+        # `_voz` devuelve `None` cuando ningun lado se pudo medir —su ventana es
+        # corta, que es el caso de 4 de 103 trozos—, y esta linea le restaba
+        # `PIERDE_VOZ`: **TypeError**, la costura entera al suelo. Y la de abajo
+        # comparaba `None <` con lo mismo. Con `None` la voz no opina: la
+        # costura se elige por coste, que es lo que se hacia antes de que la voz
+        # existiera, en vez de rechazar candidatas por una medida que no hay.
+        base = self._voz(a0, b0, a1, b1)
+        suelo = None if base is None else base - PIERDE_VOZ
         elegida = None
         for f in sorted(finales):
             for n in sorted(inicios):
-                if n <= f or self._voz(a0, f, n, b1) < suelo:
+                if n <= f:
                     continue
+                if suelo is not None:
+                    v = self._voz(a0, f, n, b1)
+                    if v is not None and v < suelo:
+                        continue
                 cand = self._como(Tramo(a0, f, self.antes.cinta),
                                   Tramo(n, b1, self.despues.cinta))
                 if elegida is None or cand.coste < elegida.coste:
@@ -192,10 +205,13 @@ class Costura:
 
         # **Lo no medido no cuenta; no suma cero.** Un lado sin medir con un
         # cero delante baja la media a la mitad y el resultado parece medido.
-        lados = [x for x in (beats.expresividad(self.antes.cinta, a0, b0),
-                             beats.expresividad(self.despues.cinta, a1, b1))
-                 if x is not None]
-        return sum(float(x) for x in lados) / len(lados) if lados else None
+        # La regla vive en `voz.media`, que es de la medida y no de la costura:
+        # aqui estaba escrita y los otros cuatro sitios que hacen lo mismo
+        # ponian el cero.
+        from .voz import media
+
+        return media(beats.expresividad(self.antes.cinta, a0, b0),
+                     beats.expresividad(self.despues.cinta, a1, b1))
 
     def __str__(self) -> str:
         return (f"costura {self.antes}|{self.despues}"

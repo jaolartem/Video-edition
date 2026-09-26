@@ -14,7 +14,6 @@ Con la lista, esa divergencia era invisible. Con el objeto es imposible: un
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 
 
 class TramoInvalido(ValueError):
@@ -80,13 +79,14 @@ class Tramo:
         Doce caracteres del texto que suena dentro. Es lo que permite saber que
         una declaración vieja habla de otras palabras cuando la cinta cambia —
         sin esto, una decisión sobrevive a la prueba que la justificaba (C-149).
-        """
-        from . import texto as _tx
 
-        dentro = _tx.comparable(self.texto_de(palabras))
-        if not dentro.strip():
-            return None
-        return hashlib.sha1(" ".join(dentro.split()).encode("utf-8")).hexdigest()[:12]
+        La regla de reducir es de `texto.huella_de_texto` y no de aquí: estaba
+        escrita también en `fijar.huella`, y de las dos cuelga si una
+        declaración de Jaime sigue valiendo.
+        """
+        from .texto import huella_de_texto
+
+        return huella_de_texto(self.texto_de(palabras))
 
     def __str__(self) -> str:
         c = f" @{self.cinta}" if self.cinta else ""

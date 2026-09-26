@@ -93,8 +93,14 @@ class Pieza:
         Esto NO es la comprobación: la comprobación sigue siendo contra el JSON
         (C-494). Esto sólo dice en qué reloj leerla.
         """
-        from beats import VELOCIDAD
+        # **A la velocidad de ESTA pieza.** Desde el 16-9 puede tener la suya
+        # (reel-10 va a 1,13 y el lote a 1,0): con la del lote, una pieza
+        # acelerada se medía contra 1,0 y salía «no acelerada», así que el
+        # chequeo del JSON la acusaba de durar un 9% de menos siendo correcta.
+        from beats import velocidad as _vel
         from dominio.version import _dura
+
+        VELOCIDAD = _vel(self.slug)
 
         r = _dura(self.render)
         e = _dura(self.entrega)

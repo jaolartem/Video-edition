@@ -67,6 +67,26 @@ def nivel(slug):
     return d["piezas"].get(slug, d["por_defecto"])
 
 
+def cola(slug=None):
+    """Cuanto silencio va al final de la pieza, en segundos.
+
+    Lo anade `musica.sh` al mezclar y lo cuenta `version.cuadra_con_el_json`
+    para no acusar de larga a una entrega que lleva dentro lo que la propia
+    linea le puso. Vive aqui porque `cama.json` se lee en este fichero y en
+    ninguno mas: el numero estaba dentro de una rama del CLI, o sea legible
+    solo desde la linea de comandos.
+    """
+    # **Y la suya si la tiene.** Jaime, 16-9, sobre reel-10 acelerada: *«la
+    # cola, dejala en 0.3»*. Es de la pieza y no del lote —«cada pieza tiene su
+    # propia logica»—: a 1,15x los 0,6 s de lote son 0,31 s de mas sobre los 30
+    # que tiene que medir, y recortar silencio es mas barato que estirar mas su
+    # voz. El lote sigue en `cola_s`.
+    d = leer()
+    if slug and slug in (d.get("colas") or {}):
+        return float(d["colas"][slug])
+    return float(d.get("cola_s", 0.6))
+
+
 def medido_contra(slug):
     """Contra qué objetivo se midió el nivel de esa pieza. `None` si no consta."""
     return leer().get("medido_contra", {}).get(slug)
@@ -208,7 +228,7 @@ def main():
         elif que == "objetivo":
             print(objetivo(sys.argv[2] if len(sys.argv) > 2 else None))
         elif que == "cola":
-            print(leer().get("cola_s", 0.6))
+            print(cola(sys.argv[2] if len(sys.argv) > 2 else None))
         else:
             return 2
         return 0

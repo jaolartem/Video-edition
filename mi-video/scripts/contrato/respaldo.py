@@ -138,10 +138,9 @@ RESPALDO = Contrato(
               nota="Es cumplimiento —prioridad 1— y hoy sólo cabe como prosa"
                    " dentro de `condiciones` o `nota`."),
         Clave("rotulo_falso",
-              dispara=(Aguja("scripts/verificar.py", "def revisar(",
-                             pendiente="parar la pieza cuando el rótulo en pantalla"
-                                       " no es lo que la fuente dice"),),
-              efecto="para la pieza",
+              dispara=(Aguja("scripts/servicio.py", 'PARAN = ("sube", "rotulo_falso")'),
+                       Aguja("scripts/verificar.py", "for n in Nota.subidas(slug):")),
+              efecto="para la pieza: nota `sube` y la puerta no deja pasar",
               nota="Registrado en `dato` id 4: «COMISION» donde la fuente dice"
                    " tarifa de gestión anual. La cifra se sostiene y el rótulo"
                    " miente, y no había clave para decirlo."),

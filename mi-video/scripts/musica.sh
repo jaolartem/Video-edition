@@ -246,6 +246,25 @@ for n in "${REELS[@]}"; do
   # nueva que el render.
   RENDER="out/reels/reel-R$n.mp4"
   SRC="$RENDER"
+  # **El nivel de la cama se lee SIEMPRE, no solo cuando se acelera.**
+  #
+  # Esta linea vivia dentro del `if` de abajo —el que solo entra con
+  # `VELOCIDAD > 1.0`—, arrastrada ahi por su bloque de comentarios. Con la
+  # velocidad en 1,0 (C-513) ese `if` no corre, asi que `MUSI` se quedaba
+  # VACIO y la musica entraba sin nivel: la ganancia se calculaba contra una
+  # cadena vacia y la cama salia pegada a la voz.
+  #
+  # Se vio por el oido de Jaime —«la musica esta muy alta en R10», «compite en
+  # ciertos momentos»— y se midio: 0,1 dB de separacion entre su voz (P90
+  # -18,5 dBFS) y la cama en sus silencios (-18,6). O sea al mismo nivel. El
+  # sello ya lo decia sin que nadie lo leyera: «musica con su pasaje mas
+  # fuerte a  LUFS», con el hueco vacio.
+  # **Y la velocidad tambien es de la pieza.** Jaime, 16-9: *«si, por pieza,
+  # solo la 10»*. La global de arriba sigue siendo la del lote y hace de
+  # respaldo; aqui se pregunta la suya, que es la que decide de donde sale
+  # `SRC` y como se filtra el remate de voz.
+  VELOCIDAD=$(python -c "import sys;sys.path.insert(0,'scripts');import beats;print(beats.velocidad('reel-%02d' % $n))" 2>/dev/null || echo "$VELOCIDAD")
+  MUSI="${MUSI_FIJO:-$(python scripts/cama.py --nivel "$(printf 'reel-%02d' "$n")" 2>/dev/null || echo -15)}"
   if awk -v v="$VELOCIDAD" 'BEGIN{exit !(v > 1.0)}' \
      && [ -f "out/entrega/reel-R$n.mp4" ]; then
     # **El nivel de la cama es POR PIEZA, y sale de su fichero.**
@@ -262,7 +281,6 @@ for n in "${REELS[@]}"; do
   # escrito en la linea de ordenes es una segunda lectura del mismo fichero, y
   # dos lecturas es como `objetivo_db` pudo decir 16 mientras el bucle que
   # mezcla apuntaba a 14.
-  MUSI="${MUSI_FIJO:-$(python scripts/cama.py --nivel "$(printf 'reel-%02d' "$n")" 2>/dev/null || echo -15)}"
   # **Y se mezcla sobre el ACELERADO SIN MUSICA, nunca sobre la entrega.**
   #
   # Esto tomaba `out/entrega` —que ya lleva musica— asi que cada corrida le
@@ -375,7 +393,18 @@ for n in "${REELS[@]}"; do
   # sino **elegir el tramo**: una obra dura entre cinco y once minutos y aqui
   # hacen falta ochenta segundos. `cama.py` busca el pasaje que se queda quieto,
   # y sobre ese la misma regla del techo deja tambien un suelo alto.
-  DESDE=$(python scripts/cama.py "$MP3" "$DUR" "$TALLA" 2>/dev/null || echo 0)
+  # **El pasaje: el declarado si lo hay, y si no el que elige `cama.py`.**
+  # Aquel busca el trozo que se queda quieto, que es el defecto correcto; pero
+  # quieto no es parejo, y un pasaje que decae deja el final de la pieza sin
+  # cama. Cuando su oido lo pilla, se declara en `compas.json` — ya en fase.
+  DESDE=$(python -c "import sys;sys.path.insert(0,'scripts');import compas;d=compas.desde('reel-%02d' % $n);print(d if d is not None else '')" 2>/dev/null)
+  if [ -z "$DESDE" ]; then
+    DESDE=$(python scripts/cama.py "$MP3" "$DUR" "$TALLA" 2>/dev/null || echo 0)
+    DESDE=$(python -c "import sys;sys.path.insert(0,'scripts');import compas
+s='reel-%02d' % $n; b=compas.bpm(s)
+d=float('$DESDE')
+print(round(d + ((compas.fase(s) - d) % (60/b)), 3) if b else d)" 2>/dev/null || echo "$DESDE")
+  fi
   FUERTE=$(ffmpeg -hide_banner -nostats -ss "${DESDE:-0}" -i "$MP3" -t "$DUR" -af "${TALLA},ebur128" -f null - 2>&1     | sed -n 's/.*S: *\(-\?[0-9.]*\).*//p' | awk '$1 > -70 { if (m == "" || $1 > m) m = $1 } END { if (m != "") printf "%.1f", m }')
   if [ -n "$FUERTE" ]; then
     GAIN=$(awk -v a="$MUSI" -v b="$FUERTE" 'BEGIN{ printf "%.1f", a - b }')
@@ -679,7 +708,9 @@ for n in "${REELS[@]}"; do
   #
   # Se congela el ultimo frame y se anade silencio: la imagen no parpadea y la
   # frase termina de sonar. Es lo que hace cualquier montaje, y lo que faltaba.
-  COLA=$(python scripts/cama.py --cola 2>/dev/null || echo 0.6)
+  # **La cola es de la pieza.** `cama.cola(slug)` da la suya si la tiene y
+  # la del lote si no; reel-10 va a 0,3 por ir acelerada (C-523).
+  COLA=$(python scripts/cama.py --cola "$(printf 'reel-%02d' "$n")" 2>/dev/null || echo 0.6)
   ffmpeg -y -v error -i "out/entrega/reel-R$n.mp4"     -filter_complex "[0:v]tpad=stop_mode=clone:stop_duration=${COLA}[v];[0:a]apad=pad_dur=${COLA}[a]"     -map "[v]" -map "[a]" -c:v h264_amf -b:v 12M -c:a aac -b:a 192k     "$TMPDIR/r$n-cola.mp4" 2>/dev/null     && mv -f "$TMPDIR/r$n-cola.mp4" "out/entrega/reel-R$n.mp4"     && echo "R$n  cola de ${COLA}s: la ultima palabra termina de sonar"
 
   # ── y la separacion de la cama, que es la decision que se declara ───────
@@ -739,10 +770,18 @@ for n in "${REELS[@]}"; do
   awk -v s="${SEP:-}" -v o="${OBJ:-}" -v n="$n" -v ald="${ALDIA:-1}" 'BEGIN{
     if (s == "" || o == "") { print "    ojo: NO SE PUDO MEDIR la separacion de la cama — casi siempre es que el stem de voz es de otro corte, y entonces la medida se niega a contestar en vez de dar un numero falso (C-243). Mira las duraciones antes de tocar el nivel."; exit }
     d = s - o; if (d < 0) d = -d
-    printf "R%s  cama a %s dB de la voz (objetivo %s)%s\n", n, s, o,
-      (d <= 1.5 ? "" : (ald == "0"
-        ? "  · FUERA: su MUSI se midio contra otro objetivo, no esta mal mezclada — `python scripts/calibrar-cama.py " n "`"
-        : "  · FUERA: sube o baja su MUSI en src/brand/cama.json"))
+    # **Con `if`, no con un ternario partido en tres lineas.** Este awk no
+    # acepta el salto de linea despues de `?`: «unexpected newline or end of
+    # string», la regla se cae entera y el paso sale con codigo 1. Y este
+    # bloque solo INFORMA, asi que un fallo suyo paraba el nivelado por una
+    # linea de texto. Paso el 16-9 con reel-10: el master no se escribio y la
+    # entrega se quedaba a -21 LUFS contra los -14 declarados.
+    aviso = ""
+    if (d > 1.5) {
+      if (ald == "0") { aviso = "  · FUERA: su MUSI se midio contra otro objetivo, no esta mal mezclada — `python scripts/calibrar-cama.py " n "`" }
+      else { aviso = "  · FUERA: sube o baja su MUSI en src/brand/cama.json" }
+    }
+    printf "R%s  cama a %s dB de la voz (objetivo %s)%s\n", n, s, o, aviso
   }'
 
   awk -v c="${CLIP:-0}" 'BEGIN{

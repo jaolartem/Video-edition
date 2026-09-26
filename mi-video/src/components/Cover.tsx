@@ -49,6 +49,23 @@ export type CoverProps = {
    * el gancho montado.
    */
   fotograma?: string;
+  /**
+   * **Cómo se resuelve el texto sobre el plano.** `velo` es la de siempre —el
+   * degradado, todo centrado, el título en oro— y `bloque` la que pidió el
+   * diseñador para reel-14: el plano NO se oscurece, se corta.
+   *
+   * Existe porque Jaime lo pidió por su nombre —*«revisa a ver si puedes
+   * variar»*— después de ver dos portadas idénticas. Y no es un caso especial
+   * de una pieza: es una variante declarable, que es la diferencia entre un
+   * sistema con dos formas y un `if (slug === …)`.
+   *
+   * Lo que cambia, y por qué va junto: un bloque sólido en vez de degradado
+   * pide alineación a la izquierda —centrar sobre un canto recto se ve
+   * indeciso— y pide que el oro pase del título a la pregunta, porque sobre
+   * fondo pleno el título ya destaca por tamaño y el oro tiene que marcar lo
+   * que interpela. Separarlas daría tres props para una sola decisión.
+   */
+  forma?: "velo" | "bloque";
   mode?: Mode;
   tone?: Tone;
   accent?: Accent;
@@ -70,6 +87,7 @@ export const Cover: React.FC<CoverProps> = ({
   kicker,
   subtitulo,
   fotograma,
+  forma = "velo",
   mode = "evidence",
   tone = "base",
   accent,
@@ -115,13 +133,18 @@ export const Cover: React.FC<CoverProps> = ({
          * luminancia variable. Misma razón que la sombra del rótulo en
          * `HookTitle`, y por eso sube desde abajo, que es donde va el texto.
          */}
-        <AbsoluteFill
-          style={{
-            background:
-              `linear-gradient(to top, ${t.ground} 8%, ${t.ground}e6 42%,`
-              + ` ${t.ground}00 74%)`,
-          }}
-        />
+        {forma === "bloque" ? (
+          /** Corte recto desde el canto de la mesa: el plano se conserva entero. */
+          <AbsoluteFill style={{ top: "64%", backgroundColor: t.ground }} />
+        ) : (
+          <AbsoluteFill
+            style={{
+              background:
+                `linear-gradient(to top, ${t.ground} 8%, ${t.ground}e6 42%,`
+                + ` ${t.ground}00 74%)`,
+            }}
+          />
+        )}
         <AbsoluteFill
           style={{
             paddingLeft: layout.safe.left,
@@ -137,29 +160,32 @@ export const Cover: React.FC<CoverProps> = ({
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-end",
-            alignItems: "center",
-            textAlign: "center",
+            alignItems: forma === "bloque" ? "flex-start" : "center",
+            textAlign: forma === "bloque" ? "left" : "center",
           }}
         >
-          <div
-            style={{
-              height: 4,
-              width: 180,
-              backgroundColor: t.accent,
-              transform: `scaleX(${rule})`,
-              marginBottom: 34,
-            }}
-          />
+          {forma === "bloque" ? null : (
+            <div
+              style={{
+                height: 4,
+                width: 180,
+                backgroundColor: t.accent,
+                transform: `scaleX(${rule})`,
+                marginBottom: 34,
+              }}
+            />
+          )}
           <div
             style={{
               fontFamily: fontFamily.video,
               fontSize: videoText.title,
               fontWeight: videoText.weight,
               letterSpacing: videoText.tracking,
-              lineHeight: 1.02,
+              lineHeight: forma === "bloque" ? 0.85 : 1.02,
               textTransform: "uppercase",
-              color: t.accent,
-              textShadow: "0 2px 18px rgba(0,0,0,0.55)",
+              color: forma === "bloque" ? "#FFFFFF" : t.accent,
+              textShadow: forma === "bloque"
+                ? "none" : "0 2px 18px rgba(0,0,0,0.55)",
               opacity: enter(duration.standard),
             }}
           >
@@ -176,7 +202,7 @@ export const Cover: React.FC<CoverProps> = ({
                 fontWeight: weight.medium,
                 letterSpacing: videoText.tracking,
                 lineHeight: 1.22,
-                color: t.text,
+                color: forma === "bloque" ? t.accent : t.text,
                 textShadow: "0 2px 14px rgba(0,0,0,0.6)",
                 opacity: enter(duration.standard * 2),
               }}

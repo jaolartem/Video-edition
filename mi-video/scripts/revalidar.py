@@ -169,22 +169,35 @@ def entrega(toma, pal, tramos):
       por cuatro — justo la vara que Jaime corrigio, porque premia lo animado y
       puntua la tristeza como plana. Aqui se calcula de verdad.
     """
-    tot = sum(y - x for x, y in tramos)
-    if tot <= 0:
-        return {"intensidad": 0.0, "voz": 0.0}
-    inten = exp = 0.0
+    # **Y el tramo que no se pudo medir se cae del promedio, con su peso.**
+    #
+    # Con `or 0.0` un tramo sin medir entraba como entrega nula y arrastraba la
+    # ponderada hacia abajo en proporcion a su duracion: el segmento salia
+    # «peor» por un trozo que nadie midio. Ahora el peso se reparte entre los
+    # que si se midieron, y si no se midio ninguno la medida es `None` — que es
+    # lo que este proyecto usa para «no lo se» desde C-143.
+    if sum(y - x for x, y in tramos) <= 0:
+        return {"intensidad": None, "voz": None}
+    ac = {"intensidad": [], "voz": []}
     for x, y in tramos:
-        peso = (y - x) / tot
         try:
-            i = beats.intensidad(toma, x, y, pal) or {}
-            inten += peso * float(i.get("intensidad") or 0.0)
+            i = (beats.intensidad(toma, x, y, pal) or {}).get("intensidad")
         except Exception:                          # noqa: BLE001
-            pass
+            i = None
         try:
-            exp += peso * float(beats.expresividad(toma, x, y) or 0.0)
+            e = beats.expresividad(toma, x, y)
         except Exception:                          # noqa: BLE001
-            pass
-    return {"intensidad": round(inten, 3), "voz": round(exp, 2)}
+            e = None
+        if i is not None:
+            ac["intensidad"].append((float(i), y - x))
+        if e is not None:
+            ac["voz"].append((float(e), y - x))
+    pond = {k: (sum(v * p for v, p in ps) / sum(p for _, p in ps)
+                if ps and sum(p for _, p in ps) else None)
+            for k, ps in ac.items()}
+    return {"intensidad": (None if pond["intensidad"] is None
+                           else round(pond["intensidad"], 3)),
+            "voz": None if pond["voz"] is None else round(pond["voz"], 2)}
 
 
 def marca(m, sal=None):
@@ -210,7 +223,13 @@ def marca(m, sal=None):
     No entra `continuidad` aqui: eso es sentido, no sonido, y lo juzga el LLM
     leyendo el texto. Mezclarlo en el numero seria decidir por el.
     """
-    base = float(m.get("intensidad") or 0.0) + float(m.get("voz") or 0.0) / 4.0
+    # **Sin ninguna de las dos no hay marca.** Devolver 0.0 es decir «la peor
+    # entrega posible» de un segmento que nadie midio, y esa marca se compara
+    # contra las demas: el segmento perdia por no haberse podido medir.
+    inten, voz = m.get("intensidad"), m.get("voz")
+    if inten is None and voz is None:
+        return None
+    base = float(inten or 0.0) + float(voz or 0.0) / 4.0
     duras = 0
     for x in (sal or []):
         t, r = x.get("tono"), x.get("ritmo")
@@ -321,8 +340,14 @@ def evaluar(slug, beat, tramos, toma=None, excluir=None, contra=None):
         # el montaje puede ser de otra cinta que la candidata, y medirlo aqui
         # con las palabras equivocadas es el mismo fallo por otra puerta.
         otras.append({"puesto": 0, "quien": "montaje actual", "marca": contra})
-    mejor = max((o["marca"] for o in otras), default=None)
-    if mejor is None:
+    mejor = max((o["marca"] for o in otras if o["marca"] is not None),
+                default=None)
+    if mia is None:
+        # **Y si la propia no se pudo medir, tampoco hay veredicto.** Decir
+        # «peor» de lo que no se midio es la misma mentira que el 0.0, con
+        # palabras.
+        veredicto, margen = "sin medir", None
+    elif mejor is None:
         # **Sin nada con que comparar no hay veredicto.** Devolvia «mejor» y eso
         # adoptaba sola cualquier etapa con una unica candidata, despues de
         # pagarle el barrido caro.

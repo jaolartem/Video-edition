@@ -1,7 +1,8 @@
 """Las piezas con las que se escribe un contrato. El vocabulario, no lo dicho.
 
 Aquí no hay ni un dato de ninguna pieza: hay qué es un campo, qué es una clave,
-qué es un bloque compartido, qué es un momento y qué es repetir hasta que pase.
+qué es un bloque compartido, qué es una herramienta supervisada, qué es un
+momento y qué es repetir hasta que pase.
 Esto no cambia cuando cambia un contrato — y ésa es toda la razón de que viva
 aparte de los cuatro ficheros que declaran.
 
@@ -17,7 +18,7 @@ from .aguja import Aguja, Prompt, plano
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Las tres piezas de un contrato
+# Las piezas de un contrato
 # ─────────────────────────────────────────────────────────────────────────────
 @dataclasses.dataclass(frozen=True)
 class Campo:
@@ -111,6 +112,55 @@ class Bloque:
 
 
 @dataclasses.dataclass(frozen=True)
+class Herramienta:
+    """Código que el agente supervisa. Ni contrato aparte, ni caja negra.
+
+    Jaime, cerrando dos intentos míos que se pasaron de largo: *«todos esos que
+    son por código son por código supervisado, es decir los agentes tienen que
+    verlo»*, y *«como herramienta dentro de su contrato, no como otro
+    contrato»*.
+
+    Y la prueba de por qué esto no es un agente, que es suya y es la que
+    reparte: *«quiero dos porque el criterio de composición es distinto al
+    criterio estético; son cosas diferentes»*. Lo que no es ninguno de los dos
+    criterios no se gradúa a agente — se mide, se enseña, y alguien responde.
+
+    **Las dos mitades van juntas a propósito.** `halla` son los campos por los
+    que el hallazgo llega al pedido; `responde`, las claves por las que el
+    agente contesta por cada uno. Y `usa` es la tercera cosa que Jaime pidió
+    aparte: *«deben tener acceso a la información que les da cada herramienta,
+    y además deben poder utilizarla»* — recibir el hallazgo es ver; `usa` es
+    poder pedirlo. Declaradas aparte, cada mitad puede existir sin la
+    otra, y las dos averías ya pasaron aquí: un dato que viaja y nadie mira
+    —`datos_respaldados`, 8 KB en los ocho pedidos— y una clave que no ejecuta
+    nada. Juntas, **una herramienta sin supervisión no se puede declarar**, que
+    es lo que separa supervisar de adjuntar.
+
+    `mide` es la aguja del código que la hace. Si se va, la herramienta es una
+    promesa y el build lo dice, igual que un campo sin su `manda`.
+    """
+
+    nombre: str
+    mide: Aguja
+    halla: tuple[Campo, ...]
+    responde: tuple[Clave, ...]
+    usa: Aguja | None = None
+    de: str = ""        # el paso del que viene, mientras quede algo suyo en disco
+    por_que: str = ""   # por qué no es criterio: lo que la mantiene fuera de un agente
+    nota: str = ""
+
+    def __post_init__(self):
+        # **Las dos mitades, o no hay herramienta.** Es la única comprobación
+        # de este fichero y va aquí porque es lo que la pieza significa: medir
+        # sin que nadie responda es una caja negra, y responder sin medir es
+        # pedir una opinión. Las dos averías tienen nombre en este proyecto.
+        if not self.halla:
+            raise ValueError(f"herramienta «{self.nombre}»: mide y no enseña nada")
+        if not self.responde:
+            raise ValueError(f"herramienta «{self.nombre}»: enseña y nadie responde")
+
+
+@dataclasses.dataclass(frozen=True)
 class Momento:
     """Cuándo se hace la misma pregunta. Tres veces, no tres preguntas.
 
@@ -167,12 +217,15 @@ class Contrato:
     claves: tuple[Clave, ...]
     bloques: tuple[Bloque, ...]
     valida: Aguja
+    herramientas: tuple[Herramienta, ...] = ()
     envoltura: tuple[str, str] = ()
     repite: Repeticion | None = None
     nota: str = ""
 
     def campos_todos(self) -> tuple[Campo, ...]:
-        return self.campos + tuple(c for b in self.bloques for c in b.campos)
+        return (self.campos + tuple(c for b in self.bloques for c in b.campos)
+                + tuple(c for h in self.herramientas for c in h.halla))
 
     def claves_todas(self) -> tuple[Clave, ...]:
-        return self.claves + tuple(k for b in self.bloques for k in b.claves)
+        return (self.claves + tuple(k for b in self.bloques for k in b.claves)
+                + tuple(k for h in self.herramientas for k in h.responde))

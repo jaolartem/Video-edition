@@ -86,13 +86,56 @@ import sys
 # las siete entregas salieron aceleradas contra lo declarado. Al oirlas: *«me
 # gustaron asi, fue un buen error»*.
 #
-# O sea que la medida se equivocaba y el oido no. Se deja en 1,15 **porque el lo
-# aprobo escuchandolo**, no porque el fallo siga ahi: el fallo era tener el
-# numero en dos sitios, y eso esta arreglado — `voz-limpia` lo importa de aqui.
+# O sea que la medida se equivocaba y el oido no, y por eso estuvo en 1,15
+# **porque el lo aprobo escuchandolo**.
+#
+# **Y el 16-9-2026 vuelve a 1,0, tambien por su oido:** *«a estas en particular
+# no vale la pena acelerarlos, no ganan mucho»*, y despues *«si, ponlo en 1,0»*.
+# Lo que cerro la discusion fue mirar el lote vivo en vez del viejo: entrega
+# contra montaje, OCHO de diez ya iban a velocidad natural —08, 09, 10, 11, 14,
+# 15, 16 y 17, identicas al milisegundo— y solo dos salian a 1,14, reel-12 y
+# reel-13. Jaime: *«el 12 ni lo hemos visto, el 13 esta publicado»*. O sea que
+# de lo que quedaba por entregar no iba acelerada ni una: 1,15 no era el lote,
+# era el rastro de las siete viejas.
+#
+# Y no era una decision de nadie, era un efecto: `voz-limpia` acelera al
+# reintegrar la voz, asi que aceleraba justo a las piezas que pasaban por Adobe
+# — las dos resintesis encadenadas otra vez, que es de donde sale el «stem no
+# cuadra» de reel-13.
 #
 # Estaba repetido en seis ficheros, que es como se acaba teniendo dos
 # velocidades distintas en el mismo montaje.
-VELOCIDAD = 1.15
+VELOCIDAD = 1.0
+
+#: **Y la excepcion de una pieza, que no es la del lote.** Jaime, 16-9-2026:
+#: *«cada pieza tiene su propia logica, no generalices lo que dije antes en
+#: todas las demas»*, y sobre reel-10: *«puedes quitarle 4 segundos… intenta
+#: eliminando todos los silencios y aumentando la velocidad»*.
+#:
+#: Los silencios ya no daban: medido palabra a palabra sobre el montaje, la
+#: pieza entera tiene UN hueco de 0,25 s o mas —0,360 s en la costura de
+#: e2->e3— y dejarlo en 0,15 recupera 0,21 s. El resto lo habia quitado el plan.
+#: Asi que los cuatro segundos son velocidad. 1,13 dejo la entrega en 30,90 s
+#: y Jaime pidio los ultimos nueve decimas: *«necesitamos quitar ese 0.9
+#: porque tampoco alcanza, subele la velocidad a 1.15»*.
+#:
+#: Va aqui y no en otro fichero **porque aqui vive la del lote**: dos sitios
+#: para el mismo numero es como se acaba teniendo dos velocidades en el mismo
+#: montaje, que es lo que dice el comentario de arriba y costo C-509.
+#: - reel-14: Jaime, 17-9, *«no me importa la duracion, quiero que aumente
+#:   un poco el ritmo»*. 1,08 es «un poco» con numero: se nota y no suena
+#:   estirada. 57,75 -> 53,5 s, y la duracion aqui es consecuencia, no
+#:   objetivo — al reves que en reel-10.
+POR_PIEZA = {"reel-10": 1.15, "reel-14": 1.08}
+
+
+def velocidad(slug=None):
+    """La velocidad de esa pieza: la suya si la tiene, o la del lote.
+
+    Sin `slug` contesta la del lote, que es lo que preguntan los pasos que no
+    miran una pieza concreta.
+    """
+    return POR_PIEZA.get(slug, VELOCIDAD) if slug else VELOCIDAD
 
 sys.path.insert(0, os.path.dirname(__file__))
 import transcribir  # noqa: E402

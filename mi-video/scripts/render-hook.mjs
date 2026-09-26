@@ -108,6 +108,33 @@ if (!source || !planPath) {
 
 const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
 const escenas = plan.escenas ?? [];
+
+/**
+ * **Las pausas que hacen que la pieza baile con su cancion.**
+ *
+ * Jaime, 17-9-2026: *«quiero que algunas tomas inicien dentro del beat de la
+ * cancion, que el reel baile con la musica»*. Las costuras estan donde el habla
+ * las deja, asi que no se mueven; lo que se mueve es lo que hay entre ellas.
+ * Una pausa congela el ultimo frame de la escena y calla — la imagen se queda
+ * quieta justo en el golpe — y con eso la costura siguiente cae en el beat.
+ *
+ * **Y se oyen a proposito.** Su regla al fijar cuanto: *«por eso es que baila
+ * porque se oye, por eso resalta porque se oye»*. Una pausa de 80 ms alinea el
+ * numero y no alinea nada que alguien perciba.
+ *
+ * Se declaran en `src/brand/compas.json` por indice de escena, con su fase y su
+ * porque, y se miden contra la rejilla de SU cancion. Aqui solo se aplican.
+ */
+const compas = (() => {
+  try {
+    const j = JSON.parse(fs.readFileSync("src/brand/compas.json", "utf8"));
+    // **De que pieza es lo dice la RUTA del plan**, `work/scenes/reel-14/…`: el
+    // plan no lleva slug dentro y anadirselo obligaria a regenerar los veinte.
+    const slug = path.basename(path.dirname(planPath));
+    return j[slug] || null;
+  } catch { return null; }
+})();
+const pausaDe = (e) => Number(compas?.pausas?.[String(e.indice)] ?? 0) || 0;
 /** El bruto de esta escena: el suyo si lo declara, el del reel si no. */
 const fuenteDe = (e) =>
   e.fuente ? path.join(path.dirname(source), `${e.fuente}.mp4`) : source;
@@ -210,12 +237,19 @@ escenas.forEach((e, i) => {
     "-v", "error", "-y",
     ...DECODE,
     "-ss", String(e.origen_desde),
+    // **El `-t` va ANTES del `-i`: acota la ENTRADA, no la salida.** Estaba
+    // detras, y ahi limita lo que se escribe pero no hace que el material se
+    // acabe — asi que `tpad`, que clona el ultimo frame cuando la entrada
+    // termina, no se disparaba nunca y la pausa salia de cero segundos.
+    "-t", String(e.duracion),
     // **Cada escena abre SU fichero.** El corte abría uno solo para toda la
     // pieza, y por eso el material grabado en otra sesión estaba frenado. No
     // hay dos fuentes en un corte: hay dos cortes.
     "-i", fuenteDe(e),
-    "-t", String(e.duracion),
-    "-vf", filtroDe(e),
+    ...(pausaDe(e)
+      ? ["-t", (e.duracion + pausaDe(e)).toFixed(3),
+         "-vf", `${filtroDe(e)},tpad=stop_mode=clone:stop_duration=${pausaDe(e).toFixed(3)}`]
+      : ["-vf", filtroDe(e)]),
     ...ENCODE,
     /**
      * **La costura tambien se oye.** Jaime: *«los cortes se sienten muy
@@ -235,7 +269,10 @@ escenas.forEach((e, i) => {
      * parte de lo que Jaime llamo *«se escucha raro a veces»*-. A 30 ms el
      * chasquido sigue tapado y el bache deja de percibirse.
      */
-    "-af", `afade=t=in:st=0:d=0.03,afade=t=out:st=${Math.max(0, e.duracion - 0.03).toFixed(3)}:d=0.03`,
+    // El fundido de salida va donde acaba la VOZ, no donde acaba la escena: con
+    // pausa detras, el silencio ya esta callado y fundir ahi no tapa nada.
+    "-af", `afade=t=in:st=0:d=0.03,afade=t=out:st=${Math.max(0, e.duracion - 0.03).toFixed(3)}:d=0.03`
+           + (pausaDe(e) ? `,apad=pad_dur=${pausaDe(e).toFixed(3)}` : ""),
     "-c:a", "aac", "-b:a", "160k", "-r", "30",
     "-video_track_timescale", "30000",
     f,

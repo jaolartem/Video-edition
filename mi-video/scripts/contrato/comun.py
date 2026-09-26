@@ -15,11 +15,8 @@ from .piezas import Bloque, Campo, Clave
 
 SUBE = Clave(
     "sube",
-    dispara=(Aguja("scripts/revision.py", "def anotar(slug, accion, desde, hasta, que, regla=None, estado=\"pendiente\"",
-                   pendiente="llamar con estado='sube' cuando la respuesta trae `sube`;"
-                             " el CHECK de la tabla ya lo admite y nadie lo usa"),
-             Aguja("scripts/verificar.py", "def revisar(",
-                   pendiente="la puerta cuenta las notas estado='sube' y para la pieza")),
+    dispara=(Aguja("scripts/servicio.py", "for k in PARAN:"),
+             Aguja("scripts/verificar.py", "for n in Nota.subidas(slug):")),
     efecto="nota de revisión con estado='sube': la pieza no pasa la puerta hasta"
            " que Jaime la mire",
     lista=("cifra_sin_fuente", "cifra_contradicha", "precio_o_fecha_cambiada",
@@ -27,7 +24,25 @@ SUBE = Clave(
            "material_no_grabado"),
     nota="Es la clave que faltaba en los cinco pasos. Regla corta del proyecto:"
          " se consulta lo que cambia el mensaje, no lo que cambia la ejecución —"
-         " y hasta ahora lo que cambia el mensaje no tenía dónde escribirse.",
+         " y hasta ahora lo que cambia el mensaje no tenía dónde escribirse."
+         " Escribe `servicio._escala` desde `recoger()`, que es la puerta por la"
+         " que entra toda respuesta, y la cuenta `verificar.revisar` leyendo"
+         " `Nota.subidas`. Ver C-532.",
+)
+
+CLASE = Clave(
+    "clase",
+    dispara=(Aguja("scripts/servicio.py",
+                   'marca = f"[{clase}] " if clase in ("comprobable", "criterio") else ""'),),
+    efecto="la nota que sube dice de qué clase es el hallazgo",
+    adjunta_a="sube",
+    lista=("comprobable", "criterio"),
+    nota="Los dos criterios no son simétricos. Lo de composición casi siempre"
+         " se puede contrastar —una duración, una repetición, una cifra contra"
+         " `dato`—; lo estético no, y produce hallazgos que ninguna herramienta"
+         " puede contradecir. Sin marcarlos, la puerta los trata igual y Jaime"
+         " no sabe cuál puede comprobar antes de mirar. Es la misma regla que"
+         " el proyecto le exige a los informes, aplicada dentro del sistema.",
 )
 
 REDUNDANCIA = Bloque(
@@ -96,7 +111,7 @@ lo decide Jaime. Tu salida es la evidencia, y va en `sube`.
                    " Bird y dieron por caducado un precio abierto (C-160)."),
         Campo("hoy",
               manda=Aguja("scripts/servicio.py",
-                          'return {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),'),
+                          'd = {"hoy": _hoy(), "datos_respaldados": _respaldos(slug),'),
               exige=(Prompt("scripts/fuentes.prompt.md", "no respalda una cifra de hoy"),),
               nota="La fecha del render. Sin ella, «hoy» es lo que el modelo"
                    " suponga, y una vigencia se juzga contra una fecha"
@@ -123,5 +138,5 @@ lo decide Jaime. Tu salida es la evidencia, y va en `sube`.
                    " comprobar una cifra y su unica salida honesta era subirla:"
                    " cinco de siete agentes subieron «sin fuente» el mismo dia."),
     ),
-    claves=(SUBE,),
+    claves=(SUBE, CLASE),
 )

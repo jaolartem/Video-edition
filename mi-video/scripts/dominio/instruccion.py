@@ -151,18 +151,57 @@ def para(paso=None, pieza=None):
     Las `en la maquina` no viajan: ya hay un mecanismo que las cumple, y
     repetirlas en el pedido sería pedirle a quien contesta que vigile algo que el
     código ya garantiza.
+
+    **Y las `descartada` tampoco, que es para lo que se creó ese estado.** Lo
+    dice el docstring de este módulo desde que existe: *«sin este estado, una
+    propuesta que Jaime rechaza se queda en `pendiente` y `servicio.pedir()` la
+    sigue metiendo en todos los pedidos como si fuera regla»*. El estado se
+    creó y esta consulta nunca aprendió a excluirlo: de las 155 que viajaban en
+    cada pedido, **41 eran instrucciones que Jaime ya había rechazado** — y
+    viajaban ocho veces por pieza, con el mismo peso que las vivas.
     """
     cx = _con()
     filas = cx.execute(
         "select id, cuando, dijo, ambito, pieza, paso, estado, veces, nota"
         "  from instruccion"
-        " where estado <> 'en la maquina'"
+        " where estado not in ('en la maquina', 'descartada')"
         "   and (ambito = 'lote'"
         "        or (ambito = 'pieza' and pieza = ?)"
         "        or (ambito = 'paso' and paso = ?))"
         " order by veces desc, id", (pieza, paso)).fetchall()
     cx.close()
     return [dict(f) for f in filas]
+
+
+#: Los pasos a los que de verdad se reparte un pedido. Salen del disco y no de
+#: una lista escrita al lado, que es como se desincronizan.
+def _pasos_reales():
+    raiz = os.path.join("work", "servicio")
+    return {d for d in os.listdir(raiz)} if os.path.isdir(raiz) else set()
+
+
+def etiquetas_huerfanas():
+    """Instrucciones con un `paso` que no es el de ningún paso de servicio.
+
+    **Por qué no se filtra por `paso` y ya.** Parece el arreglo obvio —37 filas
+    llevan `paso` y la consulta lo ignora porque su `ambito` es `lote`— y es una
+    trampa: los nombres no son los mismos. Las etiquetas dicen `montaje`,
+    `corte`, `audio`, `montado`; los pasos de servicio son `describir`,
+    `disenar`, `redundancia`, `revalidar`, `repaso`, `fuentes`, `revisar`,
+    `visto`. Sólo `disenar` casa en los dos vocabularios.
+
+    O sea que filtrar por `paso` **dejaría 23 instrucciones de Jaime sin llegar
+    a nadie**, que es peor que llegar a todos. Así que aquí se mide y se dice;
+    juntar los dos vocabularios es una decisión, y se toma mirando esta lista.
+    """
+    reales = _pasos_reales()
+    cx = _con()
+    filas = cx.execute(
+        "select paso, count(*) n from instruccion"
+        " where paso is not null and estado not in"
+        " ('en la maquina', 'descartada') group by paso").fetchall()
+    cx.close()
+    return {f["paso"]: f["n"] for f in filas if f["paso"] not in reales}
 
 
 def todas():

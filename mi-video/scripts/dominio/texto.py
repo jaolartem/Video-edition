@@ -142,3 +142,23 @@ def _cifras(t: str):
 def _niegan(t: str):
     """Cuántas veces niega, en orden. El orden importa: «no es X» y «es no X»."""
     return [p for p in palabras(t) if p in NIEGAN]
+
+
+def huella_de_texto(t: str) -> str | None:
+    """Doce caracteres del texto, para saber si ahí ahora se dice otra cosa.
+
+    **La regla de reducir, una sola vez.** Estaba escrita dos: en `fijar.huella`
+    —que sella lo declarado en `corte_fijo`— y en `Tramo.huella_de`, con la
+    normalización a mano en una y por `comparable()` en la otra. Daban lo mismo,
+    hoy: dos copias de una regla no son copias mucho tiempo, y ésta decide si
+    una declaración de Jaime sigue valiendo.
+
+    `None` cuando no hay texto, que no es lo mismo que una huella de la cadena
+    vacía: sin palabras no hay prueba contra la que comparar.
+    """
+    import hashlib
+
+    plano = " ".join(comparable(t or "").split())
+    if not plano:
+        return None
+    return hashlib.sha1(plano.encode("utf-8")).hexdigest()[:12]

@@ -56,11 +56,26 @@ class Alcance:
         if not suyos:
             return cls(slug, fase)
         tiquets = [{"id": i, "de": acc, "dice": txt} for i, acc, _f, txt in suyos]
-        etapas = {e for e in (abierto.etapa_de(t["dice"]) for t in tiquets)
-                  if e is not None}
+        # **Se le pregunta a CADA tiquet si nombra escena, no se cuentan.**
+        #
+        # Esto era `len(etapas) < len(tiquets)`, y con eso dos tiquets sobre la
+        # misma escena hacian «de la pieza entera» a los dos. No es un caso
+        # raro: es lo normal en cuanto Jaime mira una pieza dos veces. Medido
+        # el 16-9-2026 en reel-11, con los siete tiquets de subtitulos mas el
+        # del panel — los ocho con su beat, ninguno suelto— repartidos en cinco
+        # escenas: 5 < 8, `toda_la_pieza` salia cierto, y `editables` devolvia
+        # `[]` sobre una pieza aprobada. O sea que la orden que llegaba al
+        # disenador era «no puedes tocar nada» justo cuando cada tiquet decia
+        # exactamente donde.
+        #
+        # La pregunta buena es la que ya se hacia una vez: `etapa_de` contesta
+        # por tiquet. Uno solo sin escena basta para abrir la pieza, que es lo
+        # que el atributo dice significar.
+        nombran = [abierto.etapa_de(t["dice"]) for t in tiquets]
+        etapas = {e for e in nombran if e is not None}
         etapas |= abierto.beats_de_tiquets(slug, fase)
         return cls(slug, fase, tiquets=tiquets, etapas=etapas,
-                   toda_la_pieza=len(etapas) < len(tiquets),
+                   toda_la_pieza=any(e is None for e in nombran),
                    instruccion=abierto.MODO)
 
     def __bool__(self) -> bool:

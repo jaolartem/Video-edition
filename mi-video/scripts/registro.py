@@ -129,9 +129,20 @@ def resumen(desde=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--todo", action="store_true", help="no solo lo de hoy")
+    # **Escribir desde fuera de Python.** `guardas.mjs` es el otro sitio que
+    # para la linea, y es Node: sin esto imprimia y salia sin dejar fila, que
+    # es justo lo que Jaime pidio cerrar — *«no solo necesito que pare,
+    # necesito un log»*. Tres argumentos y ya; no es una segunda puerta, es la
+    # misma `anota` con una linea de comandos.
+    ap.add_argument("--anota", nargs=4,
+                    metavar=("NIVEL", "SCRIPT", "ASUNTO", "DETALLE"))
     ap.add_argument("--limpiar", action="store_true")
     ap.add_argument("--detalle", help="las lineas de un asunto concreto")
     a = ap.parse_args()
+    if a.anota:
+        nivel, script, asunto, detalle = a.anota
+        anota(nivel, script, asunto, detalle=detalle, eco=False)
+        return
     if a.limpiar:
         con = _con()
         n = con.execute("select count(*) from incidencia").fetchone()[0]

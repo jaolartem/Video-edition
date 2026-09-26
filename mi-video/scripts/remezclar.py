@@ -220,9 +220,52 @@ def distancia(mp4, voz):
     a, b = a[:k], b[:k]
     # Los huecos donde él no habla son donde se oye la cama sola.
     huecos = a < -45
+    # **Menos las pausas que la pieza declara para bailar.** Ahi el silencio es
+    # el efecto: `compas.json` las puso para que el golpe de la cancion se oiga
+    # solo. Contarlas como huecos hace que el peor tramo sea SIEMPRE una pausa y
+    # que la calibracion hunda la musica justo donde tiene que sonar — la medida
+    # peleando contra lo que se pidio. Jaime: *«por eso es que baila porque se
+    # oye»*.
+    try:
+        import os
+        import compas as _cp
+        n = "".join(ch for ch in os.path.basename(mp4) if ch.isdigit())
+        slug = f"reel-{int(n):02d}" if n else ""
+        for ini, fin in (_cp.ventanas(slug) if slug else []):
+            i, j = int(ini / 0.3), int(np.ceil(fin / 0.3))
+            huecos[max(0, i):min(len(huecos), j + 1)] = False
+    except Exception:                                  # noqa: BLE001
+        pass
     if huecos.sum() < 5:
         return None
-    return float(np.percentile(b, 90) - np.median(b[huecos]))
+    # **Por tramo, y manda el peor.** Jaime, 16-9-2026, oyendo reel-10: *«la
+    # musica esta muy alta», «compite en ciertos momentos»*, y la regla:
+    # *«esto no sale por promedio, sale por tramo», «el peor tramo es el numero
+    # real», «una cadena es tan fuerte como su paso mas debil»*.
+    #
+    # Esto devolvia la MEDIANA de la cama en los huecos, y con eso un tramo que
+    # compite se diluye entre veinte que no. Por eso la pieza podia declarar
+    # 27,2 dB de separacion y sonar encima de su voz: el numero describia el
+    # hueco tipico, no el que se oye.
+    #
+    # Se agrupan los huecos en tramos contiguos —un hueco de 0,3 s no es un
+    # tramo, es una respiracion— y cada tramo vale por su mediana, que es lo que
+    # se sostiene ahi dentro. El numero de la pieza es el del tramo MAS ALTO.
+    # **Y el minimo de duracion va en el CODIGO, no solo en el comentario.**
+    # Escrito arriba estaba —«un hueco de 0,3 s no es un tramo, es una
+    # respiracion»— y la primera version no lo aplicaba: cogia tambien los
+    # huecos de un solo marco. Medido en reel-10 el 16-9: con ellos dentro la
+    # pieza daba 23,9 dB y el tramo real mas alto —de 5,4 a 6,9 s— estaba a
+    # 47,6. Un solo marco de 0,3 s decidia el numero de la pieza entera.
+    MINIMO = 2                                   # 2 marcos = 0,6 s
+    bordes = np.diff(np.concatenate(([0], huecos.view(np.int8), [0])))
+    tramos = [(i, j) for i, j in zip(np.flatnonzero(bordes == 1),
+                                     np.flatnonzero(bordes == -1))
+              if j - i >= MINIMO]
+    if not tramos:
+        return None
+    peor = max(float(np.median(b[i:j])) for i, j in tramos)
+    return float(np.percentile(b, 90) - peor)
 
 
 def base_de(n):

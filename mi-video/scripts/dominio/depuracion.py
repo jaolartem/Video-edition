@@ -167,14 +167,24 @@ def sin_repetir(palabras, trozos):
             return -1.0
         import beats
 
+        # **El comentario decia lo correcto y el codigo hacia lo contrario.**
+        #
+        # «Se cae del sumatorio» y debajo un `else 0.0`, que es justo sumar
+        # cero. Importa porque esto elige **cual de la familia se queda**: la
+        # que no se pudo medir perdia siempre contra una medida y plana.
+        #
+        # La clave devuelve una tupla: primero si hay medida, luego cuanto, y
+        # al final el indice al reves. Asi la medida gana a la no medida, y
+        # entre dos sin medir se queda la primera —determinista, que con un
+        # `set` por medio no lo era.
         try:
-            # Lo no medido no suma cero: se cae del sumatorio.
             _e = beats.expresividad(t.cinta, t.desde, t.hasta)
             _c = beats.cambio_de_tono(t.cinta, t.desde, t.hasta)
-            return ((float(_e) if _e is not None else 0.0)
-                    + (float(_c) / 10.0 if _c is not None else 0.0))
         except Exception:                          # noqa: BLE001
-            return float(k)
+            _e = _c = None
+        hay = [x for x in (_e, None if _c is None else float(_c) / 10.0)
+               if x is not None]
+        return (1, sum(hay), -k) if hay else (0, 0.0, -k)
 
     grupos = {}
     for k, raiz in familias.items():
