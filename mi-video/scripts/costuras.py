@@ -29,6 +29,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import registro  # noqa: E402
 import rutas  # noqa: E402
+from dominio import bordes as _bordes  # noqa: E402
 from dominio.aritmetica import Aritmetica  # noqa: E402
 from dominio.borde import BUSCA, COLA  # noqa: E402,F401
 from dominio.costura import MARGEN, RITMO_OK, TONO_OK, Costura  # noqa: E402,F401
@@ -269,9 +270,10 @@ def bordes_en_sonido(slug):
         return []
     edl = json.load(open(ruta, encoding='utf-8'))
     ondas, sucios = {}, []
-    for (_a, b), det in zip(edl['segmentos'], edl['detalle']):
+    for i, ((_a, b), det) in enumerate(zip(edl['segmentos'], edl['detalle'])):
         cinta = det.get('toma')
-        if not cinta:
+        # Y si el trozo siguiente sigue ahí mismo, no es una salida (C-545).
+        if not cinta or _bordes.sigue_ahi(edl, i):
             continue
         if cinta not in ondas:
             ondas[cinta] = Senal(cinta)

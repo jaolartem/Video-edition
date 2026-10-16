@@ -41,6 +41,27 @@ import rutas  # noqa: E402
 #: del proyecto separa habla de sala; por debajo está el ruido del cuarto.
 VOZ = -42.0
 
+#: Hasta dónde dos trozos de la misma cinta «se tocan» (C-545): 20 ms, menos de
+#: lo que un borde se mueve al ajustarse a la voz.
+CONTIGUO = 0.02
+
+
+def sigue_ahi(edl, i):
+    """¿El trozo siguiente arranca en la misma cinta donde acaba éste?
+
+    Entonces su salida **no es un corte**: en el montaje la voz sigue sin salto,
+    que es lo que ya dice `Costura.es_empalme`. Las dos puertas que miran si un
+    corte deja voz sonando no lo preguntaban, y una etapa partida en mitad de una
+    frase dicha de un tirón —reel-19 e3/e4 en 18,973— salía como «se come una
+    palabra» y paraba la pieza.
+    """
+    segs, det = edl.get("segmentos") or [], edl.get("detalle") or []
+    if i + 1 >= min(len(segs), len(det)):
+        return False
+    return (det[i].get("toma") == det[i + 1].get("toma")
+            and abs(segs[i + 1][0] - segs[i][1]) <= CONTIGUO)
+
+
 #: Cuánto se mira a cada lado del corte, en segundos. 80 ms: menos que una
 #: sílaba, así que si ahí suena, suena la palabra que se está cortando.
 MIRADA = 0.08
@@ -138,7 +159,7 @@ def sucios(slug):
                                          edl.get("segmentos") or [])):
         toma = d.get("toma")
         mp4 = rutas.cinta(toma) if toma else None
-        if not mp4 or not os.path.exists(mp4):
+        if not mp4 or not os.path.exists(mp4) or sigue_ahi(edl, i):
             continue
         # Justo ANTES del corte: si ahí suena, la palabra estaba en curso.
         antes = _db(mp4, b - MIRADA, MIRADA)
