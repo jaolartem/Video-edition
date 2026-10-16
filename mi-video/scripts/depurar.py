@@ -168,7 +168,13 @@ class _Depurada:
                         "cabeza": Tramo(trozos[0].desde, nuevo,
                                         tramo.cinta).texto_de(pal)})
             segs += trozos
-            det += [{**d, "start": t.desde, "end": t.hasta} for t in trozos]
+            # **Cada trozo con su texto, no con el de la etapa** (C-543). Partir
+            # la etapa por sus pausas copiaba el `texto` entero en cada trozo, y
+            # ese campo es el que viaja en los pedidos: el agente de revalidar
+            # vio en reel-19 e4 la misma frase dos veces, lo leyó como
+            # redundancia y quitó el trozo de «una clase».
+            det += [{**d, "start": t.desde, "end": t.hasta,
+                     "texto": t.texto_de(pal)} for t in trozos]
             c = Continuidad(pal, [(t.desde, t.hasta) for t in trozos])
             if c.rota:
                 self.rotas.append((d["beat"], c))

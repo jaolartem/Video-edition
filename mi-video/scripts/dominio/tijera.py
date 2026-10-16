@@ -181,8 +181,12 @@ class Tijera:
         """
         edl = self.m.edl
         edl["segmentos"] = [[t.desde, t.hasta] for t, _ in trozos]
-        edl["detalle"] = [{**d, "start": t.desde, "end": t.hasta}
-                          for t, d in trozos]
+        # Y cada trozo dice lo suyo, no lo de la etapa entera (C-543).
+        edl["detalle"] = [
+            {**d, "start": t.desde, "end": t.hasta,
+             **({"texto": t.texto_de(self.m.palabras(t.cinta or d["toma"]))}
+                if (t.cinta or d.get("toma")) else {})}
+            for t, d in trozos]
         edl["fuentes"] = [d.get("toma") or "" for _, d in trozos]
         self._sucio = True
 

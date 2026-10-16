@@ -150,6 +150,31 @@ from dominio.ajuste import a_la_palabra as _a_la_palabra  # noqa: F401
 from dominio.ajuste import a_la_voz as _a_la_voz  # noqa: F401
 
 
+def _sin_pisar_vecinas(slug, beat, tramos):
+    """Recorta lo que cae dentro de lo declarado para OTRA etapa en la misma cinta.
+
+    Si el tramo entra dentro de uno de otra etapa, entra donde aquel sale; si
+    otro empieza dentro de él, sale donde aquel entra. Lo que se queda en nada
+    se cae: entero ya lo dice la otra etapa.
+    """
+    con = _con()
+    vid = _vid(con, slug)
+    otros = [(r["desde"], r["hasta"], r["toma"]) for r in con.execute(
+        "select desde, hasta, toma from corte_fijo where video_id = ? and"
+        " papel = 'etapa' and orden != ?", (vid, int(beat)))]
+    con.close()
+    fuera = []
+    for x, y, tk in tramos:
+        for oa, ob, _ in (o for o in otros if o[2] == tk):
+            if oa <= x < ob:
+                x = ob
+            if x < oa < y:
+                y = oa
+        if y - x > 0.05:
+            fuera.append((x, y, tk))
+    return fuera
+
+
 def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
     """Declara **cuáles son** los tramos de una etapa. Sustituye lo que hubiera.
 
@@ -231,6 +256,11 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
         (pa, pb, pk), (x, y, tk) = tramos[i - 1], tramos[i]
         if tk == pk and pa < x < pb < y:
             tramos[i] = (pb, y, tk)
+    # **Ni al de la etapa de al lado** (C-543). Lo mismo entre etapas: en una
+    # toma dicha de un tirón dos etapas son contiguas en la cinta, y el ajuste
+    # llevó la entrada de reel-19 e4 de 18,973 a 18,753, dentro de la e3: «guía
+    # guía». Y declarado no lo mueve nadie, así que el cosido daba vueltas.
+    tramos = _sin_pisar_vecinas(slug, beat, tramos)
     if not tramos:
         return {"error": f"{slug} e{beat}: los tramos propuestos no tienen voz"}
     # La medida se hace sobre la cinta principal —la que mas segundos aporta—,
