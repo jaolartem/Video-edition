@@ -18,6 +18,7 @@
  */
 import { NOMBRES } from "./caminos.mjs";
 import { PALABRAS_TIPO, esTipografico } from "./escena.mjs";
+import { canonico, revisarTablero } from "./formas.mjs";
 
 /**
  * Qué forma dibuja cada componente. Es también **la lista de componentes que
@@ -158,6 +159,20 @@ export function valida(d) {
       throw new Error(
         "«tablero» falta y el gráfico de esta etapa es tipográfico. "
         + REGLAS[1]);
+    }
+  }
+  /**
+   * **Y lo que el montaje no puede dibujar se rechaza aquí** (C-547), con la
+   * misma vara. reel-19 e1 llegó como «Cover» con `linea1`/`linea2` —«Cover» se
+   * declara con `hook`—, pasó cuatro pasos y se atascó en `montado`, donde ya no
+   * hay a quién preguntarle. Rechazado al llegar, se le vuelve a pedir con el
+   * error delante.
+   */
+  const t = d.tablero;
+  if (t && typeof t === "object" && t.kind && t.props) {
+    const faltas = revisarTablero(canonico(t.kind), t.props);
+    if (faltas.length) {
+      throw new Error(`«tablero» no se puede dibujar: ${faltas.join("; ")}`);
     }
   }
   return d;

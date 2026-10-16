@@ -14,7 +14,7 @@
  * veces por corrida, una para las aprobaciones y otra para el resto.
  */
 import { DatabaseSync } from "node:sqlite";
-import { CONSTRUIDAS, revisarTablero, sinSujeto } from "../formas.mjs";
+import { CONSTRUIDAS, canonico, revisarTablero, sinSujeto } from "../formas.mjs";
 import { marcoDe, precioVigente } from "./material.mjs";
 
 const db = new DatabaseSync("ads/decisiones.db");
@@ -85,17 +85,7 @@ export const aprobadas = (() => {
 // que mandaba a construir lo que ya estaba hecho.
 const DIBUJA = CONSTRUIDAS;
 
-/**
- * **El nombre de la forma, como lo despacha `Tablero.tsx`.** «Comparacion» con
- * mayúscula no es `comparacion` para el despacho y caía en `TableroDeclarado`,
- * que rotula sus datos; y `Gancho` es el rótulo del gancho, o sea `tipo`
- * (reel-08 v1, 12-9, C-422).
- */
-export const canonico = (k) => {
-  const s = String(k ?? "");
-  if (s.toLowerCase() === "gancho") return "tipo";
-  return [...DIBUJA].find((d) => d.toLowerCase() === s.toLowerCase()) ?? s;
-};
+// `canonico` vive en `formas.mjs`, con las formas que nombra (C-547).
 
 /**
  * **El tablero sale de la DESCRIPCIÓN, no de un literal por pieza.**

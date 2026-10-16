@@ -135,6 +135,19 @@ export const CONSTRUIDAS = new Set(
       .matchAll(/cue\.kind === "([^"]+)"/g)].map((m) => m[1]),
 );
 
+/**
+ * **El nombre de la forma, como lo despacha `Tablero.tsx`.** «Comparacion» con
+ * mayúscula no es `comparacion` para el despacho y caía en `TableroDeclarado`,
+ * que rotula sus datos; y `Gancho` es el rótulo del gancho, o sea `tipo`
+ * (reel-08 v1, 12-9, C-422). Vive aquí, junto a `CONSTRUIDAS`, porque la usan
+ * el montaje y la puerta de `describir` (C-547).
+ */
+export const canonico = (k) => {
+  const s = String(k ?? "");
+  if (s.toLowerCase() === "gancho") return "tipo";
+  return [...CONSTRUIDAS].find((d) => d.toLowerCase() === s.toLowerCase()) ?? s;
+};
+
 export class Forma {
   /**
    * @param {string} nombre        el `kind` que se guarda en `escena_desc.tablero`
