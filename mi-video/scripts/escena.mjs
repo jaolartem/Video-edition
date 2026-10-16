@@ -45,7 +45,13 @@ import { cerrada } from "./biblioteca.mjs";
  * Estaba escrita dos veces, una en cada fichero: si alguien afinaba el
  * vocabulario en uno, el otro seguía admitiendo lo que el primero ya rechazaba.
  */
-const ES_TIPO = /versales|el tipo es|la frase entera|solo texto|nada mas/i;
+//: **Y las palabras que lo delatan se le dicen a quien describe** (C-544): el
+//: contrato decía «si el gráfico es tipográfico» sin decir qué lo hace serlo, y
+//: el compositor escribió «la palabra GUIA en versales» con `componente:
+//: ninguno` y sin copy — rechazado dos veces en reel-19 y en reel-21.
+export const PALABRAS_TIPO = ["versales", "el tipo es", "la frase entera",
+  "solo texto", "nada mas"];
+const ES_TIPO = new RegExp(PALABRAS_TIPO.join("|"), "i");
 
 export const esTipografico = (grafico) => Boolean(grafico && ES_TIPO.test(grafico));
 

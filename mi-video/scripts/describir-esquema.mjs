@@ -17,7 +17,7 @@
  * escrita dos veces son dos listas, y cuando divergen las dos parecen correctas.
  */
 import { NOMBRES } from "./caminos.mjs";
-import { esTipografico } from "./escena.mjs";
+import { PALABRAS_TIPO, esTipografico } from "./escena.mjs";
 
 /**
  * Qué forma dibuja cada componente. Es también **la lista de componentes que
@@ -41,8 +41,10 @@ const REGLAS = [
   "Si `componente` no es «ninguno», `tablero` tiene que ser un objeto con"
   + " `props`: sin él el tablero se queda con lo que ya hubiera y la"
   + " descripción no llega a la pantalla.",
-  "Si el `grafico` es tipográfico, el copy va en `tablero.props.texto` (o"
-  + " `props.titulo`, o `tablero.texto`) y no puede estar vacío: sin él el"
+  "Si el `grafico` es tipográfico —lo es si dice "
+  + PALABRAS_TIPO.map((p) => `«${p}»`).join(", ")
+  + ", aunque `componente` sea «ninguno»—, el copy va en `tablero.props.texto`"
+  + " (o `props.titulo`, o `tablero.texto`) y no puede estar vacío: sin él el"
   + " render no tiene copy y la capa no entra — o peor, repite el rótulo.",
 ];
 
