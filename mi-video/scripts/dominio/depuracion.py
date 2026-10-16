@@ -80,11 +80,29 @@ def con_voz(palabras, tramo: Tramo) -> list:
     ini, fin = max(tramo.desde, ws[0].empieza - MARGEN), ws[0].acaba
     for p in ws[1:]:
         if p.empieza - fin > AIRE_MAX:
-            fuera.append(corte(ini, min(tramo.hasta, fin + MARGEN), tramo.cinta))
+            fuera.append(corte(ini, _salida(tramo, fin), tramo.cinta))
             ini = p.empieza - MARGEN
         fin = p.acaba
-    fuera.append(corte(ini, min(tramo.hasta, fin + MARGEN), tramo.cinta))
+    fuera.append(corte(ini, _salida(tramo, fin), tramo.cinta))
     return [t for t in fuera if t is not None and t.dura > 0.25]
+
+
+def _salida(tramo: Tramo, fin: float) -> float:
+    """Tras la última palabra con su margen, **y donde la onda ya calla** (C-546).
+
+    El margen se suma al final que da el transcript, y el transcript se queda
+    corto justo ahí: en reel-21 e5 «personal» acababa en el texto antes que en el
+    audio, el trozo salía en 42,512 con la cola a −37 dB y la puerta lo paraba.
+    Como era un tramo declarado, el cosido no lo podía mover y la pieza se
+    atascaba. Se avanza con `ajuste._al_silencio`, la vara del que juzga, y nunca
+    más allá de lo que el tramo trae.
+    """
+    sale = min(tramo.hasta, fin + MARGEN)
+    if not tramo.cinta or sale >= tramo.hasta:
+        return sale
+    from .ajuste import _al_silencio
+
+    return min(tramo.hasta, _al_silencio(tramo.cinta, sale))
 
 
 # ── el ensayo ───────────────────────────────────────────────────────────────
