@@ -575,9 +575,18 @@ def aplicar(slug, solo=None):
         hechos.append(b)
     # Las etapas fijadas que no estaban en el EDL —las que se habían quedado sin
     # material— entran ahora: es justo para lo que sirve fijar.
+    #
+    # **Y dejan de estar sin toma** (C-542). Entraban en `detalle` y seguían en
+    # `sin_toma`, así que la pieza decía las dos cosas a la vez: `colocar` les
+    # ponía tarjeta encima de la voz, la puerta las contaba como obligatorias sin
+    # material y `verificar` paraba reel-21 porque «la etapa 1 va a tablero»
+    # teniendo su frase declarada. De la entrada de `sin_toma` sale además el
+    # nombre de la etapa y si es obligatoria, que el dict pelado no traía.
+    huecos = {h.get("beat"): h for h in edl.get("sin_toma") or []}
     for b, fs in sorted(por_beat.items()):
         if b in puestos:
             continue
+        hueco = huecos.get(b) or {}
         for f in fs:
             toma = f["toma"]
             try:
@@ -587,9 +596,14 @@ def aplicar(slug, solo=None):
             texto = " ".join(w["text"] for w in pal
                              if transcribir.suena(w, f["desde"], f["hasta"]))
             segs.append([round(f["desde"], 3), round(f["hasta"], 3)])
-            det.append({"beat": b, "toma": toma, "texto": texto, "fijado": f["id"],
+            det.append({"beat": b, "etapa": hueco.get("etapa"),
+                        "obligatorio": hueco.get("obligatorio"),
+                        "toma": toma, "texto": texto, "fijado": f["id"],
                         "fijado_fecha": f.get("fecha"), "por_que": f["por_que"]})
         hechos.append(b)
+    if huecos:
+        edl["sin_toma"] = [h for h in edl.get("sin_toma") or []
+                           if h.get("beat") not in hechos]
     # **Una etapa que vuelve al EDL vuelve con su camino.**
     #
     # La rama de arriba conserva el detalle entero con `{**d}`; la de abajo

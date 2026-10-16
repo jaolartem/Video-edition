@@ -19,6 +19,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import registro  # noqa: E402
 import rutas  # noqa: E402
 
+#: Con cuántas pasadas se rehace una cinta que no llegó al sello (C-541): el
+#: paso baja a 5 s y lo del arranque cae en varias ventanas.
+PASADAS_CORTA = 6
+
 
 def preparar(toma, rehacer=False, pasadas=None, barato=False):
     """Deja la cinta lista, o dice por qué no puede. Una cinta, una llamada."""
@@ -140,3 +144,15 @@ def preparar(toma, rehacer=False, pasadas=None, barato=False):
           f" · acuerdo medio {acuerdo:.2f} ({len(medidos)} medidos)"
           f" · {dudosos} tramos por oír · {largas} palabras estiradas"
           f" → {ruta}")
+    # **Una cinta corta no llega al sello con el paso de siempre** (C-541). Lo
+    # de los primeros `PASO` segundos cae en una sola ventana, y en una cinta de
+    # 50 s eso pesa: `20261015_140249` salió con 1,67 pasadas de media,
+    # `Cinta.exigir` la declaró «de UNA pasada» y la selección la dejó fuera.
+    # Más pasadas es la receta que ya existía (`--pasadas`); aquí se aplica sola.
+    if not barato and not pasadas:
+        from dominio.cinta import PASADAS_MIN, Cinta
+        sello = Cinta(toma).pasadas()
+        if sello < PASADAS_MIN:
+            print(f"   sello {sello:.2f} < {PASADAS_MIN}: cinta corta, se rehace"
+                  f" con {PASADAS_CORTA} pasadas")
+            return preparar(toma, rehacer=True, pasadas=PASADAS_CORTA)

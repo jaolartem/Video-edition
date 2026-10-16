@@ -58,6 +58,18 @@ class Corrida:
         toma = self.toma
         otras = [] if propia else [t for t in rutas.material() if t != toma]
         self.corpus = Corpus([toma] + otras)
+        # **Y sin su cinta, la pieza no se elige** (C-541). `Corpus._sumar` deja
+        # fuera la cinta que no se sostiene, y para las ajenas está bien: una
+        # grabación a medias no tumba la selección de otra pieza. Pero si la que
+        # se queda fuera es la PROPIA, lo de abajo sigue eligiendo en cintas
+        # ajenas y sale una pieza entera: reel-21, el de retiro, cerraba con
+        # «comente la palabra guía» de reel-19 porque `20261015_140249` estaba
+        # sellada con 1,67 pasadas. Se para con el motivo de la cinta.
+        if toma not in self.corpus.tomas:
+            from dominio.cinta import Cinta
+            Cinta(toma).exigir()
+            raise SystemExit(f"{self.slug}: su cinta {toma} no tiene tramos de"
+                             f" habla medidos — falta work/cuts/{toma}.json")
         self._rotas: set | None = None
 
     # ── lo que la pieza pide en cada etapa ───────────────────────────────────
