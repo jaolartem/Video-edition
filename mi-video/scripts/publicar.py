@@ -279,7 +279,10 @@ def main():
         # finales»*. Asi que van los seis, tambien los que no pasan la puerta —
         # con su motivo al lado— y a una carpeta aparte, porque `FINALES` es
         # solo para lo que esta a punto y eso no cambia.
-        raiz = os.path.join(rutas.FUENTES["finales"], "_revision")
+        # **Y se queda en F:.** Jaime, 18-10-2026: *«sigue trabajando en F y
+        # los finales ya revisados, no para revision sino los definitivos»*. A
+        # Drive (I:) va solo lo definitivo; ver montado es trabajo (C-553).
+        raiz = rutas.salida("revision")
         os.makedirs(raiz, exist_ok=True)
         print(f"REVISION -> {raiz}")
         for pieza, mp4, ver, pega in listas(con):
@@ -343,7 +346,12 @@ def main():
         raiz = rutas.FUENTES["finales"]
         print(f"FINALES -> {raiz}")
         hay = False
+        from dominio.segmento import aprobada as _aprobada
         for pieza, mp4, ver, pega in listas(con):
+            # **Solo lo que el aprobo.** Pasar la puerta no es estar revisado:
+            # a FINALES va lo definitivo, ya visto y firmado por Jaime (C-553).
+            if not _aprobada(f"reel-{int(pieza.split('R')[-1]):02d}"):
+                pega = pega + ["no esta aprobada por Jaime"]
             if pega:
                 print(f"  {pieza}: NO sale — {'; '.join(pega)}")
                 continue
