@@ -128,6 +128,13 @@ def _devuelve_el_borde(pieza, motivo: str):
                              encoding="utf-8"))
         for (_a, b), d in zip(edl.get("segmentos", []), edl.get("detalle", [])):
             if seg is not None and abs(b - seg) < 0.02 and d.get("fijado"):
+                # **Salvo que el sonido lo resuelva** (C-558): si hay hueco
+                # junto al borde, lo arregla el cosido sin pagar otra lectura.
+                from dominio.senal import Senal
+                cinta = d.get("toma")
+                o = Senal(cinta) if cinta else None
+                if o and (o.antes_calla(seg) or o.donde_calla(seg, maximo=0.35)):
+                    break
                 atiende = f"revalidado — e{d.get('beat')} es un tramo declarado"
                 break
     except (OSError, ValueError):
