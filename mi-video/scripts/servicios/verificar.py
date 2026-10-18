@@ -62,6 +62,16 @@ class ServicioVerificar(Servicio):
             return Resultado(True, salida=f"pasa; {len(avisan)} ticket(s)"
                                           f" levantados" if avisan
                              else "pasa la puerta")
+        # **Un corte sobre la voz vuelve a quien puso ese borde** (C-555). El
+        # motivo decia «corre el paso cosido» y nadie llevaba la pieza alli:
+        # reel-18, 20 y 22 se quedaron el 18-10 fallando aqui en cada vuelta.
+        # Y el borde de un tramo declarado no lo mueve el cosido: lo decide
+        # quien lo declaro, en `revalidado`. A la segunda, error (C-551).
+        voz = next((m for m in paran if "cae encima de la voz" in m), None)
+        if voz:
+            vuelta = _devuelve_el_borde(pieza, voz)
+            if vuelta:
+                return vuelta
         # Se devuelve el primero y se cuentan los demas: el motivo tiene que
         # caber en una linea del log y ser accionable. La lista entera esta en
         # `verificar.py --avisa`.
@@ -78,7 +88,12 @@ def _anota(pieza, motivo: str) -> None:
         if any((t.get("dijo") or "").startswith(texto[:60])
                for t in tk.abiertos(pieza.slug)):
             return
-        tk.abrir(pieza.slug, texto, None, "objecion")
+        try:
+            tk.abrir(pieza.slug, texto, None, "objecion")
+        except tk.SinEscena:
+            # **Sin escena nombrada, es de la pieza** (C-555): «1 corte(s)…» o
+            # «b1: regla de plano» no dicen `eN`, y el aviso se perdia entero.
+            tk.abrir(pieza.slug, texto, None, "objecion", etapa="pieza")
     except Exception:                              # noqa: BLE001
         import registro
 
@@ -86,3 +101,37 @@ def _anota(pieza, motivo: str) -> None:
                        detalle=f"{pieza.slug}: {motivo[:120]}", eco=False)
 
 
+#: La marca de los tiquets de este camino; cuenta las devoluciones (C-555).
+SOBRE_LA_VOZ = "corte sobre la voz:"
+
+
+def _devuelve_el_borde(pieza, motivo: str):
+    """Tiquet al paso que puso ese borde y la pieza alli, o `None` si ya van dos."""
+    import json
+    import re
+
+    from dominio import ticket as tk
+
+    from .base import devuelve
+
+    suyos = [t for t in tk.historia(pieza.slug)
+             if (t.get("dijo") or "").startswith(SOBRE_LA_VOZ)]
+    # Dos devoluciones como mucho, y ninguna con la anterior sin atender: si
+    # sigue abierto y el corte sigue mal, volver otra vez es el bucle de C-551.
+    if len(suyos) >= 2 or any(t.get("estado") == "abierto" for t in suyos):
+        return None
+    m = re.search(r"corte de ([\d.]+)s", motivo)
+    seg = float(m.group(1)) if m else None
+    atiende = "cosido"
+    try:
+        edl = json.load(open(os.path.join("ads", pieza.slug, "edl-sell.json"),
+                             encoding="utf-8"))
+        for (_a, b), d in zip(edl.get("segmentos", []), edl.get("detalle", [])):
+            if seg is not None and abs(b - seg) < 0.02 and d.get("fijado"):
+                atiende = f"revalidado — e{d.get('beat')} es un tramo declarado"
+                break
+    except (OSError, ValueError):
+        pass
+    paso, _, por_que = atiende.partition(" — ")
+    texto = motivo.split(": ", 1)[-1] + (f" ({por_que})" if por_que else "")
+    return devuelve(pieza, SOBRE_LA_VOZ, texto, atiende=paso)
