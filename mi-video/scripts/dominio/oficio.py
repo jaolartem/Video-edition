@@ -212,7 +212,12 @@ class Oficio:
             # herramientas que su contrato declara —`docs/caminos.md`: *«lo que
             # ninguno toca: la base, los scripts, el EDL, los ficheros de
             # entrega; trabajan con Read y Write»*— y ninguna mas.
-            "--allowedTools", "Read Write", "-p",
+            "--allowedTools", "Read Write",
+            # **Y sin poder delegar en si mismo.** `--allowedTools` aprueba,
+            # no prohibe: el compositor lanzaba un subagente «compositor» que
+            # volvia a leer el pedido entero, dos arranques y dos contextos por
+            # respuesta, en todas las llamadas del 17 y el 18-10 (C-549).
+            "--disallowedTools", "Agent Task", "-p",
             ENCARGO.format(pedido=os.path.abspath(self.pedido),
                            respuesta=os.path.abspath(self.respuesta))]
         with subprocess.Popen(orden, cwd=CASA, stdin=subprocess.DEVNULL,
