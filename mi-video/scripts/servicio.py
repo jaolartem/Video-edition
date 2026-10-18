@@ -495,6 +495,13 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # definicion, que es lo que de verdad es. Para el diseno la pregunta son los
     # encargos y la pieza; lo demas viaja para poder componer.
     PREGUNTA = {"disenar": ("tableros", "pieza")}
+    # **Y cuando `datos` es una lista, lo que acompana a cada fila** (C-557).
+    # `historial` de revalidar es la maquina midiendo otra vez el tramo: cambia
+    # de una vuelta a otra sin que cambie el corte —o falla un temporal y trae
+    # un error—, y con eso el pedido se reescribia mientras el agente
+    # contestaba y su respuesta salia «anterior al pedido». reel-20 y reel-22,
+    # 18-10: dos revisiones de 210 K tokens tiradas en doce minutos.
+    POR_FILA = {"revalidar": ("historial",)}.get(paso, ())
     SOLO = PREGUNTA.get(paso)
     APOYO = CONTEXTO.get(paso, ())
 
@@ -510,6 +517,9 @@ def pedir(paso, slug, prompt, payload, cli=True):
                 return k not in VOLATILES and k not in APOYO
 
             d["datos"] = {k: v for k, v in d["datos"].items() if _cuenta(k)}
+        elif isinstance(d.get("datos"), list) and POR_FILA:
+            d["datos"] = [{k: v for k, v in f.items() if k not in POR_FILA}
+                          if isinstance(f, dict) else f for f in d["datos"]]
         for k in VOLATILES:
             d.pop(k, None)
         # El contrato se compara por su huella: un pedido escrito antes de

@@ -92,7 +92,11 @@ def contorno(toma, a, b):
     #
     # El nombre lleva el proceso y el tramo, asi que dos medidas nunca compiten
     # y ademas se puede saber de quien es un temporal que quedo suelto.
-    wav = (f"{rutas.TEMPORAL}/f0-{os.getpid()}-"
+    # **Y el hilo** (C-557): el disparador corre las piezas en hilos del mismo
+    # proceso, y dos que miden el mismo tramo se borraban el fichero el uno al
+    # otro — `No such file` dentro del historial de revalidar, el 18-10.
+    import threading
+    wav = (f"{rutas.TEMPORAL}/f0-{os.getpid()}-{threading.get_ident()}-"
            f"{abs(hash((toma, round(a, 2), round(b, 2)))) % 10**8}.wav")
     try:
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(a), "-to", str(b),
