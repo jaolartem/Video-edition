@@ -176,9 +176,36 @@ class Senal:
         while u <= t + maximo:
             if u >= fin:
                 return None
-            if 20 * math.log10(max(self.energia(u), 1e-9)) <= SUENA:
+            # **Y callado quiere decir que se queda callado** (C-558): un
+            # valle de 20 ms entre dos silabas no es el final de la palabra.
+            # reel-22 e4 se alargaba de 179,916 a 180,091, dentro de «lo», y la
+            # puerta lo paraba por voz sonando.
+            if (self._db(u) <= SUENA and self._db(u + MEDIDA) <= SUENA):
                 return round(u + GRANO, 3)
             u += GRANO
+        return None
+
+    def _db(self, t: float) -> float:
+        return 20 * math.log10(max(self.energia(t), 1e-9))
+
+    def antes_calla(self, t: float, maximo: float = 0.06):
+        """El silencio que hay JUSTO ANTES de `t`, si la voz arranca en `t`.
+
+        Un borde que cae unas milesimas tarde, en el arranque de la palabra
+        siguiente, no tiene una palabra que cerrar: tiene que volver al hueco
+        que ya habia. Alargarlo es traerse la siguiente (C-558). Se mide con el
+        umbral de la puerta, `bordes.VOZ`, para que las dos digan lo mismo.
+        """
+        from .bordes import VOZ
+
+        x, _sr = self.muestras
+        if x is None or self.suena(t) <= SUENA:
+            return None
+        u = t
+        while u >= t - maximo:
+            if self._db(u) <= VOZ:
+                return round(u, 3)
+            u -= GRANO
         return None
 
     def __str__(self) -> str:

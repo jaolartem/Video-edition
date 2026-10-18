@@ -222,6 +222,14 @@ def cerrar_palabras(slug, ver=False):
         onda = ondas.get(cinta)
         tope = topes.get(i)
         margen = ALARGA if tope is None else min(ALARGA, max(0.0, tope - t.hasta))
+        # **Primero, si el borde cayo en el arranque de la siguiente** (C-558):
+        # entonces el hueco esta detras y se vuelve a el; no hay palabra que
+        # cerrar. Solo si no, se alarga hasta que calle.
+        atras = onda.antes_calla(t.hasta) if onda else None
+        if atras is not None and atras - t.desde > 0.25:
+            cerrados += 1
+            nuevos.append((Tramo(t.desde, atras, t.cinta), d))
+            continue
         hasta = onda.donde_calla(t.hasta, maximo=margen) if (onda and margen > 0) else None
         if hasta is None:
             if onda and onda.suena(t.hasta) > SUENA:
