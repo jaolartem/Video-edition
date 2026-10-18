@@ -246,6 +246,17 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
             f" la etapa en el texto («e7», «etapa 7»), o declara"
             f" `etapa=\"pieza\"` si de verdad es de la pieza entera.")
     cx = _con()
+    # **Y lo mismo dicho dos veces es un tiquet, no dos.** Un paso que vuelve a
+    # correr vuelve a decir lo que ya dijo: reel-20 y reel-22 llevaban cinco
+    # pares identicos (#516/#525…), y cada copia pide su propia atencion y su
+    # propio cierre (C-548). Se devuelve el abierto que ya lo dice.
+    ya = cx.execute(
+        "select id from ticket where estado = 'abierto' and pieza = ?"
+        " and dijo = ? and coalesce(segundo, -1) = coalesce(?, -1)",
+        (pieza, dijo, segundo)).fetchone()
+    if ya:
+        cx.close()
+        return ya[0]
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     cur = cx.execute(
         "insert into ticket (cuando, pieza, segundo, beat, dijo, tipo,"

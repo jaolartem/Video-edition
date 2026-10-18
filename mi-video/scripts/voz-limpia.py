@@ -736,7 +736,7 @@ def main():
         # debajo del objetivo— y el paso termino con exito. `musica.sh` ademas
         # devuelve 0 aunque no encuentre el fichero, asi que el codigo de
         # salida solo no basta: se comprueba que haya dicho algo de cada pieza.
-        r = subprocess.run(["bash", "scripts/musica.sh",
+        r = subprocess.run([rutas.interprete(), "scripts/musica.sh",  # C-548
                             *[str(x) for x in pedidos]],
                            capture_output=True, text=True, encoding="utf-8")
         print(r.stdout or "", end="")

@@ -11,7 +11,7 @@
     "@remotion/google-fonts": "4.0.518",
     "@remotion/install-whisper-cpp": "4.0.518",
     "@remotion/tailwind-v4": "4.0.518",
-    "@remotion/three": "^4.0.520",
+    "@remotion/three": "4.0.518",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.518",

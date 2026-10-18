@@ -20,7 +20,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PIEZAS=("$@")
-[ ${#PIEZAS[@]} -eq 0 ] && PIEZAS=(1 2 3 4 5 6 7)
+# Sin lista por defecto: la de aqui envejecio con el lote (1..6 cuando el vivo
+# era 18..22). Las piezas se dicen; ver `arrancar.sh` (C-548).
+[ ${#PIEZAS[@]} -eq 0 ] && { echo "montar-lote.sh: di que piezas"; exit 1; }
 A_LA_VEZ="${A_LA_VEZ:-3}"
 
 # **El spec se hace una vez PORQUE nada de lo que lee va a cambiar.** Si el EDL

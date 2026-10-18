@@ -71,7 +71,8 @@ RANGO = (-40.0, 6.0)
 def _mide(n, musi):
     """Mezcla reel-n con ese nivel y devuelve la separación medida, o None."""
     entorno = dict(os.environ, MUSI=str(musi))
-    subprocess.run(["bash", "scripts/musica.sh", str(n)],
+    import rutas  # el interprete se resuelve, no se hereda: C-349, C-548
+    subprocess.run([rutas.interprete(), "scripts/musica.sh", str(n)],
                    capture_output=True, env=entorno)
     # La referencia es la voz que entro en la mezcla, no el stem del bruto:
     # ese es de otro montaje en cuanto se recorta algo, y entonces la medida se

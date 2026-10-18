@@ -188,6 +188,11 @@ def _vive(pid: int) -> bool:
     return True
 
 
+#: La marca con la que un script pide volver. La escriben `describir.mjs` y
+#: `montar.sh`; la lee `ServicioScript._correr`. C-548.
+VOLVER_A = "volver_a: "
+
+
 class ServicioScript(Servicio):
     """Envuelve un script que ya existe y funciona.
 
@@ -283,6 +288,16 @@ class ServicioScript(Servicio):
         if not dicho:
             dicho = (r.stderr or "").strip().splitlines()
         ultima = dicho[-1] if dicho else "sin salida"
+        # **Un script tambien puede pedir volver**, como un servicio con
+        # `Resultado.volver_a`: su ultima linea dice `volver_a: <fase>` y la
+        # pieza se coloca desde donde ese paso se vuelve a correr. Sin esto un
+        # «no se puede porque falta lo de atras» se contaba como espera o como
+        # fallo, y ninguna de las dos lleva la pieza atras (C-548).
+        if ultima.startswith(VOLVER_A):
+            from dominio.fase import antes_de
+            fase = ultima[len(VOLVER_A):].split()[0]
+            return Resultado(False, motivo=ultima[:160], salida=ultima[:200],
+                             volver_a=antes_de(fase))
         # **Y lo que dijo el paso no se tira.** Una etiqueta no es un
         # diagnostico: `montar.sh` muere con `set -e` dentro de `render.mjs`,
         # su ultima linea de stdout es «bundle listo en 13.0 s» —progreso

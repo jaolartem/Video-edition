@@ -279,6 +279,9 @@ const esperan = [];
 //: espera y tampoco es un exito**: hay una respuesta escrita que no se puede
 //: aplicar, y hasta que se rehaga la pieza no ha pasado este paso.
 const rechazadas = [];
+//: Las que no pueden componerse todavia y saben desde donde se arregla. **Ni
+//: espera ni rechazo**: no hay pedido escrito, asi que no hay a quien esperar.
+const vuelven = [];
 for (const [slug, suyas] of porPiezas(filas)) {
   const tocables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   try {
@@ -343,6 +346,11 @@ for (const [slug, suyas] of porPiezas(filas)) {
     // a `usadas/`: el error se veia una vez y la prueba desaparecia.
     archivaUsado(PASO, slug);
   } catch (e) {
+    if (e.volverA) {
+      console.error(`  ${slug}: ${String(e.message).slice(0, 200)}`);
+      vuelven.push({ slug, fase: e.volverA, por: String(e.message).slice(0, 120) });
+      continue;
+    }
     // Un fallo de credencial ya no llega aqui: `porCli` lo devuelve como
     // espera. Lo que llegue es un fallo de verdad —esquema, JSON roto— y ese
     // se dice por pieza sin parar el lote.
@@ -360,6 +368,13 @@ for (const [slug, suyas] of porPiezas(filas)) {
 }
 
 console.log(`${ok}/${filas.length} descritas y guardadas`);
+// **La ultima linea dice adonde volver** y `servicios/base.py` la lee: es la
+// misma via que `Resultado.volver_a`, para un paso que es un script (C-548).
+if (vuelven.length) {
+  console.log(`volver_a: ${vuelven[0].fase} — ${
+    vuelven.map((v) => `${v.slug}: ${v.por}`).join(" | ")}`);
+  process.exit(1);
+}
 if (esperan.length) {
   console.error(
     "\nEl CLI no contesta aqui (usa la credencial de la terminal que lo lanza).\n" +

@@ -208,11 +208,16 @@ export function entradaDe(slug, filas) {
 export function pedidoDe(slug, filas) {
   const falta = sinAfinar(slug);
   if (falta.length) {
-    throw new Error(
+    const e = new Error(
       `el CC no esta afinado (${falta.join(", ")}). El barrido caro va ANTES` +
         ` de componer: node/python scripts/transcribir.py --elegidos ${
           Number(slug.slice(-2))}`,
     );
+    // **Y dice adonde volver**, porque esto no es una espera: nadie va a
+    // contestar un pedido que no se llego a escribir. Contado como espera,
+    // reel-18, 20 y 22 dieron vueltas toda una manana sin escalar (C-548).
+    e.volverA = "afinado";
+    throw e;
   }
   return entradaDe(slug, filas);
 }

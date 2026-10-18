@@ -240,11 +240,17 @@ class ServicioRepaso(Servicio):
 
 
 def _ya_pregunto(slug: str) -> bool:
-    """¿Hay ya una respuesta de repaso archivada para esta pieza?"""
+    """¿Hay ya una respuesta de repaso archivada para esta pieza?
+
+    **Una desfasada no cuenta**: contestaba a un corte que ya no existe. Contada,
+    el paso daba la pieza por preguntada, no recogia la respuesta buena que
+    esperaba en el buzon, y esa respuesta la devolvia a `cosido` en cada vuelta
+    — reel-21, 16-10-2026 (C-548).
+    """
     import glob
 
-    return bool(glob.glob(os.path.join(_dir_paso("repaso"), "usadas",
-                                       f"{slug}.*.respuesta.json")))
+    return any(".desfasada." not in f for f in glob.glob(os.path.join(
+        _dir_paso("repaso"), "usadas", f"{slug}.*.respuesta.json")))
 
 
 def _cerrar_tickets(pieza) -> "Resultado":

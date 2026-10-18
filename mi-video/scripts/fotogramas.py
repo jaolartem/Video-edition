@@ -228,7 +228,8 @@ def sacar(n, cuantos=CUANTOS):
     # Lo que sale del render existente se saca con ffmpeg, que es medio segundo;
     # esto es lo otro — ver lo que todavia no existe.
     if not os.path.exists(mp4):
-        r = subprocess.run(["bash", "scripts/mirar.sh", str(n), str(cuantos)],
+        import rutas  # el interprete se resuelve, no se hereda: C-349, C-548
+        r = subprocess.run([rutas.interprete(), "scripts/mirar.sh", str(n), str(cuantos)],
                            capture_output=True, text=True)
         if r.returncode != 0:
             return None, (f"no esta {mp4} y no se pudieron renderizar los"

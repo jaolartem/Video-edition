@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# **La linea, de un tiron y desde cualquier sesion.** C-548.
+#
+#   bash scripts/arrancar.sh 18 19 20 21 22
+#
+# Jaime: *«que funcione en cualquier sesion, de un solo tiron y sin
+# problemas»*. Lo que lo impedia no era un paso roto: eran cinco condiciones
+# que solo sabia quien ya las habia sufrido —que bash.exe exista, que el CLI
+# tenga credencial (solo la tiene en el panel Terminal), que el temporal no
+# este en C:, que la cinta este copiada, que `DISPARO_APAGADO` no siga puesto—
+# y cada una fallaba a mitad, con la pieza a medias y un motivo que no decia
+# cual. Aqui se comprueban todas ANTES de mover nada, y si falta una se para
+# con lo que hay que hacer. No se sigue a medias.
+#
+# Las piezas se dicen siempre: el lote vivo cambia, y una lista por defecto
+# escrita aqui es la que envejecio en `pipeline.sh` y `montar-lote.sh`.
+cd "$(dirname "$0")/.." || exit 1
+_py() { PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); $1"; }
+
+if [ $# -eq 0 ]; then
+  echo "arrancar: di que piezas. Declaradas: $(_py 'import rutas; print(*rutas.piezas())')"
+  exit 1
+fi
+# shellcheck disable=SC1091
+source scripts/entorno.sh || { echo "arrancar: entorno.sh no pudo preparar el entorno"; exit 1; }
+
+falta=()
+command -v bash >/dev/null 2>&1 \
+  || falta+=("no hay bash: el antivirus se llevo bash.exe; reinstala Git for Windows")
+for h in node ffmpeg ffprobe claude; do
+  command -v "$h" >/dev/null 2>&1 || falta+=("no esta «$h» en el PATH")
+done
+[ -f whisper.cpp/whisper-cli.exe ] && [ -f whisper.cpp/ggml-medium.bin ] \
+  || falta+=("falta whisper.cpp/whisper-cli.exe o ggml-medium.bin (docs/entorno.md)")
+[ -n "$DISPARO_APAGADO" ] \
+  && falta+=("DISPARO_APAGADO esta puesto: nadie llamaria a los oficios — unset DISPARO_APAGADO")
+libre=$(df -BG --output=avail "$TMPDIR" 2>/dev/null | tail -1 | tr -dc 0-9)
+[ -n "$libre" ] && [ "$libre" -lt 40 ] \
+  && falta+=("solo quedan ${libre} GB en el disco del temporal; un lote de cinco pide unos 40")
+# La cinta de cada pieza, en local. Si no esta y Drive si, se trae.
+sin=$(_py "import rutas
+for n in [int(x) for x in sys.argv[1:]]:
+    t = rutas.TOMAS.get(f'reel-{n:02d}')
+    if t and not rutas.angulos(t): print(t)" "$@" 2>/dev/null)
+if [ -n "$sin" ]; then
+  echo "arrancar: faltan en local: $sin — se traen de Drive"
+  bash scripts/traer-brutos.sh || falta+=("no se pudieron traer de Drive: $sin")
+fi
+# La credencial, comprobada de verdad: `claude -p` contesta 0 aunque no tenga.
+_py "import servicio; sys.exit(0 if servicio._hay_cli() else 1)" \
+  || falta+=("el CLI de Claude no tiene sesion aqui. Lanzalo desde el panel Terminal de la app, dentro de Git Bash: & 'C:\Program Files\Git\bin\bash.exe' -lc 'cd \"$(pwd)\" && bash scripts/arrancar.sh $*'")
+
+if [ ${#falta[@]} -gt 0 ]; then
+  echo "arrancar: no se arranca, falta:"
+  printf '  - %s\n' "${falta[@]}"
+  exit 1
+fi
+echo "arrancar: todo en su sitio — disparador con $# pieza(s): $*"
+exec python scripts/disparador.py "$@" --hilos "$#"

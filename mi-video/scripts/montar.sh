@@ -552,6 +552,12 @@ for r in "${REELS[@]}"; do
   ROMPE=$(node -e "const s=JSON.parse(require('fs').readFileSync('src/reels.json','utf8'));const r=s.find(x=>x.id==='Reel-R$n');console.log((r&&r.rompe||[]).join(' | '))")
   if [ -n "$ROMPE" ]; then
     echo "montar.sh: Reel-R$n no se renderiza porque no se puede dibujar: $ROMPE"
+    # **Y se le dice a quien lo arregla.** Parar sin tiquet dejaba la
+    # descripcion mala guardada y nadie la volvia a pedir: reel-19 y reel-21
+    # murieron aqui en cada vuelta del 16-10. El tiquet lleva la escena al
+    # compositor y la ultima linea devuelve la pieza a componer (C-548).
+    PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); from dominio import ticket; ticket.abrir(sys.argv[1], 'no se puede dibujar: ' + sys.argv[2], vuelve_a='descrito')" "$(printf 'reel-%02d' "$n")" "$ROMPE" || true
+    echo "volver_a: descrito — $ROMPE"
     exit 1
   fi
   RENDERIZADA=0

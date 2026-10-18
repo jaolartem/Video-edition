@@ -47,7 +47,9 @@ for a in "$@"; do
     *) REELS+=("$a") ;;
   esac
 done
-[ ${#REELS[@]} -eq 0 ] && REELS=(1 2 3 4 5 6)
+# Sin lista por defecto: la de aqui envejecio con el lote (1..6 cuando el vivo
+# era 18..22). Las piezas se dicen; ver `arrancar.sh` (C-548).
+[ ${#REELS[@]} -eq 0 ] && { echo "pipeline.sh: di que piezas"; exit 1; }
 
 paso() { echo; echo "━━ $* ━━"; }
 fallo=0

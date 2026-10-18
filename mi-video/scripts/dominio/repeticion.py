@@ -52,8 +52,9 @@ def _volumen(toma: str, a: float, b: float):
     """dBFS medio del tramo. `None` si no se pudo medir."""
     if b - a < 0.05:
         return None
-    ruta = os.path.join("F:/Edicion de video/brutos", f"{toma}.mp4")
-    if not os.path.exists(ruta):
+    import rutas  # la cinta se le pregunta a `rutas`, no se escribe (C-548)
+    ruta = (rutas.angulos(toma) or [""])[0]
+    if not ruta or not os.path.exists(ruta):
         return None
     try:
         salida = subprocess.run(

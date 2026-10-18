@@ -21,7 +21,14 @@ for t in "${TOMAS[@]}"; do
     echo "ya está: $t"
     continue
   fi
-  echo "copiando $t …"
-  cp "$ORIGEN/$t.mp4" "$DESTINO/$t.mp4"
+  # **Cada lote vive en su subcarpeta** (`Brutos/10 16 26`): se busca la toma,
+  # no se supone en la raiz. Suponerla dejaba fuera el ciclo W40 (C-548).
+  SRC=$(find "$ORIGEN" -name "$t.mp4" -print -quit 2>/dev/null)
+  if [ -z "$SRC" ]; then
+    echo "traer-brutos: $t no esta en $ORIGEN ni en sus subcarpetas" >&2
+    exit 1
+  fi
+  echo "copiando $t desde ${SRC#$ORIGEN/} …"
+  cp "$SRC" "$DESTINO/$t.mp4"
 done
 echo "brutos en $DESTINO"

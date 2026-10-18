@@ -38,10 +38,12 @@ TRABAJO = _cfg.get("trabajo", "work")
 #: porque es la memoria de trabajo; G: guarda solo lo final. `RECOGER`
 #: incluye ademas las carpetas donde el pueda haber dejado algo ya.
 LIMPIAR = _barras(_cfg.get("limpiar", "F:/Edicion de video/Audio para limpiar"))
-RECOGER = [LIMPIAR, "out/audio-puro",
-           "G:/My Drive/Creación de videos/Audio para limpiar"]
 PUBLICO = _cfg.get("publico", "public")
 FUENTES = _cfg.get("fuentes", {})
+# La carpeta de Drive sale de `rutas.json`: escrita aqui seguia en G: cuando
+# Drive ya estaba en I: (C-548).
+RECOGER = [LIMPIAR, "out/audio-puro"] + (
+    [FUENTES["audio"]] if FUENTES.get("audio") else [])
 TOMAS = _cfg.get("tomas", {})
 # **Una pieza que deriva de otra usa su cinta** (C-388): se deduce de
 # `deriva_de` en `ads/frames.json`, no se escribe dos veces.
