@@ -106,6 +106,23 @@ ENCARGO = (
     " respuesta; no se va a buscar fuera."
 )
 
+#: **Y lo que se le dice cuando contesta un agente de la sesion**, con tope.
+#: Jaime, 18-10-2026: *«reemplaza la accion del bash con agentes tuyos y limita
+#: el tope de tokens, esta gastando demasiados; el proceso es de revision de lo
+#: que se hizo automaticamente por codigo»*. El 18-10 una sola llamada leyo el
+#: pedido en 20 tandas y gasto 4,3 M tokens de entrada (C-552).
+REVISION = (
+    " Es una REVISION de lo que el codigo ya hizo, no una composicion desde"
+    " cero. Lee el contrato y el pedido una sola vez cada uno, mas los"
+    " fotogramas que el pedido senale; no abras otros ficheros, no busques, no"
+    " ejecutes nada. Si lo hecho cumple, contesta lo minimo que el contrato"
+    " admite y cambia solo lo que no cumple. Tope: {lecturas} lecturas y una"
+    " escritura; si no basta, dilo en la respuesta y para."
+)
+#: Las lecturas del tope: el contrato (1), el pedido (hasta 2.243 lineas tras
+#: C-550: 2 tandas) y margen para los fotogramas de quien disena.
+LECTURAS = 6
+
 
 def _mata_el_arbol(pid: int) -> None:
     """Mata al CLI y a sus nietos. En Windows hace falta el árbol entero.
@@ -151,6 +168,20 @@ class Oficio:
         except Exception:                          # noqa: BLE001
             return None
         return None
+
+    def encargo(self, sesion: bool = False) -> str:
+        """Lo que se le dice, por bash o desde la sesion: un solo texto.
+
+        `sesion` le pone el tope de revision (C-552): quien contesta desde la
+        sesion que vigila es un agente de esa sesion, y lo que cuesta lo paga
+        la misma cuenta.
+        """
+        texto = ENCARGO.format(
+            pedido=os.path.abspath(self.pedido),
+            contrato=os.path.abspath(self.pedido).replace(
+                ".pedido.json", ".prompt.md"),
+            respuesta=os.path.abspath(self.respuesta))
+        return texto + (REVISION.format(lecturas=LECTURAS) if sesion else "")
 
     @property
     def respuesta(self) -> str:
@@ -218,10 +249,7 @@ class Oficio:
             # volvia a leer el pedido entero, dos arranques y dos contextos por
             # respuesta, en todas las llamadas del 17 y el 18-10 (C-549).
             "--disallowedTools", "Agent Task", "-p",
-            ENCARGO.format(pedido=os.path.abspath(self.pedido),
-                           contrato=os.path.abspath(self.pedido).replace(
-                               ".pedido.json", ".prompt.md"),
-                           respuesta=os.path.abspath(self.respuesta))]
+            self.encargo()]
         with subprocess.Popen(orden, cwd=CASA, stdin=subprocess.DEVNULL,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               text=True, encoding="utf-8",
@@ -275,3 +303,35 @@ class Oficio:
 
     def __str__(self) -> str:
         return f"{self.nombre} ({self.buzon})"
+
+
+def cola(piezas=None):
+    """Los pedidos abiertos, con su oficio y su encargo de revision. C-552.
+
+        python scripts/dominio/oficio.py 18 19 20 21 22
+
+    Una linea por pedido —`oficio<TAB>buzon<TAB>pieza<TAB>encargo`— para que
+    la sesion lance un agente por cada una sin componer el encargo a mano.
+    """
+    import sys
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if raiz not in sys.path:
+        sys.path.insert(0, raiz)
+    import servicio
+
+    quiere = {f"reel-{int(n):02d}" for n in (piezas or [])}
+    for buzon, slug, ruta in servicio.pendientes():
+        if DE.get(buzon) and (not quiere or slug in quiere):
+            yield _linea(Oficio(DE[buzon], buzon, ruta), slug)
+
+
+def _linea(o, slug):
+    return f"{o.nombre}	{o.buzon}	{slug}	{o.encargo(sesion=True)}"
+
+
+if __name__ == "__main__":
+    import sys
+
+    for linea in cola(sys.argv[1:]):
+        print(linea)

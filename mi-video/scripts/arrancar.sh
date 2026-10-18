@@ -17,6 +17,15 @@
 cd "$(dirname "$0")/.." || exit 1
 _py() { PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); $1"; }
 
+# **`--agentes`: los oficios los contesta la sesion, no el CLI por bash.**
+# Jaime, 18-10-2026: *«reemplaza la accion del bash con agentes tuyos y limita
+# el tope de tokens»*. Los pedidos quedan escritos y la sesion lanza un agente
+# por cada linea de `python scripts/dominio/oficio.py N…`, con el encargo de
+# revision y su tope. Sin CLI no hace falta el panel Terminal (C-552).
+if [ "${1:-}" = "--agentes" ]; then
+  shift
+  export OFICIOS_POR_BASH=0
+fi
 if [ $# -eq 0 ]; then
   echo "arrancar: di que piezas. Declaradas: $(_py 'import rutas; print(*rutas.piezas())')"
   exit 1
@@ -27,7 +36,9 @@ source scripts/entorno.sh || { echo "arrancar: entorno.sh no pudo preparar el en
 falta=()
 command -v bash >/dev/null 2>&1 \
   || falta+=("no hay bash: el antivirus se llevo bash.exe; reinstala Git for Windows")
-for h in node ffmpeg ffprobe claude; do
+HERRAMIENTAS="node ffmpeg ffprobe"
+[ "${OFICIOS_POR_BASH:-1}" = "0" ] || HERRAMIENTAS="$HERRAMIENTAS claude"
+for h in $HERRAMIENTAS; do
   command -v "$h" >/dev/null 2>&1 || falta+=("no esta «$h» en el PATH")
 done
 [ -f whisper.cpp/whisper-cli.exe ] && [ -f whisper.cpp/ggml-medium.bin ] \
@@ -49,8 +60,8 @@ fi
 # La credencial, comprobada de verdad: `claude -p` contesta 0 aunque no tenga.
 # Y lo que contesta se dice tal cual: «no tiene sesion» y «limite de uso hasta
 # manana» piden cosas distintas, y el 18-10 el segundo se leyo como el primero.
-cli=$(claude -p ok --output-format json 2>/dev/null | _py "import json; d = json.loads(sys.stdin.read() or '{}'); print(d.get('result') or 'sin respuesta' if d.get('is_error', True) else '')" 2>/dev/null || echo "sin respuesta")
-case "$cli" in
+[ "${OFICIOS_POR_BASH:-1}" = "0" ] || cli=$(claude -p ok --output-format json 2>/dev/null | _py "import json; d = json.loads(sys.stdin.read() or '{}'); print(d.get('result') or 'sin respuesta' if d.get('is_error', True) else '')" 2>/dev/null || echo "sin respuesta")
+case "${cli:-}" in
   "") ;;
   *"Not logged in"*|*"sin respuesta"*)
     falta+=("el CLI de Claude no tiene sesion aqui ($cli). Lanzalo desde el panel Terminal de la app, dentro de Git Bash: & 'C:\Program Files\Git\bin\bash.exe' -lc 'cd \"$(pwd)\" && bash scripts/arrancar.sh $*'") ;;
@@ -63,4 +74,5 @@ if [ ${#falta[@]} -gt 0 ]; then
   exit 1
 fi
 echo "arrancar: todo en su sitio — disparador con $# pieza(s): $*"
+[ "${OFICIOS_POR_BASH:-1}" = "0" ]   && echo "arrancar: oficios por la sesion — la cola: python scripts/dominio/oficio.py $*"
 exec python scripts/disparador.py "$@" --hilos "$#"
