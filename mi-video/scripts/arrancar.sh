@@ -47,8 +47,15 @@ if [ -n "$sin" ]; then
   bash scripts/traer-brutos.sh || falta+=("no se pudieron traer de Drive: $sin")
 fi
 # La credencial, comprobada de verdad: `claude -p` contesta 0 aunque no tenga.
-_py "import servicio; sys.exit(0 if servicio._hay_cli() else 1)" \
-  || falta+=("el CLI de Claude no tiene sesion aqui. Lanzalo desde el panel Terminal de la app, dentro de Git Bash: & 'C:\Program Files\Git\bin\bash.exe' -lc 'cd \"$(pwd)\" && bash scripts/arrancar.sh $*'")
+# Y lo que contesta se dice tal cual: «no tiene sesion» y «limite de uso hasta
+# manana» piden cosas distintas, y el 18-10 el segundo se leyo como el primero.
+cli=$(claude -p ok --output-format json 2>/dev/null | _py "import json; d = json.loads(sys.stdin.read() or '{}'); print(d.get('result') or 'sin respuesta' if d.get('is_error', True) else '')" 2>/dev/null || echo "sin respuesta")
+case "$cli" in
+  "") ;;
+  *"Not logged in"*|*"sin respuesta"*)
+    falta+=("el CLI de Claude no tiene sesion aqui ($cli). Lanzalo desde el panel Terminal de la app, dentro de Git Bash: & 'C:\Program Files\Git\bin\bash.exe' -lc 'cd \"$(pwd)\" && bash scripts/arrancar.sh $*'") ;;
+  *) falta+=("el CLI de Claude contesta: $cli") ;;
+esac
 
 if [ ${#falta[@]} -gt 0 ]; then
   echo "arrancar: no se arranca, falta:"
