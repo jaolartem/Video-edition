@@ -556,6 +556,17 @@ for r in "${REELS[@]}"; do
     # descripcion mala guardada y nadie la volvia a pedir: reel-19 y reel-21
     # murieron aqui en cada vuelta del 16-10. El tiquet lleva la escena al
     # compositor y la ultima linea devuelve la pieza a componer (C-548).
+    #
+    # **Y a la segunda, error** (C-551). Sin tope, la vuelta al compositor no
+    # convergia: reel-19 y reel-21 pidieron describir 19 y 18 veces el 18-10,
+    # cada respuesta volvia a romper el montaje, y se agoto el limite de uso
+    # del CLI. Dos devoluciones por este motivo; a la tercera la pieza se queda
+    # aqui con el motivo, para Jaime.
+    VECES=$(PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); from dominio import ticket; print(sum(1 for t in ticket.historia(sys.argv[1]) if (t.get('dijo') or '').startswith('no se puede dibujar')))" "$(printf 'reel-%02d' "$n")" 2>/dev/null || echo 0)
+    if [ "${VECES:-0}" -ge 2 ]; then
+      echo "montar.sh: Reel-R$n ya volvio $VECES veces al compositor por lo mismo y sigue sin poder dibujarse; se queda aqui para Jaime: $ROMPE"
+      exit 1
+    fi
     PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); from dominio import ticket; ticket.abrir(sys.argv[1], 'no se puede dibujar: ' + sys.argv[2], vuelve_a='descrito')" "$(printf 'reel-%02d' "$n")" "$ROMPE" || true
     echo "volver_a: descrito — $ROMPE"
     exit 1
