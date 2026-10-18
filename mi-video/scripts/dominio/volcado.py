@@ -55,3 +55,24 @@ def _referencia(slug, prompt):
     """
     sha = hashlib.sha256(str(prompt).encode("utf-8")).hexdigest()[:12]
     return f"en {slug}.prompt.md, junto a este pedido (sha {sha})"
+
+
+def comun(nombre: str, contenido) -> str:
+    """Lo que es igual para todas las piezas, escrito una vez y nombrado (C-564).
+
+    Las instrucciones generales (76 KB) y el taller del disenador (100 KB) iban
+    copiados en cada pedido de cada pieza y cada paso: leidos cinco veces por
+    ronda para decir lo mismo. Aqui se escriben una vez, con su huella en el
+    nombre —si cambian, es otro fichero—, y el pedido lleva la ruta.
+    """
+    import os
+
+    plano = json.dumps(contenido, ensure_ascii=False, sort_keys=True, default=str)
+    sha = hashlib.sha256(plano.encode("utf-8")).hexdigest()[:12]
+    carpeta = os.path.join("work", "servicio", "_comun")
+    os.makedirs(carpeta, exist_ok=True)
+    ruta = os.path.join(carpeta, f"{nombre}.{sha}.json")
+    if not os.path.exists(ruta):
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(_volcar(contenido))
+    return os.path.abspath(ruta).replace("\\", "/")

@@ -78,7 +78,8 @@ from dominio.pieza import Pieza  # noqa: E402,F401
 
 
 def devuelve(pieza, marca: str, por_que: str,
-             atiende: str = "descrito") -> Resultado:
+             atiende: str = "descrito", etapa=None,
+             cierra_con=None) -> Resultado:
     """**Un «no» se le dice a quien lo arregla: es un tiquet.**
 
     Lo usan los dos oficios que pueden parar una pieza: `visto` —«no se
@@ -97,8 +98,10 @@ def devuelve(pieza, marca: str, por_que: str,
         atiende = "descrito"
     if not any((t.get("dijo") or "").startswith(marca)
                for t in ticket.abiertos(pieza.slug)):
-        ticket.abrir(pieza.slug, f"{marca} {por_que}", etapa="pieza",
-                     tipo="objecion", vuelve_a=atiende)
+        # **Con su etapa, si se sabe** (C-560): «pieza» abre todas las etapas.
+        ticket.abrir(pieza.slug, f"{marca} {por_que}",
+                     etapa=str(etapa) if etapa else "pieza",
+                     tipo="objecion", vuelve_a=atiende, cierra_con=cierra_con)
     return Resultado(False, motivo=f"{marca} {por_que}"[:300],
                      volver_a=antes_de(atiende), salida=por_que[:200])
 

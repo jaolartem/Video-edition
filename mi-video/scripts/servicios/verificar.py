@@ -127,11 +127,13 @@ def _devuelve_el_borde(pieza, motivo: str):
         return None
     m = re.search(r"corte de ([\d.]+)s", motivo)
     seg = float(m.group(1)) if m else None
-    atiende = "cosido"
+    atiende, beat = "cosido", None
     try:
         edl = json.load(open(os.path.join("ads", pieza.slug, "edl-sell.json"),
                              encoding="utf-8"))
         for (_a, b), d in zip(edl.get("segmentos", []), edl.get("detalle", [])):
+            if seg is not None and abs(b - seg) < 0.02:
+                beat = d.get("beat")
             if seg is not None and abs(b - seg) < 0.02 and d.get("fijado"):
                 # **Salvo que el sonido lo resuelva** (C-558): si hay hueco
                 # junto al borde, lo arregla el cosido sin pagar otra lectura.
@@ -146,4 +148,6 @@ def _devuelve_el_borde(pieza, motivo: str):
         pass
     paso, _, por_que = atiende.partition(" — ")
     texto = motivo.split(": ", 1)[-1] + (f" ({por_que})" if por_que else "")
-    return devuelve(pieza, SOBRE_LA_VOZ, texto, atiende=paso)
+    # Y se cierra midiendo el borde: `cierre.cierra_cortes_limpios` (C-560).
+    return devuelve(pieza, SOBRE_LA_VOZ, texto, atiende=paso, etapa=beat,
+                    cierra_con="bordes")

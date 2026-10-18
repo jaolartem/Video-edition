@@ -397,7 +397,7 @@ export const figurasCerradas = (kind, props) => {
  * lee del despacho y de cada componente —como `CONSTRUIDAS`— para que construir
  * la columna en uno lo saque de la falta sin tocar ninguna lista.
  */
-const DEJAN_SITIO = (() => {
+export const DEJAN_SITIO = (() => {
   const t = fs.readFileSync(`${DIR_C}/Tablero.tsx`, "utf8");
   const deja = new Set();
   for (const m of t.matchAll(/if \(([^{;]*?)\)\s*return <(\w+)/g)) {

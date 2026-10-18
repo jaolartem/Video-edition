@@ -57,6 +57,19 @@ class ServicioRevalidar(Servicio):
         filas = revalidar.dossier(pieza.slug)
         if not filas:
             return Resultado(False, motivo="el dossier sale vacio")
+        # **Se pregunta por los segmentos que cambiaron, no por la pieza**
+        # (C-561). Lo ya revalidado con el mismo texto no se vuelve a pagar, y
+        # un segmento aprobado no entra salvo que un tiquet lo nombre.
+        from dominio.alcance import Alcance
+        from dominio.memoria import Memoria
+
+        mem = Memoria("revalidar", pieza.slug)
+        pide = mem.cambiados(filas, CAMPOS,
+                             abiertas=Alcance.de(pieza.slug, "revalidado").etapas)
+        if not pide:
+            return Resultado(True, salida="ningun segmento cambio desde su"
+                                          " ultima revalidacion")
+        filas = [f for f in filas if int(f["beat"]) in pide]
         # **El bucle corre ANTES de preguntar, y su historial va en el pedido.**
         #
         # Jaime: *«luego el LLM hace lo mismo, pero recibiendo la info de la
@@ -83,7 +96,18 @@ class ServicioRevalidar(Servicio):
                 False,
                 motivo="espera veredicto -> "
                        + contrato.ruta_pedido("revalidar", pieza.slug))
-        return Resultado(True, salida=aplicar(pieza, r))
+        hecho = aplicar(pieza, r)
+        # Y se recuerda el segmento como queda DESPUES de aplicar: con la huella
+        # de antes, la vuelta siguiente preguntaria por su propio arreglo.
+        mem.guarda([f for f in revalidar.dossier(pieza.slug)
+                    if int(f["beat"]) in pide], CAMPOS)
+        return Resultado(True, salida=hecho)
+
+
+#: Lo que revalidar pregunta de un segmento: **lo que dice**. Un borde que se
+#: mueve unos milisegundos no cambia la pregunta; uno que se come una palabra
+#: ya cambia el texto. Lo demas del dossier es medida de apoyo (C-557, C-561).
+CAMPOS = ("beat", "texto")
 
 
 def aplicar(pieza: Pieza, veredictos) -> str:

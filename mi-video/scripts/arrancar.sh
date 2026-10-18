@@ -20,7 +20,7 @@ _py() { PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'script
 # **`--agentes`: los oficios los contesta la sesion, no el CLI por bash.**
 # Jaime, 18-10-2026: *«reemplaza la accion del bash con agentes tuyos y limita
 # el tope de tokens»*. Los pedidos quedan escritos y la sesion lanza un agente
-# por cada linea de `python scripts/dominio/oficio.py N…`, con el encargo de
+# por buzon con `python scripts/dominio/cola.py --lote N…`, con el encargo de
 # revision y su tope. Sin CLI no hace falta el panel Terminal (C-552).
 if [ "${1:-}" = "--agentes" ]; then
   shift
@@ -74,5 +74,7 @@ if [ ${#falta[@]} -gt 0 ]; then
   exit 1
 fi
 echo "arrancar: todo en su sitio — disparador con $# pieza(s): $*"
-[ "${OFICIOS_POR_BASH:-1}" = "0" ]   && echo "arrancar: oficios por la sesion — la cola: python scripts/dominio/oficio.py $*"
+[ "${OFICIOS_POR_BASH:-1}" = "0" ]   && echo "arrancar: oficios por la sesion — la cola: python scripts/dominio/cola.py --lote $*"
+# Y el reloj y los tokens de cada pieza, desde aqui (C-565).
+_py "from dominio import cola; cola.arranca(sys.argv[1:])" "$@"
 exec python scripts/disparador.py "$@" --hilos "$#"

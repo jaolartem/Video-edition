@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import basedatos  # noqa: E402
 from dominio.fase import CICLO  # noqa: E402
+from dominio import memoria as _memoria  # noqa: E402
 import entidades  # noqa: E402
 
 #: El DDL. Al lado de `esquema.sql`, que es donde se busca un `CREATE TABLE`.
@@ -477,6 +478,8 @@ def migrar():
     _version_guarda_el_montaje(con)
     _huella_del_corte(con)
     _segmento_con_etiqueta(con)
+    # Lo que cada paso ya pregunto, por segmento (C-561).
+    _memoria.crea(con)
     entidades._entidades_de_la_escena(con)
     entidades._camara_es_una_seleccion(con)
     entidades._tipo_escena_es_una_seleccion(con)

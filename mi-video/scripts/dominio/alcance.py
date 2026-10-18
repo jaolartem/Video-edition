@@ -129,9 +129,22 @@ class Alcance:
         if not self:
             return False
         try:
-            return self.toda_la_pieza or int(etapa) in self.etapas
+            if int(etapa) in self.etapas:
+                return True
         except (TypeError, ValueError):
             return False
+        # **Un tiquet de la pieza no reabre lo aprobado** (C-560). Jaime: se
+        # aprueba por segmento, y un segmento que cambia no hace releer la
+        # pieza. Abria todas las etapas: reel-22 pidio 10/10 al disenador por
+        # una «regla de plano» sin escena.
+        if not self.toda_la_pieza:
+            return False
+        try:
+            from . import segmento as _sg
+            return not any(x.n == int(etapa) and x.aprobado
+                           for x in _sg.Segmento.de(self.slug))
+        except Exception:                          # noqa: BLE001
+            return True
 
     def sobre(self, prompt: str, payload: dict) -> tuple:
         """Pone el alcance encima del contrato: `(prompt, payload)`.

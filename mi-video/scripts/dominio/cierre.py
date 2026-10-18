@@ -105,3 +105,57 @@ def cierra_los_suyos(slug: str, fase: str = "cosido") -> list:
             print(f"  el tiquet #{t['id']} no se pudo cerrar:"
                   f" {type(e).__name__}: {e}", flush=True)
     return cerrados
+
+
+#: La marca de los tiquets que abre la puerta por un corte sobre la voz. La
+#: escribe `servicios/verificar.py :: SOBRE_LA_VOZ`; aqui se cierran.
+SOBRE_LA_VOZ = "corte sobre la voz:"
+
+
+def cierra_cortes_limpios(slug: str) -> list:
+    """Cierra los «corte sobre la voz» cuyo borde ya calla. Los cerrados.
+
+    **El empalme no sirve aqui** (C-560): un corte arreglado sigue siendo una
+    frontera de escena, asi que `hay_empalme` lo daria por abierto siempre, y
+    el tiquet trababa la pieza con `vencidas` en cuanto pasaba su paso —reel-22,
+    #632, 18-10—. Lo que el tiquet nombra es un borde en la cinta; se mira si
+    ese borde, o el que lo sustituye a menos de medio segundo, ya no suena.
+    """
+    import re
+
+    from . import ticket as _t
+    from .bordes import VOZ
+    from .senal import Senal
+
+    try:
+        edl = json.load(open(os.path.join("ads", slug, "edl-sell.json"),
+                             encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    fines = [(b, d.get("toma")) for (_a, b, *_r), d
+             in zip(edl.get("segmentos", []), edl.get("detalle", []))]
+    cerrados = []
+    for t in _t.abiertos(slug):
+        dijo = t.get("dijo") or ""
+        m = re.search(r"corte de ([\d.]+)s", dijo)
+        if not dijo.startswith(SOBRE_LA_VOZ) or not m:
+            continue
+        seg = float(m.group(1))
+        cerca = [(abs(b - seg), b, toma) for b, toma in fines if abs(b - seg) <= 0.5]
+        if cerca:
+            _d, b, toma = min(cerca)
+            try:
+                if not toma or Senal(toma).suena(b) > VOZ:
+                    continue
+            except Exception:                      # noqa: BLE001
+                continue
+            como = f"el borde esta ahora en {b:.3f} y alli ya no suena la voz"
+        else:
+            como = "ese corte ya no existe en el montaje"
+        try:
+            _t.contestar(int(t["id"]), f"medido sobre el EDL de hoy: {como}.",
+                         "arreglado", "la linea", "bordes")
+            cerrados.append(int(t["id"]))
+        except Exception as e:                     # noqa: BLE001
+            print(f"  el tiquet #{t['id']} no se pudo cerrar: {e}", flush=True)
+    return cerrados

@@ -210,3 +210,19 @@ def todas():
         "select * from instruccion order by estado, veces desc, id")]
     cx.close()
     return filas
+
+
+def por_ambito(todas):
+    """Las de la pieza en el pedido; las de todo el lote, por referencia (C-564).
+
+    Son 114 de 118 renglones identicos en cada pedido de cada pieza: se leen
+    una vez por ronda desde `work/servicio/_comun/`, no una por pedido.
+    """
+    from .volcado import _en_renglones, comun
+
+    if not isinstance(todas, list):
+        return todas
+    lote = [i for i in todas if isinstance(i, dict) and i.get("ambito") == "lote"]
+    suyas = [i for i in todas if i not in lote]
+    return {"de_todo_el_lote": comun("instrucciones", _en_renglones(lote)),
+            "de_esta_pieza": _en_renglones(suyas)}

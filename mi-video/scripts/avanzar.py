@@ -172,8 +172,8 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         # Se mide, no se supone: `dominio/cierre.py` mira si en el segundo que el
         # tiquet señala queda empalme. Si sigue habiendo, no se cierra.
         try:
-            from dominio.cierre import cierra_los_suyos
-            for i in cierra_los_suyos(pieza.slug):
+            from dominio.cierre import cierra_cortes_limpios, cierra_los_suyos
+            for i in cierra_los_suyos(pieza.slug) + cierra_cortes_limpios(pieza.slug):
                 print(f"  {pieza.slug}: cerrado #{i} por su medida (bordes)")
         except Exception:                          # noqa: BLE001
             pass

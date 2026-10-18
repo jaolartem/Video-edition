@@ -48,7 +48,10 @@ export function dejaPedido(paso, slug, prompt, datos) {
   fs.writeFileSync(`${RAIZ}/${paso}/${slug}.prompt.md`, String(prompt ?? ""));
   fs.writeFileSync(
     rutaPedido(paso, slug),
-    JSON.stringify({ paso, slug, prompt, ...contexto(paso, slug), datos }, null, 1),
+    // El contrato va por referencia, como en `servicio.py` (C-550, C-563):
+    // dentro del JSON se leia dos veces.
+    JSON.stringify({ paso, slug, prompt: `en ${slug}.prompt.md, junto a este pedido`,
+                     ...contexto(paso, slug), datos }, null, 1),
   );
 }
 
@@ -62,11 +65,14 @@ export function dejaPedido(paso, slug, prompt, datos) {
  */
 function contexto(paso, slug) {
   try {
+    // **La ultima linea, no toda la salida** (C-563): un `registro.aviso`
+    // imprime antes por stdout, el JSON no parseaba y el catch dejaba el pedido
+    // de describir sin instrucciones, tiquets ni precio desde el 16-10.
     return JSON.parse(execFileSync("python", ["-c",
       "import sys,json;sys.path.insert(0,'scripts');import servicio;"
       + "print(json.dumps(servicio.contexto(sys.argv[1],sys.argv[2]),ensure_ascii=False))",
       paso, slug], { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-      maxBuffer: 64 * 1024 * 1024 }));
+      maxBuffer: 64 * 1024 * 1024 }).trim().split("\n").pop());
   } catch {
     return { marcador: marcador(slug) };
   }

@@ -291,7 +291,8 @@ def contexto(paso, slug):
              # **Lo que Jaime ya dijo, para que no tenga que decirlo otra vez.**
              # Guardarlo y no llevarlo al paso que debe obedecerlo es
              # archivarlo. Ver `dominio/instruccion.py`.
-             "instrucciones_de_jaime": _en_renglones(_instrucciones(paso, slug)),
+             "instrucciones_de_jaime": _instruccion.por_ambito(
+                 _instrucciones(paso, slug)),
              # **El precio vigente, en TODOS los pasos.** Llegaba solo a
              # `repaso`, y los que no lo tenian dedujeron la ventana de las
              # fechas de `datos_respaldados` — y se quedaron con la fila del
@@ -324,7 +325,8 @@ def contexto(paso, slug):
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 
-from dominio.volcado import _en_renglones, _referencia, _volcar  # noqa: E402  C-550
+from dominio import instruccion as _instruccion  # noqa: E402  C-564
+from dominio.volcado import _referencia, _volcar  # noqa: E402  C-550
 
 
 def _prompt_aparte(paso, slug, prompt):

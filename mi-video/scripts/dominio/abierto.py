@@ -227,7 +227,12 @@ def etapa_de(texto):
     """
     import re
 
-    m = re.search(r"\b(?:e|etapa\s*|beat\s*)(\d{1,2})\b", (texto or "").lower())
+    t = (texto or "").lower()
+    m = re.search(r"\b(?:e|b|etapa\s*|beat\s*)(\d{1,2})\b", t)
+    # **Y las dos formas que escribe la propia maquina** (C-560): «b7» en la
+    # regla de plano y «etapas [4]» en la puerta. Sin ellas el tiquet contaba
+    # como de la pieza entera y abria todas las etapas, aprobadas incluidas.
+    m = m or re.search(r"etapas?\s*\[(\d{1,2})", t)
     return int(m.group(1)) if m else None
 
 

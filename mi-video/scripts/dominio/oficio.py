@@ -114,8 +114,8 @@ ENCARGO = (
 REVISION = (
     " Es una REVISION de lo que el codigo ya hizo, no una composicion desde"
     " cero. Lee el contrato y el pedido una sola vez cada uno, mas los"
-    " fotogramas que el pedido senale; no abras otros ficheros, no busques, no"
-    " ejecutes nada. Si lo hecho cumple, contesta lo minimo que el contrato"
+    " fotogramas que el pedido senale y los ficheros de `_comun` que nombre"
+    " (se leen una vez); no abras otros ficheros, no busques, no ejecutes nada. Si lo hecho cumple, contesta lo minimo que el contrato"
     " admite y cambia solo lo que no cumple. Tope: {lecturas} lecturas y una"
     " escritura; si no basta, dilo en la respuesta y para."
 )
@@ -305,33 +305,5 @@ class Oficio:
         return f"{self.nombre} ({self.buzon})"
 
 
-def cola(piezas=None):
-    """Los pedidos abiertos, con su oficio y su encargo de revision. C-552.
-
-        python scripts/dominio/oficio.py 18 19 20 21 22
-
-    Una linea por pedido —`oficio<TAB>buzon<TAB>pieza<TAB>encargo`— para que
-    la sesion lance un agente por cada una sin componer el encargo a mano.
-    """
-    import sys
-
-    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if raiz not in sys.path:
-        sys.path.insert(0, raiz)
-    import servicio
-
-    quiere = {f"reel-{int(n):02d}" for n in (piezas or [])}
-    for buzon, slug, ruta in servicio.pendientes():
-        if DE.get(buzon) and (not quiere or slug in quiere):
-            yield _linea(Oficio(DE[buzon], buzon, ruta), slug)
-
-
-def _linea(o, slug):
-    return f"{o.nombre}	{o.buzon}	{slug}	{o.encargo(sesion=True)}"
-
-
-if __name__ == "__main__":
-    import sys
-
-    for linea in cola(sys.argv[1:]):
-        print(linea)
+# **La cola de la sesion vive en `dominio/cola.py`** (C-564): por pedido o
+# en lote por buzon. Aqui queda quien contesta, no cuantos esperan.

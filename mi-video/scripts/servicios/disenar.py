@@ -40,6 +40,7 @@ import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from dominio import dibujable as _dib  # noqa: E402  C-562
 
 from contrato.marca import ENTRADA_GANCHO, ESTILO, PRIORIDAD  # noqa: E402,F401
 
@@ -288,11 +289,11 @@ class ServicioDisenar(Servicio):
         # **Si la pieza muestra su cara en todo tablero** (T-06): el prop
         # `cara: "siempre"` del marco. Sin esto el diseñador compondría a pleno
         # sin él y la línea se lo pararía después, cuando ya no puede corregir.
-        from dominio.libreto import Libreto
-        cara = Libreto(pieza.n).frame().get("cara") == "siempre"
         payload = {
             "pieza": pieza.slug,
-            "cara_en_todo_tablero": cara,
+            # Y las formas que a pleno le dejan la columna (C-562): con su cara
+            # en todo tablero, una forma de fuera va en `cubre: panel` o `banda`.
+            **_dib.de_la_pieza(pieza),
             "mira_estos_fotogramas": mirar,
             # **Y como suena cada corte.** Jaime, 7-9-2026: *«ambos que vean y
             # oigan; con eso el compositor sabe si estoy leyendo en una toma»*.
@@ -378,6 +379,10 @@ class ServicioDisenar(Servicio):
         # **El contrato tiene dos capas y esta es la segunda.** Las
         # capacidades no cambian —son lo que sabe hacer—; lo que cambia es el
         # encargo. El porque, con sus palabras, vive en `dominio/abierto.py`.
+        # **El taller es igual para todas las piezas: va por referencia**
+        # (C-564). Eran 100 KB en cada pedido, leidos una vez por pieza; ahora
+        # se escriben una vez en `_comun/` y el lote los lee una vez por ronda.
+        payload["taller"] = _dib.taller(payload)
         prompt, payload = _abierto.modo(prompt, payload, pieza.slug, "disenado")
         r = contrato.pedir("disenar", pieza.slug, prompt, payload)
         if r is None:
@@ -425,6 +430,12 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
                    " fotogramas de cada escena ANTES de aprobar y decir que se"
                    " vio — letras que no se leen, colores que no se ven,"
                    " composicion rota. Es parte del proceso, no un extra.")
+    # **Lo que no se puede dibujar vuelve ahora, no al montar** (C-562). Es la
+    # misma regla que `rompe` (`formas.revisarTablero` + `sinSujeto`); dicha
+    # tres pasos tarde costo 18 vueltas a reel-19 y reel-21 el 18-10.
+    vuelta = _dib.puerta(pieza, tableros)
+    if vuelta:
+        return vuelta
     if veredicto == "rota":
         # **Y la escena vuelve a quien la decide** (C-387). Jaime, 11-9-2026:
         # *«lo que el compositor decide es la escena; si la escena no cuadra y el
@@ -686,3 +697,4 @@ def _en_la_pista(slug: str) -> dict:
     33: manda la que se renderiza.
     """
     return {b: [a, z] for b, (a, z) in _remate.ventanas(slug).items()}
+
