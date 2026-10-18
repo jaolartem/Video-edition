@@ -88,12 +88,17 @@ def _anota(pieza, motivo: str) -> None:
         if any((t.get("dijo") or "").startswith(texto[:60])
                for t in tk.abiertos(pieza.slug)):
             return
+        # **Un aviso es un `dato`: se ve y no para** (C-559). La puerta ya
+        # decidio que no bloquea; como `objecion` iba al disenador, y abierto
+        # con su paso detras la pieza se quedaba trabada por lo que la propia
+        # puerta dejo pasar —reel-20, 18-10, con «"barata y" dos veces»—. Lo
+        # que si bloquea va por `_devuelve_el_borde`, con su paso y su tope.
         try:
-            tk.abrir(pieza.slug, texto, None, "objecion")
+            tk.abrir(pieza.slug, texto, None, "dato", vuelve_a="")
         except tk.SinEscena:
             # **Sin escena nombrada, es de la pieza** (C-555): «1 corte(s)…» o
             # «b1: regla de plano» no dicen `eN`, y el aviso se perdia entero.
-            tk.abrir(pieza.slug, texto, None, "objecion", etapa="pieza")
+            tk.abrir(pieza.slug, texto, None, "dato", vuelve_a="", etapa="pieza")
     except Exception:                              # noqa: BLE001
         import registro
 
