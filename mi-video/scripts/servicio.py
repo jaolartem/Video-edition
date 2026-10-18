@@ -291,7 +291,7 @@ def contexto(paso, slug):
              # **Lo que Jaime ya dijo, para que no tenga que decirlo otra vez.**
              # Guardarlo y no llevarlo al paso que debe obedecerlo es
              # archivarlo. Ver `dominio/instruccion.py`.
-             "instrucciones_de_jaime": _instrucciones(paso, slug),
+             "instrucciones_de_jaime": _en_renglones(_instrucciones(paso, slug)),
              # **El precio vigente, en TODOS los pasos.** Llegaba solo a
              # `repaso`, y los que no lo tenian dedujeron la ventana de las
              # fechas de `datos_respaldados` — y se quedaron con la fila del
@@ -322,6 +322,9 @@ def contexto(paso, slug):
              # estaba vacio en las siete piezas. Declarado y no implementado.
              "marcador": _marcador(slug)}
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
+
+
+from dominio.volcado import _en_renglones, _referencia, _volcar  # noqa: E402  C-550
 
 
 def _prompt_aparte(paso, slug, prompt):
@@ -381,9 +384,9 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # del JSON es una sola línea de 46.000 caracteres y quien contesta la leía
     # cortada a mitad del formato de respuesta (reel-08, reel-17, 12-9, C-445).
     _prompt_aparte(paso, slug, prompt)
-    nuevo = json.dumps({"paso": paso, "slug": slug, "prompt": prompt,
-                        **comun, "datos": payload},
-                       ensure_ascii=False, indent=1)
+    nuevo = _volcar({"paso": paso, "slug": slug,
+                     "prompt": _referencia(slug, prompt),
+                     **comun, "datos": payload})
     # **Y hay campos que cambian sin que cambie la pregunta.** `vuelta` cuenta
     # cuantas veces ha pasado la pieza por aqui, asi que sube cada vez que se
     # archiva un par — y con eso el pedido nunca era identico a si mismo, su
@@ -509,6 +512,10 @@ def pedir(paso, slug, prompt, payload, cli=True):
             d["datos"] = {k: v for k, v in d["datos"].items() if _cuenta(k)}
         for k in VOLATILES:
             d.pop(k, None)
+        # El contrato se compara por su huella: un pedido escrito antes de
+        # C-550 lo traia entero y no por eso es otra pregunta.
+        if "prompt" in d and not str(d["prompt"]).startswith("en "):
+            d["prompt"] = _referencia(d.get("slug"), d["prompt"])
         return json.dumps(d, ensure_ascii=False, sort_keys=True)
 
     try:

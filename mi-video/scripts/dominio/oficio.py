@@ -100,9 +100,9 @@ POR_BASH = os.environ.get("OFICIOS_POR_BASH", "1") not in ("0", "", "no")
 #: del pedido —`prompt` es su contrato— y esto sólo dice qué fichero leer y en
 #: cuál escribir. Improvisar aquí sería un segundo contrato.
 ENCARGO = (
-    "Tu turno. Lee entero el pedido {pedido} —`prompt` es tu contrato completo y"
-    " `datos` el encargo— y escribe tu respuesta en {respuesta}, con la forma que"
-    " ese `prompt` define. Si el pedido no basta para contestar, se dice en la"
+    "Tu turno. Lee entero tu contrato {contrato} y el pedido {pedido} —`datos`"
+    " es el encargo— y escribe tu respuesta en {respuesta}, con la forma que"
+    " ese contrato define. Si el pedido no basta para contestar, se dice en la"
     " respuesta; no se va a buscar fuera."
 )
 
@@ -219,6 +219,8 @@ class Oficio:
             # respuesta, en todas las llamadas del 17 y el 18-10 (C-549).
             "--disallowedTools", "Agent Task", "-p",
             ENCARGO.format(pedido=os.path.abspath(self.pedido),
+                           contrato=os.path.abspath(self.pedido).replace(
+                               ".pedido.json", ".prompt.md"),
                            respuesta=os.path.abspath(self.respuesta))]
         with subprocess.Popen(orden, cwd=CASA, stdin=subprocess.DEVNULL,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
