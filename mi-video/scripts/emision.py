@@ -7,14 +7,23 @@ concreta»*. Así que cada medida se parte por las escenas del plan
 (`fotogramas.escenas`) y cada fallo sale con su escena, su etapa y la fase que
 lo arregla:
 
-    sonoridad  −14 ±1,5 LUFS (`suena.OBJETIVO_LUFS`)    cosido; nivelado si es toda la pieza
-    pico       ≤ −1 dBTP (`suena.PICO_MAX`)              nivelado
+    sonoridad  la pieza: −14 ±1,5 LUFS integrados        nivelado
+    pico       la pieza: ≤ −1 dBTP (`suena.PICO_MAX`)    nivelado
+    nivel      la escena a más de 4 LU de la pieza       sólo avisa: lo ve el visto
     silencio   ≤ `suena.AIRE_MAX`                         cosido
     negro      > 0,5 s (`blackdetect`)                    cortado
     congelado  > 0,5 s (`freezedetect`)                   cortado
     lectura    tablero, panel o recorte más corto que
                lo que cuesta leerlo (`lectura.json`)      disenado
     formato    1080×1920, 30 fps, duración del spec ±0,1 s   montado (escena 0: la pieza)
+
+**El nivel por escena avisa, no devuelve.** Con ±1,5 LUFS por escena, reel-21
+abría tres tiquets a `cosido`: el gancho a −19,0, que sí se oye, y dos escenas a
+−12,0 y −12,2, que son una voz variando. `cosido` mueve bordes y no cambia
+niveles, así que la escena daba la vuelta entera para acabar igual; y el nivel
+por escena lo iguala la voz limpia tras aprobar (#91). Lo que se separa más de
+`SEPARA_LU` de la pieza va al documento, con cuánto y hacia dónde, y lo decide
+quien lo mira.
 
 **Una pasada.** La imagen se lee en la misma de `suena` (`suena.traza`): los
 filtros miden y dejan pasar, y el render ya se decodificaba entero para oírlo.
@@ -49,6 +58,8 @@ from dominio.documento import CAPAS, Documento  # noqa: E402
 FPS = 30
 ANCHO, ALTO = 1080, 1920
 HOLGURA_LUFS = 1.5
+#: Lo que una escena se puede separar de la integrada de su pieza sin avisar.
+SEPARA_LU = 4.0
 HOLGURA_DURA = 0.1
 #: Negro o imagen quieta más larga que esto es un hueco en la emisión.
 QUIETO_MAX = 0.5
@@ -63,11 +74,14 @@ _BLOQUE = re.compile(r"t:\s*([\d.]+)\s+TARGET:\S+ LUFS\s+M:\s*(-?[\d.]+)"
 
 @dataclass(frozen=True)
 class Alerta:
-    """Un fallo de emisión: qué regla, quién lo arregla y en qué segundo."""
+    """Un fallo de emisión: qué regla, quién lo arregla y en qué segundo.
+
+    `puerta=False` es un aviso: va al documento y no abre tiquet."""
     regla: str
     quien: str
     dice: str
     en: float | None = None
+    puerta: bool = True
 
 
 def integrada(ms) -> float | None:
@@ -113,7 +127,8 @@ class Emision:
         plan = f"work/scenes/{self.slug}/plan-full.json"
         st = [(os.path.getsize(f), os.path.getmtime(f)) if f and os.path.exists(f)
               else None for f in (self.mp4, plan, "src/brand/lectura.json")]
-        varas = (suena.OBJETIVO_LUFS, suena.PICO_MAX, suena.AIRE_MAX, IMAGEN, HOLGURA_LUFS)
+        varas = (suena.OBJETIVO_LUFS, suena.PICO_MAX, suena.AIRE_MAX, IMAGEN, HOLGURA_LUFS,
+                 SEPARA_LU)
         return hashlib.sha1(json.dumps([self.mp4, st, varas, self.spec], sort_keys=True,
                                        default=str).encode()).hexdigest()[:16]
 
@@ -172,9 +187,13 @@ class Emision:
         global_ = {**suena.onda(t), **f}
         parte[0].update(hasta=f["dura"], medido={**parte[0]["medido"], **global_})
         fallos[0] += self._pieza(f)
-        toda = global_.get("sonoridad")
-        nivel = "nivelado" if toda is not None and abs(toda - suena.OBJETIVO_LUFS) > HOLGURA_LUFS \
-            else "cosido"
+        toda, pico = global_.get("sonoridad"), global_.get("pico_real")
+        if toda is not None and abs(toda - suena.OBJETIVO_LUFS) > HOLGURA_LUFS:
+            fallos[0].append(Alerta("sonoridad", "nivelado", f"{toda} LUFS integrados, fuera"
+                                    f" de {suena.OBJETIVO_LUFS:.0f} ±{HOLGURA_LUFS}"))
+        if pico is not None and pico > suena.PICO_MAX:
+            fallos[0].append(Alerta("pico", "nivelado", f"pico {pico} dBTP, por encima"
+                                    f" de {suena.PICO_MAX:.0f}"))
         bloques = [(float(a), float(m), max(float(x) for x in pk.split()))
                    for a, m, pk in _BLOQUE.findall(t)]
         for e in self.escenas:
@@ -183,12 +202,11 @@ class Emision:
             lufs = integrada([m for _, m, _ in dentro])
             pico = max((p for *_, p in dentro), default=None)
             parte[e["n"]]["medido"].update(lufs=lufs, pico=pico)
-            if lufs is not None and abs(lufs - suena.OBJETIVO_LUFS) > HOLGURA_LUFS:
-                fallos[e["n"]].append(Alerta("sonoridad", nivel, f"{lufs} LUFS, fuera de"
-                                             f" {suena.OBJETIVO_LUFS:.0f} ±{HOLGURA_LUFS}", e["desde"]))
-            if pico is not None and pico > suena.PICO_MAX:
-                fallos[e["n"]].append(Alerta("pico", "nivelado", f"pico {pico} dBTP, por"
-                                             f" encima de {suena.PICO_MAX:.0f}", e["desde"]))
+            if lufs is not None and toda is not None and abs(lufs - toda) > SEPARA_LU:
+                fallos[e["n"]].append(Alerta(
+                    "nivel", "visto", f"{abs(lufs - toda):.1f} LU por"
+                    f" {'debajo' if lufs < toda else 'encima'} de la pieza ({lufs} frente a"
+                    f" {toda} LUFS)", round(e["desde"], 1), puerta=False))
         negro = _tramos(t, "black_start", "black_end", f["dura"])
         quieto = [q for q in _tramos(t, "freeze_start", "freeze_end", f["dura"])
                   if not any(a - 0.1 <= q[0] and q[1] <= b + 0.1 for a, b in negro)]
@@ -211,7 +229,8 @@ def _juntas(alertas) -> list:
     por = {}
     for a in alertas:
         y = por.get(a.regla)
-        por[a.regla] = a if y is None else Alerta(a.regla, y.quien, f"{y.dice}; {a.dice}", y.en)
+        por[a.regla] = a if y is None else Alerta(a.regla, y.quien, f"{y.dice}; {a.dice}",
+                                                  y.en, y.puerta)
     return list(por.values())
 
 
@@ -250,7 +269,8 @@ def atender(n) -> tuple[list, str | None]:
     from dominio.fase import camino
 
     slug, parte = f"reel-{int(n):02d}", por_escena(n)
-    fallos = [(k, d, a) for k, d in parte.items() for a in d["alertas"]]
+    fallos = [(k, d, a) for k, d in parte.items() for a in d["alertas"]
+              if a.get("puerta", True)]
     suyos = [t for t in ticket.abiertos(slug) if (t.get("dijo") or "").startswith(MARCA)]
     claves = {_clave(k, a["regla"]) for k, _, a in fallos}
     dicho, vuelven, siguen = [], [], []
@@ -306,20 +326,23 @@ def main():
     ap.add_argument("--atender", action="store_true",
                     help="abre un tiquet por fallo; sin esto, sólo mira")
     a = ap.parse_args()
-    mal, ultima = 0, None
+    mal, avisos, ultima = 0, 0, None
     for n in a.reels:
         parte = por_escena(n)
         print(f"\nreel-{n:02d}  {parte[0]['medido'].get('render') or 'sin render'}")
         for k in sorted(parte):
             print(_linea(k, parte[k]))
             for x in parte[k]["alertas"]:
-                mal += 1
-                print(f"      · {x['regla']}: {x['dice']} -> {x['quien']}")
+                para = x.get("puerta", True)
+                mal, avisos = mal + para, avisos + (not para)
+                print(f"      {'·' if para else '~'} {x['regla']}: {x['dice']} ->"
+                      f" {x['quien'] if para else 'aviso, sin tiquet'}")
         if a.atender:
             dicho, ultima = atender(n)
             for x in dicho:
                 print(x)
-    print(f"\n{mal} fallo(s) de emisión" if mal else "\npasa el control de emisión")
+    print((f"\n{mal} fallo(s) de emisión" if mal else "\npasa el control de emisión")
+          + (f" · {avisos} aviso(s) para el visto" if avisos else ""))
     if ultima:
         print(ultima)
     sys.exit(1 if mal else 0)
