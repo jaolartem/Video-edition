@@ -110,7 +110,10 @@ def transcribir(mp4, wav, base):
         # Whisper mete comillas donde no las hay: en el reel 1 salio
         # «le queda lo que deberia"» con una comilla suelta al final. En un
         # subtitulo quemado eso no se puede corregir despues.
+        # «>>» es la marca de cambio de hablante de whisper, no texto (C-580):
+        # reel-19 salio con «¿usted sabe>> ¿Cuánta plata…» en pantalla.
         t = t.replace('"', "").replace("“", "").replace("”", "")
+        t = t.replace(">>", "").replace("<<", "").strip()
         if not t:
             continue
         off = s["offsets"]
