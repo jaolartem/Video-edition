@@ -296,7 +296,10 @@ def atender(n) -> tuple[list, str | None]:
     for k, d, a in fallos:
         clave = _clave(k, a["regla"])
         ya = next((t for t in suyos if t["dijo"].split(" — ")[0] == clave), None)
-        if ya and ya.get("devuelto"):
+        # **Y si alguien lo encaminó a otra fase, manda esa** (C-602): reel-18,
+        # 19-10, el #725 (firma de 0,76 s) se mandó a `revisado` para Jaime y
+        # esto devolvía la pieza a `disenado` cada medio minuto, en bucle.
+        if ya and (ya.get("devuelto") or (ya.get("vuelve_a") or "") != a["quien"]):
             siguen.append(f"#{ya['id']} {clave}")
             continue
         i = ticket.abrir(slug, f"{clave} — {a['dice']}", segundo=a["en"],
