@@ -497,8 +497,11 @@ def revisar(slug):
     tablero = {d.get("beat") for d in (edl.get("sin_toma") or [])}
     # La firma es corta por definicion —el libreto dice «Soy Jaime Olarte.»,
     # tres palabras— y paraba reel-20 por no llegar a cuatro (C-573).
-    firmas = {d.get("beat") for d in edl["detalle"]
-              if "firma" in str(d.get("etapa") or "").lower()}
+    # Y el gancho tambien (C-592): compite contra el pulgar y lleva su rotulo.
+    # reel-18 e1 decia «tengo miedo, harto.» con «A MI TAMBIEN ME DA MIEDO.»
+    # encima, y esto la paraba por tres palabras una vuelta tras otra.
+    firmas = {d.get("beat") for d in edl["detalle"] if d.get("trato") == "portada"
+              or "firma" in str(d.get("etapa") or "").lower()}
     for b, t in sorted(dice.items()):
         if len(t.split()) < 4 and b not in firmas:
             mal.append(f"{slug} e{b}: dice «{t}» — no llega a una idea")
