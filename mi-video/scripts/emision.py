@@ -154,10 +154,15 @@ class Emision:
         # La entrega lleva las pausas del compas y la cola de la mezcla, igual
         # que en `version.cuadra_con_el_json` (C-597): sin ellas, reel-18 volvia
         # a `montado` con 53,80 s contra un spec de 53,13 y un render de 53,18.
+        # Y con el mismo margen relativo que `version` (C-601): el codificador
+        # rellena hasta el cuadro siguiente, y reel-18 salio 0,73 s sobre un
+        # spec de 61,27 con 0,60 de cola: 0,03 por encima de 0,1 fijo.
         import cama
         import compas
+        from dominio.version import MARGEN
         slug = str(self.spec.get("video") or "").replace(".mp4", "")
-        if abs(f["dura"] - f["spec"] - compas.total(slug)) > HOLGURA_DURA + cama.cola(slug):
+        debe = f["spec"] + compas.total(slug)
+        if abs(f["dura"] - debe) > max(HOLGURA_DURA, debe * MARGEN) + cama.cola(slug):
             mal.append(f"dura {f['dura']:.2f} s y el spec {f['spec']:.2f} s")
         return [Alerta("formato", "montado", "; ".join(mal))] if mal else []
 
