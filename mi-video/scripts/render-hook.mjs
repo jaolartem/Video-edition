@@ -17,6 +17,7 @@
  */
 import { execFileSync } from "child_process";
 import fs from "fs";
+import { createHash } from "crypto";
 import path from "path";
 
 const arg = (n, d) => {
@@ -212,11 +213,10 @@ const tmp = path.join(
   "work",
   "seg-" + path.basename(out).replace(/\.\w+$/, ""),
 );
-try {
-  fs.rmSync(tmp, { recursive: true, force: true });
-} catch (e) {
-  console.error(`  ojo: no se pudo limpiar ${tmp} (${e.code}); se reutiliza`);
-}
+// **La carpeta ya no se borra: cada trozo es una escena con su huella** (C-567).
+// Re-cortar el 4K de las 29 escenas porque cambio una costaba ~65 s por montaje;
+// un trozo cuyos parametros no cambiaron se reutiliza, y al final se quitan los
+// que ya no salen en la lista.
 fs.mkdirSync(tmp, { recursive: true });
 fs.mkdirSync(path.dirname(out), { recursive: true });
 
@@ -227,8 +227,12 @@ console.error(
 );
 
 const trozos = [];
+let reutilizados = 0;
 escenas.forEach((e, i) => {
-  const f = path.join(tmp, `s${String(i).padStart(3, "0")}.mp4`);
+  const clave = createHash("sha1").update(JSON.stringify([fuenteDe(e), e.origen_desde,
+    e.duracion, filtroDe(e), pausaDe(e), DECODE, ENCODE])).digest("hex").slice(0, 16);
+  const f = path.join(tmp, `${clave}.mp4`);
+  if (fs.existsSync(f)) { trozos.push(f); reutilizados += 1; return; }
   const z = e.zoom ? `  zoom a ${e.zoom.hasta}` : "";
   console.error(
     `  ${e.indice} ${e.encuadre.padEnd(12)} ${e.duracion.toFixed(1)}s${z}`,
@@ -281,6 +285,12 @@ escenas.forEach((e, i) => {
 });
 
 // Se unen sin recodificar: los trozos salieron con los mismos parametros.
+for (const viejo of fs.readdirSync(tmp)) {
+  if (viejo.endsWith(".mp4") && !trozos.includes(path.join(tmp, viejo))) {
+    fs.rmSync(path.join(tmp, viejo), { force: true });
+  }
+}
+if (reutilizados) console.error(`  ${reutilizados} escena(s) sin cambios: se reutilizan`);
 const lista = path.join(tmp, "lista.txt");
 fs.writeFileSync(
   lista,

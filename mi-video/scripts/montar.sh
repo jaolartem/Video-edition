@@ -344,7 +344,10 @@ for r in "${PIEZAS_CORTE[@]}"; do
   # Va antes del `if` de abajo a proposito: edita el EDL, asi que al tocarlo deja
   # el plan viejo y la propia comparacion de fechas lo regenera. Al reves se
   # cortaria con el plan de antes del cosido.
-  PYTHONIOENCODING=utf-8 python scripts/costuras.py "$((10#$r))" 2>&1 | grep -vE ": 0 " || true
+  # **Y ya no se cose aqui otra vez** (C-567). El cosido es su fase (`cosido`,
+  # `costuras.py {n}`) y lo que deja ya lo vio la puerta; volver a coser dentro
+  # del montaje reescribia el EDL, caducaba el plan y re-cortaba el 4K de todas
+  # las escenas en cada montaje.
   # **Si el EDL cambio, el plan esta viejo.** El corte no lee el EDL: lee
   # `plan-full.json`, que `plan-reel.mjs` derivo de el en su dia. Asi que editar
   # el EDL —anadir un cierre, recortar una entrada— **no cambiaba nada y no lo
@@ -416,7 +419,11 @@ for r in "${PIEZAS_CORTE[@]}"; do
   if _hay_que trasfondo "$((10#$r))"; then
     PYTHONIOENCODING=utf-8 python scripts/dominio/trasfondo.py "$((10#$r))" 2>&1 | tail -1
   fi
-  python scripts/subtitular.py "$r"
+  # Sólo si el corte de ESTA pieza cambio (C-567): corria siempre, con whisper
+  # sobre la pieza entera.
+  if _hay_que subtitulos "$((10#$r))"; then
+    python scripts/subtitular.py "$r"
+  fi
   # **Y el subtitulo, cruzado con el libreto. Aqui, no cuando alguien se acuerde.**
   #
   # Pregunta de Jaime sobre el cc de reel-05: *«"una futura situacion gratuita"

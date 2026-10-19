@@ -405,12 +405,32 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
 // La huella no adivina: es el sha1 de lo que el render va a dibujar. Si el
 // fichero renderizado no lleva esta misma huella, lo que hay en disco NO es lo
 // que se compuso. No hay tercera posibilidad.
+/**
+ * **Se escribe sólo lo que cambia** (C-567). `src/reels.json` es uno para todas
+ * las piezas y su fecha caducaba el render de las 22; ahora cada pieza deja su
+ * huella en `work/scenes/<slug>/spec.huella`, que es lo que mira `cadena.py`, y
+ * el fichero compartido sólo se reescribe si su contenido cambia.
+ */
+function escribeSpec(piezas) {
+  const texto = JSON.stringify(piezas, null, 1) + "\n";
+  const antes = fs.existsSync("src/reels.json") ? fs.readFileSync("src/reels.json", "utf8") : "";
+  if (texto !== antes) fs.writeFileSync("src/reels.json", texto);
+  for (const p of piezas) {
+    const slug = String(p.video || "").replace(/\.mp4$/, "");
+    const ruta = `work/scenes/${slug}/spec.huella`;
+    const ya = fs.existsSync(ruta) ? fs.readFileSync(ruta, "utf8").trim() : "";
+    if (slug && p.huella && ya !== p.huella && fs.existsSync(`work/scenes/${slug}`)) {
+      fs.writeFileSync(ruta, p.huella + "\n");
+    }
+  }
+}
+
 for (const p of spec) {
   const {huella: _v, ...sinHuella} = p;
   p.huella = createHash("sha1").update(JSON.stringify(sinHuella)).digest("hex").slice(0, 12);
 }
 
-fs.writeFileSync("src/reels.json", JSON.stringify(spec, null, 1) + "\n");
+escribeSpec(spec);
 // **Las comprobaciones van DESPUES de escribir el spec.** Estaban antes, asi
 // que cuando una paraba el montaje `src/reels.json` se quedaba con el estado
 // anterior y no habia forma de mirar por que fallo: los numeros que uno lee no
@@ -426,7 +446,7 @@ revisar(spec); faltasDelCierre(spec, faltas); // el cierre que falta tambien blo
  * llegaba al fichero. Se escribe dos veces a propósito: la primera para no
  * perder el trabajo, la segunda para no perder el veredicto.
  */
-fs.writeFileSync("src/reels.json", JSON.stringify(spec, null, 1) + "\n");
+escribeSpec(spec);
 const parados = spec.filter((r) => r.bloqueado?.length);
 if (parados.length) {
   console.log(

@@ -55,7 +55,9 @@ ESLABONES = [
     ("plan",        "work/scenes/{s}/plan-full.json",     "plan-reel.mjs",      "edl"),
     ("encuadres",   "work/scenes/{s}/plan-full.json",     "punch-ins.py",       "plan"),
     ("corte",       "public/{s}.mp4",                     "render-hook.mjs",    "encuadres"),
-    ("subtitulos",  "work/subs/todos.json",               "subtitular.py",      "corte"),
+    # De ESA pieza, no el fichero compartido (C-567): subtitular otra pieza
+    # movia `todos.json` y esta parecia al dia sin estarlo, o al reves.
+    ("subtitulos",  "work/subs/{s}.json",                 "subtitular.py",      "corte"),
     # De `corte`, no de `subtitulos`: se mide la cara sobre el vídeo cortado.
     ("cara",        "work/scenes/{s}/cara.json",          "sujeto.py",          "corte"),
     # La otra mitad de `cara`, y del mismo corte: a qué lado deja sitio su
@@ -71,7 +73,9 @@ ESLABONES = [
     # que cuelgan del corte, y dejar sólo una habría sido perder la otra en
     # silencio — que es justo el parentesco deducido contra el que avisa la nota
     # de arriba, con el signo cambiado.
-    ("spec",        "src/reels.json",                     "reels-spec.mjs",     ("huecos", "trasfondo")),
+    # La huella del spec de ESA pieza (C-567). `src/reels.json` es uno para
+    # las 22: cualquier escritura caducaba el render de todas.
+    ("spec",        "work/scenes/{s}/spec.huella",        "reels-spec.mjs",     ("huecos", "trasfondo")),
     # **Y el render come también de `src/`** (C-475): los componentes son el
     # código que dibuja. Con sólo `render.mjs`, arreglar un componente no
     # caducaba nada — reel-14 se volvió a entregar a las 14:00 con el render de
@@ -111,7 +115,9 @@ def _codigo(quien):
             raiz = os.path.join(aqui, "..", nombre)
             t = max((os.path.getmtime(os.path.join(d, f))
                      for d, _, fs in os.walk(raiz) for f in fs
-                     if f.endswith((".ts", ".tsx", ".json"))), default=None)
+                     if f.endswith((".ts", ".tsx", ".json"))
+                     # El spec no es codigo: es el dato de cada pieza (C-567).
+                     and f != "reels.json"), default=None)
             if t is not None:
                 ts.append((t, nombre))
             continue
