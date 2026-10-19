@@ -13,16 +13,7 @@
  */
 import fs from "fs";
 import { DEJAN_SITIO, canonico, revisarTablero, sinSujeto } from "./formas.mjs";
-import { bloquesDePanel } from "./reels/tableros.mjs";
-
-// El tope de un bloque de panel, leido de donde lo declara el componente
-// (`src/brand/copy.ts`), no copiado aqui (C-572).
-const TOPE_PANEL = Number((fs.readFileSync("src/brand/copy.ts", "utf8")
-  .match(/panel:\s*(\d+)/) || [])[1] || 24);
-const panelLargo = (props) => (props?.cubre === "panel" ? bloquesDePanel(props) : [])
-  .filter((b) => String(b?.texto ?? "").length > TOPE_PANEL)
-  .map((b) => `panel: «${b.texto}» tiene ${String(b.texto).length} caracteres y el`
-    + ` maximo es ${TOPE_PANEL}; partelo en otro bloque o acortalo`);
+import { panelLargo } from "./reels/tableros.mjs";
 
 // `--con-su-cara`: las formas que dibujan a pleno dejandole la columna. Va en
 // el pedido para que el diseñador no elija una que el montaje va a rechazar.

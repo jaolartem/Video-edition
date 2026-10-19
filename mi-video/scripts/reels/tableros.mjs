@@ -354,6 +354,23 @@ export const bloquesDePanel = (props) => {
 /** Cuantos renglones caben en un panel: los de una firma, nombre mas titulo. */
 export const LINEAS_PANEL = 4;
 
+// El tope de un bloque de panel, leido de donde lo declara el componente
+// (`src/brand/copy.ts`), no copiado aqui (C-572).
+const TOPE_PANEL = Number((fs.readFileSync("src/brand/copy.ts", "utf8")
+  .match(/panel:\s*(\d+)/) || [])[1] || 24);
+
+/**
+ * **Los bloques de panel que pasan del tope**, que es lo que `SidePanel` mide
+ * con `assertShort` y tumba el render. Lo preguntan la puerta del diseño
+ * (`dibujable.mjs`) y la de antes del render (`base.tablerosDe` → `rompe`):
+ * con sólo la primera, un diseño aceptado antes de C-572 llegaba al render y
+ * moria en el fotograma 150 —reel-20 y reel-22, cinco veces cada una— (C-581).
+ */
+export const panelLargo = (props) => (props?.cubre === "panel" ? bloquesDePanel(props) : [])
+  .filter((b) => String(b?.texto ?? "").length > TOPE_PANEL)
+  .map((b) => `panel: «${b.texto}» tiene ${String(b.texto).length} caracteres y el`
+    + ` maximo es ${TOPE_PANEL}; partelo en otro bloque o acortalo`);
+
 export function armarPaneles(bs, reloj, tableros, captions) {
   return bs
     .map((b) => {

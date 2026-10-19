@@ -16,6 +16,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { CONSTRUIDAS, canonico, revisarTablero, sinSujeto } from "../formas.mjs";
 import { marcoDe, precioVigente } from "./material.mjs";
+import { panelLargo } from "./tableros.mjs";
 
 const db = new DatabaseSync("ads/decisiones.db");
 
@@ -165,7 +166,7 @@ export function tablerosDe(slug) {
       const t = JSON.parse(f.tablero);
       return { beat: Number(f.etapa_orden), kind: canonico(t.kind), props: t.props };
     }).filter((b) => {
-      for (const m of revisarTablero(b.kind, b.props))
+      for (const m of [...revisarTablero(b.kind, b.props), ...panelLargo(b.props)])
         faltas.push(`${slug} e${b.beat}: ${m}`);
       // **Y la regla de la cara, sólo donde la pieza la declara** (T-06): aquí
       // se sabe de qué pieza es el tablero, en `formas.mjs` no.
