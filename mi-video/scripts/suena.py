@@ -81,9 +81,19 @@ def pasada(mp4, umbral=-40, minimo=0.6):
     la entrada de la pieza entera. Dos funciones con el mismo nombre en el mismo
     fichero no chocan: la de abajo tapa a la de arriba **en silencio**.
     """
-    t = _ffmpeg(["-i", mp4, "-af",
-                 CADENA.format(umbral=umbral, minimo=minimo)])
+    t = traza(mp4, umbral, minimo)
     return {**onda(t), **aire(t)}
+
+
+def traza(mp4, umbral=-40, minimo=0.6, vf=None):
+    """Lo que dice ffmpeg en esa pasada, y la imagen en la MISMA si se pide `vf`.
+
+    El control de emisión (`emision.py`) necesita negro e imagen congelada, y
+    el render ya se decodifica entero para oírlo: abrir otro ffmpeg sería leer
+    dos veces el mismo fichero, la avería que `CADENA` cerró para el sonido.
+    """
+    return _ffmpeg(["-i", mp4, *(["-vf", vf] if vf else []),
+                    "-af", CADENA.format(umbral=umbral, minimo=minimo)])
 
 
 def onda(t):
@@ -236,6 +246,7 @@ def main():
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--guardar", action="store_true")
     a = ap.parse_args()
+    ultimas = []
     for n in (a.reels or rutas.piezas()):
         d = medir(n)
         if not d:
@@ -265,6 +276,19 @@ def main():
             print("    suena limpio")
         if a.guardar:
             print(f"    ({guardar(d)} medida(s) apuntadas)")
+            # **Y el control de emisión, escena a escena** (C-596). Va aquí
+            # porque `medido` es esta orden: lo que falla abre su tiquet a la
+            # fase que lo arregla, y la última línea dice adónde volver.
+            import emision
+
+            dicho, ultima = emision.atender(n)
+            for x in dicho:
+                print(x)
+            if ultima:
+                ultimas.append(ultima)
+    if ultimas:
+        print(ultimas[0])
+        sys.exit(1)
 
 
 if __name__ == "__main__":
