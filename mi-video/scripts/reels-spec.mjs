@@ -419,9 +419,13 @@ function escribeSpec(piezas) {
     const slug = String(p.video || "").replace(/\.mp4$/, "");
     const ruta = `work/scenes/${slug}/spec.huella`;
     const ya = fs.existsSync(ruta) ? fs.readFileSync(ruta, "utf8").trim() : "";
-    if (slug && p.huella && ya !== p.huella && fs.existsSync(`work/scenes/${slug}`)) {
-      fs.writeFileSync(ruta, p.huella + "\n");
-    }
+    if (!slug || !p.huella || !fs.existsSync(`work/scenes/${slug}`)) continue;
+    // **Igual o no, queda dicho que se miró** (C-595): con la huella quieta, la
+    // fecha se quedaba detrás de `huecos.json` y `cadena` daba el spec por
+    // caducado cada vuelta —reel-21 volvía a montarse sin fin—. El render ya no
+    // mira esta fecha: compara la huella que estampó con ésta.
+    if (ya !== p.huella) fs.writeFileSync(ruta, p.huella + "\n");
+    else { const t = new Date(); fs.utimesSync(ruta, t, t); }
   }
 }
 

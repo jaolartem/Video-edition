@@ -133,6 +133,22 @@ def _codigo(quien):
     return max(ts) if ts else None
 
 
+def _misma_huella(s, n):
+    """¿El render se hizo con el spec de hoy? Por contenido, no por fecha (C-595).
+
+    `render.mjs` estampa al lado del mp4 la huella del spec que pintó; si es la
+    misma que la de la pieza, lo dibujado no ha cambiado aunque la fecha del
+    spec se mueva cada vez que se mira.
+    """
+    def leer(r):
+        try:
+            return open(r, encoding="utf-8").read().strip()
+        except OSError:
+            return None
+    hay = leer(f"out/reels/reel-R{n}.mp4.huella")
+    return hay is not None and hay == leer(f"work/scenes/{s}/spec.huella")
+
+
 def desde(n):
     """El primer eslabón caducado de la pieza `n`, o `None` si está al día."""
     s = f"reel-{n:02d}"
@@ -147,7 +163,7 @@ def desde(n):
         for come in (come_de,) if isinstance(come_de, str) else (come_de or ()):
             padre = cuando.get(come)
             # `encuadres` comparte fichero con `plan`: no se compara consigo mismo.
-            if padre is not None and ruta != donde[come] and t < padre:
+            if padre is not None and ruta != donde[come] and t < padre                     and not (nombre == "render" and _misma_huella(s, n)):
                 return (i, nombre, quien,
                         f"{ruta} es mas viejo que {donde[come]}")
         cod = _codigo(quien)
