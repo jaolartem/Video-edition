@@ -15,7 +15,9 @@
 # Las piezas se dicen siempre: el lote vivo cambia, y una lista por defecto
 # escrita aqui es la que envejecio en `pipeline.sh` y `montar-lote.sh`.
 cd "$(dirname "$0")/.." || exit 1
-_py() { PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); $1"; }
+# Con sus argumentos (C-569): pasaba sólo el codigo, y `cola.arranca` y la
+# comprobacion de cintas recibian una lista vacia sin decir nada.
+_py() { local c="$1"; shift; PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0, 'scripts'); $c" "$@"; }
 
 # **`--agentes`: los oficios los contesta la sesion, no el CLI por bash.**
 # Jaime, 18-10-2026: *«reemplaza la accion del bash con agentes tuyos y limita
