@@ -383,9 +383,29 @@ def declarar_tramos(slug, por_etapa):
                                 "decidido al describir", quien="compositor")
             if not (vd or {}).get("error"):
                 hechos.append(int(orden))
+            else:
+                _rechazado(slug, int(orden), vd["error"])
     if hechos:
         fijar.aplicar(slug)
     return {"declaradas": hechos}
+
+
+def _rechazado(slug, orden, error):
+    """**Un tramo que no se declara vuelve a quien lo pidió** (C-588).
+
+    Se perdía callado: reel-18 e9, 18-10, el compositor pidió el plano mudo de la
+    firma —3,8 s mirando al lente, como dice el brief— y `fijar` lo tiró por no
+    tener voz. El JSON se quedó con la firma de 0,76 s y nadie se enteró hasta
+    que el diseñador vio el marcador. Un silencio a cámara no es un tramo: se
+    conserva con la pausa declarada de la etapa (`[pausa]` en su libreto).
+    """
+    from dominio import ticket
+
+    ticket.abrir(slug, f"no se declaro el tramo de e{orden}: {error}. Un silencio"
+                 " mirando a camara no es un tramo: se conserva con la pausa"
+                 " declarada de la etapa ([pausa] en su libreto), y el corte"
+                 " sigue con los tramos de antes", etapa=str(orden),
+                 vuelve_a="descrito")
 
 
 def guardar_tablero(slug, orden, tablero):
