@@ -137,7 +137,7 @@ def afinar(toma, tramos, pasadas=4):
     # que pasaron por el modelo bueno — incluidos aquellos en los que se decidio
     # quedarse con lo viejo. Son cosas distintas y hacen falta las dos: lo
     # primero manda el borrado, lo segundo es lo que la puerta pregunta.
-    hechos, oidos, nuevas, tocados = [], [], [], 0
+    hechos, oidos, nuevas, tocados, intentados = [], [], [], 0, []
     for a, b in tramos:
         va, vb = a_voz(a), a_voz(max(a, b - 0.01))
         if va is None or vb is None:
@@ -173,6 +173,10 @@ def afinar(toma, tramos, pasadas=4):
                            toma=toma,
                            detalle=f"{a:.2f}-{b:.2f}: {pasadas} pasadas, todas"
                                    f" vacias, alucinadas o atascadas", eco=True)
+            # **Y queda dicho que se intentó** (C-599): sin esto la puerta de
+            # composición lo volvía a pedir cada vuelta —reel-20 e10, la firma
+            # de 0,78 s, seis minutos de whisper por vuelta toda la mañana—.
+            intentados.append((a, b))
             continue
         elegido, acuerdo = medoide(cands)
         # **Y no se acepta si trae menos de lo que se va a llevar.**
@@ -261,6 +265,8 @@ def afinar(toma, tramos, pasadas=4):
     d["afinado"] = sorted(set(tuple(t) for t in
                               [tuple(x) for x in d.get("afinado", [])] +
                               [tuple(t) for t in hechos] + oidos))
+    d["intentado"] = sorted(set(tuple(t) for t in
+                                [tuple(x) for x in d.get("intentado", [])] + intentados))
     json.dump(d, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return d, tocados
 

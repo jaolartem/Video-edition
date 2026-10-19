@@ -137,7 +137,9 @@ class Montaje:
         for t, det in self.tramos():
             if t.cinta not in rangos:
                 try:
-                    rangos[t.cinta] = Cinta(t.cinta).datos().get("afinado") or []
+                    dat = Cinta(t.cinta).datos()
+                    # Lo intentado sin fruto cuenta: no hay pasada mejor (C-599).
+                    rangos[t.cinta] = (dat.get("afinado") or []) + (dat.get("intentado") or [])
                 except Exception:                  # noqa: BLE001
                     rangos[t.cinta] = []
             af = rangos[t.cinta]
