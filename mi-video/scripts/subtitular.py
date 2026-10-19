@@ -118,15 +118,38 @@ def transcribir(mp4, wav, base):
     return out
 
 
-def agrupar(words):
+def costuras(slug):
+    """Donde empieza cada etapa en el montaje, sacado del plan (C-578).
+
+    **Un subtitulo no cruza de una etapa a otra.** reel-18, 18-10: el gancho
+    enseñaba «Que si tengo miedo, / CUANDO YO LLEGUE», y «cuando yo llegue» es
+    de la etapa 2 y no se oye hasta 5,34 s. El agrupador sólo miraba caracteres
+    y pausas, y en una costura no hay pausa: el corte las quita.
+    """
+    try:
+        esc = json.load(open(f"work/scenes/{slug}/plan-full.json",
+                             encoding="utf-8"))["escenas"]
+    except (OSError, ValueError, KeyError):
+        return []
+    return [b["montado_desde"] for a, b in zip(esc, esc[1:])
+            if a.get("beat") != b.get("beat")]
+
+
+def agrupar(words, cortes=()):
     caps, buf = [], None
     for w in words:
         cierra = w["text"][-1:] in ".?!"
+        # La palabra es de la etapa donde ACABA: whisper adelanta los arranques
+        # (en reel-18 «cuando» empezaba en 5,02 con la costura en 5,34).
+        costura = next((c for c in cortes
+                        if (buf["end"] if buf else -1) <= c < w["end"]), None)
         if buf and (len(buf["text"]) + 1 + len(w["text"]) > TOPE
-                    or w["start"] - buf["end"] > 0.7):
+                    or w["start"] - buf["end"] > 0.7 or costura is not None):
             caps.append(buf); buf = None
         if not buf:
             buf = {"start": w["start"], "end": w["end"], "text": w["text"]}
+            if costura is not None:
+                buf["start"], buf["costura"] = max(w["start"], costura), True
         else:
             buf["text"] += " " + w["text"]
             buf["end"] = w["end"]
@@ -165,7 +188,7 @@ def agrupar(words):
     # subtitulo, tampoco era una frase: el punto de delante es invento.
     fuera = []
     for c in caps:
-        if fuera and len(c["text"].split()) == 1:
+        if fuera and len(c["text"].split()) == 1 and not c.get("costura"):
             prev = fuera[-1]
             suelta = c["text"]
             if prev["text"].endswith("."):
@@ -517,7 +540,8 @@ if __name__ == "__main__":
             faltan.append(r)
             continue
         base = f"work/subs/reel-{r}"
-        caps = agrupar(transcribir(mp4, base + ".wav", base))
+        caps = agrupar(transcribir(mp4, base + ".wav", base),
+                       costuras(f"reel-{r}"))
         caps, n = reconciliar(caps, esperadas(f"reel-{r}"))
         caps, g = glosario(caps)
         todo[f"reel-{r}"] = caps
