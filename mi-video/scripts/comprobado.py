@@ -93,7 +93,7 @@ COMPROBACIONES = [
         decision="que el render corresponde al montaje que se compuso",
         decide_con="texto: la huella del spec",
         comprueba_con="reloj: el fichero es posterior a su corte",
-        vive_en="scripts/cadena.py :: def hay_que(nombre, n):",
+        vive_en="scripts/cadena.py :: def hay_que(nombre, n, refresca=False):",
     ),
     Comprobado(
         decision="cuando entra cada subtitulo",
