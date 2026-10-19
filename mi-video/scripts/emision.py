@@ -151,7 +151,13 @@ class Emision:
             mal.append(f"{f['ancho']}×{f['alto']} y no {ANCHO}×{ALTO}")
         if f["fps"] != FPS:
             mal.append(f"{f['fps']} fps y no {FPS}")
-        if abs(f["dura"] - f["spec"]) > HOLGURA_DURA:
+        # La entrega lleva las pausas del compas y la cola de la mezcla, igual
+        # que en `version.cuadra_con_el_json` (C-597): sin ellas, reel-18 volvia
+        # a `montado` con 53,80 s contra un spec de 53,13 y un render de 53,18.
+        import cama
+        import compas
+        slug = str(self.spec.get("video") or "").replace(".mp4", "")
+        if abs(f["dura"] - f["spec"] - compas.total(slug)) > HOLGURA_DURA + cama.cola(slug):
             mal.append(f"dura {f['dura']:.2f} s y el spec {f['spec']:.2f} s")
         return [Alerta("formato", "montado", "; ".join(mal))] if mal else []
 
