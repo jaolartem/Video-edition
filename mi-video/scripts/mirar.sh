@@ -111,10 +111,21 @@ print(" ".join(str(f) for f in out))
 PY
 )
 
+# **Los fotogramas llevan la huella de lo que dibujan** (C-568). Cada pedido de
+# describir y de diseno los volvia a renderizar —un `remotion still` por
+# fotograma, Chrome arrancando cada vez: 3-4 minutos por pieza— aunque la pieza
+# no hubiera cambiado. Si el plan y el spec de ESTA pieza son los mismos, valen.
+CLAVE=$( (cat "$PLAN"; cat "work/scenes/$SLUG/spec.huella" 2>/dev/null;           echo "$POR_ESCENA $DESDE $HASTA $FRAMES") | sha1sum | cut -c1-16)
+if [ -f "$SALIDA/.clave" ] && [ "$(cat "$SALIDA/.clave")" = "$CLAVE" ]; then
+  echo "== fotogramas de $SLUG al dia: se reutilizan =="
+  exit 0
+fi
+rm -f "$SALIDA"/f*.png
 echo "== $(echo "$FRAMES" | wc -w) fotogramas de $SLUG =="
 for f in $FRAMES; do
   npx remotion still "$BUNDLE" "Reel-R$N" "$SALIDA/f$f.png" --frame="$f" >/dev/null 2>&1 \
     && printf '.' || printf 'x'
 done
 echo ""
+echo "$CLAVE" > "$SALIDA/.clave"
 echo "== en $SALIDA =="
