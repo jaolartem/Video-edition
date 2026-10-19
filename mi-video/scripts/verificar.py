@@ -69,6 +69,10 @@ BASE = "ads/decisiones.db"
 #:   distinguirlos es entender, no medir.
 NO_PARAN = ("habla de otro texto", "sin contestar: ['describir']",
             "dos veces seguidas",
+            # Una propuesta fuera de encargo es para que Jaime la vea, no un
+            # dato sin respaldo (C-571): paraba el render que el necesita para
+            # mirarla. Lo de cumplimiento —cifras, titulos— sigue parando.
+            "propuesta fuera de encargo",
             # La regla de plano nacio el 25-9 y la incumplen nueve de diez
             # piezas del lote: se anota en cada verificacion y no para.
             "regla de plano ·",
@@ -308,6 +312,10 @@ def revisar(slug):
 
     mal += [f"{slug}: {r}" for r in _pl.reparos(slug)]
     for n in Nota.subidas(slug):
+        if str(n.que).startswith("PROPUESTA de «"):
+            mal.append(f"{slug}: propuesta fuera de encargo para Jaime —"
+                       f" #{n.id} «{str(n.que)[:90]}»")
+            continue
         mal.append(f"{slug}: subio a Jaime y sigue abierto —"
                    f" #{n.id} «{str(n.que)[:90]}»")
     con = basedatos.abrir(BASE)
