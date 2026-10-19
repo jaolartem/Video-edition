@@ -58,7 +58,17 @@ def devuelve(pieza, faltas: dict):
 
 
 def puerta(pieza, tableros):
-    """`None` si todo se dibuja; si no, el `Resultado` que lo devuelve."""
+    """`None` si todo se dibuja; si no, el `Resultado` que lo devuelve.
+
+    **`cubre` se lee también al lado de `kind`** (C-589). La línea lo mira
+    dentro de `props`, y el diseñador lo escribió fuera tres veces el 18 y el
+    19-10 (reel-19, reel-20 y reel-22): cada vez el panel contó como tablero a
+    pleno sin cara, y volvió una ronda entera por una llave mal puesta. Se mueve
+    a `props` aquí, antes de mirar y de guardar.
+    """
+    for t in tableros or []:
+        if isinstance(t, dict) and t.get("cubre") and "cubre" not in (t.get("props") or {}):
+            t["props"] = {**(t.get("props") or {}), "cubre": t.pop("cubre")}
     faltas = consulta([], {"cara": cara(pieza), "tableros": tableros})
     return devuelve(pieza, faltas) if faltas else None
 
