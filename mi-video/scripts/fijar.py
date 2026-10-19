@@ -493,6 +493,7 @@ def aplicar(slug, solo=None):
     corrección concreta — ver `rehacer`.
     """
     import transcribir
+    import trato as _tr
 
     fjs = fijados(slug)
     if solo is not None:
@@ -582,7 +583,7 @@ def aplicar(slug, solo=None):
     for b_ in ya:
         por_beat.pop(b_, None)
     if not por_beat:
-        return 0, []
+        return _tr.sin_cambios(slug, edl, ruta)
 
     segs, det, hechos = [], [], []
     puestos = set()
@@ -650,8 +651,6 @@ def aplicar(slug, solo=None):
     # lo que el paso de descripcion resolvio mirando la pieza entera, y el
     # nombre de la etapa sale de `etapa`, que es donde vive el frame. Si nadie
     # lo ha decidido todavia se queda sin poner, que es distinto de ponerlo mal.
-    import trato as _tr
-
     # El nombre de la etapa vive en el frame y lo pone `beats`; aqui basta con
     # que no se pierda el que ya trae el detalle. Lo que el render exige y se
     # perdia es el `trato`.

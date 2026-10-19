@@ -197,6 +197,18 @@ def completa(slug, detalle):
             d["trato"] = t if t and t != "portada" else "diapositiva"
 
 
+def sin_cambios(slug, edl, ruta):
+    """Sin tramos que poner, la portada se corrige igual (C-590), y sólo se
+    escribe si algo cambió: lo que `fijar.aplicar` devuelve cuando no hay nada."""
+    import json
+
+    antes = [d.get("trato") for d in edl.get("detalle", [])]
+    completa(slug, edl.get("detalle", []))
+    if [d.get("trato") for d in edl.get("detalle", [])] != antes:
+        json.dump(edl, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    return 0, []
+
+
 def decidir(*, desde_s, dura_s, parrafo, texto, literal, voz_st,
             nivel=None, figura=None, es_cta=False, decidido=None):
     """El tratamiento de un segmento, con el porqué.
