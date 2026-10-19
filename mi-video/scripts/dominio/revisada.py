@@ -88,10 +88,15 @@ class LosCortes(Comprobacion):
     devuelve_a = "cosido"
 
     def mirar(self, pieza) -> list:
-        import costuras
+        # **En la onda, no en el transcript** (C-604): con la misma vara que la
+        # verificación y el cosido (`bordes`, C-574). Medía con los tiempos de
+        # whisper, que en un trozo declarado ya nadie puede mover (C-570), y
+        # reel-20 volvió de aquí al cosido en bucle por cortes de 3 y 75 ms que
+        # la onda daba por callados.
+        from . import bordes
 
         try:
-            n = costuras.palabras_enteras(pieza.slug, ver=True)
+            n = len(bordes.sucios(pieza.slug))
         except Exception as e:                     # noqa: BLE001
             return [Falta(f"no se pudieron medir los cortes:"
                           f" {type(e).__name__}")]
