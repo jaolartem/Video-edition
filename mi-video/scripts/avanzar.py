@@ -41,6 +41,7 @@ BASE = "ads/decisiones.db"
 # los llaman así, y mover algo no tiene por qué romper a quien lo usa.
 from dominio import abierto as _abierto  # noqa: E402
 from dominio import oficio as _oficio  # noqa: E402
+from dominio import puertas as _puertas  # noqa: E402
 from dominio.fase import (  # noqa: E402,F401
     _con, _fallo_antes, _render_caduco, ESLABON_DE, VUELVE_SI_CADUCO, anotar,
     antes_de, camino, fase_de)
@@ -513,9 +514,9 @@ def _una_vuelta(a) -> int:
                 registro.aviso("marcador", "no se pudo aplicar",
                                detalle=f"{slug}: {type(e).__name__}: {e}"[:200],
                                eco=False)
-        for paso, slug in _contestadas_tarde():
+        for paso, slug in _puertas.contestadas_tarde():
             if int(slug[-2:]) not in ocupadas:
-                _devuelve(slug, paso)
+                _puertas.devuelve_tarde(slug, paso)
     # **Las piezas que no comparten cinta trabajan a la vez.** El bucle de una
     # en una hacía que el paso más lento parase a las siete, incluidas las que
     # no dependían de él. Ver `planificador.py`.
@@ -593,102 +594,6 @@ def _una_vuelta(a) -> int:
 #: `dominio/oficio.py`, que es quien sabe de buzones. Escrita aquí eran dos
 #: listas, y estas dos ya habían divergido.
 DE_QUIEN = _oficio.LA_FASE
-
-
-def _contestadas_tarde() -> list:
-    """Respuestas escritas para un paso que la pieza ya dejo atras."""
-    import glob
-
-    ruta = camino()
-    orden = {f["nombre"]: k for k, f in enumerate(ruta)}
-    fuera = []
-    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
-                                           "*.respuesta.json"))):
-        paso = os.path.basename(os.path.dirname(f))
-        slug = os.path.basename(f)[:-len(".respuesta.json")]
-        fase = DE_QUIEN.get(paso)
-        if not fase or fase not in orden:
-            continue
-        try:
-            pieza = Pieza(int(slug[-2:]))
-            actual = fase_de(pieza)
-        except Exception:                          # noqa: BLE001
-            continue
-        if actual and orden.get(actual["nombre"], -1) > orden[fase]:
-            fuera.append((paso, slug))
-    return fuera
-
-
-def _devuelve(slug: str, paso: str) -> None:
-    """Manda la pieza al punto desde el que ese paso se vuelve a correr.
-
-    **Que no es su propia fase, y ahí estaba el fallo.** Una etiqueta dice el
-    paso ya hecho: dejar la pieza en `descrito` es dejarla con la descripción
-    por buena, así que lo siguiente que corre es `disenado` y la respuesta que
-    la devolvió no la lee nadie. Medido el 8-9-2026: reel-03 y reel-05 entraron
-    en `descrito` a las 19:45:56 y salieron a `disenado` **el mismo segundo**,
-    con sus respuestas sin aplicar y sus tiquets abiertos.
-
-    Se devuelve a la fase ANTERIOR, que es desde donde el paso vuelve a correr,
-    y sale del camino declarado en vez de escribirse aquí: si mañana se mete un
-    paso entre medias, esto sigue apuntando al sitio correcto.
-    """
-    fase = antes_de(DE_QUIEN.get(paso))
-    # **Y una pieza aprobada no se devuelve.** Jaime, 7-9-2026, viendo el
-    # tablero: *«por que esta el 4, el 6 y el 7... ya estan aprobados»*, y el
-    # motivo: *«porque gastan tiempo valioso»*.
-    #
-    # Esto saco a reel-07 de `aprobado` a las 19:02 y dejo a reel-04 y reel-06
-    # rebotando: llega una respuesta escrita para un paso que la pieza ya paso,
-    # y el enrutador la manda atras. Para una pieza en vuelo eso es correcto —la
-    # respuesta se pago y aplicarla tarde es mejor que tirarla—; para una
-    # firmada es recomponer lo aprobado, y ademas en bucle, porque al volver a
-    # avanzar la respuesta sigue ahi.
-    #
-    # El guarda de `puertas._aprobada` cubria la puerta del tiquet y no esto. Es
-    # el mismo criterio en el otro camino: lo aprobado vuelve cuando Jaime lo
-    # dice, no porque llegue una respuesta con retraso.
-    try:
-        from dominio.puertas import _aprobada
-        if _aprobada(slug):
-            _reg_aviso = __import__("registro")
-            _reg_aviso.aviso(
-                "avanzar", "respuesta tardia sobre una pieza aprobada",
-                detalle=f"{slug}: llego «{paso}» y esta firmada; no se devuelve",
-                eco=True)
-            # **Y se archiva, no se deja en la cola** (C-491). Quedarse en el
-            # buzón la dejaba viva para cuando Jaime reabriera la pieza: reel-13,
-            # 14-9, volvió de «revisado» a «medido» por un visto del 13-9 que ya
-            # no hablaba de nada. **Con su pedido**, que también es viejo: sin
-            # respuesta, el pedido se contaba como trabajo abierto.
-            __import__("servicio")._archivar(paso, slug, sufijo="tardia",
-                                            solo_respuesta=False)
-            return
-    except Exception:                              # noqa: BLE001
-        pass
-    # **Y devolver no adelanta** (C-483), la misma regla que la puerta del
-    # tiquet (`puertas._no_ha_llegado`). Si un tiquet mandó la pieza más atrás
-    # que el paso de esta respuesta, llegará a él sola y la leerá entonces.
-    # Moverla aquí la saltaba por encima del paso del tiquet, y el tiquet se
-    # quedaba «ya devuelto» y sin atender: reel-16 #421 y reel-12 #449
-    # (13-9), las dos paradas con «su paso ya quedo atras» y sin pedido.
-    try:
-        from dominio.puertas import _no_ha_llegado
-        if _no_ha_llegado(int(slug[-2:]), fase):
-            return
-    except Exception:                              # noqa: BLE001
-        pass
-    con = _con()
-    destino = con.execute("select id from fase where nombre = ?",
-                          (fase,)).fetchone()
-    con.close()
-    if destino is None:
-        return
-    pieza = Pieza(int(slug[-2:]))
-    if pieza.video_id is None:
-        return
-    anotar(pieza.video_id, destino["id"],
-           f"llego la respuesta de «{paso}» y la pieza ya habia pasado")
 
 
 # **Aqui vivian `_sin_contestar` y `_respuestas`, y se van sin sustituto.**

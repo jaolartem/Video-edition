@@ -28,6 +28,7 @@ import os
 
 from . import ticket
 from .fase import anotar, antes_de
+from .oficio import LA_FASE as DE_QUIEN
 
 #: Lo que cuenta como un bruto. El resto de la carpeta de origen —proyectos,
 #: audio suelto, capturas— no abre nada.
@@ -223,3 +224,98 @@ def del_bruto(origen=None):
             f" conoce: {', '.join(nuevas[:4])}"
             + (" …" if len(nuevas) > 4 else "")
             + f". Catalogar es decisión: `python scripts/catalogar.py`."]
+
+
+def contestadas_tarde() -> list:
+    """Respuestas escritas para un paso que la pieza ya dejo atras.
+
+    Vivia en `avanzar.py` y se vino con la puerta, que es quien devuelve
+    (C-579): el lanzador llego a 303 lineas.
+    """
+    import glob
+
+    from .fase import camino, fase_de
+    from .pieza import Pieza
+
+    ruta = camino()
+    orden = {f["nombre"]: k for k, f in enumerate(ruta)}
+    fuera = []
+    for f in sorted(glob.glob(os.path.join("work", "servicio", "*",
+                                           "*.respuesta.json"))):
+        paso = os.path.basename(os.path.dirname(f))
+        slug = os.path.basename(f)[:-len(".respuesta.json")]
+        fase = DE_QUIEN.get(paso)
+        if not fase or fase not in orden:
+            continue
+        try:
+            pieza = Pieza(int(slug[-2:]))
+            actual = fase_de(pieza)
+        except Exception:                          # noqa: BLE001
+            continue
+        if actual and orden.get(actual["nombre"], -1) > orden[fase]:
+            fuera.append((paso, slug))
+    return fuera
+
+
+def devuelve_tarde(slug: str, paso: str) -> None:
+    """Manda la pieza al punto desde el que ese paso se vuelve a correr.
+
+    **Que no es su propia fase, y ahí estaba el fallo.** Una etiqueta dice el
+    paso ya hecho: dejar la pieza en `descrito` es dejarla con la descripción
+    por buena, así que lo siguiente que corre es `disenado` y la respuesta que
+    la devolvió no la lee nadie. Medido el 8-9-2026: reel-03 y reel-05 entraron
+    en `descrito` a las 19:45:56 y salieron a `disenado` **el mismo segundo**,
+    con sus respuestas sin aplicar y sus tiquets abiertos.
+
+    Se devuelve a la fase ANTERIOR, que es desde donde el paso vuelve a correr,
+    y sale del camino declarado en vez de escribirse aquí: si mañana se mete un
+    paso entre medias, esto sigue apuntando al sitio correcto.
+    """
+    fase = antes_de(DE_QUIEN.get(paso))
+    # **Y una pieza aprobada no se devuelve.** Jaime, 7-9-2026, viendo el
+    # tablero: *«por que esta el 4, el 6 y el 7... ya estan aprobados»*, y el
+    # motivo: *«porque gastan tiempo valioso»*.
+    #
+    # Esto saco a reel-07 de `aprobado` a las 19:02 y dejo a reel-04 y reel-06
+    # rebotando: llega una respuesta escrita para un paso que la pieza ya paso,
+    # y el enrutador la manda atras. Para una pieza en vuelo eso es correcto —la
+    # respuesta se pago y aplicarla tarde es mejor que tirarla—; para una
+    # firmada es recomponer lo aprobado, y ademas en bucle, porque al volver a
+    # avanzar la respuesta sigue ahi.
+    #
+    # El guarda de `puertas._aprobada` cubria la puerta del tiquet y no esto. Es
+    # el mismo criterio en el otro camino: lo aprobado vuelve cuando Jaime lo
+    # dice, no porque llegue una respuesta con retraso.
+    try:
+        if _aprobada(slug):
+            _reg_aviso = __import__("registro")
+            _reg_aviso.aviso(
+                "avanzar", "respuesta tardia sobre una pieza aprobada",
+                detalle=f"{slug}: llego «{paso}» y esta firmada; no se devuelve",
+                eco=True)
+            # **Y se archiva, no se deja en la cola** (C-491). Quedarse en el
+            # buzón la dejaba viva para cuando Jaime reabriera la pieza: reel-13,
+            # 14-9, volvió de «revisado» a «medido» por un visto del 13-9 que ya
+            # no hablaba de nada. **Con su pedido**, que también es viejo: sin
+            # respuesta, el pedido se contaba como trabajo abierto.
+            __import__("servicio")._archivar(paso, slug, sufijo="tardia",
+                                            solo_respuesta=False)
+            return
+    except Exception:                              # noqa: BLE001
+        pass
+    # **Y devolver no adelanta** (C-483), la misma regla que la puerta del
+    # tiquet (`puertas._no_ha_llegado`). Si un tiquet mandó la pieza más atrás
+    # que el paso de esta respuesta, llegará a él sola y la leerá entonces.
+    # Moverla aquí la saltaba por encima del paso del tiquet, y el tiquet se
+    # quedaba «ya devuelto» y sin atender: reel-16 #421 y reel-12 #449
+    # (13-9), las dos paradas con «su paso ya quedo atras» y sin pedido.
+    try:
+        if _no_ha_llegado(int(slug[-2:]), fase):
+            return
+    except Exception:                              # noqa: BLE001
+        pass
+    a_donde, vid = _fase_id(fase), _video_id(slug)
+    if a_donde is None or vid is None:
+        return
+    anotar(vid, a_donde,
+           f"llego la respuesta de «{paso}» y la pieza ya habia pasado")
