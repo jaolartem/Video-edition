@@ -21,6 +21,7 @@
  */
 import fs from "fs";
 import { DatabaseSync } from "node:sqlite";
+import { createHash } from "node:crypto";
 import { bruto } from "./rutas.mjs";
 import { camaraDe, movimientoDe } from "./camara.mjs";
 import { sql } from "./consulta.mjs";
@@ -363,6 +364,19 @@ const out = `work/scenes/${slug}/plan-full.json`;
 // corrido otro antes no es un paso, es una suposición.
 fs.mkdirSync(`work/scenes/${slug}`, { recursive: true });
 fs.writeFileSync(out, JSON.stringify(plan, null, 1));
+// **Y con qué cámara se planeó** (C-598): `cadena` lo compara con la base,
+// porque la cámara que decide el diseñador vive en `escena_desc` y no mueve
+// la fecha de ningún fichero. reel-19 e2 pidió «medio» y se montó tres veces
+// con el primer plano de ayer, con el subtítulo encima de los ojos.
+try {
+  const db = new DatabaseSync("ads/decisiones.db", { readOnly: true });
+  const filas = db.prepare("select etapa_orden, camara, tablero from escena_desc" +
+    " where video_slug = ? order by etapa_orden").all(slug)
+    .map((f) => [f.etapa_orden, f.camara ?? null, f.tablero ?? null]);
+  db.close();
+  fs.writeFileSync(`work/scenes/${slug}/camara.huella`,
+    createHash("sha1").update(JSON.stringify(filas)).digest("hex").slice(0, 12) + "\n");
+} catch { /* sin base no hay cámara declarada: el plan va con la de siempre */ }
 console.log(
   `${slug}: ${escenas.length} escenas · ${montado.toFixed(1)}s ` +
   `(quitados ${aireQuitado.toFixed(1)}s de silencio interno) → ${out}`,

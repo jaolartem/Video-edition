@@ -149,6 +149,28 @@ def _misma_huella(s, n):
     return hay is not None and hay == leer(f"work/scenes/{s}/spec.huella")
 
 
+def _camara_al_dia(s):
+    """¿El plan se hizo con la cámara que hoy decide la base? (C-598)
+
+    La misma huella que deja `plan-reel.mjs` en `camara.huella`: las filas
+    `(etapa_orden, camara, tablero)` de `escena_desc`, por orden.
+    """
+    import hashlib
+    import json
+    import sqlite3
+    try:
+        hay = open(f"work/scenes/{s}/camara.huella", encoding="utf-8").read().strip()
+        con = sqlite3.connect("file:ads/decisiones.db?mode=ro", uri=True, timeout=10)
+        filas = [list(r) for r in con.execute(
+            "select etapa_orden, camara, tablero from escena_desc"
+            " where video_slug = ? order by etapa_orden", (s,))]
+        con.close()
+    except (OSError, sqlite3.Error):
+        return True
+    txt = json.dumps(filas, ensure_ascii=False, separators=(",", ":"))
+    return hay == hashlib.sha1(txt.encode("utf-8")).hexdigest()[:12]
+
+
 def desde(n):
     """El primer eslabón caducado de la pieza `n`, o `None` si está al día."""
     s = f"reel-{n:02d}"
@@ -166,6 +188,8 @@ def desde(n):
             if padre is not None and ruta != donde[come] and t < padre                     and not (nombre == "render" and _misma_huella(s, n)):
                 return (i, nombre, quien,
                         f"{ruta} es mas viejo que {donde[come]}")
+        if nombre == "plan" and not _camara_al_dia(s):
+            return (i, nombre, quien, "la camara decidida cambio y el plan no la tiene")
         cod = _codigo(quien)
         if cod and t < cod[0]:
             return (i, nombre, quien, f"{ruta} se hizo con el {cod[1]} de antes")
