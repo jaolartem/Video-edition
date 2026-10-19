@@ -493,7 +493,7 @@ def aplicar(slug, ver=False):
             ya.add(nid)
     if tapados and not ver:
         con.commit()
-    hechos = recorte.recortar(edl, cortes)
+    hechos = recorte.recortar(edl, recorte.al_silencio(edl, cortes))
 
     if ver:
         con.close()

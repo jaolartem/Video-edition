@@ -99,6 +99,31 @@ def retirar_fijados(slug, edl, antes):
     return len(fuera)
 
 
+def al_silencio(edl, cortes):
+    """Los bordes de cada corte, llevados al silencio medido antes de cortar (C-603).
+
+    El ancla da los tiempos de palabra del transcript, y whisper los adelanta y
+    los estira. reel-20, 19-10: `revisar` quitó «y y» y «de su propio» por esos
+    tiempos y los dos cortes quedaron sobre la voz (36,14 y 153,79). Como los
+    trozos estaban fijados, el cosido no podía tocarlos y la pieza se quedó
+    parada en `cortado`. Es la misma vara del cosido y de la puerta (`Senal`).
+    """
+    from .senal import SUENA, Senal
+
+    segs, det, fuera = edl.get("segmentos") or [], edl.get("detalle") or [], []
+    for d, h, nid, que in cortes:
+        try:
+            i = next(k for k, s in enumerate(segs) if s[0] - 1e-6 <= d <= s[1] + 1e-6)
+            sen = Senal(det[i].get("toma"))
+            d = sen.salida_callada(segs[i][0], d)
+            if h is not None and sen.suena(h) > SUENA:
+                h = sen.donde_calla(h) or h
+        except Exception:                          # noqa: BLE001 — se corta como venía
+            pass
+        fuera.append((d, h, nid, que))
+    return fuera
+
+
 def recortar(edl, cortes):
     """Quita esos tramos del EDL, **de atrás hacia delante**, y dice cuáles.
 
