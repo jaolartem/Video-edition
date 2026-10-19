@@ -200,7 +200,7 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         # `por_que` en `video_fase` es lo que `_fallo_antes` cuenta como intento
         # fallido, y esto no es un fallo — es un paso que no tenia trabajo.
         eslabon = ESLABON_DE.get(siguiente["nombre"])
-        if eslabon and not ver and not cadena.hay_que(eslabon, n)[0]:
+        if eslabon and not ver and not cadena.hay_que(eslabon, n, refresca=True)[0]:
             print(f"  {pieza.slug}: {siguiente['nombre']} ya esta al dia"
                   f" — «{eslabon}» no ha caducado")
             anotar(pieza.video_id, siguiente["id"])

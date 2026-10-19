@@ -157,7 +157,22 @@ def desde(n):
     return None
 
 
-def hay_que(nombre, n):
+def refresca_spec(n):
+    """Rehace el spec antes de preguntar si el render esta al dia (C-582).
+
+    La huella del spec (C-567) sólo se reescribía dentro del montaje. El salto
+    «ya está al día» de `avanzar` preguntaba antes de montar, así que un diseño
+    nuevo no movía nada: reel-19 pasó de `verificado` a `montado` en el mismo
+    segundo con el render de antes, y la huella nueva llegó dos segundos tarde.
+    El diseño vive en la base y no tiene fecha de fichero: se pregunta al spec.
+    """
+    import subprocess
+
+    subprocess.run(["node", "scripts/reels-spec.mjs"], capture_output=True,
+                   env=dict(os.environ, REELS_PEDIDOS=str(n)))
+
+
+def hay_que(nombre, n, refresca=False):
     """¿Hay que rehacer ese eslabón de esa pieza? `(sí/no, por qué)`.
 
     **Es la pregunta que la línea nunca hacía.** Este fichero declaraba los trece
@@ -179,6 +194,8 @@ def hay_que(nombre, n):
         # silencio. Una errata no puede leerse como «no hace falta».
         raise ValueError(
             f"no existe el eslabon «{nombre}». Los que hay: " + ", ".join(orden))
+    if refresca and nombre == "render":
+        refresca_spec(n)
     d = desde(n)
     if d is None:
         return False, "la pieza esta al dia de punta a punta"
