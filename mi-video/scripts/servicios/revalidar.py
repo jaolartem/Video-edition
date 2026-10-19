@@ -64,8 +64,16 @@ class ServicioRevalidar(Servicio):
         from dominio.memoria import Memoria
 
         mem = Memoria("revalidar", pieza.slug)
-        pide = mem.cambiados(filas, CAMPOS,
-                             abiertas=Alcance.de(pieza.slug, "revalidado").etapas)
+        abiertas = Alcance.de(pieza.slug, "revalidado").etapas
+        pide = mem.cambiados(filas, CAMPOS, abiertas=abiertas)
+        # **Y lo ya declarado no se repregunta** (C-600): reel-22, 19-10, volvió
+        # a pedir e1 y e7 media hora después de declararlas, porque el cosido
+        # llevó un borde al silencio y el texto cambió una palabra. Una etapa
+        # con todos sus trozos fijados ya está decidida; sólo un tiquet la abre.
+        from dominio.tijera import Tijera
+        tij = Tijera(pieza.slug)
+        sueltas = {tij.beat(i) for i in range(len(tij)) if not tij.fijado(i)}
+        pide = [b for b in pide if b in sueltas or b in set(abiertas or ())]
         if not pide:
             return Resultado(True, salida="ningun segmento cambio desde su"
                                           " ultima revalidacion")
