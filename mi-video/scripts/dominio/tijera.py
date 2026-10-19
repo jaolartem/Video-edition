@@ -142,13 +142,12 @@ class Tijera:
         ajuste añade o quita una palabra ya no es cuadrar el corte, es cambiar la
         etapa, y ahí manda la declaración: se respeta y se cuenta.
         """
-        if not self.fijado(i) or self.aprobado(i):
-            return self.mover(i, nuevo)
-        ws = self.m.palabras(self.tramo(i).cinta)
-        if not ws or self.tramo(i).huella_de(ws) != nuevo.huella_de(ws):
-            self.respetados.add(i)
-            return False
-        return self._escribir(i, nuevo)
+        # **Y lo declarado ya no se cuadra aqui** (C-570). El borde se resuelve
+        # al declararlo, contra la onda (`fijar.declarar` → `Senal.callar`);
+        # cuadrarlo despues por whisper lo devolvia al final de palabra que el
+        # transcript estira: reel-22 e4 de 179,866 —silencio medido— a 179,916,
+        # en el arranque de «si», y la puerta lo paraba por voz sonando.
+        return self.mover(i, nuevo)
 
     def _escribir(self, i: int, nuevo: Tramo) -> bool:
         viejo = self.tramo(i)
