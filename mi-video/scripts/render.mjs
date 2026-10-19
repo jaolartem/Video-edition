@@ -73,6 +73,11 @@ if (piezas.length === 0 && !soloBundle) {
  * de sitio libre existian en un sitio y no en el otro.
  */
 const TMP = aplicar(`render-${process.pid}`);
+// **Y se recoge aunque el render muera** (C-575). Sólo se borraba al final del
+// camino bueno: el 18-10 un render que fallaba en el fotograma 150 se reintento
+// 38 veces y dejo 38 temporales de 4 GB, hasta llenar F: y romper la base con
+// «disk I/O error». `exit` corre tambien cuando el proceso sale por un error.
+process.on("exit", () => { try { fs.rmSync(TMP, {recursive: true, force: true}); } catch {} });
 
 /**
  * Apunta lo que tardo el render, con sus banderas. **Nunca tumba el montaje.**

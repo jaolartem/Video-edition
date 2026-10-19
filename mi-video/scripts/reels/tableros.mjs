@@ -329,10 +329,34 @@ const ES_PUNTERO = (props) => {
   return ([, v]) => typeof v === "string" && claves.has(v.trim());
 };
 
+/**
+ * **Los bloques de texto que dibuja un panel.** Una sola regla para el montaje
+ * (`armarPaneles`) y para la puerta del diseño (`scripts/dibujable.mjs`), que
+ * comprueba cada uno contra el tope `panel` de `src/brand/copy.ts` al llegar la
+ * respuesta (C-572): reel-18 murió en el render por un bloque de 25 caracteres.
+ */
+export const bloquesDePanel = (props) => {
+  if (Array.isArray(props?.bloques)) return props.bloques;
+  if (Array.isArray(props?.casillas)) return [];
+  const puntero = ES_PUNTERO(props);
+  // **Una linea, un bloque.** El disenador escribe los renglones con un salto
+  // de linea dentro de un mismo texto, y el tope de 24 es del bloque entero:
+  // «A MI TAMBIEN / ME DA MIEDO.» son dos renglones de 12 y morian como un
+  // bloque de 25 (C-572).
+  return Object.entries(props ?? {})
+    .filter(([k, v]) => !NO_TEXTO.has(k) && typeof v === "string" && v.trim())
+    .filter((e) => !puntero(e))
+    .flatMap(([, v]) => v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean))
+    .slice(0, LINEAS_PANEL)
+    .map((texto) => ({ texto }));
+};
+
+/** Cuantos renglones caben en un panel: los de una firma, nombre mas titulo. */
+export const LINEAS_PANEL = 4;
+
 export function armarPaneles(bs, reloj, tableros, captions) {
   return bs
     .map((b) => {
-      const yaSon = Array.isArray(b.props?.bloques) ? b.props.bloques : null;
       // **La lámina del panel, cuando el diseño la declara.**
       //
       // Con `figuras.json` y `volumenes.json` cerradas —*«gráficos y palabras,
@@ -354,12 +378,7 @@ export function armarPaneles(bs, reloj, tableros, captions) {
       const reparto = b.props?.reparto?.porciones?.length
         ? b.props.reparto
         : null;
-      const puntero = ES_PUNTERO(b.props);
-      const bloques = yaSon ?? (casillas ? [] : Object.entries(b.props ?? {})
-        .filter(([k, v]) => !NO_TEXTO.has(k) && typeof v === "string" && v.trim())
-        .filter((e) => !puntero(e))
-        .slice(0, 3)
-        .map(([, v]) => ({ texto: v })));
+      const bloques = bloquesDePanel(b.props);
       // **La placa tambien en el panel, no solo a pleno.** `SidePanel` sabe
       // pintarla desde hace tiempo —la mete detras del bloque al 50% para que
       // el collage asome sin comerse el texto— y esto no se la pasaba nunca:

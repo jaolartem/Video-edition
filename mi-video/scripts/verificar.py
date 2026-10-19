@@ -495,8 +495,12 @@ def revisar(slug):
     # una etapa que no dice nada es una etapa que no está.
     beats_edl = {d.get("beat") for d in edl["detalle"]}
     tablero = {d.get("beat") for d in (edl.get("sin_toma") or [])}
+    # La firma es corta por definicion —el libreto dice «Soy Jaime Olarte.»,
+    # tres palabras— y paraba reel-20 por no llegar a cuatro (C-573).
+    firmas = {d.get("beat") for d in edl["detalle"]
+              if "firma" in str(d.get("etapa") or "").lower()}
     for b, t in sorted(dice.items()):
-        if len(t.split()) < 4:
+        if len(t.split()) < 4 and b not in firmas:
             mal.append(f"{slug} e{b}: dice «{t}» — no llega a una idea")
 
     # 3 · **El gancho es su cara.** Nunca un tablero: contradice el camino

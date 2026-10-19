@@ -166,6 +166,16 @@ def sucios(slug):
         # Y justo DESPUÉS: si también suena, es que sigue hablando y la tijera
         # cayó en medio. Si calla, el corte llegó a un silencio y está bien.
         despues = _db(mp4, b, MIRADA)
+        # **Con la misma vara que coloca el borde** (C-574): `Senal`, la de
+        # `fijar` y el cosido. Con ventanas de 80 ms, una pausa de 20-40 ms
+        # entre dos palabras —reel-22 e4, «hizo, | si lo»— no admitia ningun
+        # corte, y lo que el cosido daba por limpio la puerta lo paraba.
+        try:
+            from .senal import Senal
+            o = Senal(toma)
+            antes, despues = o._db(b - 0.04), o.suena(b)
+        except Exception:                          # noqa: BLE001
+            pass
         if antes is None or despues is None:
             continue
         if antes > VOZ and despues > VOZ:
