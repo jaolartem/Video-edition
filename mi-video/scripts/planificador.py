@@ -50,6 +50,20 @@ import rutas
 PESTANAS = 12
 MINIMO = 4
 
+#: **Lo que sigue en marcha de una vuelta a la siguiente** (C-577). Cada vuelta
+#: esperaba a la pieza mas lenta: el 18-10 el montaje de reel-20 —recortes con
+#: alfa, 40 min— tuvo a reel-19 sin pedido escrito mientras su disenador
+#: esperaba. Ahora la vuelta espera `ESPERA` segundos como mucho, devuelve lo
+#: que termino, y lo que sigue corriendo no se vuelve a lanzar hasta que acabe.
+ESPERA = 60
+_POOL = None
+_EN_CURSO: dict = {}
+
+
+def ocupadas() -> set:
+    """Las piezas cuyo trabajo de una vuelta anterior sigue corriendo."""
+    return {n for n, f in _EN_CURSO.items() if not f.done()}
+
 
 def por_pieza(hilos: int) -> int:
     """Cuántas pestañas le tocan a cada pieza si corren `hilos` a la vez."""
@@ -70,8 +84,8 @@ def antes_de_montar(piezas):
     if i is None or i == 0:
         return False
     previa = ruta[i - 1]["nombre"]
-    van = [n for n in piezas
-           if ((Pieza(n).fase or {}).get("nombre") == previa)]
+    van = [n for n in piezas if n not in ocupadas()
+           and ((Pieza(n).fase or {}).get("nombre") == previa)]
     if not van:
         return False
     # El interprete se resuelve, no se nombra: el antivirus ya se llevo
@@ -92,10 +106,13 @@ def antes_de_montar(piezas):
 class Planificador:
     """Recorre varias piezas a la vez, respetando quién escribe qué cinta."""
 
+    # De la clase y no de cada vuelta (C-577): un montaje que sigue de la
+    # vuelta anterior tiene tomado su candado, y la vuelta nueva tiene que verlo.
+    _candados: dict = {}
+    _reparto = threading.Lock()
+
     def __init__(self, hilos: int = 4):
         self.hilos = max(1, int(hilos))
-        self._candados: dict = {}
-        self._reparto = threading.Lock()
         #: Para el parte: cuántas veces alguien tuvo que esperar de verdad.
         self.esperas = 0
 
@@ -140,15 +157,22 @@ class Planificador:
         con varias piezas a la vez, el parte por orden de llegada es ilegible y
         además cambia entre corridas iguales.
         """
-        from concurrent.futures import ThreadPoolExecutor
+        global _POOL
+        from concurrent.futures import ThreadPoolExecutor, wait
 
         piezas = list(piezas)
         if self.hilos == 1 or len(piezas) < 2:
             return {n: trabajo(n) for n in piezas}
         salida: dict = {}
-        with ThreadPoolExecutor(max_workers=self.hilos) as pool:
-            futuros = {pool.submit(trabajo, n): n for n in piezas}
-            for f, n in futuros.items():
+        if _POOL is None:
+            _POOL = ThreadPoolExecutor(max_workers=self.hilos)
+        for n in piezas:
+            if n not in _EN_CURSO:
+                _EN_CURSO[n] = _POOL.submit(trabajo, n)
+        wait([_EN_CURSO[n] for n in piezas], timeout=ESPERA)
+        for n in piezas:
+            if _EN_CURSO[n].done():
+                f = _EN_CURSO.pop(n)
                 try:
                     salida[n] = f.result()
                 except Exception as e:                 # noqa: BLE001

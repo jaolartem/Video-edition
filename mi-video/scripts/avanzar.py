@@ -487,6 +487,7 @@ def _una_vuelta(a) -> int:
     #
     # Va aqui, al principio de la vuelta, porque devolver es enrutar y esto es
     # el enrutador. Lo aprobado no se devuelve: eso lo guarda `_devuelve`.
+    ocupadas = planificador.ocupadas()   # lo que sigue montandose (C-577)
     if not a.ver:
         # **Y lo que los oficios escribieron en su marcador entra en la base.**
         #
@@ -497,7 +498,7 @@ def _una_vuelta(a) -> int:
         #
         # Va delante de todo lo demas porque cambia lo que el resto de la
         # vuelta va a leer: un segmento aprobado deja de estar en juego.
-        for slug in (f"reel-{int(n):02d}" for n in piezas):
+        for slug in (f"reel-{int(n):02d}" for n in piezas if n not in ocupadas):
             try:
                 _estado.aplica(slug)
             except Exception as e:                 # noqa: BLE001
@@ -505,7 +506,8 @@ def _una_vuelta(a) -> int:
                                detalle=f"{slug}: {type(e).__name__}: {e}"[:200],
                                eco=False)
         for paso, slug in _contestadas_tarde():
-            _devuelve(slug, paso)
+            if int(slug[-2:]) not in ocupadas:
+                _devuelve(slug, paso)
     # **Las piezas que no comparten cinta trabajan a la vez.** El bucle de una
     # en una hacía que el paso más lento parase a las siete, incluidas las que
     # no dependían de él. Ver `planificador.py`.
