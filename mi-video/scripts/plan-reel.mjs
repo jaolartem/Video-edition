@@ -223,8 +223,14 @@ const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
   // dos escenas con 0,937 s de hueco entre ellas — «semanales» solo entre dos
   // silencios, el tiquet #287 y el t282 antes que el. reel-03 declara
   // 340,251-342,320 y arrancaba 0,317 s tarde, que es el «es que» del t279.
+  //
+  // **Y lo dice el JSON, no el parecido con la declaracion** (C-576).
+  // `fijar.declarar` parte el tramo declarado por sus silencios y marca cada
+  // trozo `fijado`; esos trozos ya no se parecen al rango entero y salian como
+  // «del automatismo». Aqui se les quitaba otra vez el aire con otra vara, y
+  // reel-18 se monto en 51,49 s con un JSON de 54,31: musica.sh lo paro.
   const t = conPausa(PAUSAS, d0.beat, a, b,
-                     declarado(a, b)
+                     d0.fijado || declarado(a, b)
                        ? [[a, b]]
                        : conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]));
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
