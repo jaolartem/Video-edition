@@ -247,6 +247,14 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             registro.aviso("avanzar", "el paso revento",
                            detalle=f"{pieza.slug}: {motivo}"[:600], eco=True)
             break
+        # **Si otro la movio mientras el paso corria, gana el que la movio**
+        # (C-579). reel-21, 22:50:32: el visto abrio el #659, su puerta la
+        # devolvio a «repasado», y en el mismo segundo este bucle volvio a
+        # escribir «medido» con la espera del visto encima. El tiquet quedo
+        # marcado como devuelto y la pieza, parada sin que nadie la moviera.
+        if (pieza.fase or {}).get("id") != actual["id"]:
+            motivo = f"{siguiente['nombre']}: la movio otro mientras corria"
+            break
         # **Un «no» que dice adonde volver no es un fallo: es un camino.**
         # `visto` contesta «no se enseña, vuelve a cosido» con `ok=False` y
         # `volver_a`; esto se cortaba aqui antes de mirar `volver_a`, y reel-07
