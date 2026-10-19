@@ -41,7 +41,11 @@ PUERTA = 12.0
 #: —30 de 132 salidas—, los bordes que Jaime señaló como *«el corte se come el
 #: final de las palabras»* estaban entre -7 y -14 dB; los limpios, por debajo
 #: de -40. El suelo va en medio y con margen.
-SUENA = -35.0
+#
+#: **Y es el mismo umbral que la puerta** (C-566): `bordes.VOZ`. Con −35 aqui y
+#: −42 en `verificar`, el cosido daba por callado lo que la puerta oia, y
+#: volvia a moverlo en la pasada siguiente: reel-22 e4 de 179,916 a 180,206.
+from .bordes import VOZ as SUENA  # noqa: E402
 #: Cuánto se puede alargar un corte para que la palabra termine. Medio segundo
 #: es una sílaba larga con su cola; más que eso ya no es cerrar la palabra, es
 #: traerse la siguiente. **1,2 s y no 0,5**: medido, los bordes que quedaban
@@ -180,8 +184,10 @@ class Senal:
             # valle de 20 ms entre dos silabas no es el final de la palabra.
             # reel-22 e4 se alargaba de 179,916 a 180,091, dentro de «lo», y la
             # puerta lo paraba por voz sonando.
-            if (self._db(u) <= SUENA and self._db(u + MEDIDA) <= SUENA):
-                return round(u + GRANO, 3)
+            # **Calla con la misma medida que decide mover** (C-566): si no,
+            # el punto elegido vuelve a «sonar» en la pasada siguiente.
+            if self.suena(u) <= SUENA:
+                return round(u, 3)
             u += GRANO
         return None
 
@@ -196,17 +202,47 @@ class Senal:
         que ya habia. Alargarlo es traerse la siguiente (C-558). Se mide con el
         umbral de la puerta, `bordes.VOZ`, para que las dos digan lo mismo.
         """
-        from .bordes import VOZ
-
         x, _sr = self.muestras
         if x is None or self.suena(t) <= SUENA:
             return None
         u = t
         while u >= t - maximo:
-            if self._db(u) <= VOZ:
+            if self.suena(u) <= SUENA:
                 return round(u, 3)
             u -= GRANO
         return None
+
+    def calla_entre(self, a: float, b: float) -> bool:
+        """¿No suena la voz en ningun punto de `[a, b]`? Con el umbral de la puerta."""
+        u = a
+        while u <= b:
+            if self._db(u) > SUENA:
+                return False
+            u += GRANO
+        return True
+
+    @staticmethod
+    def callar(tramos):
+        """`[(desde, hasta, cinta)]` con cada salida en silencio medido."""
+        return [(a, Senal(tk).salida_callada(a, b), tk) for a, b, tk in tramos]
+
+    def salida_callada(self, a: float, b: float) -> float:
+        """La salida `b` de un tramo, llevada al silencio medido (C-566).
+
+        La resuelve `fijar` al declarar, una vez: primero hacia atras —el hueco
+        que ya habia si el borde cayo en el arranque de la palabra siguiente—,
+        luego hacia delante como mucho `ALARGA`. Sin silencio, se queda donde la
+        declararon y la puerta lo dira.
+        """
+        try:
+            if self.suena(b) <= SUENA:
+                return b
+            atras = self.antes_calla(b, maximo=ALARGA)
+            if atras is not None and atras - a > 0.25:
+                return atras
+            return self.donde_calla(b, maximo=ALARGA) or b
+        except Exception:                          # noqa: BLE001
+            return b
 
     def __str__(self) -> str:
         return f"señal de {self.nombre}"

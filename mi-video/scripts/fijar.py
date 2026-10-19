@@ -260,9 +260,14 @@ def declarar(slug, beat, toma, tramos, por_que="", quien="servicio"):
     # toma dicha de un tirón dos etapas son contiguas en la cinta, y el ajuste
     # llevó la entrada de reel-19 e4 de 18,973 a 18,753, dentro de la e3: «guía
     # guía». Y declarado no lo mueve nadie, así que el cosido daba vueltas.
-    tramos = _sin_pisar_vecinas(slug, beat, tramos)
+    # **La salida se resuelve aqui, una vez, contra la onda** (C-566). Quien
+    # declara mide por whisper; el borde va al silencio medido mas cercano y
+    # ningun paso mecanico lo vuelve a tocar (ver `Tijera.protegido`).
+    from dominio.senal import Senal
+    tramos = Senal.callar(_sin_pisar_vecinas(slug, beat, tramos))
     if not tramos:
         return {"error": f"{slug} e{beat}: los tramos propuestos no tienen voz"}
+
     # La medida se hace sobre la cinta principal —la que mas segundos aporta—,
     # que es la que define el timbre de la etapa.
     _por_cinta = {}
@@ -672,7 +677,7 @@ def aplicar(slug, solo=None):
     orden = sorted(range(len(det)), key=lambda i: det[i].get("beat") or 0)
     edl["segmentos"] = [segs[i] for i in orden]
     edl["detalle"] = [det[i] for i in orden]
-    edl["duracion_s"] = round(sum(b - a for a, b in edl["segmentos"]), 2)
+    edl["duracion_s"] = round(sum(s[1] - s[0] for s in edl["segmentos"]), 2)
     # **Y el otro sitio donde vive la misma cifra.** El EDL lleva la duracion
     # dos veces —`duracion_s` y `duracion_montada_s`— y este paso solo tocaba
     # una: despues de fijar una etapa el fichero decia 93,92 y 93,36 a la vez.

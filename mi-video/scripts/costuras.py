@@ -101,6 +101,11 @@ def bordes(slug, ver=False):
     return n, len(sucios)
 
 
+#: El margen que `ajuste.a_la_voz` deja alrededor de la voz, con holgura de
+#: redondeo. Dentro de el, un borde ya esta bien puesto (C-566).
+MARGEN_VOZ = 0.125
+
+
 def sin_aire(slug, ver=False):
     """Quita de TODOS los segmentos el silencio que no es una pausa.
 
@@ -130,12 +135,18 @@ def sin_aire(slug, ver=False):
         #
         # Y no se pierde nada: `fijar.declarar` ya pasa cada tramo por
         # `_a_la_voz` al declararlo, asi que un tramo declarado llega recortado.
-        if tij.fijado(i):
+        if tij.protegido(i):
             nuevos.append((t, d))
             continue
         cinta = t.cinta or rutas.TOMAS.get(slug)
         trozos = fijar._a_la_voz(cinta, t.desde, t.hasta) if cinta else None
-        if not trozos:
+        # **Banda muerta del margen** (C-566): `a_la_voz` deja 0,12 s alrededor
+        # de la voz, y un borde que ya esta dentro de ese margen saltaba de un
+        # lado al otro en cada pasada —reel-22 e2, 139,625 / 139,745—. Sólo se
+        # recoloca lo que se sale del margen o se parte en varios trozos.
+        if (not trozos or len(trozos) == 1
+                and abs(trozos[0][0] - t.desde) <= MARGEN_VOZ
+                and abs(trozos[0][1] - t.hasta) <= MARGEN_VOZ):
             nuevos.append((t, d))
             continue
         quitado += t.dura - sum(y - x for x, y in trozos)
@@ -210,9 +221,14 @@ def cerrar_palabras(slug, ver=False):
                if j != i and tij.tramo(j).cinta == t.cinta
                and tij.tramo(j).desde >= t.hasta]
         topes[i] = min(sig) - 0.02 if sig else None
-    ondas, nuevos, cerrados, sonando = {}, [], 0, 0
+    ondas, cerrados, sonando = {}, 0, 0
     for i in range(len(tij)):
-        t, d = tij.tramo(i), tij.detalle(i)
+        # **Lo declarado y lo aprobado no se cierran aqui** (C-566): su borde
+        # se resolvio al declararlo (`fijar`) o lo vio Jaime. Moverlo era la
+        # deriva de reel-22 e4, 179,916 → 180,091 → 180,206.
+        if tij.protegido(i):
+            continue
+        t = tij.tramo(i)
         cinta = t.cinta or rutas.TOMAS.get(slug)
         if cinta and cinta not in ondas:
             try:
@@ -226,24 +242,23 @@ def cerrar_palabras(slug, ver=False):
         # entonces el hueco esta detras y se vuelve a el; no hay palabra que
         # cerrar. Solo si no, se alarga hasta que calle.
         atras = onda.antes_calla(t.hasta) if onda else None
-        if atras is not None and atras - t.desde > 0.25:
-            cerrados += 1
-            nuevos.append((Tramo(t.desde, atras, t.cinta), d))
-            continue
-        hasta = onda.donde_calla(t.hasta, maximo=margen) if (onda and margen > 0) else None
+        if atras is None or atras - t.desde <= 0.25:
+            atras = None
+        hasta = atras or (onda.donde_calla(t.hasta, maximo=margen)
+                          if (onda and margen > 0) else None)
         if hasta is None:
             if onda and onda.suena(t.hasta) > SUENA:
                 sonando += 1
-            nuevos.append((t, d))
             continue
-        cerrados += 1
-        nuevos.append((Tramo(t.desde, hasta, t.cinta), d))
+        # Trozo a trozo y por la tijera, que no reescribe la lista entera ni
+        # deja tocar lo protegido.
+        if ver or tij.mover(i, Tramo(t.desde, hasta, t.cinta)):
+            cerrados += 1
     if not cerrados:
         return 0
     if ver:
         print(f"  {slug}: cerraria {cerrados} palabra(s) en los bordes")
         return cerrados
-    tij.rehacer(nuevos)
     tij.guardar()
     registro.nota("costuras", "palabras cerradas en los bordes",
                   detalle=f"{slug}: {cerrados} borde(s), {sonando} sin cerrar")

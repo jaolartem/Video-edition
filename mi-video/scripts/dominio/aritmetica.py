@@ -248,12 +248,14 @@ class Aritmetica:
             eco = self._eco(a, b)
             if eco is None:
                 continue
-            self.tij.mover(i, Tramo(a.desde, eco, a.cinta))
+            # En seco no se mueve ni se guarda (C-566): `--ver` tocaba el EDL.
+            if not self.ver and not self.tij.mover(i, Tramo(a.desde, eco, a.cinta)):
+                continue
             tocados += 1
             if self.ver:
                 print(f"  {self.slug} e{self.tij.beat(i)}: la cola repetia el"
                       f" arranque del siguiente; acaba en {eco:.2f}")
-        if tocados:
+        if tocados and not self.ver:
             self.tij.guardar()
         return tocados
 
@@ -302,7 +304,12 @@ class Aritmetica:
             # deja escribir: fundirlo es lo único que se puede hacer.
             if tij.beat(i) == tij.beat(j) or b.hasta <= a.hasta + 0.001:
                 hasta = max(a.hasta, b.hasta)
-                tij.mover(i, Tramo(a.desde, hasta, a.cinta))
+                # **Sólo se quita el segundo si el primero lo absorbe** (C-566):
+                # con el primero declarado, `mover` se niega, y quitar el otro
+                # perdia el audio de despues del borde declarado.
+                if not (tij.mover(i, Tramo(a.desde, hasta, a.cinta))
+                        or b.hasta <= a.hasta + 0.001):
+                    continue
                 fuera.add(j)
                 dice = f"fundidos en [{a.desde:.2f}-{hasta:.2f}]"
             else:
@@ -360,6 +367,17 @@ class Aritmetica:
             if ga < bar:
                 na, ga = t.desde, 0.0
             if gb < bar:
+                nb, gb = t.hasta, 0.0
+            # **Hacia dentro sólo si lo que se deja fuera calla** (C-566): si
+            # no, se come el arranque o la cola de una palabra, y `sin_aire` lo
+            # devolvia en la pasada siguiente — reel-22 e2 oscilaba entre
+            # 139,51 y 139,745 cada vez que se cosia.
+            # Y nunca hacia fuera: eso es meter aire, que `sin_aire` quita en la
+            # pasada siguiente. Abrir un borde ya tiene dueno: `cerrar_palabras`
+            # en la salida y el RETROCESO de `a_la_voz` en la entrada.
+            if na < t.desde or (na > t.desde and not senal.calla_entre(t.desde, na)):
+                na, ga = t.desde, 0.0
+            if nb > t.hasta or (nb < t.hasta and not senal.calla_entre(nb, t.hasta)):
                 nb, gb = t.hasta, 0.0
             if nb - na <= 0.25 or (na == t.desde and nb == t.hasta):
                 continue

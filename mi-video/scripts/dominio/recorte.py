@@ -57,8 +57,16 @@ def dar_por_hecha(slug, nota_id):
         return
     rev["notas_aplicadas"] = sorted(ya | {nota_id})
     edl["revision"] = rev
-    json.dump(edl, open(ruta, "w", encoding="utf-8"),
-              ensure_ascii=False, indent=1)
+    # Y sólo si cambia (C-566): con 0 cortes reescribia el EDL igual y movia
+    # su fecha, que es lo que hace caducar el re-corte y el render.
+    texto = json.dumps(edl, ensure_ascii=False, indent=1)
+    try:
+        if open(ruta, encoding="utf-8").read() == texto:
+            return
+    except OSError:
+        pass
+    with open(ruta, "w", encoding="utf-8") as f:
+        f.write(texto)
 
 
 def retirar_fijados(slug, edl, antes):
@@ -140,13 +148,21 @@ def guardar(ruta, edl, hechos, ya):
     # fichero decía 62,79 y 88,81 a la vez. Es C-192 en el otro fichero que
     # recorta — quien lea la equivocada cree que la pieza dura 26 s más de lo que
     # dura.
-    edl["duracion_s"] = round(sum(b - a for a, b in edl["segmentos"]), 2)
+    edl["duracion_s"] = round(sum(s[1] - s[0] for s in edl["segmentos"]), 2)
     edl["duracion_montada_s"] = round(
-        sum(b - a for a, b in edl["segmentos"]), 2)
+        sum(s[1] - s[0] for s in edl["segmentos"]), 2)
     rev = dict(edl.get("revision") or {})
     rev["revision_final"] = " · ".join(
         f"{d:.0f}-{h:.0f}s: {q[:70]}" for _, d, h, q in hechos)
     rev["notas_aplicadas"] = sorted(ya | {nid for nid, _, _, _ in hechos})
     edl["revision"] = rev
-    json.dump(edl, open(ruta, "w", encoding="utf-8"),
-              ensure_ascii=False, indent=1)
+    # Y sólo si cambia (C-566): con 0 cortes reescribia el EDL igual y movia
+    # su fecha, que es lo que hace caducar el re-corte y el render.
+    texto = json.dumps(edl, ensure_ascii=False, indent=1)
+    try:
+        if open(ruta, encoding="utf-8").read() == texto:
+            return
+    except OSError:
+        pass
+    with open(ruta, "w", encoding="utf-8") as f:
+        f.write(texto)

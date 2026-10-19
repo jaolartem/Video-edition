@@ -58,11 +58,12 @@ class Tijera:
     abre la confianza: la abre la huella. Ver ahí por qué.
     """
 
-    __slots__ = ("m", "_sucio", "respetados")
+    __slots__ = ("m", "_sucio", "respetados", "_aprobados")
 
     def __init__(self, slug):
         self.m = Montaje(slug)
         self._sucio = False
+        self._aprobados = None
         #: Los trozos declarados que algún paso quiso tocar y no pudo. Vacío es
         #: lo normal; que no lo esté significa que un paso empujó contra una
         #: decisión declarada, y eso se dice al guardar.
@@ -93,6 +94,25 @@ class Tijera:
     def fijado(self, i: int) -> bool:
         return bool(self.detalle(i).get("fijado"))
 
+    def aprobado(self, i: int) -> bool:
+        """¿El segmento de este trozo esta aprobado contra el corte de hoy?
+
+        **Lo aprobado no se mueve por un paso mecanico** (C-566). Se aprueba
+        por segmento, y su huella es la de sus tramos: un milisegundo que mueva
+        el cosido le quita la aprobacion sin que nadie lo decida.
+        """
+        if self._aprobados is None:
+            try:
+                from .segmento import Segmento
+                self._aprobados = {x.n for x in Segmento.de(self.slug) if x.aprobado}
+            except Exception:                      # noqa: BLE001
+                self._aprobados = set()
+        return self.beat(i) in self._aprobados
+
+    def protegido(self, i: int) -> bool:
+        """Lo que ningun paso mecanico toca: lo declarado y lo aprobado."""
+        return self.fijado(i) or self.aprobado(i)
+
     # ── lo que se puede cambiar ─────────────────────────────────────────────
     def mover(self, i: int, nuevo: Tramo) -> bool:
         """El trozo `i` pasa a ser `nuevo`. **Y su detalle se mueve con él.**
@@ -101,7 +121,7 @@ class Tijera:
         los pasos cuentan por el retorno, así que negarse no infla el contador
         que decide si el cosido converge.
         """
-        if self.fijado(i):
+        if self.protegido(i):
             self.respetados.add(i)
             return False
         return self._escribir(i, nuevo)
@@ -122,7 +142,7 @@ class Tijera:
         ajuste añade o quita una palabra ya no es cuadrar el corte, es cambiar la
         etapa, y ahí manda la declaración: se respeta y se cuenta.
         """
-        if not self.fijado(i):
+        if not self.fijado(i) or self.aprobado(i):
             return self.mover(i, nuevo)
         ws = self.m.palabras(self.tramo(i).cinta)
         if not ws or self.tramo(i).huella_de(ws) != nuevo.huella_de(ws):
@@ -134,7 +154,9 @@ class Tijera:
         viejo = self.tramo(i)
         if abs(nuevo.desde - viejo.desde) < 1e-9 and abs(nuevo.hasta - viejo.hasta) < 1e-9:
             return False
-        self.m.edl["segmentos"][i] = [nuevo.desde, nuevo.hasta]
+        # Y la cinta, si el trozo la traia de tercer elemento (C-566).
+        self.m.edl["segmentos"][i] = [nuevo.desde, nuevo.hasta,
+                                      *self.m.edl["segmentos"][i][2:]]
         self.m.edl["detalle"][i] = {**self.detalle(i),
                                     "start": nuevo.desde, "end": nuevo.hasta}
         self._sucio = True
@@ -158,7 +180,7 @@ class Tijera:
         Un declarado se queda y se dice; el contador cuenta lo que de verdad
         salio, para que el paso que llama no crea que hizo mas de lo que hizo.
         """
-        fuera = {i for i in indices if not self.fijado(i)}
+        fuera = {i for i in indices if not self.protegido(i)}
         quedan = set(indices) - fuera
         if quedan:
             self.respetados |= quedan
@@ -180,7 +202,19 @@ class Tijera:
         mover sino una lista nueva.
         """
         edl = self.m.edl
-        edl["segmentos"] = [[t.desde, t.hasta] for t, _ in trozos]
+        # **Lo protegido sale igual que entro, o se para el paso** (C-566). Es
+        # lo que la clase prometia de `rehacer` y nadie comprobaba.
+        sale = {(d.get("beat"), round(t.desde, 3), round(t.hasta, 3)) for t, d in trozos}
+        for i in range(len(self)):
+            if self.protegido(i):
+                t = self.tramo(i)
+                if (self.beat(i), round(t.desde, 3), round(t.hasta, 3)) not in sale:
+                    raise DecisionMovida(
+                        f"{self.slug}: rehacer movia el trozo {i} (e{self.beat(i)},"
+                        f" {t.desde}-{t.hasta}), que es declarado o aprobado")
+        edl["segmentos"] = [[t.desde, t.hasta, *([t.cinta] if t.cinta and t.cinta
+                                                  != d.get("toma") else [])]
+                            for t, d in trozos]
         # Y cada trozo dice lo suyo, no lo de la etapa entera (C-543).
         edl["detalle"] = [
             {**d, "start": t.desde, "end": t.hasta,
@@ -219,9 +253,20 @@ class Tijera:
             sum(float(b) - float(a) for a, b in
                 (s[:2] for s in edl.get("segmentos") or [])), 2)
         edl["duracion_montada_s"] = edl["duracion_s"]
-        with open(self.m.pieza.ruta_edl, "w", encoding="utf-8") as f:
-            json.dump(edl, f, ensure_ascii=False, indent=1)
         self._sucio = False
+        # **Y sólo si el fichero cambia de verdad** (C-566). `anotar` marcaba
+        # sucio aunque escribiera lo mismo, y cada `costuras.py N` reescribia el
+        # EDL: su fecha nueva hacia caducar el plan, el re-corte 4K de todas las
+        # escenas y el render. Correr dos veces un paso deja el mismo fichero.
+        texto = json.dumps(edl, ensure_ascii=False, indent=1)
+        try:
+            with open(self.m.pieza.ruta_edl, encoding="utf-8") as f:
+                if f.read() == texto:
+                    return False
+        except OSError:
+            pass
+        with open(self.m.pieza.ruta_edl, "w", encoding="utf-8") as f:
+            f.write(texto)
         return True
 
     def __str__(self) -> str:

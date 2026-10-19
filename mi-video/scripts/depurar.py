@@ -138,6 +138,11 @@ class _Depurada:
         self.segs, self.det, self.cruces = [], [], []
         self.aire = self.quitado = 0.0
         self.rotas, self.brutos, self.partes = [], {}, []
+        try:
+            from dominio.segmento import Segmento
+            self.aprobados = {x.n for x in Segmento.de(m.slug) if x.aprobado}
+        except Exception:                          # noqa: BLE001
+            self.aprobados = set()
         self._depurar(m)
 
     def _depurar(self, m):
@@ -145,6 +150,15 @@ class _Depurada:
         for tramo, d in m.tramos():
             pal = m.palabras(tramo.cinta)
             self.brutos[d["beat"]] = (tramo.desde, tramo.hasta)
+            # **Lo declarado y lo aprobado no se depuran** (C-566): su corte
+            # ya lo decidio alguien, y recortarlo en cada pasada era la deriva
+            # de los tramos fijados de reel-18, 20 y 22.
+            if d.get("fijado") or d.get("beat") in self.aprobados:
+                segs.append(tramo)
+                det.append(d)
+                self.partes.append((tramo, d, [tramo], [],
+                                    Continuidad(pal, [(tramo.desde, tramo.hasta)])))
+                continue
             trozos = _dep.con_voz(pal, tramo)
             util = sum(t.dura for t in trozos)
             self.aire += tramo.dura - util
@@ -263,7 +277,11 @@ def _guardar(m, r):
     autoridad.
     """
     edl = m.edl
-    edl["segmentos"] = [[t.desde, t.hasta] for t in r.segs]
+    antes = json.dumps(edl, ensure_ascii=False, indent=1)
+    # La cinta del tercer elemento se conserva (C-566).
+    edl["segmentos"] = [[t.desde, t.hasta, *([t.cinta] if t.cinta and t.cinta
+                                             != d.get("toma") else [])]
+                        for t, d in zip(r.segs, r.det)]
     edl["detalle"] = r.det
     edl["fuentes"] = [d.get("toma") or "" for d in r.det]
     edl["duracion_montada_s"] = round(sum(t.dura for t in r.segs), 2)
@@ -274,8 +292,13 @@ def _guardar(m, r):
                        f"PALABRAS y no contra los tramos de habla. Ver "
                        f"scripts/depurar.py.")
     edl["revision"] = rev
+    # Y sólo si cambia (C-566): reescribirlo igual movia su fecha y con ella
+    # el re-corte y el render de la pieza entera.
+    texto = json.dumps(edl, ensure_ascii=False, indent=1)
+    if texto == antes:
+        return
     with open(m.pieza.ruta_edl, "w", encoding="utf-8") as f:
-        json.dump(edl, f, ensure_ascii=False, indent=1)
+        f.write(texto)
     registro.nota("depurar", "aire y repeticion fuera",
                   detalle=f"{m.slug}: {r.aire:.1f}s + {r.quitado:.1f}s")
 
