@@ -141,7 +141,21 @@ export function apartaDelGancho(pieza, slug) {
   if (!titular) return [];
   const fin = titular.at + titular.duration;
   const faltas = [];
-  pieza.paneles = (pieza.paneles ?? []).map((p) => {
+  // **Y el que repite el rótulo no se corre: se quita** (C-591). reel-18 y
+  // reel-21, 19-10: el panel de e1 decía lo mismo que el titular —«A MÍ
+  // TAMBIÉN / ME DA MIEDO.»— y, corrido a 5 s, lo volvía a decir en e2. Nada se
+  // dice dos veces.
+  const plano = (t) => String(t ?? "").normalize("NFD").replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim().toLowerCase();
+  const rotulo = plano((titular.rotulo?.lineas ?? []).join(" "));
+  pieza.paneles = (pieza.paneles ?? []).flatMap((p) => {
+    if (rotulo && plano((p.bloques ?? []).map((b) => b?.texto).join(" ")) === rotulo) {
+      faltas.push(`${slug}: el panel del beat ${p.beat ?? "?"} repite el rótulo del` +
+        " gancho: se quita, nada se dice dos veces.");
+      return [];
+    }
+    return [p];
+  }).map((p) => {
     if (p.at >= fin || p.at + p.duration <= titular.at) return p;
     faltas.push(
       `${slug}: el panel del beat ${p.beat ?? "?"} empieza dentro del gancho` +

@@ -174,6 +174,29 @@ def dibujable(parrafo, texto):
     return (any(c in t for c in COMPARA) and any(c in t for c in CONCRETO))
 
 
+def completa(slug, detalle):
+    """El `trato` de cada etapa del detalle: lo que decidió quien describe, si
+    falta, y **la portada en la etapa que abre el montaje, y sólo en ésa** (C-590).
+
+    `decidir` ya lo dice —«la portada es mecánica y no se renegocia»—, pero el
+    `trato` del JSON sólo se rellenaba si faltaba, así que una portada de otro
+    corte se quedaba: reel-21, 19-10, la llevaba en e2. El gancho entraba a los
+    5,03 s, en el tercio de Meta, y e1 iba como diapositiva. Se corrige en el
+    sitio, sobre el detalle ya ordenado.
+    """
+    abre = (detalle[0] if detalle else {}).get("beat")
+    for d in detalle:
+        if d.get("beat") is not None and not d.get("trato"):
+            t, porque = decidido(slug, d["beat"])
+            if t:
+                d["trato"], d["trato_porque"] = t, porque
+        if d.get("beat") == abre:
+            d["trato"] = "portada"
+        elif d.get("trato") == "portada":
+            t, _ = decidido(slug, d.get("beat"))
+            d["trato"] = t if t and t != "portada" else "diapositiva"
+
+
 def decidir(*, desde_s, dura_s, parrafo, texto, literal, voz_st,
             nivel=None, figura=None, es_cta=False, decidido=None):
     """El tratamiento de un segmento, con el porqué.

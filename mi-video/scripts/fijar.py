@@ -655,14 +655,6 @@ def aplicar(slug, solo=None):
     # El nombre de la etapa vive en el frame y lo pone `beats`; aqui basta con
     # que no se pierda el que ya trae el detalle. Lo que el render exige y se
     # perdia es el `trato`.
-    for d in det:
-        b = d.get("beat")
-        if b is None:
-            continue
-        if not d.get("trato"):
-            t, porque = _tr.decidido(slug, b)
-            if t:
-                d["trato"], d["trato_porque"] = t, porque
 
     # **Por etapa, y DENTRO de la etapa como se construyo.**
     #
@@ -677,6 +669,7 @@ def aplicar(slug, solo=None):
     orden = sorted(range(len(det)), key=lambda i: det[i].get("beat") or 0)
     edl["segmentos"] = [segs[i] for i in orden]
     edl["detalle"] = [det[i] for i in orden]
+    _tr.completa(slug, edl["detalle"])   # y la portada, la que abre (C-590)
     edl["duracion_s"] = round(sum(s[1] - s[0] for s in edl["segmentos"]), 2)
     # **Y el otro sitio donde vive la misma cifra.** El EDL lleva la duracion
     # dos veces —`duracion_s` y `duracion_montada_s`— y este paso solo tocaba
