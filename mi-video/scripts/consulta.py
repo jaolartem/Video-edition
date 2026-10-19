@@ -97,6 +97,20 @@ def abanico(frase, cintas=None, tope=12):
     return _abanico(frase, cintas, tope)
 
 
+def candidatas(slug, etapa, cuantas=3):
+    """Las tomas que la seleccion dejo para esa etapa, la mejor primero. C-586.
+
+    Es el primer peldaño de la escalera del compositor —*«si hay tomas para esa
+    etapa, se elige entre ellas»*— y su pedido no las traia: las buscaba a mano,
+    con `abanico` y leyendo transcripts, en 44 llamadas (reel-19, 18-10).
+
+        python scripts/consulta.py candidatas '["reel-19", 1]'
+    """
+    import revalidar
+
+    return revalidar.candidatas(slug, int(etapa), int(cuantas))
+
+
 def brolls(minimo=2.0, maximo=8.0, cintas=None):
     """Los tramos donde él está en cuadro y no habla. Material de transición."""
     return _brolls(minimo, maximo, cintas)
@@ -405,6 +419,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "onda": onda,
           "repetido": repetido,
           "abanico": abanico,
+          "candidatas": candidatas,
           "brolls": brolls,
           "pausas": pausas,
           "voz": voz,

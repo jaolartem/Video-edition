@@ -175,6 +175,9 @@ class Momento:
     trae: tuple[str, ...] = ()
     no_trae: tuple[str, ...] = ()
     nota: str = ""
+    #: Los apartados del prompt que lee ese momento; `()` = entero (C-583).
+    #: Ver `dominio/pliego.py`.
+    lee: tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)

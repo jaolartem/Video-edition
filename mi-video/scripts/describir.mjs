@@ -132,17 +132,25 @@ function describePieza(slug, filas) {
   // la foto»*. Salen de la CINTA porque cuando el que compone elige, el montaje
   // todavia no existe — y sin esto el bloque que los pide en el prompt seria
   // otra cosa declarada y no implementada, que es la averia de la casa.
+  // **En una hoja, y con sus candidatas** (C-584, C-586). Jaime, 19-10-2026: los
+  // agentes trabajan con un documento, no con el video. Y las candidatas son el
+  // primer peldaño de su escalera: las buscaba a mano, 44 llamadas en reel-19.
+  // Solo de lo que puede tocar: lo aprobado va de contexto.
+  const editables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
+  const suya = (f) => !editables || editables.includes(Number(f.orden));
   const conFotos = filas.map((f) => {
+    const c = suya(f) ? { candidatas: JSON.parse(sql("candidatas", [slug, f.orden]) || "[]") } : {};
     const d = (f.toma && f.start != null && f.end != null) ? f : null;
-    if (!d) return f;
+    if (!d) return { ...f, ...c };
     try {
-      const j = execFileSync("python", ["-c",
+      const j = JSON.parse(execFileSync("python", ["-c",
         "import sys,json;sys.path.insert(0,'scripts');import fotogramas as F;"
-        + "print(json.dumps(F.de_la_escena(sys.argv[1],int(sys.argv[2]))))",
+        + "f=F.de_la_escena(sys.argv[1],int(sys.argv[2]));print(json.dumps({'f':f,"
+        + "'h':F.Hoja.de_la_cinta(sys.argv[1],int(sys.argv[2]),f).escribe()}))",
         slug, String(f.orden)],
-        { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
-      return { ...f, fotogramas: JSON.parse(j) };
-    } catch { return f; }
+        { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } }));
+      return { ...f, ...c, fotogramas: j.f, hoja: j.h };
+    } catch { return { ...f, ...c }; }
   });
   // **Y el DESPUES: como quedo esa escena ya montada.** Jaime, 7-9-2026: *«el
   // compositor puede ver dos tipos de fotogramas, los del video base y las 3 o
@@ -156,6 +164,15 @@ function describePieza(slug, filas) {
   try {
     despues = JSON.parse(sql("montada_en_fotogramas", [slug]) || "[]");
   } catch { despues = []; }
+  // **Y en hoja** (C-584): el despues en un documento, no en treinta fotogramas.
+  let enHoja = [];
+  try {
+    enHoja = despues.length ? JSON.parse(execFileSync("python", ["-c",
+      "import sys,json;sys.path.insert(0,'scripts');import fotogramas as F;"
+      + "print(json.dumps(F.Hoja.del_render(sys.argv[1],json.load(sys.stdin),None,'montada').escribe()))",
+      slug], { encoding: "utf8", input: JSON.stringify(despues),
+               env: { ...process.env, PYTHONIOENCODING: "utf-8" } })) : [];
+  } catch { enHoja = []; }
   // **`pedidoDe` devuelve UN TEXTO, no un objeto.** Esto lo esparcia con `...`,
   // y esparcir una cadena en un objeto la parte caracter a caracter: el pedido
   // de reel-03 salia con 3.420 claves —`"0": "R", "1": "e", "2": "e"…`— que son
@@ -174,7 +191,6 @@ function describePieza(slug, filas) {
   //
   // `null` = la pieza entera es editable, que es el modo normal, el de componer
   // de cero. Una lista = sólo ésas; las demás van de contexto.
-  const editables = JSON.parse(sql("acotado", [slug, "descrito"]) || "null");
   const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
                     revisa_oyendo: escucha, tiquets, editables,
                     // **Lo que la linea ya midio, delante de quien decide.**
@@ -186,7 +202,7 @@ function describePieza(slug, filas) {
                     // a la fase 10 — o sea a despues de pagarle a el y al
                     // disenador. C-359.
                     la_linea_midio: JSON.parse(sql("lo_medido", [slug]) || "[]"),
-                    ya_montada_asi: despues };
+                    ya_montada_en_hoja: enHoja, ya_montada_asi: despues };
   // **El contrato tiene dos capas y esta es la segunda.** Las capacidades no
   // cambian —son lo que sabe hacer—; lo que cambia es el encargo. El otro
   // oficio la pone con `abierto.modo` (`servicios/disenar.py`); aqui llega por

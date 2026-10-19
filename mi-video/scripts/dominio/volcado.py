@@ -46,6 +46,40 @@ def _en_renglones(ins):
             for i in ins]
 
 
+def _sin_repetir(decididos):
+    """Lo ya decidido, una vez por cosa dicha: `veces` cuenta las demas. C-585.
+
+    reel-19, 18-10: 35 tiquets cerrados en cada pedido, y 18 eran la misma queja
+    de la linea —«no se puede dibujar: Cover se declara con hook…»— cerrada en
+    cada vuelta. Quince KB por pedido para decir una cosa. Se queda la ultima,
+    que es la que dice como acabo.
+    """
+    if not isinstance(decididos, list):
+        return decididos
+    ultima, veces = {}, {}
+    for t in decididos:
+        k = (t.get("etapa"), t.get("dijo")) if isinstance(t, dict) else id(t)
+        ultima[k], veces[k] = t, veces.get(k, 0) + 1
+    return [dict(t, veces=veces[k]) if veces[k] > 1 else t for k, t in ultima.items()]
+
+
+#: Lo que dice algo de un tiquet abierto. C-585.
+DICHO = ("id", "cuando", "segundo", "beat", "dijo", "tipo", "vuelve_a", "devuelto")
+
+
+def _lo_dicho(tiquets):
+    """Los tiquets abiertos con sus palabras enteras, sin la fila de la base.
+
+    Viajaban con sus veinte columnas: `estado` siempre «abierto», `pieza` la del
+    pedido, la huella interna y seis `*_id` a `null`. reel-22, 18-10: 22
+    tiquets, 10,4 KB; lo que dicen, 3,7 KB. Lo que Jaime dijo va entero.
+    """
+    if not isinstance(tiquets, list):
+        return tiquets
+    return [{k: t[k] for k in DICHO if t.get(k) not in (None, "")}
+            if isinstance(t, dict) else t for t in tiquets]
+
+
 def _referencia(slug, prompt):
     """Donde esta el contrato, con su huella: el texto va en `.prompt.md`.
 

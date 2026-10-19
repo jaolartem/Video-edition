@@ -146,7 +146,7 @@ def _tickets(slug):
         from dominio import ticket
 
         ticket.recolocar(slug)
-        return ticket.abiertos(slug)
+        return _lo_dicho(ticket.abiertos(slug))  # sin la fila de la base: C-585
     except Exception as e:                        # noqa: BLE001
         return _falta("tiquets", e, [])
 
@@ -173,7 +173,7 @@ def _decididos(slug):
                     and (mapa is None or t["beat"] is None or t["beat"] in mapa)]
 
         origen, mapa = origen_de(slug)
-        return de(slug) + (de(origen, mapa) if origen else [])
+        return _sin_repetir(de(slug) + (de(origen, mapa) if origen else []))  # C-585
     except Exception as e:                        # noqa: BLE001
         return _falta("lo_ya_decidido", e, [])
 
@@ -325,8 +325,8 @@ def contexto(paso, slug):
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 
-from dominio import instruccion as _instruccion  # noqa: E402  C-564
-from dominio.volcado import _referencia, _volcar  # noqa: E402  C-550
+from dominio import instruccion as _instruccion, pliego as _pliego  # noqa: E402  C-564
+from dominio.volcado import _lo_dicho, _referencia, _sin_repetir, _volcar  # noqa: E402
 
 
 def _prompt_aparte(paso, slug, prompt):
@@ -363,8 +363,9 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # `docs/piso.md` es el minimo que no se puede evitar, con sus palabras, y se
     # antepone aqui. Cambiarlo cambia los cinco contratos a la vez, que es lo
     # unico que mantiene un criterio siendo uno.
-    if _piso():
-        prompt = _piso() + SEPARA + prompt
+    # **Y del contrato del paso, sólo los apartados que su momento lee**
+    # (C-583, `dominio/pliego.py`). El piso va entero, como siempre.
+    prompt = (_piso() + SEPARA if _piso() else "") + _pliego.para(paso, prompt)
     # **Lo que exigen los CUATRO contratos va por un solo sitio**, igual que el
     # piso. `contratos.py` lo lleva diciendo desde que existe: `hoy`, `evento` y
     # `datos_respaldados` figuran como exigidos en los cuatro y **no se enviaban

@@ -67,7 +67,7 @@ DISENO = Contrato(
                 trae=("encargo", "canon", "otras_etapas", "topes", "camara",
                       "composicion", "figuras", "ya_en_pantalla",
                       "correccion", "placas", "voz"),
-                no_trae=(),
+                no_trae=(), lee=("-Si el pedido es de `visto`",),  # C-583
                 nota="Después de `descrito`, que es quien dice qué etapas llevan"
                      " tablero y qué tiene que quedar dicho en cada uno. Antes de"
                      " `cortado`: montar sobre un corte que aún puede moverse es"
@@ -86,7 +86,18 @@ DISENO = Contrato(
                       "motivos_abiertos"),
                 no_trae=("encargo", "canon", "otras_etapas", "topes", "camara",
                          "composicion", "figuras", "ya_en_pantalla",
-                         "correccion", "placas", "voz"),
+                         "correccion", "placas", "voz", "intencion_del_gancho",
+                         "arco", "laminas", "estilo", "antes_de_dibujar",
+                         "piezas", "prioridad", "oficio_reel", "sonidos",
+                         "volumenes"),
+                # **Y lee sólo lo suyo** (C-583): quién es, cumplimiento, cómo
+                # se mira y qué contesta. El taller de componer no le sirve
+                # para decir si se enseña, y eran 36 KB de cada visto.
+                lee=("Diseñar — prompt fijo", "El copy, y por qué",
+                     "Cumplimiento, que manda", "`fuente` es LA LÍNEA DEL PIE",
+                     "La fecha y el precio", "Antes de contestar: MÍRALO",
+                     "ANTES DE APROBAR NADA", "Y tu respuesta lo tiene",
+                     "Si el pedido es de `visto`", "Si la toma es lectura"),
                 nota="Aquí no recibe encargos: recibe **el artefacto medido** —lo"
                      " que dura, dónde calla, qué costuras se oyen, qué dice dos"
                      " veces y qué hay en pantalla sobre qué texto— y contesta"
@@ -110,7 +121,7 @@ DISENO = Contrato(
         # campana.
         Campo("intencion_del_gancho",
               manda=Aguja("scripts/contrato/marca.py", "ENTRADA_GANCHO = {"),
-              exige=(Prompt("scripts/disenar.prompt.md", "parar el scroll"),),
+              exige=(Prompt("scripts/disenar.prompt.md", "compite contra el pulgar"),),  # C-583
               nota="Jaime: «que todos los hooks se revisen y se hagan animados"
                    " de verdad, que paren scroll». El gancho no compite contra"
                    " otro video, compite contra el pulgar, y pierde en tres"
@@ -118,7 +129,7 @@ DISENO = Contrato(
                    " de opacidad, un texto que aparece, una placa que cruza."),
         Campo("encargo",
               manda=Aguja("scripts/servicios/disenar.py", '"encargo": f["grafico"],'),
-              exige=(Prompt("scripts/disenar.prompt.md", "el encargo no se reinterpreta"),),
+              exige=(Prompt("scripts/disenar.prompt.md", "no un encargo cerrado"),),  # C-583: #43
               nota="**El contrato de este paso lo escribe el paso anterior.**"
                    " Jaime: *«el contrato del segundo lo crea el primero; el"
                    " segundo hace el diseño gráfico, de las escenas y del"
@@ -197,6 +208,14 @@ DISENO = Contrato(
               nota="Los siete efectos que existen, con lo que hace cada uno."
                    " Sin esto el disenador describia el sonido con sus palabras"
                    " —«un roce grave y arrastrado»— y la capa se montaba muda."),
+        # **La hoja de contacto: un documento, no un video** (C-584). Jaime,
+        # 19-10-2026. Un campo por momento porque cada uno la manda desde su
+        # servicio; la frase que la usa la leen los dos.
+        *(Campo("hoja", manda=Aguja(f, aguja), en=(fase,), exige=(Prompt(
+            "scripts/disenar.prompt.md", "Mira primero la hoja de contacto"),))
+          for fase, f, aguja in (
+              ("visto", "scripts/servicios/visto.py", 'd["hoja"] = fotogramas.Hoja.del_render('),
+              ("disenado", "scripts/servicios/disenar.py", '"hoja": _fotogramas.Hoja.del_render('))),
         Campo("verse",
               manda=Aguja("scripts/servicios/disenar.py", '"verse": VERSE,'),
               exige=(Prompt("scripts/disenar.prompt.md", "míralo antes de contestar"),),

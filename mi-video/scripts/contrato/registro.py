@@ -11,7 +11,9 @@ salta el contrato en silencio.
 """
 from __future__ import annotations
 
-from .aguja import NADIE
+import os
+
+from .aguja import NADIE, RAIZ
 from .piezas import Campo, Contrato, Momento
 
 
@@ -88,4 +90,29 @@ class Registro:
                 for a in kv.dispara:
                     if a is not NADIE and not a.esta():
                         perdidos.append(f"{c.paso} · clave «{kv.nombre}» -> {a}")
+            perdidos += self.fuera_de_lo_leido(c)
         return perdidos, sin_clausula
+
+    def fuera_de_lo_leido(self, c: Contrato) -> list[str]:
+        """Lo que un momento corta del contrato y aun asi le hace falta (C-583).
+
+        Un momento que lee por apartados (`Momento.lee`) no ve el resto del
+        fichero. Si un titulo declarado ya no esta, o un campo que le llega se
+        exige con una frase que cae fuera de lo que lee, ese campo viaja y nadie
+        sabe para que: se para el build.
+        """
+        from dominio.pliego import Pliego
+
+        fuera = []
+        for m in (x for x in c.momentos if x.lee):
+            try:
+                p = Pliego.de(os.path.join(RAIZ, c.prompt))
+            except OSError:
+                fuera.append(f"{c.paso} · {m.fase} lee por apartados y no esta {c.prompt}")
+                continue
+            fuera += [f"{c.paso} · {m.fase} lee «{t}» y el prompt ya no lo tiene"
+                      for t in p.faltan(m.lee)]
+            fuera += [f"{c.paso} · {m.fase} recibe «{k.nombre}» y no lee «{e.frase}»"
+                      for k in self.campos_del_momento(m.fase) for e in k.exige
+                      if e.fichero == c.prompt and not p.frase_dentro(m.lee, e.frase)]
+        return fuera

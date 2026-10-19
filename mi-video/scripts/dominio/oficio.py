@@ -113,15 +113,17 @@ ENCARGO = (
 #: pedido en 20 tandas y gasto 4,3 M tokens de entrada (C-552).
 REVISION = (
     " Es una REVISION de lo que el codigo ya hizo, no una composicion desde"
-    " cero. Lee el contrato y el pedido una sola vez cada uno, mas los"
-    " fotogramas que el pedido senale y los ficheros de `_comun` que nombre"
-    " (se leen una vez); no abras otros ficheros, no busques, no ejecutes nada. Si lo hecho cumple, contesta lo minimo que el contrato"
+    " cero. Lee el contrato y el pedido una sola vez cada uno, sus hojas de"
+    " contacto (`hoja`) y los ficheros de `_comun` que nombre (se leen una"
+    " vez); un fotograma suelto, solo de la escena que te haga dudar. No abras"
+    " otros ficheros, no busques, no ejecutes nada. Si lo hecho cumple, contesta lo minimo que el contrato"
     " admite y cambia solo lo que no cumple. Tope: {lecturas} lecturas y una"
     " escritura; si no basta, dilo en la respuesta y para."
 )
-#: Las lecturas del tope: el contrato (1), el pedido (hasta 2.243 lineas tras
-#: C-550: 2 tandas) y margen para los fotogramas de quien disena.
-LECTURAS = 6
+#: Las lecturas del tope: el contrato (1), el pedido (1), los comunes (1), las
+#: hojas de contacto (2-3, C-584) y un fotograma suelto. Eran 6 cuando el
+#: pedido se leia en dos tandas (C-550) y los fotogramas iban de uno en uno.
+LECTURAS = 7
 
 
 def _mata_el_arbol(pid: int) -> None:
@@ -250,10 +252,13 @@ class Oficio:
             # respuesta, en todas las llamadas del 17 y el 18-10 (C-549).
             "--disallowedTools", "Agent Task", "-p",
             self.encargo()]
+        # **Y sin el CLAUDE.md, que es del operador** (C-587): el contrato es su
+        # instruccion completa, y eran ~10 K tokens por llamada. Por la sesion
+        # lo quita `omitClaudeMd` en `.claude/agents/`; por el CLI, esto.
         with subprocess.Popen(orden, cwd=CASA, stdin=subprocess.DEVNULL,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              text=True, encoding="utf-8",
-                              errors="replace") as p:
+                              text=True, encoding="utf-8", errors="replace",
+                              env={**os.environ, "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}) as p:
             try:
                 salida, err = p.communicate(timeout=ESPERA)
             except subprocess.TimeoutExpired:

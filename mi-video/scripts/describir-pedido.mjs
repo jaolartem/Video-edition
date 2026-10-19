@@ -149,6 +149,15 @@ export function entradaDe(slug, filas) {
         //
         // Los frames salen de la CINTA y no del render, porque cuando el que
         // compone elige, el montaje todavia no existe.
+        ...(f.candidatas && f.candidatas.length
+          ? ["Candidatas de la seleccion para esta etapa, la mejor primero:",
+             ...f.candidatas.map((x) => `  ${x.puesto}. ${x.toma} ${x.desde}-${x.hasta} s`
+               + ` (${x.dura} s) · intensidad ${x.intensidad} · altura ${x.altura}`
+               + ` · velocidad ${x.velocidad} · «${x.texto}»`)]
+          : []),
+        ...(f.hoja && f.hoja.length
+          ? [`Hoja de la toma (sus cinco fotogramas en una fila): ${f.hoja.join(" ")}`]
+          : []),
         ...(f.fotogramas && f.fotogramas.length
           ? ["Mira estos cinco fotogramas de la toma y dime si esta LEYENDO."
              + " Que buscar, con sus palabras: «generalmente tengo el papel en"

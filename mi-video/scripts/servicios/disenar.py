@@ -295,6 +295,7 @@ class ServicioDisenar(Servicio):
             # en todo tablero, una forma de fuera va en `cubre: panel` o `banda`.
             **_dib.de_la_pieza(pieza),
             "mira_estos_fotogramas": mirar,
+            "hoja": _fotogramas.Hoja.del_render(pieza.slug, mirar, None, "disenar").escribe(),  # C-584
             # **Y como suena cada corte.** Jaime, 7-9-2026: *«ambos que vean y
             # oigan; con eso el compositor sabe si estoy leyendo en una toma»*.
             # Vale para los dos oficios y por el mismo motivo: leer se ve en la

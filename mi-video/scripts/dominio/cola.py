@@ -31,9 +31,10 @@ LOTE = (
     "Es una REVISION de lo que el código ya hizo, no una composición desde"
     " cero: si lo hecho cumple, contesta lo mínimo que el contrato admite y"
     " cambia sólo lo que no cumple. No abras otros ficheros, no busques, no"
-    " ejecutes nada. Tope: 2 lecturas y una escritura por pedido, más el"
-    " contrato y los comunes una vez; si no basta, dilo en esa respuesta y"
-    " sigue con la siguiente."
+    " ejecutes nada. Tope por pedido: leerlo, sus hojas de contacto (`hoja`) y"
+    " como mucho dos fotogramas sueltos de la escena que te haga dudar, y una"
+    " escritura; el contrato y los comunes, una vez. Si no basta, dilo en esa"
+    " respuesta y sigue con la siguiente."
 )
 
 

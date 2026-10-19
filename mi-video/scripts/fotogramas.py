@@ -41,6 +41,7 @@ import json
 import os
 import subprocess
 import sys
+import textwrap
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -255,10 +256,155 @@ def sacar(n, cuantos=CUANTOS):
     return hechas, None
 
 
+class Hoja:
+    """**La hoja de contacto: la pieza en un documento, no en un video.** C-584.
+
+    Jaime, 19-10-2026: *«hacer hojas de contacto antes de presentar el video;
+    con eso los agentes no tienen que ver los videos sino que trabajan con algo
+    mas facil, un documento»*, y *«de facil lectura»*.
+
+    El visto abria un fotograma por etapa, uno a uno: entre 9 y 23 imagenes y
+    hasta 28 llamadas por pieza (W40, 18-10). Dos hojas, segun quien mira:
+
+    - **La del render** (`del_render`): un fotograma por escena —el del medio,
+      que es el estado estable—, rotulado con su etapa, su escena y su segundo,
+      y debajo lo que se dice en ese momento. Los cinco de cada escena siguen en
+      disco: se abren solo los de la escena que dude.
+    - **La de la cinta** (`de_la_cinta`): los cinco de una etapa en una fila,
+      que es como el que compone ve si esta leyendo —la mirada baja a ratos—.
+
+    **Y legible antes que pequena.** Cada hoja cabe en `TOPE_PX`, que es lo que
+    el modelo ve sin reducir la imagen: mas grande, la encoge el y el rotulo
+    deja de leerse. Por eso van `POR_HOJA` fotogramas como mucho.
+    """
+
+    POR_HOJA = 6
+    TOPE_PX, LADO = 1_150_000, 1568
+    CABEZA, BANDA = 30, 78         # la etapa encima; lo que se dice, debajo
+
+    def __init__(self, slug, tiros, nombre="hoja", en_fila=False):
+        self.slug, self.nombre, self.en_fila = slug, nombre, en_fila
+        #: `(rotulo, segundo, fichero, pie)`, en el orden en que se leen.
+        self.tiros = list(tiros)
+        self.banda = self.BANDA if any(t[3] for t in self.tiros) else 0
+
+    #: Lo que el spec pinta encima del plano: no puede quedar sin fotograma.
+    CAPAS = ("boards", "paneles", "recortes")
+
+    @classmethod
+    def del_render(cls, slug, hechas, etapas=None, nombre="hoja") -> "Hoja":
+        """Un fotograma por escena del render, con lo que se dice debajo.
+
+        **Por escena, no por etapa.** La primera medida (reel-21, 19-10) iba con
+        uno por etapa, no vio «ESCRIBA RETIRO.» —vive en la escena 10, una de
+        las dos de e5— y el visto devolvio la pieza por un rotulo que estaba.
+        La escena es la unidad del montaje; y si un tablero, un panel o un
+        recorte cae entre los fotogramas elegidos, se anade el suyo.
+        """
+        escs = [e for e in hechas or []
+                if e.get("mira") and (etapas is None or e.get("etapa") in etapas)]
+
+        def en(e, k):
+            return e["mira"][k].get("en", (e["desde"] + e["hasta"]) / 2)
+
+        dicho, capas = cls._spec(slug)
+        elegidos = {(e["escena"], len(e["mira"]) // 2): e for e in escs}
+        for a, b in capas:
+            if any(a <= en(e, k) <= b for (_n, k), e in elegidos.items()):
+                continue
+            mitad = (a + b) / 2
+            e = next((x for x in escs if x["desde"] <= mitad < x["hasta"]), None)
+            if e:
+                k = min(range(len(e["mira"])), key=lambda i: abs(en(e, i) - mitad))
+                elegidos[(e["escena"], k)] = e
+        tiros = []
+        for (_n, k), e in sorted(elegidos.items(), key=lambda x: en(x[1], x[0][1])):
+            t = en(e, k)
+            pie = " / ".join(x for a, b, x in dicho if a <= t < b) or "(sin subtitulo)"
+            tiros.append((f"e{e.get('etapa')} · esc {e['escena']}", t, e["mira"][k]["fichero"], pie))
+        return cls(slug, tiros, nombre=nombre)
+
+    @classmethod
+    def de_la_cinta(cls, slug, etapa, fotos) -> "Hoja":
+        """Los fotogramas de una etapa en la cinta, en una fila. Ver `de_la_escena`."""
+        return cls(slug, [(f"e{etapa} cinta", x.get("en", 0), x["fichero"], "")
+                          for x in fotos or []], nombre=f"cinta-e{etapa}", en_fila=True)
+
+    @classmethod
+    def _spec(cls, slug):
+        """Del spec que se renderizo: los subtitulos y las capas, en segundos."""
+        try:
+            n = int(slug.split("-")[1])
+            spec = json.load(open("src/reels.json", encoding="utf-8"))
+            r = next((x for x in spec if x.get("id") == f"Reel-R{n}"), {})
+        except (OSError, ValueError, IndexError):
+            return [], []
+        tramo = lambda c: (c["at"] / 30, (c["at"] + c["duration"]) / 30)  # noqa: E731
+        dicho = [(*tramo(c), c.get("text", "")) for c in r.get("captions") or []
+                 if "at" in c and "duration" in c]
+        capas = [tramo(c) for k in cls.CAPAS for c in r.get(k) or []
+                 if isinstance(c, dict) and "at" in c and "duration" in c]
+        cta = r.get("cta")
+        if isinstance(cta, dict) and "at" in cta and "dur" in cta:
+            capas.append((cta["at"], cta["at"] + cta["dur"]))
+        return dicho, capas
+
+    def _ancho(self, k):
+        """`(columnas, ancho)`: el reparto que deja cada fotograma mas grande."""
+        def cabe(cols, w):
+            alto = -(-k // cols) * (w * 16 / 9 + self.CABEZA + self.banda)
+            return cols * w * alto <= self.TOPE_PX and max(cols * w, alto) <= self.LADO
+
+        return max(((c, max([w for w in range(120, 541, 4) if cabe(c, w)] or [120]))
+                    for c in ([k] if self.en_fila else range(1, k + 1))), key=lambda x: x[1])
+
+    def escribe(self) -> list:
+        """Las hojas en disco, con su ruta absoluta. `[]` si no hay que mirar."""
+        from PIL import Image, ImageDraw, ImageFont
+
+        def letra(tam, negrita=False):
+            try:
+                return ImageFont.truetype("arialbd.ttf" if negrita else "arial.ttf", tam)
+            except OSError:
+                return ImageFont.load_default()
+
+        rutas_, n = [], len(self.tiros)
+        os.makedirs(SALIDA.format(slug=self.slug), exist_ok=True)
+        hojas = 1 if self.en_fila else -(-n // self.POR_HOJA)
+        for i in range(hojas if n else 0):          # repartidas: 9 son 4 y 5, no 6 y 3
+            lote = self.tiros[i * n // hojas:(i + 1) * n // hojas]
+            cols, w = self._ancho(len(lote))
+            h = round(w * 16 / 9)
+            celda = h + self.CABEZA + self.banda
+            hoja = Image.new("RGB", (cols * w, -(-len(lote) // cols) * celda), "white")
+            pinta = ImageDraw.Draw(hoja)
+            for j, (rotulo, en, fichero, pie) in enumerate(lote):
+                x, y = (j % cols) * w, (j // cols) * celda
+                pinta.rectangle((x, y, x + w - 1, y + self.CABEZA), fill="black")
+                pinta.text((x + 8, y + 4), f"{rotulo} · {en:.1f} s".replace(".", ","),
+                           fill="white", font=letra(20, True))
+                try:
+                    hoja.paste(Image.open(fichero).convert("RGB").resize((w, h)),
+                               (x, y + self.CABEZA))
+                except OSError:
+                    pinta.text((x + 8, y + h // 2), "sin fotograma", fill="black", font=letra(18))
+                for k, renglon in enumerate(textwrap.wrap(pie, max(12, w // 10))[:3]):
+                    pinta.text((x + 6, y + self.CABEZA + h + 4 + 24 * k), renglon,
+                               fill="black", font=letra(18))
+                pinta.rectangle((x, y, x + w - 1, y + celda - 1), outline="black")
+            nombre = self.nombre if self.en_fila else f"{self.nombre}-{i + 1}"
+            ruta = os.path.abspath(os.path.join(SALIDA.format(slug=self.slug), f"{nombre}.jpg"))
+            hoja.save(ruta, quality=88)
+            rutas_.append(ruta.replace("\\", "/"))
+        return rutas_
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reels", nargs="*", type=int)
     ap.add_argument("--cuantos", type=int, default=CUANTOS)
+    # La hoja de la pieza entera, a mano: lo que hacia `hoja-contacto.sh`.
+    ap.add_argument("--hoja", action="store_true")
     a = ap.parse_args()
     total = 0
     import rutas
@@ -267,6 +413,8 @@ def main():
         if mal:
             print(f"  reel-{n:02d}: {mal}")
             continue
+        if a.hoja:
+            print("\n".join(Hoja(f"reel-{n:02d}", hechas).escribe()))
         tiros = sum(len(e["mira"]) for e in hechas)
         total += tiros
         print(f"  reel-{n:02d}: {len(hechas)} escena(s), {tiros} fotograma(s)"

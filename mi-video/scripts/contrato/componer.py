@@ -87,11 +87,15 @@ COMPONE = Contrato(
                    " inicio, ni fin, ni duración — y el prompt razona sobre tiempo"
                    " de lectura y pide devolver `tramos`."),
         Campo("candidatas",
-              manda=None,
-              deuda="ver `nota`",
+              manda=Aguja("scripts/describir.mjs", 'sql("candidatas", [slug, f.orden])'),
               exige=(Prompt("scripts/describir.prompt.md", "no se salta un peldaño"),),
-              nota="EXIGIDO Y NO ENVIADO. `remedio: 'recuperar'` presupone saber"
-                   " qué más se grabó y el payload manda un único texto por etapa."),
+              nota="Enviado desde C-586: las tres de la seleccion por etapa que"
+                   " puede tocar, con su voz y su texto. Antes las buscaba a mano"
+                   " —44 llamadas en reel-19, 18-10—."),
+        Campo("ya_montada_en_hoja",
+              manda=Aguja("scripts/describir.mjs", "ya_montada_en_hoja: enHoja"),
+              exige=(Prompt("scripts/describir.prompt.md", "El después, en hoja"),),
+              nota="C-584: el montaje en un documento, no en fotogramas sueltos."),
         Campo("cruces",
               manda=None,
               deuda="ver `nota`",

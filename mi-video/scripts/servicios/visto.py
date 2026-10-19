@@ -99,6 +99,10 @@ def dossier(pieza: Pieza) -> dict | None:
 
         tiros, por_que = fotogramas.sacar(n)
         d["mira"] = tiros if tiros else []
+        # **Y la hoja de contacto, que es lo que se mira primero** (C-584):
+        # un fotograma por etapa sin aprobar, rotulado, en una o dos imagenes.
+        abiertas = {e.get("etapa") for e in d["mira"]} - set(d["ya_aprobados"])
+        d["hoja"] = fotogramas.Hoja.del_render(pieza.slug, d["mira"], abiertas, "visto").escribe()
         if por_que:
             d["sin_fotogramas"] = por_que
     except Exception as e:                         # noqa: BLE001
