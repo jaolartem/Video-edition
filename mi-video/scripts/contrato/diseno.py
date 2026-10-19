@@ -208,14 +208,14 @@ DISENO = Contrato(
               nota="Los siete efectos que existen, con lo que hace cada uno."
                    " Sin esto el disenador describia el sonido con sus palabras"
                    " —«un roce grave y arrastrado»— y la capa se montaba muda."),
-        # **La hoja de contacto: un documento, no un video** (C-584). Jaime,
-        # 19-10-2026. Un campo por momento porque cada uno la manda desde su
-        # servicio; la frase que la usa la leen los dos.
-        *(Campo("hoja", manda=Aguja(f, aguja), en=(fase,), exige=(Prompt(
-            "scripts/disenar.prompt.md", "Mira primero la hoja de contacto"),))
+        # **El documento de revisión: imágenes y lo que suena en cada una**
+        # (C-584, C-594). Jaime, 19-10-2026. Un campo por momento porque cada
+        # uno lo manda desde su servicio; la frase que lo usa la leen los dos.
+        *(Campo("documento", manda=Aguja(f, aguja), en=(fase,), exige=(Prompt(
+            "scripts/disenar.prompt.md", "Mira primero el documento de revisión"),))
           for fase, f, aguja in (
-              ("visto", "scripts/servicios/visto.py", 'd["hoja"] = fotogramas.Hoja.del_render('),
-              ("disenado", "scripts/servicios/disenar.py", '"hoja": _fotogramas.Hoja.del_render('))),
+              ("visto", "scripts/servicios/visto.py", 'd["documento"] = Documento('),
+              ("disenado", "scripts/servicios/disenar.py", '"documento": _Documento('))),
         Campo("verse",
               manda=Aguja("scripts/servicios/disenar.py", '"verse": VERSE,'),
               exige=(Prompt("scripts/disenar.prompt.md", "míralo antes de contestar"),),

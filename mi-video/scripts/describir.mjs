@@ -164,15 +164,17 @@ function describePieza(slug, filas) {
   try {
     despues = JSON.parse(sql("montada_en_fotogramas", [slug]) || "[]");
   } catch { despues = []; }
-  // **Y en hoja** (C-584): el despues en un documento, no en treinta fotogramas.
-  let enHoja = [];
+  // **Y el despues, en el documento de revision** (C-594): sus hojas y, por
+  // fotograma, lo que se dice, lo que hay en pantalla y lo que suena. Jaime,
+  // 19-10-2026: las imagenes son el corazon del documento.
+  let montada = {};
   try {
-    enHoja = despues.length ? JSON.parse(execFileSync("python", ["-c",
-      "import sys,json;sys.path.insert(0,'scripts');import fotogramas as F;"
-      + "print(json.dumps(F.Hoja.del_render(sys.argv[1],json.load(sys.stdin),None,'montada').escribe()))",
+    montada = despues.length ? JSON.parse(execFileSync("python", ["-c",
+      "import sys,json;sys.path.insert(0,'scripts');from dominio.documento import Documento as D;"
+      + "print(json.dumps(D(sys.argv[1],json.load(sys.stdin),None,'montada').escribe(),ensure_ascii=False))",
       slug], { encoding: "utf8", input: JSON.stringify(despues),
-               env: { ...process.env, PYTHONIOENCODING: "utf-8" } })) : [];
-  } catch { enHoja = []; }
+               env: { ...process.env, PYTHONIOENCODING: "utf-8" } }).trim().split(String.fromCharCode(10)).pop()) : {};
+  } catch { montada = {}; }
   // **`pedidoDe` devuelve UN TEXTO, no un objeto.** Esto lo esparcia con `...`,
   // y esparcir una cadena en un objeto la parte caracter a caracter: el pedido
   // de reel-03 salia con 3.420 claves —`"0": "R", "1": "e", "2": "e"…`— que son
@@ -202,7 +204,7 @@ function describePieza(slug, filas) {
                     // a la fase 10 — o sea a despues de pagarle a el y al
                     // disenador. C-359.
                     la_linea_midio: JSON.parse(sql("lo_medido", [slug]) || "[]"),
-                    ya_montada_en_hoja: enHoja, ya_montada_asi: despues };
+                    ya_montada: montada };
   // **El contrato tiene dos capas y esta es la segunda.** Las capacidades no
   // cambian —son lo que sabe hacer—; lo que cambia es el encargo. El otro
   // oficio la pone con `abierto.modo` (`servicios/disenar.py`); aqui llega por

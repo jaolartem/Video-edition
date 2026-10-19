@@ -58,6 +58,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .base import Pieza, Resultado, Servicio  # noqa: E402
 
+#: Con qué empieza todo lo que el visto devuelve o sube: así se cuentan sus vueltas.
+MARCA = "visto · el diseñador no la enseña:"
+
 #: El mismo prompt del diseño: es su segundo momento, no otro oficio.
 PROMPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "disenar.prompt.md")
@@ -98,15 +101,16 @@ def dossier(pieza: Pieza) -> dict | None:
         import fotogramas
 
         tiros, por_que = fotogramas.sacar(n)
-        d["mira"] = tiros if tiros else []
-        # **Y la hoja de contacto, que es lo que se mira primero** (C-584):
-        # un fotograma por etapa sin aprobar, rotulado, en una o dos imagenes.
-        abiertas = {e.get("etapa") for e in d["mira"]} - set(d["ya_aprobados"])
-        d["hoja"] = fotogramas.Hoja.del_render(pieza.slug, d["mira"], abiertas, "visto").escribe()
+        # **Y el documento de revisión, que es lo que se mira** (C-594): las
+        # hojas y, por fotograma, lo que se dice, lo que hay en pantalla y lo
+        # que suena. Sólo de lo que no está aprobado.
+        from dominio.documento import Documento
+        abiertas = {e.get("etapa") for e in tiros or []} - set(d["ya_aprobados"])
+        d["documento"] = Documento(pieza.slug, tiros, abiertas, "visto").escribe()
         if por_que:
             d["sin_fotogramas"] = por_que
     except Exception as e:                         # noqa: BLE001
-        d["mira"] = []
+        d["documento"] = {}
         d["sin_fotogramas"] = f"{type(e).__name__}: {e}"[:160]
     # Una pasada de ffmpeg para las cuatro medidas, no una por medida: los
     # tres filtros miden y dejan pasar, asi que en serie dicen lo mismo.
@@ -167,6 +171,11 @@ class ServicioVisto(Servicio):
         segs = Segmento.de(pieza.slug)
         if segs and all(s.aprobado for s in segs):
             return Resultado(True, salida="todos sus tramos están aprobados")
+        # **Y lo que subió a Jaime se le espera a él** (C-594): sin esto el
+        # mismo visto se volvía a pedir sobre el mismo render.
+        from dominio.nota import Nota
+        if any(str(n.que).startswith(MARCA) for n in Nota.subidas(pieza.slug)):
+            return Resultado(False, motivo="espera a Jaime: una escena del visto subió")
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
         # **Y va por su propia carpeta, no por la de `disenar`.**
@@ -240,6 +249,31 @@ def aplicar(pieza: Pieza, veredicto) -> Resultado:
     # repetido no abre otro.
     from .base import devuelve
 
+    # **Y devuelve escenas, no la pieza** (C-593). Jaime, 19-10-2026: *«si hay
+    # un error es un error en una escena concreta»*. Un tiquet por escena, con
+    # su etapa y su paso; la pieza vuelve al más temprano de ellos.
+    escenas = [d for d in v.get("devuelve") or []
+               if isinstance(d, dict) and str(d.get("etapa")).isdigit()]
+    if escenas:
+        from dominio import ticket
+        from dominio.fase import camino
+        from .base import sube
+
+        # **Y una escena devuelta dos veces sube a Jaime** (C-594): la tercera
+        # vuelta no la arregla la máquina; las demás escenas siguen solas.
+        veces = lambda n: sum(1 for t in ticket.historia(pieza.slug)  # noqa: E731
+                              if (t.get("dijo") or "").startswith(MARCA)
+                              and str(t.get("beat")) == str(n))
+        for d in [d for d in escenas if veces(d["etapa"]) >= 2]:
+            sube(pieza, MARCA, d.get("por_que") or "sin motivo", d["etapa"])
+        orden = {f["nombre"]: i for i, f in enumerate(camino())}
+        hechos = [devuelve(pieza, MARCA,
+                           f"e{d['etapa']}: {d.get('por_que') or 'sin motivo'}",
+                           d.get("vuelve_a") or "descrito", etapa=int(d["etapa"]))
+                  for d in escenas if veces(d["etapa"]) < 2]
+        if not hechos:
+            return Resultado(False, motivo="visto: lo que queda subió a Jaime")
+        return min(hechos, key=lambda r: orden.get(r.volver_a, len(orden)))
     return devuelve(pieza, "visto · el diseñador no la enseña:",
                     v.get("por_que") or "sin motivo",
                     v.get("vuelve_a") or "descrito")

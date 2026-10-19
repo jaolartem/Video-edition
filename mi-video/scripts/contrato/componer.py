@@ -92,10 +92,10 @@ COMPONE = Contrato(
               nota="Enviado desde C-586: las tres de la seleccion por etapa que"
                    " puede tocar, con su voz y su texto. Antes las buscaba a mano"
                    " —44 llamadas en reel-19, 18-10—."),
-        Campo("ya_montada_en_hoja",
-              manda=Aguja("scripts/describir.mjs", "ya_montada_en_hoja: enHoja"),
-              exige=(Prompt("scripts/describir.prompt.md", "El después, en hoja"),),
-              nota="C-584: el montaje en un documento, no en fotogramas sueltos."),
+        Campo("ya_montada",
+              manda=Aguja("scripts/describir.mjs", "ya_montada: montada"),
+              exige=(Prompt("scripts/describir.prompt.md", "El después, en el documento"),),
+              nota="C-594: el montaje en el documento de revisión, no en fotogramas sueltos."),
         Campo("cruces",
               manda=None,
               deuda="ver `nota`",

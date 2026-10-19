@@ -331,6 +331,8 @@ if (VELOCIDAD === 1) {
     "-movflags", "+faststart", out,
   ], { stdio: ["ignore", "inherit", "inherit"] });
 }
-fs.rmSync(tmp, { recursive: true, force: true });
+// **Y la carpeta se queda** (C-594): este borrado final deshacia C-567 y cada
+// montaje volvia a cortar todas las escenas. Los trozos que ya no salen se
+// quitan arriba, antes de unir.
 
 console.error("\nlisto → " + out);

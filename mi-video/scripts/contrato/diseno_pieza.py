@@ -48,7 +48,7 @@ NIVEL_PIEZA = (
                    " inventan**, y la portada es donde más tienta hacerlo"
                    " porque es lo único que se ve antes del play. `en` es el"
                    " segundo del MONTAJE, elegido de entre los que ya mira en"
-                   " `mira_estos_fotogramas`; el fichero lo saca la máquina del"
+                   " `documento`; el fichero lo saca la máquina del"
                    " bruto —3840×2160 contra los 1080 del corte, así que"
                    " acercarse no lo deshace— porque él trabaja con Read y"
                    " Write y no puede exportar una imagen. Y `por_que`, como"

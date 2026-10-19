@@ -239,7 +239,9 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     beat = _beat(pieza, segundo)
     if beat is None or beat is SIN_EDL:
         from . import abierto as _ab
-        beat = _ab.etapa_de(dijo)
+        # **Y la etapa que se le pasa, se le pone** (C-593): el visto devolvía
+        # escenas y el tiquet quedaba sin etapa si el texto no decía «eN».
+        beat = int(etapa) if str(etapa).isdigit() else _ab.etapa_de(dijo)
     if beat is None and str(etapa).lower() not in ("pieza", "0", "todas"):
         raise SinEscena(
             f"{pieza}: un tiquet dice a que escena va. Pasa `segundo=`, nombra"
@@ -513,8 +515,11 @@ def recolocar(pieza):
     """
     cx = _con()
     n = 0
+    # **Sin segundo no hay nada que recolocar** (C-593): su etapa la dijo quien
+    # lo abrió, y `beat_en(…, None)` la borraba en cada pedido (#671, #695, #698).
     for f in cx.execute("select id, segundo from ticket where pieza = ?"
-                        " and estado = 'abierto'", (pieza,)).fetchall():
+                        " and estado = 'abierto' and segundo is not null",
+                        (pieza,)).fetchall():
         b = beat_en(pieza, f["segundo"])
         if b is SIN_EDL:
             continue

@@ -96,7 +96,10 @@ def devuelve(pieza, marca: str, por_que: str,
 
     if atiende not in {f["nombre"] for f in camino()}:
         atiende = "descrito"
+    # **Uno por pieza y etapa** (C-593): era uno por pieza, y el segundo «no»
+    # del visto sobre otra escena se perdía.
     if not any((t.get("dijo") or "").startswith(marca)
+               and (etapa is None or str(t.get("beat")) == str(etapa))
                for t in ticket.abiertos(pieza.slug)):
         # **Con su etapa, si se sabe** (C-560): «pieza» abre todas las etapas.
         ticket.abrir(pieza.slug, f"{marca} {por_que}",
@@ -104,6 +107,27 @@ def devuelve(pieza, marca: str, por_que: str,
                      tipo="objecion", vuelve_a=atiende, cierra_con=cierra_con)
     return Resultado(False, motivo=f"{marca} {por_que}"[:300],
                      volver_a=antes_de(atiende), salida=por_que[:200])
+
+
+def sube(pieza, marca: str, por_que: str, etapa) -> None:
+    """**Lo que la máquina ya no arregla sola, sube a Jaime** (C-594).
+
+    La otra mitad de `devuelve`: una nota con `estado='sube'`, que la puerta
+    cuenta como «subió a Jaime y sigue abierto» hasta que él la mira. La usa el
+    visto cuando una escena vuelve por tercera vez.
+    """
+    import datetime
+
+    import basedatos
+
+    con = basedatos.abrir()
+    con.execute("insert into revision (video_slug, accion, que, estado, fecha, etapa,"
+                " quien, pasada, cual) values (?,?,?,'sube',?,?,?,1,1)",
+                (pieza.slug, "otro", f"{marca} e{etapa}: {por_que}"[:1200],
+                 datetime.datetime.now().isoformat(timespec="seconds"), int(etapa),
+                 "visto"))
+    con.commit()
+    con.close()
 
 
 class Servicio:

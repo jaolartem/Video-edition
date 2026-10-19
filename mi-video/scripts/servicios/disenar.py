@@ -286,6 +286,7 @@ class ServicioDisenar(Servicio):
         # La ultima prueba se hace MIRANDO: el dossier dice lo que se pidio y
         # el frame lo que salio. El porque vive en `fotogramas.py`.
         mirar, _ = _fotogramas.sacar(pieza.n)
+        from dominio.documento import Documento as _Documento
         # **Si la pieza muestra su cara en todo tablero** (T-06): el prop
         # `cara: "siempre"` del marco. Sin esto el diseñador compondría a pleno
         # sin él y la línea se lo pararía después, cuando ya no puede corregir.
@@ -294,8 +295,7 @@ class ServicioDisenar(Servicio):
             # Y las formas que a pleno le dejan la columna (C-562): con su cara
             # en todo tablero, una forma de fuera va en `cubre: panel` o `banda`.
             **_dib.de_la_pieza(pieza),
-            "mira_estos_fotogramas": mirar,
-            "hoja": _fotogramas.Hoja.del_render(pieza.slug, mirar, None, "disenar").escribe(),  # C-584
+            "documento": _Documento(pieza.slug, mirar, None, "disenar").escribe(),  # C-594
             # **Y como suena cada corte.** Jaime, 7-9-2026: *«ambos que vean y
             # oigan; con eso el compositor sabe si estoy leyendo en una toma»*.
             # Vale para los dos oficios y por el mismo motivo: leer se ve en la

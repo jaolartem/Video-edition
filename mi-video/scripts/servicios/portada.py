@@ -13,7 +13,7 @@ escena. Por eso `disenar` la aplica antes de recorrer los tableros.
 ## Él elige el instante; el fotograma lo saca la máquina
 
 El diseñador trabaja con `Read` y `Write`: no puede exportar una imagen. Así que
-declara **el segundo** —de los que ya mira en `mira_estos_fotogramas`— y aquí se
+declara **el segundo** —de los que ya mira en el `documento`— y aquí se
 extrae.
 
 **Del corte (`public/reel-NN.mp4`), no del render y no del bruto.** Los tres

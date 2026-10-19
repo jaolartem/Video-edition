@@ -193,13 +193,17 @@ def _del_still(slug):
     los mismos cinco momentos.
     """
     import glob
+    import re
 
+    # **Donde los deja `mirar.sh`, que es `work/still/mirar/<pieza>/f<n>.png`**
+    # (C-594). Esto los buscaba en `work/still/<pieza>/eNN-*` y volvia siempre
+    # vacio: la pieza sin render no se veia nunca.
+    hechos = sorted((int(re.search(r"f(\d+)\.png$", p).group(1)), p.replace("\\", "/"))
+                    for p in glob.glob(os.path.join("work", "still", "mirar", slug, "f*.png")))
     fuera = []
     for e in escenas(slug):
-        tiros = []
-        for jpg in sorted(glob.glob(os.path.join(
-                "work", "still", slug, f"e{e['n']:02d}-*"))):
-            tiros.append({"fichero": jpg.replace("\\", "/")})
+        tiros = [{"en": round(f / 30, 2), "fichero": p} for f, p in hechos
+                 if e["desde"] <= f / 30 < e["hasta"]]
         if tiros:
             fuera.append({"escena": e["n"], "etapa": e["etapa"],
                           "desde": round(e["desde"], 2),
@@ -301,15 +305,25 @@ class Hoja:
         La escena es la unidad del montaje; y si un tablero, un panel o un
         recorte cae entre los fotogramas elegidos, se anade el suyo.
         """
+        dicho, _ = cls._spec(slug)
+        tiros = []
+        for e, k, t in cls.elegidos(slug, hechas, etapas):
+            pie = " / ".join(x for a, b, x in dicho if a <= t < b) or "(sin subtitulo)"
+            tiros.append((f"e{e.get('etapa')} · esc {e['escena']}", t, e["mira"][k]["fichero"], pie))
+        return cls(slug, tiros, nombre=nombre)
+
+    @classmethod
+    def elegidos(cls, slug, hechas, etapas=None) -> list:
+        """`(escena, k, segundo)`: el del medio de cada escena, y el de cada capa
+        que caiga entre ellos. Lo leen la hoja y el documento (C-594)."""
         escs = [e for e in hechas or []
                 if e.get("mira") and (etapas is None or e.get("etapa") in etapas)]
 
         def en(e, k):
             return e["mira"][k].get("en", (e["desde"] + e["hasta"]) / 2)
 
-        dicho, capas = cls._spec(slug)
         elegidos = {(e["escena"], len(e["mira"]) // 2): e for e in escs}
-        for a, b in capas:
+        for a, b in cls._spec(slug)[1]:
             if any(a <= en(e, k) <= b for (_n, k), e in elegidos.items()):
                 continue
             mitad = (a + b) / 2
@@ -317,12 +331,8 @@ class Hoja:
             if e:
                 k = min(range(len(e["mira"])), key=lambda i: abs(en(e, i) - mitad))
                 elegidos[(e["escena"], k)] = e
-        tiros = []
-        for (_n, k), e in sorted(elegidos.items(), key=lambda x: en(x[1], x[0][1])):
-            t = en(e, k)
-            pie = " / ".join(x for a, b, x in dicho if a <= t < b) or "(sin subtitulo)"
-            tiros.append((f"e{e.get('etapa')} · esc {e['escena']}", t, e["mira"][k]["fichero"], pie))
-        return cls(slug, tiros, nombre=nombre)
+        return [(e, k, en(e, k)) for (_n, k), e
+                in sorted(elegidos.items(), key=lambda x: en(x[1], x[0][1]))]
 
     @classmethod
     def de_la_cinta(cls, slug, etapa, fotos) -> "Hoja":
