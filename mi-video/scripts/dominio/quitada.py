@@ -61,7 +61,11 @@ def declarar(slug, etapa, por_que, quien="servicio"):
         return f"{slug}: no está en la base"
     ob = cx.execute("select obligatorio from etapa where video_id = ? and orden = ?",
                     (v[0], int(etapa))).fetchone()
-    if ob and ob[0]:
+    # **Y si es él quien la quita, sale** (C-622). «Sube a Jaime» es para que
+    # la máquina no decida sola; cuando lo decide él no queda a quién subirlo.
+    # Jaime, 20-10-2026, sobre reel-21: *«creo que queda mejor hasta el segundo
+    # 20»*, y lo que cae después es su etapa obligatoria de condición.
+    if ob and ob[0] and not _de_persona(quien):
         return f"{slug} e{etapa} es obligatoria: sin material sube a Jaime"
     cx.execute("delete from corte_fijo where video_id = ? and papel = 'etapa'"
                " and orden = ?", (v[0], int(etapa)))
@@ -70,6 +74,13 @@ def declarar(slug, etapa, por_que, quien="servicio"):
                 datetime.datetime.now().isoformat(timespec="seconds")))
     cx.commit()
     return None
+
+
+def _de_persona(quien) -> bool:
+    """Si lo declara una persona, que es quien puede decidir sobre lo obligatorio."""
+    from .autor import Autor
+
+    return getattr(Autor.de(quien or ""), "tipo", None) == "persona"
 
 
 def de(slug) -> dict:
@@ -106,7 +117,11 @@ def aplicar(slug) -> list:
         return []
     edl = json.load(open(ruta, encoding="utf-8"))
     det = edl.get("detalle") or []
-    if any(d.get("beat") in fuera and d.get("obligatorio") for d in det):
+    suyas = {int(e) for e, q in _con().execute(
+        f"select q.etapa, q.quien from {TABLA} q join video v on v.id = q.video_id"
+        " where v.slug = ?", (slug,)) if _de_persona(q)}
+    if any(d.get("beat") in fuera and d.get("obligatorio")
+           and d.get("beat") not in suyas for d in det):
         raise SystemExit(f"{slug}: una etapa quitada figura como obligatoria"
                          " en el EDL — sube a Jaime")
     quedan = [i for i, d in enumerate(det) if d.get("beat") not in fuera]
