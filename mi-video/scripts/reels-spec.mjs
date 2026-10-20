@@ -431,7 +431,12 @@ function escribeSpec(piezas) {
 
 for (const p of spec) {
   const {huella: _v, ...sinHuella} = p;
-  p.huella = createHash("sha1").update(JSON.stringify(sinHuella)).digest("hex").slice(0, 12);
+  // **La portada no es del vídeo** (C-620): la pinta `Portada-*` aparte y el
+  // render no la lee. Contándola, declarar las portadas de R19 a R22 cambió la
+  // huella de cuatro piezas publicadas cuyo vídeo no había cambiado ni un
+  // fotograma. Va a `null`, que es lo que llevaban: las huellas de antes casan.
+  p.huella = createHash("sha1").update(JSON.stringify({ ...sinHuella, portada: null }))
+    .digest("hex").slice(0, 12);
 }
 
 escribeSpec(spec);
