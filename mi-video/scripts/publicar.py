@@ -397,6 +397,25 @@ def main():
             # a FINALES va lo definitivo, ya visto y firmado por Jaime (C-553).
             if not _aprobada(f"reel-{int(pieza.split('R')[-1]):02d}"):
                 pega = pega + ["no esta aprobada por Jaime"]
+            # **Y no sale sin su portada** (C-618). Jaime: *«eso debe salir
+            # siempre con todos los videos»*. La pinta `servicios/portada.py`
+            # con lo que declaró el diseñador; en seco sólo se mira si la hay.
+            from servicios import portada as _po
+
+            num = int(pieza.split("R")[-1])
+            png = None
+            if not seco:
+                _po.recoger(num)
+            if not _po.declarada(f"reel-{num:02d}"):
+                # El encargo sale de aquí y no de `disenar`: al diseñar todavía
+                # no hay corte del que sacar el fotograma. Va a su buzón y lo
+                # contesta el diseñador como cualquier otro pedido.
+                pega = pega + ["sin portada" + ("" if seco else
+                               f": encargada al diseñador -> {_po.pedido(num)}")]
+            elif not seco:
+                png = _po.png(num)
+                if not png:
+                    pega = pega + ["la portada no se pudo pintar"]
             if pega:
                 print(f"  {pieza}: NO sale — {'; '.join(pega)}")
                 continue
@@ -407,6 +426,7 @@ def main():
             if not seco:
                 subir(mp4, os.path.join(raiz, f"{pieza}.mp4"), seco)
                 subir(ver, os.path.join(raiz, f"{pieza}.verificacion.md"), seco)
+                subir(png, os.path.join(raiz, f"{pieza}-portada.png"), seco)
                 registro.nota("publicar", "pieza subida", detalle=pieza)
                 # Y en la base, no solo en el log: el registro se lee con los
                 # ojos y la tabla la lee `donde.py`.

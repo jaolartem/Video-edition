@@ -33,9 +33,10 @@ NIVEL_PIEZA = (
                    " un tablero — es de la pieza, y no se ve mirando uno."),
     Clave("portada",
               dispara=(Aguja("scripts/servicios/portada.py", "def guardar(slug, respuesta):"),
-                       Aguja("scripts/servicios/disenar.py", "    _portada(pieza.slug, respuesta)"),),
+                       Aguja("scripts/servicios/disenar.py", "    _portada(pieza.slug, respuesta)"),
+                       Aguja("scripts/publicar.py", "subir(png, os.path.join(raiz, f\"{pieza}-portada.png\"), seco)"),),
               efecto="la imagen que se ve ANTES de darle al play",
-              obligatoria=False,
+              obligatoria=True,
               nota="**Lo único que se ve sin reproducir, y no lo tenía nadie.**"
                    " Jaime, 16-9-2026: *«no me dejaste la portada»*, y dónde"
                    " vive la decisión: *«inclúyela en el contrato del"
@@ -56,5 +57,9 @@ NIVEL_PIEZA = (
                    "                   Y puede variar de una pieza a otra:"
                    " Jaime, el mismo día, *«la portada puede ser variable»*. La"
                    " de reel-13 —su cara, el rótulo en oro y una línea debajo—"
-                   " es una forma que funcionó, no la única."),
+                   " es una forma que funcionó, no la única.\n\n"
+                   "                   **Y desde el 20-10-2026 es obligatoria.**"
+                   " Jaime, viendo FINALES: *«eso debe salir siempre con todos"
+                   " los videos»*. Si una pieza llega a publicarse sin ella,"
+                   " `publicar.py` la encarga al diseñador y no la sube (C-618)."),
 )
