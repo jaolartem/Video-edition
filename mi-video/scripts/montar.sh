@@ -363,8 +363,13 @@ for r in "${PIEZAS_CORTE[@]}"; do
   # habia movido. O sea que `montar.sh 6` corria entero, salia con exito, y
   # entregaba la pieza construida con el productor de antes de la correccion.
   # Un eslabon tiene dos fuentes: lo que come y quien lo cocina (C-234).
-  if [ "ads/reel-$r/edl-sell.json" -nt "work/scenes/reel-$r/plan-full.json" ]      || [ "scripts/plan-reel.mjs" -nt "work/scenes/reel-$r/plan-full.json" ]; then
-    echo "  (el EDL o plan-reel.mjs son mas nuevos que el plan: regenerando escenas)"
+  #
+  # **Y la camara decidida, que no tiene fecha** (C-608). C-598 la puso en la
+  # cadena y este `if` siguio mirando solo fechas: reel-19, 19-10, monto dos
+  # veces con el plan de las 11:18 y la cadena la devolvia a `verificado` cada
+  # vez. La pregunta es de la cadena, como la del corte y la del render.
+  if [ "ads/reel-$r/edl-sell.json" -nt "work/scenes/reel-$r/plan-full.json" ]      || [ "scripts/plan-reel.mjs" -nt "work/scenes/reel-$r/plan-full.json" ]      || _hay_que plan "$((10#$r))"; then
+    echo "  (el EDL, plan-reel.mjs o la camara decidida son mas nuevos que el plan: regenerando escenas)"
     node scripts/plan-reel.mjs --reel "$r" 2>&1 | tail -1
   fi
   # `plan-reel.mjs` regenera el plan SIN encuadres —los calcula `punch-ins.py`—
