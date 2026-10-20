@@ -222,6 +222,7 @@ let aireQuitado = 0;
  * palabra. Los dos que sí —«lo es», «puede que me adelante»— llevan voz en el
  * hueco y siguen cortándose. En el modelo general `unir` es 0: no toca nada.
  */
+let pausasDelRitmo = 0;
 const { SEGS, DETS } = (() => {
   const SEGS = [], DETS = [];
   (edl.segmentos || []).forEach(([a, b], i) => {
@@ -234,6 +235,7 @@ const { SEGS, DETS } = (() => {
       .some(([x, y]) => Math.min(y, y0) - Math.max(x, x0) > 0.05);
     if (ps && RITMO.unir > 0 && pd.beat === d.beat && pd.toma === d.toma
         && hueco > 0 && hueco <= RITMO.unir && !conVozDentro) {
+      pausasDelRitmo += hueco;
       ps[1] = b;
       DETS[DETS.length - 1] = { ...pd, texto: `${pd.texto || ""} ${d.texto || ""}`.trim(),
                                 fijado: Boolean(pd.fijado && d.fijado) };
@@ -417,6 +419,10 @@ const plan = {
   cambio_cada_s: CADA,
   escenas,
 };
+// **Y cuánto alarga eso la pieza, dicho**: el JSON mide los tramos y no los
+// huecos que el ritmo conserva entre ellos. `version.cuadra_con_el_json` lo
+// suma, como suma las pausas del compás (C-621). En el general no sale.
+if (pausasDelRitmo > 0) plan.pausas_del_ritmo_s = Number(pausasDelRitmo.toFixed(3));
 const out = `work/scenes/${slug}/plan-full.json`;
 // **La carpeta se crea aquí.** Nunca se creaba: existía de corridas anteriores,
 // así que el fallo sólo aparece arrancando de cero — y arrancar de cero es

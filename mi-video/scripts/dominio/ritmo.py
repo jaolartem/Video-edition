@@ -77,3 +77,17 @@ class Confesion(Ritmo):
     aire = HUECO
     unir = HUECO
     cambia_encuadre = True
+
+
+def alarga(slug: str) -> float:
+    """Cuánto alarga la pieza el ritmo: los huecos que el plan conservó (C-621).
+
+    El JSON mide los tramos; lo que `Confesion` deja entre dos tramos seguidos
+    no está en `duracion_montada_s`. Lo dice el plan, que es quien lo decide, y
+    lo suma `version.cuadra_con_el_json` igual que las pausas del compás.
+    """
+    try:
+        plan = json.load(open(f"work/scenes/{slug}/plan-full.json", encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0.0
+    return float(plan.get("pausas_del_ritmo_s") or 0.0)

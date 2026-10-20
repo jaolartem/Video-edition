@@ -298,7 +298,12 @@ def cuadra_con_el_json(slug, fichero, margen=MARGEN):
 
     acelerada = Pieza(int(slug.rsplit("-", 1)[1])).acelerada
     VELOCIDAD = _vel(slug)
+    # **Y las pausas que su ritmo conserva**, que están en el corte a 1x y no en
+    # el JSON: las declara el plan (C-621). En el general son cero.
+    from dominio.ritmo import alarga as _alarga
+
     debe = dice / VELOCIDAD if acelerada else dice
+    debe += _alarga(slug) / VELOCIDAD if acelerada else _alarga(slug)
     hay = _dura(fichero)
     if hay is None:
         return (f"{slug}: NO SE PUDO MEDIR {fichero} — el JSON dice"
