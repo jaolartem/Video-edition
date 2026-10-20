@@ -64,7 +64,15 @@ class ServicioRevalidar(Servicio):
         from dominio.memoria import Memoria
 
         mem = Memoria("revalidar", pieza.slug)
-        abiertas = Alcance.de(pieza.slug, "revalidado").etapas
+        alc = Alcance.de(pieza.slug, "revalidado")
+        abiertas = alc.etapas
+        # **Y un tiquet de la pieza entera abre lo que esté por aprobar** (C-627).
+        # No nombra etapa, así que `etapas` salía vacío y el paso pasaba sin
+        # preguntar: reel-20, 20-10, el #813 —«no siguieron la lógica del
+        # libreto, todo el video»— y `vencidas` la paró en `cosido`. El alcance
+        # es el mismo que recibe el compositor: `editables`.
+        if alc.toda_la_pieza:
+            abiertas = set(alc.editables or {int(f["beat"]) for f in filas})
         pide = mem.cambiados(filas, CAMPOS, abiertas=abiertas)
         # **Y lo ya declarado no se repregunta** (C-600): reel-22, 19-10, volvió
         # a pedir e1 y e7 media hora después de declararlas, porque el cosido
