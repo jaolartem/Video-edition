@@ -124,6 +124,13 @@ def pausas(slug):
     return Guion(slug).pausas()
 
 
+def ritmo(slug):
+    """El modelo de montaje de la pieza: `dominio.ritmo` (C-619)."""
+    from dominio.ritmo import Ritmo
+
+    return Ritmo.de(slug).como_dict()
+
+
 def voz(toma):
     """Donde de verdad SUENA la voz de una cinta, sin la holgura del detector.
 
@@ -442,6 +449,7 @@ VERBOS = {"escenas_por_describir": escenas_por_describir,
           "candidatas": candidatas,
           "brolls": brolls,
           "pausas": pausas,
+          "ritmo": ritmo,
           "voz": voz,
           "fijos": fijos,
           "precio_vigente": precio_vigente,

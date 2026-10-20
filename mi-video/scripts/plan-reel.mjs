@@ -23,7 +23,7 @@ import fs from "fs";
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import { bruto } from "./rutas.mjs";
-import { camaraDe, movimientoDe } from "./camara.mjs";
+import { camaraDe, encuadres, movimientoDe } from "./camara.mjs";
 import { sql } from "./consulta.mjs";
 import { conPausa, esDeclarado, fijosDe,
          pausasDe } from "./reels/declarado.mjs";
@@ -39,8 +39,12 @@ import { conPausa, esDeclarado, fijosDe,
  * son varios segundos de nada. Con 0,16 se respeta la respiración y se va el
  * hueco. Y no queda crudo: la mezcla pasa por Adobe Podcast, que suaviza el
  * empalme — *«Adobe Podcast va a suavizar los cortes»*.
+ *
+ * **Y ese 0,16 es del modelo general, no de todas** (C-619). Vive en
+ * `dominio/ritmo.py` y lo declara la pieza: una confesión no se corta con la
+ * vara de una lista dicha. Se lee más abajo, cuando ya se sabe qué pieza es.
  */
-const AIRE = 0.16;
+let AIRE;
 /** Margen que se deja a cada lado del habla para no comerse la consonante. */
 const MARGEN = 0.05;
 
@@ -93,6 +97,9 @@ const CADA = Number(arg("cada", "999"));
 const MINIMO = 1.2;
 
 const slug = `reel-${String(arg("reel")).padStart(2, "0")}`;
+/** El modelo de montaje de la pieza: `dominio/ritmo.py` (C-619). */
+const RITMO = JSON.parse(sql("ritmo", [slug]));
+AIRE = RITMO.aire;
 /** La toma del reel, para poder leer sus tramos de habla. */
 const tomaDe = (sl) =>
   JSON.parse(fs.readFileSync("rutas.json", "utf8")).tomas[sl];
@@ -207,8 +214,39 @@ let aireQuitado = 0;
  * no por tiempo: el reparto puede ir fuera de orden (aprendizaje 35).
  */
 
-const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
-  const d0 = (edl.detalle || [])[iSeg] || {};
+/**
+ * **Lo que el modelo deja seguido no se corta** (C-619). Dos tramos de la misma
+ * cinta y la misma etapa separados por un hueco SIN VOZ de hasta `RITMO.unir`
+ * son una frase con su pausa, no dos frases: en R18 eran siete de los nueve
+ * cortes de dentro de una etapa, de 0,27 a 0,95 s, y ninguno quitaba una sola
+ * palabra. Los dos que sí —«lo es», «puede que me adelante»— llevan voz en el
+ * hueco y siguen cortándose. En el modelo general `unir` es 0: no toca nada.
+ */
+const { SEGS, DETS } = (() => {
+  const SEGS = [], DETS = [];
+  (edl.segmentos || []).forEach(([a, b], i) => {
+    const d = (edl.detalle || [])[i] || {};
+    const ps = SEGS[SEGS.length - 1], pd = DETS[DETS.length - 1];
+    const hueco = ps ? a - ps[1] : -1;
+    // Por dentro, lejos de los bordes: el borde ya roza la voz por su margen.
+    const x0 = ps ? ps[1] + 0.15 : 0, y0 = a - 0.15;
+    const conVozDentro = y0 > x0 && (runsDe(d.toma) ?? [])
+      .some(([x, y]) => Math.min(y, y0) - Math.max(x, x0) > 0.05);
+    if (ps && RITMO.unir > 0 && pd.beat === d.beat && pd.toma === d.toma
+        && hueco > 0 && hueco <= RITMO.unir && !conVozDentro) {
+      ps[1] = b;
+      DETS[DETS.length - 1] = { ...pd, texto: `${pd.texto || ""} ${d.texto || ""}`.trim(),
+                                fijado: Boolean(pd.fijado && d.fijado) };
+      return;
+    }
+    SEGS.push([a, b]);
+    DETS.push(d);
+  });
+  return { SEGS, DETS };
+})();
+
+const conVoz = SEGS.flatMap(([a, b], iSeg) => {
+  const d0 = DETS[iSeg] || {};
   // La pausa declarada dice de QUE LADO se conserva el silencio, no sólo que
   // esta etapa lo tiene: el criterio vive en `declarado.mjs :: conPausa`.
   // **Un tramo declarado entra entero: no se le quita el silencio de dentro.**
@@ -235,7 +273,7 @@ const conVoz = edl.segmentos.flatMap(([a, b], iSeg) => {
                        ? [[a, b]]
                        : conHabla(a, b, runsDe(d0.toma) ?? [[a, b]]));
   aireQuitado += b - a - t.reduce((n, [x, y]) => n + (y - x), 0);
-  const d = (edl.detalle || [])[iSeg] || {};
+  const d = DETS[iSeg] || {};
   /**
    * **Dentro de un tramo declarado, el empalme no cambia de plano.**
    *
@@ -351,6 +389,28 @@ for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
   }
 }
 
+/**
+ * **Y el salto dentro de la etapa cambia de encuadre**, si el modelo lo pide
+ * (C-619). Dentro de una etapa todas las escenas piden el mismo encuadre para
+ * que el empalme no se vea, y eso vale cuando lo que se quitó es silencio
+ * pegado. Cuando la escena siguiente es OTRO momento de la cinta —un tropiezo
+ * fuera, una frase de diez segundos después—, el mismo encuadre es justo lo
+ * que delata el salto: la cabeza brinca en el mismo cuadro. Con una sola
+ * cámara se tapa cambiando de plano, un paso más cerrado.
+ */
+if (RITMO.cambia_encuadre) {
+  const orden = encuadres().sort((x, y) => y.cuadro - x.cuadro).map((e) => e.nombre);
+  for (let k = 1; k < escenas.length; k++) {
+    const p = escenas[k - 1], e = escenas[k];
+    const seguido = e.fuente === p.fuente
+      && Math.abs(e.origen_desde - p.origen_hasta) < 0.05;
+    if (e.beat !== p.beat || seguido || e.hereda_encuadre
+        || !e.encuadre || e.encuadre !== p.encuadre) continue;
+    const i = orden.indexOf(p.encuadre);
+    e.encuadre = orden[i + 1] ?? orden[i - 1] ?? e.encuadre;
+  }
+}
+
 const plan = {
   source: bruto(slug),
   gancho_s: Number(montado.toFixed(3)),
@@ -364,6 +424,9 @@ const out = `work/scenes/${slug}/plan-full.json`;
 // corrido otro antes no es un paso, es una suposición.
 fs.mkdirSync(`work/scenes/${slug}`, { recursive: true });
 fs.writeFileSync(out, JSON.stringify(plan, null, 1));
+// **Y con qué ritmo** (C-619): `cadena._ritmo_al_dia` lo compara con el que
+// declara la pieza, que vive en `frames.json` y no mueve la fecha del plan.
+fs.writeFileSync(`work/scenes/${slug}/ritmo.huella`, `${RITMO.nombre}\n`);
 // **Y con qué cámara se planeó** (C-598): `cadena` lo compara con la base,
 // porque la cámara que decide el diseñador vive en `escena_desc` y no mueve
 // la fecha de ningún fichero. reel-19 e2 pidió «medio» y se montó tres veces

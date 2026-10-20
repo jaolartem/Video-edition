@@ -171,6 +171,22 @@ def _camara_al_dia(s):
     return hay == hashlib.sha1(txt.encode("utf-8")).hexdigest()[:12]
 
 
+def _ritmo_al_dia(s):
+    """¿El plan se hizo con el modelo de montaje que hoy declara la pieza? (C-619)
+
+    `plan-reel.mjs` deja el nombre en `ritmo.huella`. Un plan sin ella es de
+    antes de los modelos, o sea del general: así declarar el ritmo de una pieza
+    rehace su plan y no caduca el de las demás.
+    """
+    from dominio.ritmo import Ritmo
+
+    try:
+        hay = open(f"work/scenes/{s}/ritmo.huella", encoding="utf-8").read().strip()
+    except OSError:
+        hay = Ritmo.nombre
+    return hay == Ritmo.de(s).nombre
+
+
 def desde(n):
     """El primer eslabón caducado de la pieza `n`, o `None` si está al día."""
     s = f"reel-{n:02d}"
@@ -190,6 +206,8 @@ def desde(n):
                         f"{ruta} es mas viejo que {donde[come]}")
         if nombre == "plan" and not _camara_al_dia(s):
             return (i, nombre, quien, "la camara decidida cambio y el plan no la tiene")
+        if nombre == "plan" and not _ritmo_al_dia(s):
+            return (i, nombre, quien, "el ritmo declarado cambio y el plan no lo tiene")
         cod = _codigo(quien)
         if cod and t < cod[0]:
             return (i, nombre, quien, f"{ruta} se hizo con el {cod[1]} de antes")
