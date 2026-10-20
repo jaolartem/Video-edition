@@ -80,6 +80,14 @@ def guardar(slug, respuesta):
     dicho = respuesta.get("portada") if isinstance(respuesta, dict) else None
     if not isinstance(dicho, dict) or not dicho.get("titulo"):
         return None
+    # **Y cabe, o no se declara** (C-618). `Cover` para el render si el texto
+    # pasa de su tope —el título de `title`, el subtítulo de `statement`— y una
+    # portada declarada que no se puede pintar es una portada que no hay.
+    for campo, rol in (("titulo", "title"), ("subtitulo", "statement")):
+        largo, tope = len(dicho.get(campo) or ""), _topes().get(rol)
+        if tope and largo > tope:
+            return _di(f"{slug}: el {campo} mide {largo} caracteres y caben"
+                       f" {tope} — no se escribe")
     try:
         en = float(dicho.get("en"))
     except (TypeError, ValueError):
@@ -189,11 +197,20 @@ def _criterio():
     return chr(10).join(lineas).strip()
 
 
-def pedido(n):
+def _topes():
+    """Los topes de texto de `src/brand/copy.ts`. Los lee su dueño: `marca`."""
+    from .marca import _topes as topes
+
+    t = topes()
+    return {} if "error" in t else t
+
+
+def pedido(n, rechazo=None):
     """El encargo de sólo la portada, para una pieza ya diseñada que no la tiene.
 
     Mismo buzón y misma respuesta que el diseño: lo contesta el diseñador con
-    el criterio de su prompt, lo que dice la pieza y sus hojas de contacto.
+    el criterio de su prompt, lo que dice la pieza y sus hojas de contacto. Si
+    vuelve, `rechazo` dice por qué y qué había contestado.
     """
     import fotogramas
     from dominio.pieza import Pieza
@@ -212,19 +229,50 @@ def pedido(n):
             {"escena": e["escena"], "etapa": e["etapa"], **t}
             for e in (fotos or []) for t in e["mira"]],
         "formato_respuesta": {
-            "titulo": "texto de la caja, MAYÚSCULAS, 2-10 palabras",
-            "subtitulo": "la segunda línea, o null",
+            "titulo": "texto de la caja, MAYÚSCULAS, 2-10 palabras; como mucho"
+                      f" {_topes().get('title', '?')} caracteres: más para el render",
+            "subtitulo": "la segunda línea, o null; como mucho"
+                         f" {_topes().get('statement', '?')} caracteres",
             "en": "el segundo del montaje del que se saca el fotograma",
             "forma": "velo | bloque", "por_que": "por qué ésta"},
+        **({"rechazado": rechazo} if rechazo else {}),
         "escribe_en": os.path.join(BUZON, f"{slug}.portada.json").replace("\\", "/"),
     }, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return ruta
 
 
 def recoger(n):
-    """Si el diseñador contestó el encargo, se declara. Devuelve la línea o `None`."""
+    """Si el diseñador contestó el encargo, se declara. Devuelve la línea o `None`.
+
+    **Y lo que no se puede declarar vuelve a él con su motivo**, como un tramo
+    rechazado vuelve al compositor (C-588): la respuesta se aparta y el pedido
+    se rehace diciendo qué falló y qué había contestado.
+    """
     slug = f"reel-{int(n):02d}"
     ruta = os.path.join(BUZON, f"{slug}.portada.json")
     if not os.path.exists(ruta):
         return None
-    return guardar(slug, {"portada": json.load(open(ruta, encoding="utf-8"))})
+    dicho = json.load(open(ruta, encoding="utf-8"))
+    linea = guardar(slug, {"portada": dicho})
+    if declarada(slug) and declarada(slug).get("titulo") == dicho.get("titulo"):
+        os.replace(ruta, ruta.replace(".portada.json", ".portada.hecha.json"))
+        # Y la pregunta se retira: un pedido sin respuesta al lado es lo que la
+        # cola cuenta como pendiente.
+        pregunta = ruta.replace(".portada.json", ".portada.pedido.json")
+        if os.path.exists(pregunta):
+            os.remove(pregunta)
+        return linea
+    os.replace(ruta, ruta.replace(".portada.json", ".portada.rechazada.json"))
+    pedido(n, rechazo={"motivo": linea, "lo_que_contestaste": dicho})
+    return linea
+
+
+def retirar(slug):
+    """Quita la portada declarada: una que no se puede pintar no es una portada."""
+    d = json.load(open(FRAMES, encoding="utf-8"))
+    if (d["reels"].get(slug) or {}).pop("portada", None) is None:
+        return False
+    with open(FRAMES, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=1)
+        f.write(chr(10))
+    return True
