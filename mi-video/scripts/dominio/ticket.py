@@ -660,6 +660,11 @@ def main():
     t = [x for x in historia(a.pieza) if x["id"] == i][0]
     print("apuntado:")
     print(_texto(t))
+    # **Lo que dice el reabre su segmento, no la pieza** (C-605). La puerta no
+    # reabre lo aprobado y su tiquet se quedaba en «sube a Jaime».
+    if t.get("beat") is not None:
+        from .segmento import reabre
+        reabre(a.pieza, t["beat"])
 
 
 if __name__ == "__main__":

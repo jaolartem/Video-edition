@@ -313,6 +313,21 @@ def aprobada(slug) -> bool:
     return bool(segs) and all(s.aprobado and es_suya(s.por_quien) for s in segs)
 
 
+def reabre(slug, etapa) -> bool:
+    """**Un tiquet de Jaime reabre su segmento aprobado, y solo ese** (C-605).
+
+    La puerta no reabre una pieza aprobada, y hace bien: lo que levanta la
+    maquina no rediscute lo aprobado. Pero el revisor tambien aprueba, asi que
+    su tiquet sobre e1 de reel-19, en `revisado`, se quedo diciendo «sube a
+    Jaime» con sus propias palabras. `abre` ya decia que lo hace «un tiquet
+    suyo, o Jaime», y nadie lo llamaba.
+    """
+    for s in Segmento.de(slug):
+        if s.n == int(etapa) and s.aprobado:
+            return s.abre()
+    return False
+
+
 def abiertos(slug, modo=SEGMENTO):
     """Los segmentos sobre los que se trabaja, segun el modo.
 
