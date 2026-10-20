@@ -154,6 +154,11 @@ def de_la_pieza(n, muestras=4):
     m = donde_esta(video, ts)
     if not m:
         return None
+    # **Y la cara de cada escena, en el mismo fichero** (C-624): la pieza
+    # entera es una constante, y el subtítulo se coloca escena por escena.
+    from .rostro import por_escena
+
+    m["escenas"] = por_escena(n, video)
     d = os.path.join("work", "scenes", f"reel-{n:02d}")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "cara.json"), "w", encoding="utf-8") as f:

@@ -68,6 +68,8 @@ export type CaptionCue = {
   /** Que se quede abajo. Ver `abajo` en `CaptionBand`. */
   abajo?: boolean;
   /** Cómo se resuelve su fondo. Ver `trato` en `CaptionBand`. */ trato?: Trato;
+  /** La coronilla de SU escena (C-624); sin ella, la de la pieza. */
+  coronilla?: number;
 };
 
 /**
@@ -308,7 +310,7 @@ export const Ad: React.FC<AdProps> = ({
           <CaptionBand
             text={caption.text}
             tokens={t}
-            coronilla={coronilla}
+            coronilla={caption.coronilla ?? coronilla}
             lado={lado}
             corrige={caption.corrige}
             palpita={caption.palpita}

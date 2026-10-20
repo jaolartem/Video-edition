@@ -231,7 +231,11 @@ export const caraDe = (slug) => {
   const f = `work/scenes/${slug}/cara.json`;
   if (!fs.existsSync(f)) return null;
   const m = JSON.parse(fs.readFileSync(f, "utf8"));
-  return {coronilla: m.coronilla, pies: m.pies, visto: m.visto};
+  // Y su cara escena por escena (C-624): la de la pieza es una mediana, y el
+  // subtitulo se coloca en cada escena. Solo si se midio: sin ella la huella
+  // del spec no cambia, y una pieza aprobada no se vuelve a renderizar por nada.
+  return {coronilla: m.coronilla, pies: m.pies, visto: m.visto,
+          ...(m.escenas ? {escenas: m.escenas} : {})};
 };
 
 /**

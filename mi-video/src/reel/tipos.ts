@@ -93,11 +93,14 @@ export type ReelSpec = {
    */
   boards: BoardCue[];
   /**
-   * Donde cae su cara en el cuadro, en fracciones. Lo mide `punch-ins.py` y lo
-   * trae `reels-spec`. Con esto el subtitulo se coloca **encima de su cabeza**,
-   * que es el 18% del cuadro que estaba sin usar.
+   * Donde cae su cara en el cuadro, en fracciones. Lo mide `sujeto.py` sobre el
+   * corte y lo trae `reels-spec`; `escenas` es la de cada escena (C-624). Con
+   * esto el subtitulo se coloca **encima de su cabeza** cuando cabe.
    */
-  cara?: { coronilla: number; menton: number } | null;
+  cara?: {
+    coronilla: number;
+    escenas?: { escena: number; coronilla?: number; boca?: number; menton?: number }[];
+  } | null;
   /** Tramos en blanco y negro. Ver `Desatura` en `Ad`. */
   desatura: { at: number; duration: number }[];
   /**

@@ -39,6 +39,17 @@ const CABEZA = J.cabeza;
 /** La altura del cuadro. Copia consciente de `layout.height`, como en `franja.mjs`. */
 const ALTURA = 1920;
 
+/**
+ * **Si el cc de esa banda le tapa la boca** (C-624): la banda se apoya en su
+ * suelo y crece hacia arriba, así que tapa si la boca medida cae por debajo de
+ * su techo. Encima de la cabeza no tapa por construcción; sin medida, no se
+ * acusa.
+ */
+const FRANJA = JSON.parse(fs.readFileSync("src/brand/franja.json", "utf8"));
+const SUELO = { barbilla: J.suelo_barbilla, franja: FRANJA.suelo };
+export const tapaLaBoca = (banda, cara) =>
+  banda !== "cabeza" && !!cara?.boca && cara.boca > SUELO[banda] - FRANJA.alto;
+
 /** Si el cc cabe en el hueco de encima de su cabeza. Ver `cabeElCcArriba`. */
 export const cabeArriba = (coronilla) =>
   !!coronilla &&
@@ -101,7 +112,11 @@ export function trataElCc(pieza, slug, captions) {
   pieza.cc = null;
   if (!trasfondo?.length) return captions;
   const titular = (pieza.recortes ?? []).find((x) => x.elemento === "titular");
-  const arriba = cabeArriba(pieza.cara?.coronilla);
+  // **La cara de cada escena, no la de la pieza** (C-624). Con una sola
+  // coronilla —la mediana de cuatro fotogramas— reel-19 llevaba el cc a la
+  // barbilla en todas, y en sus primeros planos la boca cae en 0,68-0,74: el
+  // texto se la tapaba. Sin medida de la escena, la de la pieza.
+  const caras = new Map((pieza.cara?.escenas ?? []).map((x) => [x.escena, x]));
   const finGancho = titular ? titular.at + titular.duration : 0;
   const FPS = 30;
 
@@ -132,7 +147,9 @@ export function trataElCc(pieza, slug, captions) {
     // Bajo el gancho el cc baja a la franja, así que el fondo que le toca es el
     // de la franja y no el de su sitio normal.
     const enGancho = t.desde * FPS < finGancho;
-    const cual = enGancho ? "franja" : arriba ? "cabeza" : "barbilla";
+    const cara = caras.get(t.escena);
+    const cual = enGancho ? "franja"
+      : cabeArriba(cara?.coronilla ?? pieza.cara?.coronilla) ? "cabeza" : "barbilla";
     const m = t.bandas[cual] ?? t.bandas.barbilla;
     if (!m) continue;
     const corta = t.hasta - t.desde < U.minimo_s;
@@ -140,7 +157,7 @@ export function trataElCc(pieza, slug, captions) {
     // Una escena corta hereda; la primera no tiene de quién, así que se queda
     // con lo suyo — un destello al principio de la pieza no existe.
     const cual2 = corta && previo ? previo : suyo;
-    escenas.push({ ...t, banda: cual, medida: m, trato: cual2 });
+    escenas.push({ ...t, banda: cual, medida: m, trato: cual2, cara });
     previo = cual2;
   }
   if (!escenas.length) return captions;
@@ -163,8 +180,11 @@ export function trataElCc(pieza, slug, captions) {
   pieza.cc = escenas.map((e) => ({
     escena: e.escena, beat: e.beat, desde: e.desde, hasta: e.hasta,
     banda: e.banda, trato: e.trato,
+    // Sólo con cara medida: sin ella el spec de una pieza ya aprobada no cambia.
+    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaBoca(e.banda, e.cara) } : {}),
     luz: e.medida.luz, grano: e.medida.grano, movimiento: e.medida.movimiento,
     contraste: e.medida.contraste,
   }));
-  return captions.map((c) => ({ ...c, trato: dueña(c).trato }));
+  return captions.map((c) => ({ ...c, trato: dueña(c).trato,
+    ...(dueña(c).cara?.coronilla ? { coronilla: dueña(c).cara.coronilla } : {}) }));
 }

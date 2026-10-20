@@ -185,6 +185,20 @@ export function revisar(spec) {
   const suyo = (r) => [...faltasDePaneles(r), ...faltasDeFondo(r), ...faltasDelGancho(r)];
   for (const r of spec) for (const m of suyo(r)) para(r, m);
   /**
+   * **Un subtítulo que le tapa la boca** (C-624). Lo mide `cc.mjs` escena por
+   * escena con la cara medida sobre el corte. Jaime, reel-19: *«los subtítulos
+   * me tapan la cara»*. No se arregla aquí —abrir el plano o cambiar lo que
+   * cubre la etapa es del diseñador—: se dice, con la medida, y no se publica.
+   */
+  // Bajo un tablero el cc es otro y la cara no se ve: no cuenta.
+  const bajoTablero = (r, e) => (r.boards ?? []).some((b) =>
+    b.at <= ((e.desde + e.hasta) / 2) * FPS && ((e.desde + e.hasta) / 2) * FPS < b.at + b.duration);
+  for (const r of spec)
+    for (const e of (r.cc ?? []).filter((x) => x.tapa && !bajoTablero(r, x)))
+      para(r, `e${e.beat}: el subtítulo le tapa la boca en la escena ${e.escena + 1}` +
+        ` (banda ${e.banda}, boca en ${e.boca} del cuadro) — abre el plano o cambia` +
+        ` lo que cubre la etapa`);
+  /**
    * **Una cifra en pantalla sin fila en `dato` para la pieza.**
    *
    * El contrato de diseño lo daba por hecho —«una cifra en pantalla sin fila en

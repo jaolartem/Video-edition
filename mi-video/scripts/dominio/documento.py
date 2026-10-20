@@ -154,14 +154,18 @@ class Documento:
         alertas = self._alertas()
         capas = self._capas(spec, lee)
         por_escena = {}
+        caras = {c["escena"]: c for c in spec.get("cc") or [] if isinstance(c, dict)}
         for e, k, t in Hoja.elegidos(self.slug, self.hechas, self.etapas):
             n = e["escena"]
             p = plan[n - 1] if 0 < n <= len(plan) else {}
             d = por_escena.setdefault(n, {
                 "escena": n, "etapa": e.get("etapa"), "desde": round(e["desde"], 1),
                 "hasta": round(e["hasta"], 1), "encuadre": p.get("encuadre"),
-                "cara": {k: v for k, v in (p.get("cara") or {}).items()
-                         if k in ("coronilla", "menton")},
+                # **La cara medida sobre el corte, y si el cc se la tapa**
+                # (C-624): la del plan era una suposición, y con ella la hoja
+                # le decía al revisor que no la tapaba.
+                "cara": {k: v for k, v in (caras.get(n - 1) or {}).items()
+                         if k in ("banda", "boca", "tapa")},
                 "en_pantalla": [c for c in capas if c["desde"] < e["hasta"] - 0.1
                                 and c["desde"] + c["dura"] > e["desde"] + 0.1],
                 "sueltos": [x["fichero"] for x in e["mira"]],
