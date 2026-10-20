@@ -338,3 +338,27 @@ export function sinRespaldo(slug, piezas) {
   }
   return fuera;
 }
+
+/** La pieza de una entrada del spec, como la nombra la base. */
+export const deVideo = (r) => String(r.video ?? "").replace(/\.mp4$/, "");
+
+/** Lo que una entrada del spec rotula con su beat: tableros y paneles. */
+export const rotuladas = (r) =>
+  [...(r.boards ?? []), ...(r.paneles ?? [])].filter((b) => b.beat !== undefined);
+
+/**
+ * **Y se le pregunta desde fuera, no se copia.** El paso de respaldo buscaba las
+ * cifras en el libreto y en `grafico`, y la puerta en lo que se pinta: R20
+ * rotulaba «$2,50» y «$0,10» en un tablero, el respaldo contestó «ninguna cifra
+ * en pantalla» y la puerta la paró igual (C-616). Ahora `fuentes.dossier` y
+ * `publicar.py` preguntan aquí, con el spec y la base de este momento.
+ *
+ *   node scripts/reels/cifras.mjs --sin-respaldo reel-20
+ */
+if ((process.argv[1] ?? "").replace(/\\/g, "/").endsWith("scripts/reels/cifras.mjs")
+    && process.argv[2] === "--sin-respaldo") {
+  const slug = process.argv[3];
+  const spec = JSON.parse(fs.readFileSync("src/reels.json", "utf8"));
+  const suyas = spec.filter((r) => deVideo(r) === slug).flatMap(rotuladas);
+  console.log(JSON.stringify(sinRespaldo(slug, suyas)));
+}

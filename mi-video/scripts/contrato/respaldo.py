@@ -34,6 +34,12 @@ RESPALDO = Contrato(
               exige=(Prompt("scripts/fuentes.prompt.md", "qué se va a dibujar"),),
               nota="Una cifra dibujada pesa más que una dicha: la del tablero se"
                    " queda en pantalla y se puede congelar y compartir."),
+        Campo("tablero",
+              manda=Aguja("scripts/fuentes.py", '"tablero": _props(f["tablero"])'),
+              exige=(Prompt("scripts/fuentes.prompt.md", "lo que el tablero pinta"),),
+              nota="Las cifras que se pintan entran por `fuentes.pintadas`, que"
+                   " pregunta a `cifras.mjs` como la puerta; y el tablero viaja"
+                   " entero porque su pie suele decir de qué estudio sale (C-616)."),
         Campo("cifras",
               manda=Aguja("scripts/fuentes.py", "for m in CIFRA.finditer(texto)"),
               exige=(Prompt("scripts/fuentes.prompt.md", "tal como sale en la pieza"),),

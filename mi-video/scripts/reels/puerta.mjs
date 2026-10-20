@@ -25,7 +25,7 @@ import { informe } from "./informe.mjs";
 import { faltasDePaneles } from "./paneles.mjs";
 import { faltasDeFondo } from "./fondo.mjs";
 import { faltasDelGancho } from "./portada.mjs";
-import { sinRespaldo } from "./cifras.mjs";
+import { deVideo, rotuladas, sinRespaldo } from "./cifras.mjs";
 
 /**
  * Cuánto metraje con Jaime en cuadro basta por sí solo.
@@ -198,11 +198,14 @@ export function revisar(spec) {
    * el calendario: una pieza que rotula un número que la fuente no respalda es
    * un problema legal, no un defecto de acabado. Con `REELS_VER=1` sale igual y
    * con el motivo escrito, que es como este proyecto deja que decida Jaime.
+   *
+   * **Y este motivo caduca antes de publicar.** Entre el montaje y la salida
+   * corre `respaldado`, que verifica la cifra y le pone su fila; así que
+   * `publicar.py` no se fía de lo escrito aquí y vuelve a preguntar (C-616).
    */
   for (const r of spec) {
-    const slug = String(r.video ?? "").replace(/\.mp4$/, "");
-    const piezas = [...(r.boards ?? []), ...(r.paneles ?? [])]
-      .filter((b) => b.beat !== undefined);
+    const slug = deVideo(r);
+    const piezas = rotuladas(r);
     for (const { beat, cifra } of sinRespaldo(slug, piezas)) {
       para(r,
         `${r.id}: el beat ${beat} rotula «${cifra}» y la etapa no declara esa ` +

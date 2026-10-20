@@ -43,6 +43,9 @@ import rutas  # noqa: E402
 
 BASE = os.path.join("ads", "decisiones.db")
 
+#: Cómo escribe `puerta.mjs` el motivo de una cifra pintada sin fila (C-616).
+SIN_FILA = "la etapa no declara esa cifra"
+
 
 # El apodo lo hace `dominio.texto`, que es el dueño de cómo se normaliza un
 # texto en este proyecto. Estaba copiado aquí, en `publicar.py` y en
@@ -274,6 +277,24 @@ def main():
         # ni estaba en la lista, paraba a R18—. Con piezas nombradas pesa el
         # motivo de esas; sin nombrarlas, el de todas, como siempre (C-615).
         pedidas = {f"Reel-R{n}" for n in a.piezas}
+        # **La cifra sin fila se pregunta ahora, no se lee del montaje.** Ese
+        # motivo lo escribió `puerta.mjs` al montar, y después corre
+        # `respaldado`, que la verifica en red y le pone su fila: leído tal
+        # cual, paraba lo ya resuelto. Jaime, con R20 parada por un estudio de
+        # JAMA citado en su propio tablero: *«si puedes verificar en red, ¿por
+        # qué paras producción?»* (C-616).
+        import fuentes
+
+        for r in spec:
+            if (pedidas and r["id"] not in pedidas) or not any(
+                    SIN_FILA in m for m in r.get("bloqueado") or []):
+                continue
+            r["bloqueado"] = [m for m in r["bloqueado"] if SIN_FILA not in m] + [
+                f"{r['id']}: el beat {b} rotula «{c}» y sigue sin fila en `dato`"
+                f" después del respaldo"
+                for b, cs in fuentes.pintadas(
+                    str(r.get("video") or "").removesuffix(".mp4")).items()
+                for c in cs]
         con_motivo = [(r["id"], r.get("bloqueado") or []) for r in spec
                       if r.get("bloqueado")
                       and (not pedidas or r["id"] in pedidas)]

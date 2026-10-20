@@ -38,6 +38,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import basedatos
 import sys
 import rutas  # noqa: E402
@@ -131,6 +132,36 @@ def propias():
     return fuera
 
 
+def pintadas(slug):
+    """Lo que los tableros pintan sin fila en `dato`, contado por quien para.
+
+    Este dossier buscaba cifras en el libreto y en `grafico`, y la puerta en
+    los props que se pintan: R20 rotulaba «$2,50» y «$0,10» en un tablero, aquí
+    no salió ninguna y el paso pasó con «ninguna cifra en pantalla» (C-616). Se
+    le pregunta a `cifras.mjs`, que es el dueño. Y si no contesta, se para: no
+    medir no es aprobar.
+    """
+    cifras = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "reels", "cifras.mjs")
+    r = subprocess.run(["node", cifras, "--sin-respaldo", slug],
+                       capture_output=True, text=True, encoding="utf-8")
+    if r.returncode:
+        raise RuntimeError(f"{slug}: cifras.mjs no dijo qué se pinta —"
+                           f" {(r.stderr or '').strip()[:300]}")
+    por = {}
+    for x in json.loads(r.stdout):
+        por.setdefault(int(x["beat"]), []).append(x["cifra"])
+    return por
+
+
+def _props(tablero):
+    """Lo que el tablero pinta, con su fuente declarada al pie si la lleva."""
+    try:
+        return (json.loads(tablero) or {}).get("props") if tablero else None
+    except (ValueError, AttributeError):
+        return None
+
+
 def dossier(slug):
     """Las etapas que ponen una cifra delante del espectador, con su contexto.
 
@@ -140,19 +171,25 @@ def dossier(slug):
     congelar y compartir.
     """
     con = _con()
+    # **Por `video_slug`, que es lo que la descripción siempre lleva.** Se unía
+    # por `video_id`, y 98 de 152 filas lo tienen vacío —de reel-07 en
+    # adelante—: a este paso no le llegaba ni el gráfico ni el tratamiento de
+    # dieciséis piezas (C-616). `arco.py` ya la une así.
     filas = con.execute(
         "select e.orden, l.texto as libreto, d.trato, d.grafico, d.que_pasa,"
-        "       d.corrige_dice, d.corrige_es"
+        "       d.corrige_dice, d.corrige_es, d.tablero"
         "  from etapa e"
         "  join video v on v.id = e.video_id"
         "  left join libreto l on l.video_id = v.id and l.orden = e.orden"
-        "  left join escena_desc d on d.video_id = v.id and d.etapa_orden = e.orden"
+        "  left join escena_desc d on d.video_slug = v.slug and d.etapa_orden = e.orden"
         " where v.slug = ? order by e.orden", (slug,)).fetchall()
     con.close()
+    pinta = pintadas(slug)
     out = []
     for f in filas:
         texto = " ".join(x for x in (f["libreto"], f["grafico"]) if x)
-        cifras = sorted({_normal(m.group(0)) for m in CIFRA.finditer(texto)})
+        cifras = sorted({_normal(m.group(0)) for m in CIFRA.finditer(texto)}
+                        | set(pinta.get(f["orden"], [])))
         cifras = [c for c in cifras if c]
         # **El precio no necesita fuente externa: es de la casa.** Se marca aqui
         # para que el paso de respaldo no lo pregunte y quien contesta no gaste
@@ -165,6 +202,7 @@ def dossier(slug):
                     "ya_respaldadas": propia,
                     "libreto": f["libreto"], "trato": f["trato"],
                     "grafico": f["grafico"], "que_pasa": f["que_pasa"],
+                    "tablero": _props(f["tablero"]),
                     # Una o varias (C-465).
                     "corrige": ([{"dice": d, "es": e} for d, e in
                                  _correcciones(f["corrige_dice"], f["corrige_es"])]
