@@ -482,6 +482,9 @@ def pedir(paso, slug, prompt, payload, cli=True):
         # `montaje`. Lo demas va para que pueda juzgarlo, no es lo juzgado.
         "repaso": ("onda", "se_ve", "etapas_sin_voz", "material_en_corpus",
                    "libreto", "evento", "estructura", "cierres_en_corpus"),
+        # La descripcion contesta sobre `pedido`, `editables` y `tiquets`. Las
+        # hojas del montaje entran una vuelta despues que el pedido (C-607).
+        "describir": ("ya_montada", "la_linea_midio"),
     }
     # **Y donde se sabe cual es la pregunta, se dice la pregunta — no el resto.**
     #
