@@ -425,7 +425,7 @@ def main():
             print(f"  {pieza}  {mb:.0f} MB")
             if not seco:
                 subir(mp4, os.path.join(raiz, f"{pieza}.mp4"), seco)
-                subir(ver, os.path.join(raiz, f"{pieza}.verificacion.md"), seco)
+                # La verificación no va suelta: va dentro del índice (C-623).
                 subir(png, os.path.join(raiz, f"{pieza}-portada.png"), seco)
                 registro.nota("publicar", "pieza subida", detalle=pieza)
                 # Y en la base, no solo en el log: el registro se lee con los

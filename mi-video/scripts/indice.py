@@ -62,6 +62,20 @@ def _titulo(guion):
     return frase if len(frase) <= TITULO else frase[:TITULO].rsplit(" ", 1)[0] + "…"
 
 
+def _verificacion(n):
+    """El bloque de verificación de la pieza, como sección del índice."""
+    import rutas
+
+    try:
+        texto = open(os.path.join(rutas.DESTINO, f"Reel-R{n}.verification.md"),
+                     encoding="utf-8").read()
+    except OSError:
+        return ["### Verificación", "", "Sin verificación escrita para esta pieza.", ""]
+    lineas = [ln for ln in texto.splitlines() if not ln.startswith("# ")]
+    return ["### Verificación", ""] + [
+        ("##" + ln) if ln.startswith("## ") else ln for ln in lineas] + [""]
+
+
 def ficha(n):
     """La sección de una pieza, en markdown."""
     p = Pieza(n)
@@ -96,6 +110,11 @@ def ficha(n):
     for b, t in guion:
         nombre = etapas.get(b) or "—"
         out += [f"**{b if b is not None else '·'} · {nombre}.** {t}", ""]
+    # **Y su verificación, dentro** (C-623). Jaime: *«todos los documentos
+    # deben estar en un solo documento»*: subía un `.verificacion.md` por
+    # pieza al lado del vídeo. Es el bloque de `verificacion.mjs`, con sus
+    # títulos bajados un nivel para que cuelguen de la pieza.
+    out += _verificacion(n)
     pies = [(b.get("beat"), (b.get("props") or {}).get("pie"))
             for b in (p.pintado or {}).get("boards") or []]
     if any(pie for _, pie in pies):
