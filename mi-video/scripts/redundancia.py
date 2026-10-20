@@ -408,6 +408,7 @@ def cargar(slug, cortes, pasada=1):
     vuelve a montar. Un paso que corta por su cuenta se pisa con el otro.
     """
     n = 0
+    atendidos = []
     for c in cortes:
         ancla = (c.get("ancla") or "").strip()
         if not ancla:
@@ -417,6 +418,17 @@ def cargar(slug, cortes, pasada=1):
                         regla=REGLA, pasada=pasada, ancla=ancla,
                         cual=int(c.get("cual") or 1))
         n += 1
+        atendidos += c.get("tiquets") or []
+    # **Y los tiquets que el corte declara atender se cierran aquí** (C-625).
+    # La respuesta los nombraba y nadie los leía: reel-20, 20-10, el #811 de
+    # «gratis» cinco veces quedó recortado y abierto, y `vencidas` paró la pieza
+    # en `recortado` vuelta tras vuelta por algo ya hecho. Es lo que `revalidar`
+    # y `disenar` hacen con los suyos: cerrar es parte de atender.
+    if atendidos:
+        from dominio import abierto as _abierto
+
+        _abierto.cerrar(slug, "sin_redundancia", "recortado por el servicio de"
+                        " redundancia, que declara haberlo atendido", atendidos)
     return n
 
 
