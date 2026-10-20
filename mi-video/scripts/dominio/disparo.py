@@ -159,6 +159,18 @@ def _anota(detalle):
         pass
 
 
+#: Con qué código sale el disparador para que `arrancar.sh` lo vuelva a poner.
+REARRANCA = 75
+
+
+def _version():
+    """El HEAD de la copia que corre, o `None` si no se puede leer."""
+    import subprocess
+
+    r = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+    return r.stdout.strip() or None
+
+
 def puesto(vuelta, cada=30):
     """Se queda dando vueltas mientras corra. Es lo que hay que dejar activo.
 
@@ -185,6 +197,7 @@ def puesto(vuelta, cada=30):
     # a mano. Aqui es lo contrario: mata el puesto entero, y las otras seis
     # piezas dejan de moverse por una. Se anota y se sigue a la vuelta
     # siguiente, que es lo que el propio motor hace con `planta=False`.
+    corre = _version()
     while True:
         try:
             vuelta()
@@ -192,6 +205,14 @@ def puesto(vuelta, cada=30):
             return
         except (SystemExit, Exception) as e:       # noqa: BLE001
             _anota(f"la vuelta del disparador se corto: {type(e).__name__}: {e}")
+        # **Y si el código cambió, se rearranca** (C-629). Los pasos corren
+        # dentro de este proceso, así que lo fusionado no entraba hasta
+        # reiniciarlo: 20-10, cuatro arreglos (C-625..628) fusionados y la línea
+        # seguía parando reel-20 con el `revalidar` de las 17:59.
+        if corre and _version() != corre:
+            print("disparador: el codigo cambio — se rearranca para correrlo",
+                  file=__import__("sys").stderr)
+            raise SystemExit(REARRANCA)
         try:
             time.sleep(max(5, int(cada)))
         except KeyboardInterrupt:

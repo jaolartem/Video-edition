@@ -79,4 +79,10 @@ echo "arrancar: todo en su sitio — disparador con $# pieza(s): $*"
 [ "${OFICIOS_POR_BASH:-1}" = "0" ]   && echo "arrancar: oficios por la sesion — la cola: python scripts/dominio/cola.py --lote $*"
 # Y el reloj y los tokens de cada pieza, desde aqui (C-565).
 _py "from dominio import cola; cola.arranca(sys.argv[1:])" "$@"
-exec python scripts/disparador.py "$@" --hilos "$#"
+# Y si sale pidiendo rearranque, es que el codigo cambio: se vuelve a poner con
+# el nuevo (C-629). Cualquier otra salida es la suya.
+while :; do
+  python scripts/disparador.py "$@" --hilos "$#"; rc=$?
+  [ "$rc" -eq 75 ] || exit "$rc"
+  echo "arrancar: el codigo cambio — disparador puesto otra vez"
+done
