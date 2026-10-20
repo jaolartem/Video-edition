@@ -163,7 +163,13 @@ def png(n):
              # La muestra trae su antetítulo; aquí no lleva ninguno. Y nada más
              # a `null`: un null se salta el valor por defecto de `Cover`.
              "kicker": None}
-    huella = hashlib.sha1(json.dumps(props, sort_keys=True).encode()).hexdigest()[:12]
+    # **Y la imagen, no sólo su nombre**: rehacer el encargo saca otro
+    # fotograma con la misma ruta, y con el nombre solo la portada no cambiaba.
+    try:
+        foto = open(os.path.join("public", p["fotograma"]), "rb").read()
+    except OSError:
+        foto = b""
+    huella = hashlib.sha1(json.dumps(props, sort_keys=True).encode() + foto).hexdigest()[:12]
     salida = PNG.format(n=int(n))
     try:
         if open(salida + ".huella", encoding="utf-8").read().strip() == huella:
@@ -276,3 +282,19 @@ def retirar(slug):
         json.dump(d, f, ensure_ascii=False, indent=1)
         f.write(chr(10))
     return True
+
+
+def devolver(n, motivo):
+    """Jaime la mira y no le sirve: se retira y se encarga otra vez con su motivo.
+
+    Jaime, 20-10-2026, sobre la de reel-19 —un selfi con la cara cortada por el
+    borde—: *«rehaz la portada de R19»*. Va por aquí y no a mano, para que el
+    encargo lleve el porqué y lo que se había contestado (C-618).
+    """
+    slug = f"reel-{int(n):02d}"
+    hecha = os.path.join(BUZON, f"{slug}.portada.hecha.json")
+    antes = json.load(open(hecha, encoding="utf-8")) if os.path.exists(hecha) else declarada(slug)
+    retirar(slug)
+    if os.path.exists(hecha):
+        os.replace(hecha, hecha.replace(".hecha.json", ".rechazada.json"))
+    return pedido(n, rechazo={"motivo": motivo, "lo_que_contestaste": antes})
