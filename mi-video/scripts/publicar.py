@@ -24,6 +24,7 @@ se sabe qué es.
     python scripts/publicar.py --ver          # que subiria, sin tocar nada
     python scripts/publicar.py --fragmentos   # sube los aprobados
     python scripts/publicar.py --finales      # sube las piezas listas
+    python scripts/publicar.py --finales 18 19   # solo esas
 """
 import argparse
 import datetime
@@ -217,6 +218,13 @@ def main():
                     help="sube LAS SEIS a FINALES/_revision para verlas montadas."
                          " No es publicar: es enseñar")
     ap.add_argument("--ver", action="store_true", help="dice que haria y no toca nada")
+    # **Las piezas se nombran, como las nombra el camino.** `fase.CICLO` llama
+    # `publicar.py --finales {n}` y esto no aceptaba el numero: el 20-10-2026
+    # el disparador lo intento 362 veces por pieza con «unrecognized arguments»
+    # y R18-R22 no salieron. Y sin nombrarlas, `--finales` sube todo lo listo
+    # de una vez, cuando Jaime pidio *«sube las nuevas»* y solo esas (C-615).
+    ap.add_argument("piezas", nargs="*", type=int,
+                    help="solo esas piezas (18 19 …); sin numeros, todas")
     a = ap.parse_args()
     seco = a.ver or not (a.fragmentos or a.finales or a.revision)
 
@@ -261,8 +269,14 @@ def main():
             spec = _j.load(open("src/reels.json", encoding="utf-8"))
         except OSError:
             spec = []
+        # **Para la pieza con motivo, no a sus vecinas.** Con todas, una sola
+        # pieza con motivo dejaba el lote entero en tierra —el 20-10, R2, que
+        # ni estaba en la lista, paraba a R18—. Con piezas nombradas pesa el
+        # motivo de esas; sin nombrarlas, el de todas, como siempre (C-615).
+        pedidas = {f"Reel-R{n}" for n in a.piezas}
         con_motivo = [(r["id"], r.get("bloqueado") or []) for r in spec
-                      if r.get("bloqueado")]
+                      if r.get("bloqueado")
+                      and (not pedidas or r["id"] in pedidas)]
         if con_motivo:
             print(f"NO SE PUBLICA — {len(con_motivo)} pieza(s) con motivos"
                   f" abiertos:")
@@ -346,8 +360,11 @@ def main():
         raiz = rutas.FUENTES["finales"]
         print(f"FINALES -> {raiz}")
         hay = False
+        salieron = set()
         from dominio.segmento import aprobada as _aprobada
         for pieza, mp4, ver, pega in listas(con):
+            if a.piezas and int(pieza.split("R")[-1]) not in a.piezas:
+                continue
             # **Solo lo que el aprobo.** Pasar la puerta no es estar revisado:
             # a FINALES va lo definitivo, ya visto y firmado por Jaime (C-553).
             if not _aprobada(f"reel-{int(pieza.split('R')[-1]):02d}"):
@@ -356,6 +373,7 @@ def main():
                 print(f"  {pieza}: NO sale — {'; '.join(pega)}")
                 continue
             hay = True
+            salieron.add(int(pieza.split("R")[-1]))
             mb = os.path.getsize(mp4) / 1e6
             print(f"  {pieza}  {mb:.0f} MB")
             if not seco:
@@ -368,6 +386,13 @@ def main():
                     "reel-", "reel-").strip(), raiz, con)
         if not hay:
             print("  nada listo para salir.")
+        # **Y la pieza pedida que no sale no sale con exito.** El camino lee el
+        # codigo de salida para pasarla a `publicado`: un «NO sale» con 0 la
+        # daria por publicada sin estar en Drive (C-615).
+        quedan = sorted(set(a.piezas) - salieron)
+        if quedan and not seco:
+            con.close()
+            raise SystemExit(f"\nNO salieron: {', '.join(f'R{n}' for n in quedan)}")
 
     if seco:
         print("\n(en seco: no se ha copiado nada. Anade --fragmentos o --finales)")
