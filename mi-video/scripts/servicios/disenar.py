@@ -44,7 +44,7 @@ from dominio import dibujable as _dib  # noqa: E402  C-562
 
 from contrato.marca import ENTRADA_GANCHO, ESTILO, PRIORIDAD  # noqa: E402,F401
 
-from dominio import abierto as _abierto  # noqa: E402
+from dominio import abierto as _abierto, quitada as _quitada  # noqa: E402
 import fotogramas as _fotogramas  # noqa: E402
 from dominio import remate as _remate  # noqa: E402
 from dominio.mudo import sin_copy as _sin_copy  # noqa: E402
@@ -214,7 +214,10 @@ def encargos(slug):
     from dominio.segmento import Segmento
 
     aprobados = {s.n for s in Segmento.de(slug) if s.aprobado}
-    return [f for f in filas
+    # **Y lo que se mandó quitar no se encarga** (C-628): reel-21, 20-10, la
+    # etapa 5 —el aviso, fuera por decisión de Jaime— seguía pidiendo tablero y
+    # `verificar` le abría un tiquet que paraba la final.
+    return [f for f in filas if int(f["etapa_orden"]) not in _quitada.todas(slug)
             if (int(f["etapa_orden"]) not in aprobados and _pide_tablero(f)
                 and (not f["tablero"] or _sin_copy(f) or _desfasado(f)))
             or _abierto.abre(slug, "disenado", f)]

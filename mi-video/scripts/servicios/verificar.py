@@ -85,8 +85,18 @@ def _anota(pieza, motivo: str) -> None:
 
     try:
         texto = motivo.split(": ", 1)[-1][:2000]
+        # **Ni se reabre lo que cerró una persona** (C-628): reel-21, 20-10,
+        # Jaime cerró las nueve «regla de plano» (#673–681) al firmar la pieza y
+        # el siguiente montaje las abrió otra vez (#822–830). Lo decidido no
+        # vuelve; lo que cerró la línea sí, porque puede haber vuelto a pasar.
+        from dominio.autor import Autor
+
+        def _persona(quien):
+            return getattr(Autor.de(quien or ""), "tipo", None) == "persona"
+
         if any((t.get("dijo") or "").startswith(texto[:60])
-               for t in tk.abiertos(pieza.slug)):
+               and (t.get("estado") == "abierto" or _persona(t.get("quien")))
+               for t in tk.historia(pieza.slug)):
             return
         # **Un aviso es un `dato`: se ve y no para** (C-559). La puerta ya
         # decidio que no bloquea; como `objecion` iba al disenador, y abierto
