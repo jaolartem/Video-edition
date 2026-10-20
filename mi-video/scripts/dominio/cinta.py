@@ -49,7 +49,8 @@ HOLGURA = PAUSA / 2 + MARGEN
 
 
 class CintaIncompleta(Exception):
-    """Tiene habla sin texto. No es «rehazla»: es «tápale los huecos».
+    """Tiene habla sin texto, o texto sin habla. No es «rehazla»: es «tápale
+    los huecos», o «afina esa zona».
 
     Excepción propia a propósito: el bucle que transcribe caza `SystemExit`
     como «rehazla entera», y eso son treinta minutos de CPU repitiendo el
@@ -191,6 +192,28 @@ class Cinta:
                if b - a >= minimo and not any(a <= p.empieza < b for p in ws)]
         return [x for x in hue if not self._descartado(*x)]
 
+    def en_silencio(self) -> list:
+        """Las palabras que el texto pone donde la onda calla entera (C-610).
+
+        **El revés de `huecos()`**: aquello es habla medida sin texto, esto es
+        texto sin habla. En `20261015_124118`, 249-318 s, el afinado del 19-10
+        dejó «es» en 251,35-251,66, sobre -94 dB, y tres pasos leyeron esa zona
+        con las palabras corridas sin que nada lo dijera. Se mide con la vara
+        de la puerta (`Senal.calla_entre`, `bordes.VOZ`), no con otra.
+
+        **Con `AIRE` por delante**, el mismo que `desde_el_ataque`: el texto
+        entra tarde, y la última palabra de una frase alineada arranca 0,2-0,3 s
+        después de que la voz calle. Sin él, una cinta bien alineada da 28 de
+        588; con él, 0 — y la de la avería, 22.
+        """
+        from .senal import Senal
+
+        s = Senal(self.nombre)
+        if s.muestras[0] is None:
+            return []
+        return [p for p in self.palabras()
+                if s.calla_entre(p.empieza - AIRE, p.acaba)]
+
     def exigir(self, cobertura: bool = True, varias: bool = True) -> None:
         """La cinta sirve, o se para. Sin avisos que nadie lee.
 
@@ -220,6 +243,17 @@ class Cinta:
                     f"{self.transcript}: {falta:.0f}s de habla medida sin una"
                     f" sola palabra. Lo que se decide por palabra no puede"
                     f" verla." + receta)
+            # **Y el revés: texto donde la onda calla** (C-610). Sólo en lo
+            # alineado, que es lo que promete casar con el audio; el reparto de
+            # antes deja 1-26 por cinta y no se para la línea por lo que ya
+            # estaba así.
+            mudas = self.en_silencio() if d.get("alineado") else []
+            if mudas:
+                raise CintaIncompleta(
+                    f"{self.transcript}: {len(mudas)} palabra(s) donde la onda"
+                    f" calla — {', '.join(str(p) for p in mudas[:4])}. Sus"
+                    f" tiempos no casan con el audio, y lo que se decida por"
+                    f" ellos cae donde no se dijo." + receta)
 
     def datos(self) -> dict:
         """Lo que hay escrito en el transcript, tal cual.

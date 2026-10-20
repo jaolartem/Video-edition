@@ -22,6 +22,47 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import registro  # noqa: E402
 
 
+def alineadas(segmentos, larga):
+    """Las palabras de una pasada, **con el arranque que midió el alineamiento**.
+
+    Con `-ml 1 -sow` cada palabra es un segmento, y sus `offsets` no salen del
+    audio: whisper reparte el tiempo del segmento entre sus tokens por lo que
+    miden. Sobre la misma frase y cuatro ventanas, ese arranque bailaba 1,45 s;
+    el `t_dtw` del primer token —el alineamiento contra el audio— baila 0,08 s.
+    Y la votación entre pasadas compara texto, así que con el reparto ganaba una
+    y sus tiempos entraban sin que nadie los mirara (C-610).
+
+    El final no lo mide nadie, así que no se inventa: una palabra acaba donde
+    empieza la siguiente, **etiquetas incluidas** —el «[Sonido de caja]» dice
+    dónde dejó de hablar—, y la última de la ventana dura lo que dijo el reparto,
+    con `larga` de techo. Lo que se estire sobre un silencio lo recorta la
+    `Cinta`, que sí sabe dónde calla.
+
+    `None` si no vino ningún alineamiento: un binario o una bandera que lo
+    apague no puede devolver tiempos que parecen buenos.
+    """
+    ws, dura, alguna = [], 0.0, False
+    for s in segmentos:
+        txt = s.get("text", "").strip()
+        if not txt:
+            continue
+        toks = [t for t in s.get("tokens", [])
+                if not t.get("text", "").startswith("[_")]
+        dtw = toks[0].get("t_dtw", -1) if toks else -1
+        alguna |= dtw >= 0
+        o = s["offsets"]
+        a = dtw / 100.0 if dtw >= 0 else o["from"] / 1000.0
+        if ws:
+            ws[-1]["b"] = a = max(a, ws[-1]["a"])
+        ws.append({"a": a, "b": a, "t": txt})
+        dura = max(0.0, (o["to"] - o["from"]) / 1000.0)
+    if ws and not alguna:
+        return None
+    if ws:
+        ws[-1]["b"] = ws[-1]["a"] + min(dura, larga)
+    return ws
+
+
 def sin_etiquetas(ws):
     """Quita las etiquetas de sonido, que con `-ml 1` vienen partidas.
 

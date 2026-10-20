@@ -112,6 +112,15 @@ HILOS = 12
 # compra mejor la votacion entre pasadas. `-bs 2` sale peor en las dos cosas
 # (16,2 s y 0,934), asi que no es una escala: es un escalon.
 VORAZ = ["-bs", "1", "-bo", "1"]
+# **El arranque de cada palabra lo mide el alineamiento, no el reparto.** Sin
+# `-dtw`, whisper reparte el tiempo de cada segmento entre sus tokens por lo que
+# miden, y eso no mira el audio: sobre la misma frase de la cinta
+# 20261015_124118, cuatro ventanas pusieron «y yo no sé cuál» en 250,36, 250,76,
+# 251,57 y 251,81 — la onda dice 251,76. Con `-dtw` las cuatro dicen 251,91-251,99.
+# Cada modelo trae sus propias cabezas de alineamiento, de ahí el nombre; y el
+# binario calla el DTW con flash attention puesta (`t_dtw` = -1), de ahí `-nfa`.
+# Medido: 11,7 s por ventana contra 12,5 s sin él. Ver C-610.
+ALINEA = {"ggml-small.bin": "small", "ggml-medium.bin": "medium"}
 
 # Lo que el modelo dice cuando se queda sin voz. No es transcripcion, es relleno
 # aprendido de YouTube — y ademas delata que ahi hay silencio (aprendizaje 30).
@@ -179,10 +188,12 @@ def recorte(wav, a, b, destino, sr, anchura):
 
 
 def pasada(wav, salida, modelo=None):
-    """whisper sobre una ventana, con granularidad de palabra."""
-    r = subprocess.run(gpu.whisper() + ["-m", modelo or MODELO, "-f", wav,
-                    "-l", "es", "-mc", "0", "-ml", "1", "-sow", "-oj",
-                    "-of", salida, "-np", "-nf", "-t", str(HILOS)] + VORAZ,
+    """whisper sobre una ventana, con granularidad de palabra y alineada."""
+    modelo = modelo or MODELO
+    r = subprocess.run(gpu.whisper() + ["-m", modelo, "-f", wav,
+                    "-l", "es", "-mc", "0", "-ml", "1", "-sow", "-ojf",
+                    "-of", salida, "-np", "-nf", "-t", str(HILOS),
+                    "-dtw", ALINEA[os.path.basename(modelo)], "-nfa"] + VORAZ,
                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     if r.returncode != 0 or not os.path.exists(salida + ".json"):
         registro.error("transcribir", "whisper salio mal",
@@ -190,13 +201,14 @@ def pasada(wav, salida, modelo=None):
                                f" {(r.stderr or b'')[-160:].decode('utf8','replace')}")
         return []
     d = json.load(open(salida + ".json", encoding="utf-8"))
-    out = []
-    for w in d.get("transcription", []):
-        t = w["offsets"]
-        txt = w["text"].strip()
-        if txt:
-            out.append({"a": t["from"] / 1000.0, "b": t["to"] / 1000.0,
-                        "t": txt})
+    from dominio import pasadas as _p
+
+    out = _p.alineadas(d.get("transcription", []), LARGA)
+    if out is None:
+        registro.error("transcribir", "whisper sin alineamiento",
+                       detalle=f"{os.path.basename(salida)}: ninguna palabra trae"
+                               f" t_dtw; sin el, los tiempos no miran el audio")
+        return []
     return sin_etiquetas(out)
 
 
@@ -307,7 +319,11 @@ def transcribir(toma, runs, verbose=True, modelo=None, paso=None):
         for v in salidas:
             if v["a"] > a or v["b"] < b:
                 continue                       # la ventana no lo contiene entero
-            dentro = [w for w in v["ws"] if a <= (w["a"] + w["b"]) / 2 < b]
+            # **Por el arranque, que es lo medido** (C-610). El centro mezclaba
+            # el arranque con un final que nadie mide, y una palabra estirada
+            # sobre el hueco caia en el tramo de despues: «la verdad, síganme»
+            # entro dos veces, la segunda sobre el ruido de una caja.
+            dentro = [w for w in v["ws"] if a <= w["a"] < b]
             if not dentro:
                 continue
             texto = " ".join(w["t"] for w in dentro)
@@ -518,7 +534,11 @@ def main():
 
         slug = f"reel-{a.elegidos:02d}"
         total = 0
-        for t, tramos in afinado.elegidos(slug).items():
+        for t, todos in afinado.elegidos(slug).items():
+            tramos = afinado.pendientes(t, todos)
+            if not tramos:
+                print(f"  {t}: los {len(todos)} tramos elegidos ya estaban afinados")
+                continue
             d, n = afinar(t, tramos)
             total += n
             print(f"  {t}: {n}/{len(tramos)} tramos elegidos afinados"

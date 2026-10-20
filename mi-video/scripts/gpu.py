@@ -323,14 +323,17 @@ def aviso_si_cae(script):
 # ── la medida ───────────────────────────────────────────────────────────────
 # Las mismas banderas que usa `transcribir.pasada()`. Si alli cambian, aqui
 # tambien: una medida con otras banderas no compara este paso, compara otro.
-BANDERAS = ["-l", "es", "-mc", "0", "-ml", "1", "-sow", "-oj", "-np", "-nf",
-            "-bs", "1", "-bo", "1", "-t", "12"]
+BANDERAS = ["-l", "es", "-mc", "0", "-ml", "1", "-sow", "-ojf", "-np", "-nf",
+            "-bs", "1", "-bo", "1", "-t", "12", "-nfa"]
 
 
 def _corre(wav, modelo, exe, etiqueta):
     salida = os.path.join(rutas.temporal("gpu"), etiqueta)
     t = time.perf_counter()
-    subprocess.run([exe, "-m", modelo, "-f", wav, "-of", salida] + BANDERAS,
+    from transcribir import ALINEA
+
+    subprocess.run([exe, "-m", modelo, "-f", wav, "-of", salida] + BANDERAS
+                   + ["-dtw", ALINEA[os.path.basename(modelo)]],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     dt = time.perf_counter() - t
     if not os.path.exists(salida + ".json"):

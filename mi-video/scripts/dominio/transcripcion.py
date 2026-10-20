@@ -33,7 +33,8 @@ def guardar(toma, palabras, mapa, dudosos, modelo=None, paso=None):
     cuatro fallos: se corrige uno y el otro sigue diciendo lo de antes. Asi que
     esto sustituye a `work/transcripts/<toma>.json` en vez de convivir con el.
     """
-    from transcribir import MODELO, PASO, SELLO, VENTANA, gpu, sin_fantasmas
+    from transcribir import (ALINEA, MODELO, PASO, SELLO, VENTANA, gpu,
+                             sin_fantasmas)
 
     os.makedirs("work/transcripts", exist_ok=True)
     ruta = f"work/transcripts/{toma}.json"
@@ -53,6 +54,9 @@ def guardar(toma, palabras, mapa, dudosos, modelo=None, paso=None):
                # (medido, 1,000 de parecido), eso es un hecho a comprobar en
                # cada corrida, no una suposicion a heredar.
                "dispositivo": gpu.sello(),
+               # **Y si sus tiempos los midió el alineamiento** (C-610): es lo
+               # que promete que casan con la onda, y `Cinta.exigir` lo cobra.
+               "alineado": ALINEA[os.path.basename(modelo or MODELO)],
                SELLO: len(con_texto) and round(
                    sum(m["pasadas"] for m in con_texto) / len(con_texto), 2),
                "dudosos": dudosos,

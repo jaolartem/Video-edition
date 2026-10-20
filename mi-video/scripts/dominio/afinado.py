@@ -154,8 +154,8 @@ def afinar(toma, tramos, pasadas=4):
             trozo = os.path.join(tmp, f"a{k:02d}.wav")
             recorte(voz_wav, w0, min(w0 + ancho, dur), trozo, sr, anchura)
             ws = pasada(trozo, os.path.join(tmp, f"a{k:02d}"), MODELOS["bueno"])
-            dentro = [w for w in ws
-                      if va <= w["a"] + w0 + (w["b"] - w["a"]) / 2 < vb]
+            # Por el arranque, como al transcribir (C-610).
+            dentro = [w for w in ws if va <= w["a"] + w0 < vb]
             for w in dentro:
                 w["a"] += w0
                 w["b"] += w0
@@ -311,6 +311,33 @@ def dudosos(toma, suelo=0.6):
         " order by s.acuerdo", (toma, suelo))]
     cx.close()
     return juntar(tr)
+
+
+def pendientes(toma, tramos):
+    """Los que aún no pasaron por el modelo bueno. **Lo oído no se vuelve a oír.**
+
+    La fase 3 corre `--elegidos` en cada vuelta de la pieza y afinaba otra vez
+    lo ya afinado: 36 s de whisper por tramo para escribir lo mismo. Mientras
+    salía idéntico sólo costaba tiempo; con C-610 los tiempos cambian, y
+    reescribirlos bajo una pieza aprobada movería las huellas de sus
+    declaraciones —13 de 15 en reel-18— y `fijar` las mandaría al compositor.
+    Rehacer lo oído es `--rehacer` de la cinta entera: una decisión, no una vuelta.
+    """
+    from dominio import Cinta
+
+    c = Cinta(toma)
+    if not c.existe():
+        return list(tramos)
+    d = c.datos()
+    ya = [tuple(x) for x in (d.get("afinado") or []) + (d.get("intentado") or [])]
+    runs = c.habla()
+
+    def oido(a, b):
+        toca = [(x, y) for x, y in runs if y > a and x < b]
+        return bool(toca) and all(
+            any(p <= x + 0.001 and y <= q + 0.001 for p, q in ya) for x, y in toca)
+
+    return [(a, b) for a, b in tramos if not oido(a, b)]
 
 
 #: Lo que se abre a cada lado de un tramo elegido. La redundancia suele empezar
