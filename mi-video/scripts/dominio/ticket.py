@@ -218,6 +218,15 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
     por_defecto = RUTA.get(tipo, ("", ""))
     if cierra_con is None and not por_defecto[1]:
         cierra_con = tipo
+    # **Ni uno de `cosido` que no se pueda medir** (C-626). `cosido` no mueve
+    # bordes —`costuras.py` deja `bordes` fuera, es criterio— y sólo cierra lo
+    # que mide en su segundo (`cierre.cierra_los_suyos`) o por texto. reel-18,
+    # 20-10: el visto mandó ahí «el tramo acaba en una «y» que no es suya», sin
+    # segundo, y `vencidas` paró la pieza en `repasado` en cada vuelta. Dónde
+    # empieza y acaba un tramo lo declara el compositor, como el #536.
+    va = por_defecto[0] if vuelve_a is None else vuelve_a
+    if va == "cosido" and segundo is None and (cierra_con or por_defecto[1]) != "texto":
+        vuelve_a = "descrito"
     # **Y no se abre un tiquet sin decir a que escena va.** Jaime, 7-9-2026:
     # *«cada tiquet va ligado a la escena y el compositor solo ve esa escena»*.
     # Sin escena nadie puede acotar: el #282 salio asi y el pedido pidio las
