@@ -76,17 +76,28 @@ def _verificacion(n):
         ("##" + ln) if ln.startswith("## ") else ln for ln in lineas] + [""]
 
 
-def ficha(n):
-    """La sección de una pieza, en markdown."""
+def ficha(n, raiz=None):
+    """La sección de una pieza, en markdown. Describe EL FICHERO de `raiz`."""
     p = Pieza(n)
     edl = p.edl or {}
     etapas = {}
     for d in edl.get("detalle", []) + edl.get("sin_toma", []):
         etapas.setdefault(d.get("beat"), d.get("etapa"))
     dicho = p.dicho
+    # **Y el fichero de la carpeta tiene que ser la entrega de hoy.** Si la
+    # pieza se remontó en F: y aún no se subió, su guion es el del corte nuevo
+    # y el vídeo de FINALES el viejo: R18, 20-10-2026, describía 63,0 s junto a
+    # un fichero de 59,4. Lo que no es lo mismo no se describe.
+    alli = os.path.join(raiz, f"reel-R{n}.mp4") if raiz else ""
+    distinto = (bool(alli) and os.path.exists(alli) and os.path.exists(p.entrega)
+                and os.path.getsize(alli) != os.path.getsize(p.entrega))
+    if distinto:
+        dicho = None
     guion = [(b, t) for b, t in sorted((dicho or {}).items(),
                                        key=lambda x: (x[0] is None, x[0] or 0))]
-    v = p.version or {}
+    # La versión y la duración son las de la entrega de hoy: con otro fichero
+    # en la carpeta, no son las suyas.
+    v = {} if distinto else (p.version or {})
     plan = _plan(p.slug)
     cab = f"## R{n} · {plan or _titulo(guion)}" if plan or guion else f"## R{n}"
     datos = [f"`reel-R{n}.mp4`"]
@@ -103,7 +114,11 @@ def ficha(n):
     if _porque(p.slug):
         out += [f"**Qué es.** {_porque(p.slug)}", ""]
     out += ["### Guion final", ""]
-    if dicho is None:
+    if distinto:
+        out += ["El vídeo de esta carpeta no es la entrega de hoy: la pieza se"
+                " está rehaciendo y la nueva todavía no se ha subido. Su guion"
+                " no se describe hasta que suba.", ""]
+    elif dicho is None:
         out += ["El vídeo de esta carpeta salió de un montaje anterior al de hoy"
                 " —la huella del render no es la del spec—, así que su guion no"
                 " está en la línea. No se reconstruye.", ""]
@@ -114,7 +129,7 @@ def ficha(n):
     # deben estar en un solo documento»*: subía un `.verificacion.md` por
     # pieza al lado del vídeo. Es el bloque de `verificacion.mjs`, con sus
     # títulos bajados un nivel para que cuelguen de la pieza.
-    out += _verificacion(n)
+    out += [] if distinto else _verificacion(n)
     pies = [(b.get("beat"), (b.get("props") or {}).get("pie"))
             for b in (p.pintado or {}).get("boards") or []]
     if any(pie for _, pie in pies):
@@ -137,7 +152,7 @@ def escribir(raiz):
                       f" | {', '.join(sorted(Pieza(n).cintas)) or '—'} |")
     partes.append("")
     for n in nums:
-        partes += ["---", "", ficha(n)]
+        partes += ["---", "", ficha(n, raiz)]
     ruta = os.path.join(raiz, NOMBRE)
     open(ruta, "w", encoding="utf-8", newline="\n").write("\n".join(partes) + "\n")
     return ruta
