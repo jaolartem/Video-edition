@@ -494,7 +494,11 @@ def aplicar(slug, solo=None):
     """
     import transcribir
     import trato as _tr
+    from dominio import quitada
 
+    # **Lo que sale de la pieza, antes que nada** (C-609): una etapa quitada
+    # no vuelve por su tramo declarado, que `quitada.declarar` ya borro.
+    quitada.aplicar(slug)
     fjs = fijados(slug)
     if solo is not None:
         fjs = [f for f in fjs if f["beat"] in solo]
