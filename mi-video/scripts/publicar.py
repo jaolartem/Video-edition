@@ -228,7 +228,14 @@ def main():
     # de una vez, cuando Jaime pidio *«sube las nuevas»* y solo esas (C-615).
     ap.add_argument("piezas", nargs="*", type=int,
                     help="solo esas piezas (18 19 …); sin numeros, todas")
+    ap.add_argument("--indice", action="store_true",
+                    help="rehace FINALES/INDICE.md sin subir nada")
     a = ap.parse_args()
+    if a.indice:
+        import indice
+
+        print(indice.escribir(rutas.FUENTES["finales"]))
+        return
     seco = a.ver or not (a.fragmentos or a.finales or a.revision)
 
     con = basedatos.abrir(BASE)
@@ -407,6 +414,13 @@ def main():
                     "reel-", "reel-").strip(), raiz, con)
         if not hay:
             print("  nada listo para salir.")
+        # **Y el índice de la carpeta, cada vez que entra algo.** Jaime: *«un
+        # descriptor de qué video es cada uno, con el script final, todo en un
+        # archivo md»*. Se rehace con lo que hay en FINALES (C-617).
+        if hay and not seco:
+            import indice
+
+            print(f"  indice -> {indice.escribir(raiz)}")
         # **Y la pieza pedida que no sale no sale con exito.** El camino lee el
         # codigo de salida para pasarla a `publicado`: un «NO sale» con 0 la
         # daria por publicada sin estar en Drive (C-615).

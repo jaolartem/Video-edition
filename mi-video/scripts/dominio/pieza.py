@@ -25,6 +25,9 @@ import rutas  # noqa: E402
 #: usa. Estaba escrita a mano y esa es la avería de siempre en pequeño.
 BASE = basedatos.BASE
 
+#: El reloj de los subtítulos del spec: fotogramas a 30 por segundo.
+FPS = 30
+
 
 class Pieza:
     """Una pieza del lote. Lo que sabe de sí misma, en un solo sitio.
@@ -166,6 +169,42 @@ class Pieza:
             ws = [w["text"] for w in Pieza._CINTAS[toma]
                   if transcribir.suena(w, rango[0], rango[1])]
             por.setdefault(det.get("beat"), []).extend(ws)
+        return {b: " ".join(v) for b, v in por.items()}
+
+    @property
+    def pintado(self) -> dict | None:
+        """La entrada de `src/reels.json` que pintó la entrega.
+
+        Sólo si el render salió del spec de hoy —lo dice la huella, `cadena`—:
+        si no, el vídeo es de otro montaje y esta entrada no es la suya, así que
+        es `None` y nadie describe lo que no se pintó.
+        """
+        import cadena
+
+        try:
+            spec = json.load(open("src/reels.json", encoding="utf-8"))
+        except OSError:
+            return None
+        r = next((x for x in spec if x.get("id") == f"Reel-R{self.n}"), None)
+        return r if r and cadena._misma_huella(self.slug, self.n) else None
+
+    @property
+    def dicho(self) -> dict | None:
+        """Lo que **la entrega** dice, por beat: los subtítulos que se pintaron.
+
+        `texto` es lo que suena en el montaje de hoy, sacado de la cinta; esto
+        es lo que el espectador lee, ya con el glosario puesto. `None` si el
+        render es de otro montaje: no se finge un guion.
+        """
+        r = self.pintado
+        if not r:
+            return None
+        por: dict = {}
+        for c in r.get("captions") or []:
+            t = c["at"] / FPS
+            beat = next((x["beat"] for x in r.get("cc") or []
+                         if x["desde"] <= t < x["hasta"]), None)
+            por.setdefault(beat, []).append(c["text"].strip())
         return {b: " ".join(v) for b, v in por.items()}
 
     def _con(self):
