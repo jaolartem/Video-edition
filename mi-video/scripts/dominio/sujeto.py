@@ -156,7 +156,8 @@ def de_la_pieza(n, muestras=4):
         return None
     # **Y la cara de cada escena, en el mismo fichero** (C-624): la pieza
     # entera es una constante, y el subtítulo se coloca escena por escena.
-    from .rostro import por_escena
+    # Absoluto: `montar.sh` corre este fichero como script, sin paquete.
+    from dominio.rostro import por_escena
 
     m["escenas"] = por_escena(n, video)
     d = os.path.join("work", "scenes", f"reel-{n:02d}")
