@@ -80,6 +80,24 @@ def de(slug) -> dict:
         " where v.slug = ?", (slug,))}
 
 
+def todas(slug) -> set:
+    """Las que se decidió sacar, por las dos vías que hay para decirlo.
+
+    La declaración de aquí y la nota de corte aplicada con regla «seccion que
+    sobra», la del mecanismo de reel-01, que `verificar` leía por su cuenta.
+    Sirve para no acusar de falta lo que alguien mandó quitar; `aplicar` saca
+    del EDL sólo las declaradas, porque una nota nombra etapas en texto libre.
+    """
+    import re
+
+    fuera = set(de(slug))
+    for (q,) in _con().execute(
+            "select que from revision where video_slug = ? and accion = 'cortar'"
+            " and estado = 'aplicada' and regla = 'seccion que sobra'", (slug,)):
+        fuera.update(int(b) for b in re.findall(r"e(\d+)", q or ""))
+    return fuera
+
+
 def aplicar(slug) -> list:
     """Las saca del EDL. Escribe sólo si había algo que sacar."""
     fuera = de(slug)

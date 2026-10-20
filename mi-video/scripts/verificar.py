@@ -38,7 +38,6 @@ renderiza y `pipeline.sh` no sigue.
 import argparse
 import json
 import os
-import re
 import sqlite3
 import basedatos
 import sys
@@ -522,15 +521,13 @@ def revisar(slug):
     # La diferencia entre «falta» y «se quito» no es del montaje: esta en el
     # log. Una nota de corte aplicada, con su ancla y su porque, es la prueba de
     # que hubo una decision — y una decision no es un agujero.
+    #
+    # **Y la declarada por `quitada` (C-609)**, que es la otra forma de decirlo:
+    # las dos se preguntan en un solo sitio, `quitada.todas`.
     quitadas = set()
     try:
-        _c = basedatos.abrir(BASE)
-        for (q,) in _c.execute(
-                "select que from revision where video_slug = ? and accion='cortar'"
-                " and estado='aplicada' and regla='seccion que sobra'", (slug,)):
-            for _b in re.findall(r"e(\d+)", q or ""):
-                quitadas.add(int(_b))
-        _c.close()
+        from dominio import quitada
+        quitadas = quitada.todas(slug)
     except Exception as e:                         # noqa: BLE001
         # **Y si no se puede saber, no se da por hecho que no hay ninguna.**
         # Este `pass` dejaba `quitadas` vacio ante cualquier tropiezo —la base
