@@ -81,6 +81,27 @@ DE = {b: quien for b, (quien, _f) in BUZONES.items()}
 #: Qué fase mueve cada buzón. La misma tabla, leída por la otra columna.
 LA_FASE = {b: fase for b, (_q, fase) in BUZONES.items()}
 
+
+def vigente(buzon, slug) -> bool:
+    """**Un pedido espera mientras su pieza no haya pasado su fase** (C-606).
+
+    reel-19, 19-10: el pedido de `describir` de las 11:09 seguía sin respuesta
+    con la pieza ya en `verificado`. `Oficio.de` lo encontraba antes que el de
+    `disenar`, por orden alfabético, y la línea anunciaba «pedido abierto para
+    compositor (describir)»: un agente sobre una pregunta que ya nadie hace.
+    Lo que no es una pieza del ciclo (las de prueba) sigue esperando.
+    """
+    import re
+    from .fase import camino
+    from .pieza import Pieza
+
+    m = re.fullmatch(r"reel-(\d+)", slug or "")
+    if not m or buzon not in LA_FASE:
+        return True
+    ahora = Pieza(int(m.group(1))).fase
+    suya = next((f for f in camino() if f["nombre"] == LA_FASE[buzon]), None)
+    return not (ahora and suya) or ahora["orden"] < suya["orden"]
+
 #: Si la línea lanza el CLI por bash para contestar. **Encendido desde el
 #: 15-9-2026**, que es lo que hace que la línea ande sola: sin esto el pedido
 #: se queda escrito y abierto esperando a que un agente de la sesión que vigila

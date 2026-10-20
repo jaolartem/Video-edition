@@ -853,7 +853,9 @@ def _por_cli(prompt, payload):
 
 
 def pendientes():
-    """Pedidos escritos y sin respuesta. Es la cola del servicio."""
+    """Pedidos escritos y sin respuesta, de una fase que su pieza no ha pasado."""
+    from dominio.oficio import vigente
+
     out = []
     if not os.path.isdir(RAIZ):
         return out
@@ -865,7 +867,7 @@ def pendientes():
             if not f.endswith(".pedido.json"):
                 continue
             slug = f[: -len(".pedido.json")]
-            if not os.path.exists(ruta_respuesta(paso, slug)):
+            if not os.path.exists(ruta_respuesta(paso, slug)) and vigente(paso, slug):
                 out.append((paso, slug, os.path.join(d, f)))
     return out
 
