@@ -36,8 +36,12 @@ def guardar(toma, palabras, mapa, dudosos, modelo=None, paso=None):
     from transcribir import (ALINEA, MODELO, PASO, SELLO, VENTANA, gpu,
                              sin_fantasmas)
 
+    from . import prueba
+
     os.makedirs("work/transcripts", exist_ok=True)
     ruta = f"work/transcripts/{toma}.json"
+    # Lo de antes, para pasar las pruebas de `corte_fijo` que lo admitan (C-614).
+    viejas = prueba.antes(toma)
     con_texto = [m for m in mapa if m.get("texto")]
     # **El sello dice lo que se hizo, no lo que dice la constante.** Guardaba
     # `PASO` del modulo mientras la corrida usaba otro: con `--pasadas 4` el
@@ -74,6 +78,7 @@ def guardar(toma, palabras, mapa, dudosos, modelo=None, paso=None):
     except Exception as e:                        # noqa: BLE001
         registro.error("transcribir", "no se pudo guardar en la base",
                        toma=toma, detalle=str(e)[:160])
+    prueba.reestampar(toma, viejas)
     return ruta
 
 def _guardar_en_base(toma, mapa):

@@ -260,6 +260,9 @@ def afinar(toma, tramos, pasadas=4):
         return any(w["end"] > x + 0.001 and w["start"] < y - 0.001
                    for x, y in hechos)
 
+    from dominio import prueba
+
+    viejas = prueba.antes(toma)
     fuera = [w for w in d["segmentos"] if not _toca(w)]
     d["segmentos"] = sin_fantasmas(fuera + nuevas)
     d["afinado"] = sorted(set(tuple(t) for t in
@@ -268,6 +271,8 @@ def afinar(toma, tramos, pasadas=4):
     d["intentado"] = sorted(set(tuple(t) for t in
                                 [tuple(x) for x in d.get("intentado", [])] + intentados))
     json.dump(d, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    # La segmentación nueva no tira la decisión si dice lo mismo (C-614).
+    prueba.reestampar(toma, viejas)
     return d, tocados
 
 
