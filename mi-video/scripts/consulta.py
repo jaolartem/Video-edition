@@ -423,6 +423,24 @@ def guardar_tablero(slug, orden, tablero):
         raise SystemExit(str(e)) from e
 
 
+def dibujable(slug, respuesta):
+    """Lo que la puerta del diseño diría de esta respuesta, antes de entregarla.
+
+    `{}` si todo se dibuja; si no, `{etapa: [lo que falla]}`. No abre tiquets
+    ni archiva nada (C-648). La respuesta va por su ruta: es el fichero que se
+    va a entregar.
+
+        python scripts/consulta.py dibujable '["reel-22", "ruta/reel-22.respuesta.json"]'
+    """
+    from dominio import dibujable as _dib
+    from dominio.pieza import Pieza
+
+    if isinstance(respuesta, str):
+        respuesta = json.load(io.open(respuesta, encoding="utf-8"))
+    tableros = respuesta.get("tableros") if isinstance(respuesta, dict) else respuesta
+    return _dib.faltas(Pieza(int(str(slug).split("-")[-1])), list(tableros or []))
+
+
 def repeticion(toma, primera, segunda):
     """Cuanto sube la segunda entrega de una frase respecto a la primera.
 
@@ -440,6 +458,7 @@ def repeticion(toma, primera, segunda):
 
 VERBOS = {"escenas_por_describir": escenas_por_describir,
           "repeticion": repeticion,
+          "dibujable": dibujable,
           "cc_afinado": cc_afinado,
           "bordes_sucios": bordes_sucios,
           "cruces": cruces,

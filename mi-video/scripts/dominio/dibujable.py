@@ -66,11 +66,22 @@ def puerta(pieza, tableros):
     pleno sin cara, y volvió una ronda entera por una llave mal puesta. Se mueve
     a `props` aquí, antes de mirar y de guardar.
     """
+    falta = faltas(pieza, tableros)
+    return devuelve(pieza, falta) if falta else None
+
+
+def faltas(pieza, tableros) -> dict:
+    """Lo que no se dibuja, por etapa, **sin abrir nada**: la regla a secas.
+
+    La usa la puerta al llegar y la usa quien diseña ANTES de entregar
+    (`consulta.py dibujable`, C-648). Reel-22, 21-10: dos vueltas por dos
+    cintas de 27 caracteres, y el diseñador escribió que no tenía con qué
+    comprobarlo — contaba los caracteres a mano contra `topes`.
+    """
     for t in tableros or []:
         if isinstance(t, dict) and t.get("cubre") and "cubre" not in (t.get("props") or {}):
             t["props"] = {**(t.get("props") or {}), "cubre": t.pop("cubre")}
-    faltas = consulta([], {"cara": cara(pieza), "tableros": tableros})
-    return devuelve(pieza, faltas) if faltas else None
+    return consulta([], {"cara": cara(pieza), "tableros": tableros}) or {}
 
 
 #: Lo que en el pedido del disenador es igual para todas las piezas (C-564).
