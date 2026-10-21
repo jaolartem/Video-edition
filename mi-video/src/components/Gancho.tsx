@@ -147,7 +147,11 @@ const Linea: React.FC<{
       }}
     >
       <span style={bloque
-        ? { background: color.navy, padding: "0 0.14em", opacity: p }
+        // `inline-block`: el bloque mide su renglón y no la caja entera de la
+        // fuente, que con este interlineado se mete en el de arriba y le corta
+        // el pie de las letras («EL GOBIERNO» salía «FI GORIFRNO», reel-19).
+        ? { display: "inline-block", verticalAlign: "top", background: color.navy,
+            padding: "0 0.14em", opacity: p }
         : undefined}>
       {partes.map((w, k) => {
         const pw = entrando(frame, cuando(k));
