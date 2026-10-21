@@ -44,6 +44,9 @@ class Ritmo:
     #: Si un salto dentro de la etapa —otro momento de la cinta— cambia de
     #: encuadre. No: dentro de una etapa todas las escenas piden el mismo.
     cambia_encuadre = False
+    #: Si las etapas se montan en el orden en que se grabaron, no en el del
+    #: libreto (C-636). Cada etapa sigue entera; cambia su sitio.
+    sigue_la_cinta = False
 
     @classmethod
     def de(cls, slug: str) -> "Ritmo":
@@ -60,7 +63,8 @@ class Ritmo:
 
     def como_dict(self) -> dict:
         return {"nombre": self.nombre, "aire": self.aire, "unir": self.unir,
-                "cambia_encuadre": self.cambia_encuadre}
+                "cambia_encuadre": self.cambia_encuadre,
+                "sigue_la_cinta": self.sigue_la_cinta}
 
 
 class Confesion(Ritmo):
@@ -77,6 +81,9 @@ class Confesion(Ritmo):
     aire = HUECO
     unir = HUECO
     cambia_encuadre = True
+    #: Jaime, reel-18 (#882): *«el video está grabado más o menos como un
+    #: recorrido»*, y a la pregunta del orden: el de la grabación.
+    sigue_la_cinta = True
 
 
 def alarga(slug: str) -> float:

@@ -223,10 +223,22 @@ let aireQuitado = 0;
  * hueco y siguen cortándose. En el modelo general `unir` es 0: no toca nada.
  */
 let pausasDelRitmo = 0;
+/**
+ * **Y si el modelo sigue la cinta, las etapas van en el orden en que se grabaron**
+ * (C-636). Jaime, reel-18: *«está grabado más o menos como un recorrido»*, y
+ * eligió el orden de la grabación sobre el del libreto. Cada etapa sigue entera
+ * —sus tramos, en su orden— y se coloca por el primer segundo que trae de la
+ * cinta. Sólo con una cinta: entre dos grabaciones los segundos no se comparan.
+ */
+const PARES = (edl.segmentos || []).map((s, i) => [s, (edl.detalle || [])[i] || {}]);
+if (RITMO.sigue_la_cinta && new Set(PARES.map(([, d]) => d.toma)).size === 1) {
+  const primero = {};
+  for (const [[a], d] of PARES) primero[d.beat] = Math.min(primero[d.beat] ?? a, a);
+  PARES.sort(([, x], [, y]) => primero[x.beat] - primero[y.beat]);
+}
 const { SEGS, DETS } = (() => {
   const SEGS = [], DETS = [];
-  (edl.segmentos || []).forEach(([a, b], i) => {
-    const d = (edl.detalle || [])[i] || {};
+  PARES.forEach(([[a, b], d]) => {
     const ps = SEGS[SEGS.length - 1], pd = DETS[DETS.length - 1];
     const hueco = ps ? a - ps[1] : -1;
     // Por dentro, lejos de los bordes: el borde ya roza la voz por su margen.
