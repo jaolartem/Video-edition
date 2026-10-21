@@ -115,6 +115,9 @@ export function armarGancho(capas, imagen, slug) {
         // componente dibuje y la puerta compruebe el mismo número.
         lado: t.props.lado ?? "izq",
         oro: t.props.oro ?? Math.max(0, (t.props.lineas ?? []).length - 1),
+        // **Y el bloque detrás, si el diseño lo pide** (C-635). Sólo viaja
+        // declarado: así el spec de una pieza aprobada no cambia.
+        ...(t.props.bloque ? { bloque: true } : {}),
       },
     },
   ];

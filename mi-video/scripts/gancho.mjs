@@ -192,6 +192,7 @@ export const portada = {
         palabras,
         regla,
         reglaDura,
+        ...(rotuloDe(desc)?.bloque ? { bloque: true } : {}),
         // Cada línea entra en su frame; se declaran para que la puerta pueda
         // comprobar el escalonado sin volver a calcularlo.
         entradas: lineas.map((_, i) => at + CANON.entradaEn + i * CANON.escalon),

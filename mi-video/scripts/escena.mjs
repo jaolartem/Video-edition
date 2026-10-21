@@ -308,7 +308,10 @@ export const rotuloDe = (desc) => {
     // El oro puede nombrar la palabra y no el renglón («INMIGRANTE»).
     const i = typeof o === "number" ? o : (lineas.indexOf(q) >= 0 ? lineas.indexOf(q)
       : (q ? lineas.findIndex((l) => l.includes(q)) : -1));
-    return lineas.length ? { lineas, oro: i >= 0 && i < lineas.length ? i : null } : null;
+    // Y el bloque navy detrás, si lo pide (C-635): sólo viaja declarado.
+    const bloque = !suelto && (r?.bloque === true || d?.props?.bloque === true);
+    return lineas.length ? { lineas, oro: i >= 0 && i < lineas.length ? i : null,
+                             ...(bloque ? { bloque: true } : {}) } : null;
   } catch {
     return null;
   }

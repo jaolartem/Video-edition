@@ -84,6 +84,13 @@ export type Rotulo = {
   reglaDura?: number;
   /** Lo ancho que sale cada línea, en px. El filete mide lo que la del oro. */
   anchos?: number[];
+  /**
+   * **Un bloque navy plano detrás de cada renglón** (C-635). Jaime, reel-19:
+   * *«el título con letras blancas en un cielo gris… no se lee y no hay
+   * contraste»*. A escuadra y del ancho de su línea: sin sombra ni degradado,
+   * que el canon no admite. Lo declara el diseño en las props del titular.
+   */
+  bloque?: boolean;
 };
 
 /** Lo entrada que va una cosa que arranca en `en`. Nunca se pasa de 1. */
@@ -116,7 +123,8 @@ const Linea: React.FC<{
   en: number;
   palabras?: number[];
   lado: "izq" | "der";
-}> = ({ texto, cuerpo, oro, en, palabras, lado }) => {
+  bloque?: boolean;
+}> = ({ texto, cuerpo, oro, en, palabras, lado, bloque }) => {
   const frame = useCurrentFrame();
   const partes = texto.trim().split(/\s+/);
   const cuando = (k: number) => palabras?.[k] ?? en;
@@ -138,6 +146,9 @@ const Linea: React.FC<{
         transformOrigin: lado === "der" ? "right bottom" : "left bottom",
       }}
     >
+      <span style={bloque
+        ? { background: color.navy, padding: "0 0.14em", opacity: p }
+        : undefined}>
       {partes.map((w, k) => {
         const pw = entrando(frame, cuando(k));
         return (
@@ -155,6 +166,7 @@ const Linea: React.FC<{
           </React.Fragment>
         );
       })}
+      </span>
     </div>
   );
 };
@@ -243,6 +255,7 @@ export const Titular: React.FC<{ rotulo: Rotulo }> = ({ rotulo }) => (
           en={gancho.entradaEn + i * gancho.escalon}
           palabras={rotulo.palabras?.[i]}
           lado={rotulo.lado}
+          bloque={rotulo.bloque}
         />
       ))}
       {rotulo.reglaDura ? (
