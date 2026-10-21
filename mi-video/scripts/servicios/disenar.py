@@ -497,13 +497,15 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
         # `escena_desc.componente`, no del tablero, asi que quien lo declaraba
         # veia su decision desaparecer sin aviso. Es la misma forma de siempre:
         # una clave con contrato, con lector, y sin nadie que la guarde.
-        comp = t.get("componente")
-        if isinstance(comp, str) and comp.strip():
-            con.execute(
-                "update escena_desc set componente = ?, fecha = ?"
-                " where video_slug = ? and etapa_orden = ?",
-                (comp.strip(), ahora, pieza.slug, int(beat)))
-            componentes += 1
+        # **Y el lado del subtítulo, por la misma puerta** (C-633): una
+        # columna, un valor suyo.
+        cc = t["cc"] if isinstance(t.get("cc"), dict) else {}
+        for col, v in (("componente", t.get("componente")), ("cc_lado", cc.get("lado"))):
+            if isinstance(v, str) and v.strip() and (col != "cc_lado" or v in ("der", "izq")):
+                con.execute(f"update escena_desc set {col} = ?, fecha = ?"
+                            " where video_slug = ? and etapa_orden = ?",
+                            (v.strip(), ahora, pieza.slug, int(beat)))
+                componentes += col == "componente"
         # **Y cómo suena él en el remate de esa etapa.** Jaime: *«que cambie mi
         # voz en los punchlines»*.
         #

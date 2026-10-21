@@ -465,12 +465,15 @@ def _paso_de_instruccion_apunta_bien(con):
 
 
 def _escena_corrige_marca(con):
-    """`escena_desc` gana `corrige_marca`: si la corrección se ve (C-630)."""
+    """`escena_desc` gana `corrige_marca` (C-630) y `cc_lado` (C-633)."""
     cols = {r[1] for r in con.execute("pragma table_info(escena_desc)")}
-    if not cols or "corrige_marca" in cols:
+    if not cols:
         return False
-    con.execute("ALTER TABLE escena_desc ADD COLUMN corrige_marca TEXT")
-    return True
+    nuevas = [(c, d) for c, d in (("corrige_marca", "TEXT"), ("cc_lado",
+              "TEXT CHECK (cc_lado IN ('der','izq'))")) if c not in cols]
+    for c, d in nuevas:
+        con.execute(f"ALTER TABLE escena_desc ADD COLUMN {c} {d}")
+    return bool(nuevas)
 
 
 def migrar():

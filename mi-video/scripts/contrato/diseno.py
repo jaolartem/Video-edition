@@ -362,6 +362,8 @@ DISENO = Contrato(
               dispara=(Aguja("scripts/caminos.mjs", "componente: desc?.componente ?? null,"),),
               efecto="qué forma dibuja la etapa, y si compone o va a plano seco",
               sin_valor="ninguno"),
+        Clave("cc", dispara=(Aguja("src/components/CaptionBand.tsx", 'alignItems: alinea === "der" ? "flex-end" : "flex-start",'),),
+              efecto="a qué lado va el subtítulo de la etapa, `{lado: der}` (C-633)"),
         Clave("color",
               dispara=(Aguja("scripts/escena.mjs", "const desaturaDe = (color) =>"),),
               efecto="si la escena se aviva o se apaga bajo el gráfico",

@@ -32,6 +32,7 @@
  */
 import fs from "node:fs";
 import { trasfondoDe } from "./material.mjs";
+import { ladoDelCcDe } from "./base.mjs";
 
 const J = JSON.parse(fs.readFileSync("src/brand/cc.json", "utf8"));
 const U = J.umbrales;
@@ -121,6 +122,7 @@ export function trataElCc(pieza, slug, captions) {
   // barbilla en todas, y en sus primeros planos la boca cae en 0,68-0,74: el
   // texto se la tapaba. Sin medida de la escena, la de la pieza.
   const caras = new Map((pieza.cara?.escenas ?? []).map((x) => [x.escena, x]));
+  const lados = ladoDelCcDe(slug);
   const finGancho = titular ? titular.at + titular.duration : 0;
   const FPS = 30;
 
@@ -196,5 +198,7 @@ export function trataElCc(pieza, slug, captions) {
   return captions.map((c) => ({ ...c, trato: dueña(c).trato,
     ...(dueña(c).cara?.coronilla ? { coronilla: dueña(c).cara.coronilla } : {}),
     // La franja se dibuja con `abajo`, como bajo el gancho (C-632).
-    ...(dueña(c).banda === "franja" ? { abajo: true } : {}) }));
+    ...(dueña(c).banda === "franja" ? { abajo: true } : {}),
+    // Y el lado que declaró el diseñador para esa etapa (C-633).
+    ...(lados[dueña(c).beat] ? { alinea: lados[dueña(c).beat] } : {}) }));
 }

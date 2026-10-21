@@ -208,6 +208,11 @@ export const correccionesDe = (slug) =>
     " where video_slug = ? and corrige_dice is not null",
   ).all(slug)).map((c) => ({ ...c, corrige_es: conPrecio(c.corrige_es) }));
 
+/** A qué lado va el subtítulo de cada etapa, `{beat: "der"|"izq"}` (C-633). */
+export const ladoDelCcDe = (slug) => Object.fromEntries(db.prepare(
+  "select etapa_orden, cc_lado from escena_desc where video_slug = ? and cc_lado is not null",
+).all(slug).map((r) => [r.etapa_orden, r.cc_lado]));
+
 /**
  * **Una fila por corrección, aunque la etapa guarde varias** (C-465). Con dos,
  * las columnas llevan dos listas JSON paralelas (`dominio/escena.py ::

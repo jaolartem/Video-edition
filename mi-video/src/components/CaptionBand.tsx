@@ -147,8 +147,15 @@ export const CaptionBand: React.FC<{
    * Los tres tratamientos y lo que comparten viven en `src/brand/cc.ts`.
    */
   trato?: Trato;
+  /**
+   * **A qué lado va el texto, si el diseñador lo pidió para la etapa** (C-633).
+   * Jaime, reel-20: *«prefiero que todas las letras queden al lado derecho»*,
+   * para equilibrar el plano que se cerró para sacar el clóset. A la derecha,
+   * en la mitad libre y alineado a ese borde. Sin él, el de siempre.
+   */
+  alinea?: "izq" | "der";
 }> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0,
-        coronilla, lado, abajo, trato = cc.porDefecto }) => (
+        coronilla, lado, abajo, alinea, trato = cc.porDefecto }) => (
   <div
     style={{
       position: "absolute",
@@ -208,7 +215,10 @@ export const CaptionBand: React.FC<{
       // El borde de abajo es el que no se mueve; lo que crece, crece hacia
       // arriba. Ver la cabecera del componente.
       justifyContent: "flex-end",
-      alignItems: "flex-start",
+      alignItems: alinea === "der" ? "flex-end" : "flex-start",
+      ...(alinea === "der"
+        ? { left: layout.width * 0.44, textAlign: "right" as const }
+        : {}),
       fontFamily: fontFamily.body,
       // **Sobre un tablero esta banda ya no se dibuja.** Bajaba a 0,68 del
       // cuerpo y se quedaba donde estaba —incluso encima de la coronilla, o sea

@@ -734,6 +734,11 @@ CREATE TABLE IF NOT EXISTS escena_desc (
   -- humanidad en lo que no es una cifra, un organismo ni un nombre. Con varias,
   -- lista JSON paralela a las dos de arriba.
   corrige_marca TEXT,
+  -- **A que lado va el subtitulo de esa etapa** (C-633). NULL es el de
+  -- siempre, a la izquierda de la banda. Jaime, reel-20: «prefiero que todas
+  -- las letras queden al lado derecho», en las escenas donde se veia el closet.
+  -- Lo declara el disenador; lo dibuja `CaptionBand`.
+  cc_lado TEXT CHECK (cc_lado IN ('der','izq')),
   remedio      TEXT CHECK (remedio IN ('ninguno','tablero','recuperar','cortar')),
   quien       TEXT NOT NULL DEFAULT 'ia',
   fecha       TEXT,

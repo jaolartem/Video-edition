@@ -70,6 +70,8 @@ export type CaptionCue = {
   /** Cómo se resuelve su fondo. Ver `trato` en `CaptionBand`. */ trato?: Trato;
   /** La coronilla de SU escena (C-624); sin ella, la de la pieza. */
   coronilla?: number;
+  /** A qué lado va, si el diseñador lo declaró para su etapa (C-633). */
+  alinea?: "izq" | "der";
 };
 
 /**
@@ -318,6 +320,7 @@ export const Ad: React.FC<AdProps> = ({
             compuesto={caption.compuesto}
             desde={caption.at}
             abajo={caption.abajo}
+            alinea={caption.alinea}
             trato={caption.trato}
           />
         )
