@@ -51,9 +51,21 @@ const FRANJA = JSON.parse(fs.readFileSync("src/brand/franja.json", "utf8"));
 const SUELO = { barbilla: J.suelo_barbilla, franja: FRANJA.suelo };
 /** Dos renglones de cc: 62 px de cuerpo con interlineado 1,2. Copia consciente. */
 const DOS = (2 * 62 * 1.2) / ALTURA;
-export const tapaLaCara = (banda, cara) =>
-  banda !== "cabeza" && !!cara?.boca &&
-  SUELO[banda] - DOS < cara.boca && SUELO[banda] > (cara.ojos ?? cara.boca);
+/**
+ * **Y de lado, por debajo de la barbilla** (C-644). Alineado a la derecha la
+ * caja empieza en el 44 % del ancho, las cues de 36 caracteres salen en tres
+ * renglones y el texto queda AL LADO de la cara, no debajo: lo que suba de la
+ * barbilla le tapa la mandíbula. Jaime, reel-20: *«hay letras que tapan la
+ * cara»*, con la boca a 0,41 y el bloque subiendo hasta 0,49.
+ */
+const TRES = (3 * 62 * 1.2) / ALTURA;
+export const tapaLaCara = (banda, cara) => {
+  if (banda === "cabeza" || !cara?.boca) return false;
+  if (cara.lado === "der") {
+    return SUELO[banda] - TRES < (cara.menton ?? cara.boca) && SUELO[banda] > cara.ojos;
+  }
+  return SUELO[banda] - DOS < cara.boca && SUELO[banda] > (cara.ojos ?? cara.boca);
+};
 
 /** Si el cc cabe en el hueco de encima de su cabeza. Ver `cabeElCcArriba`. */
 export const cabeArriba = (coronilla) =>
@@ -121,8 +133,11 @@ export function trataElCc(pieza, slug, captions) {
   // coronilla —la mediana de cuatro fotogramas— reel-19 llevaba el cc a la
   // barbilla en todas, y en sus primeros planos la boca cae en 0,68-0,74: el
   // texto se la tapaba. Sin medida de la escena, la de la pieza.
-  const caras = new Map((pieza.cara?.escenas ?? []).map((x) => [x.escena, x]));
+  // Con el lado de su etapa dentro: de lado, la cara se protege hasta la
+  // barbilla (C-644).
   const lados = ladoDelCcDe(slug);
+  const caras = new Map((pieza.cara?.escenas ?? []).map((x) =>
+    [x.escena, lados[x.beat] ? { ...x, lado: lados[x.beat] } : x]));
   const finGancho = titular ? titular.at + titular.duration : 0;
   const FPS = 30;
 
