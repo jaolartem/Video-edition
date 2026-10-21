@@ -159,3 +159,39 @@ def cierra_cortes_limpios(slug: str) -> list:
         except Exception as e:                     # noqa: BLE001
             print(f"  el tiquet #{t['id']} no se pudo cerrar: {e}", flush=True)
     return cerrados
+
+
+def cierra_los_fijados(slug: str) -> list:
+    """Cierra los tiquets de `fijado` cuyos tramos declarados ya están en el corte.
+
+    `fijar.py --aplicar` es código: mete en el EDL lo que se declaró, y no
+    declara qué tiquets atiende (C-631). reel-18, 20-10: «reponer el cierre
+    decidido… ya declarado con fijar, falta que entre en el corte» (#848) entró
+    en el corte y siguió abierto, y `vencidas` paró la pieza en `afinado` en cada
+    vuelta. Se mide lo que el tiquet pide: que cada tramo declarado de su etapa
+    esté en el EDL. Sin declaración, o con un tramo que falte, se queda abierto.
+    """
+    import fijar
+
+    from . import ticket as _t
+
+    try:
+        edl = json.load(open(os.path.join("ads", slug, "edl-sell.json"),
+                             encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    en_corte = {(d.get("beat"), round(s[0], 2), round(s[1], 2))
+                for s, d in zip(edl.get("segmentos", []), edl.get("detalle", []))}
+    cerrados = []
+    for t in _t.abiertos(slug):
+        if (t.get("vuelve_a") or "") != "fijado" or t.get("beat") is None:
+            continue
+        suyos = [(f["beat"], round(f["desde"], 2), round(f["hasta"], 2))
+                 for f in fijar.fijados(slug) if f["beat"] == int(t["beat"])]
+        if not suyos or not set(suyos) <= en_corte:
+            continue
+        _t.contestar(int(t["id"]), f"medido: los {len(suyos)} tramo(s) declarados"
+                     f" de e{t['beat']} están en el corte", "arreglado", "la linea",
+                     t.get("cierra_con") or "")
+        cerrados.append(int(t["id"]))
+    return cerrados

@@ -195,7 +195,7 @@ export function revisar(spec) {
     b.at <= ((e.desde + e.hasta) / 2) * FPS && ((e.desde + e.hasta) / 2) * FPS < b.at + b.duration);
   for (const r of spec)
     for (const e of (r.cc ?? []).filter((x) => x.tapa && !bajoTablero(r, x)))
-      para(r, `e${e.beat}: el subtítulo le tapa la boca en la escena ${e.escena + 1}` +
+      para(r, `e${e.beat}: el subtítulo le tapa la cara en la escena ${e.escena + 1}` +
         ` (banda ${e.banda}, boca en ${e.boca} del cuadro) — abre el plano o cambia` +
         ` lo que cubre la etapa`);
   /**
