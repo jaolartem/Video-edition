@@ -339,6 +339,15 @@ for (const [slug, suyas] of porPiezas(filas)) {
           `${(d.grafico || "").slice(0, 40)}`,
       );
     }
+    // **Y lo que contestó sin que se le pidiera tampoco se tira** (C-640):
+    // sube como propuesta, igual que lo de fuera de su encargo. reel-18, 20-10:
+    // el compositor alargó e6 y e7 por un tiquet de Jaime de la pieza entera,
+    // el pedido sólo traía e1 y e3, y las dos desaparecieron sin una línea.
+    const pedidas = new Set(suyas.map((f) => Number(f.orden)));
+    for (const d of ds.filter((x) => !pedidas.has(Number(x.etapa_orden)))) {
+      sql("proponer", [slug, d.etapa_orden, "compositor", JSON.stringify(d).slice(0, 900)]);
+      console.log(`  ${slug} e${d.etapa_orden}: no se pidió — SUBE como propuesta, no se aplica`);
+    }
     if (Object.keys(tramos).length) sql("declarar_tramos", [slug, tramos]);
     // **Y los tiquets que la respuesta dice haber atendido se cierran aqui.**
     //
