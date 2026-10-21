@@ -464,6 +464,15 @@ def _paso_de_instruccion_apunta_bien(con):
     return True
 
 
+def _escena_corrige_marca(con):
+    """`escena_desc` gana `corrige_marca`: si la corrección se ve (C-630)."""
+    cols = {r[1] for r in con.execute("pragma table_info(escena_desc)")}
+    if not cols or "corrige_marca" in cols:
+        return False
+    con.execute("ALTER TABLE escena_desc ADD COLUMN corrige_marca TEXT")
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -471,6 +480,7 @@ def migrar():
     esquema(con)
     _revision_estructurada(con)
     _escena_voz(con)
+    _escena_corrige_marca(con)
     _corte_fijo_etapa(con)
     _corte_fijo_huella(con)
     _escalera(con)

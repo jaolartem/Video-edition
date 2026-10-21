@@ -204,7 +204,7 @@ export const descDe = (slug) =>
  */
 export const correccionesDe = (slug) =>
   expandeCorrecciones(db.prepare(
-    "select etapa_orden, corrige_dice, corrige_es from escena_desc" +
+    "select etapa_orden, corrige_dice, corrige_es, corrige_marca from escena_desc" +
     " where video_slug = ? and corrige_dice is not null",
   ).all(slug)).map((c) => ({ ...c, corrige_es: conPrecio(c.corrige_es) }));
 
@@ -219,7 +219,10 @@ export const expandeCorrecciones = (filas) => filas.flatMap((f) => {
   try {
     const dice = JSON.parse(d);
     const es = JSON.parse(f.corrige_es);
-    return dice.map((x, i) => ({ ...f, corrige_dice: x, corrige_es: es[i] }));
+    // La marca va en paralelo si alguna no la lleva (C-630).
+    const marca = f.corrige_marca ? JSON.parse(f.corrige_marca) : [];
+    return dice.map((x, i) => ({ ...f, corrige_dice: x, corrige_es: es[i],
+                                 corrige_marca: marca[i] ?? null }));
   } catch {
     return [f];
   }

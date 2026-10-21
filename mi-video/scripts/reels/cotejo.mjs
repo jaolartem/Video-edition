@@ -89,6 +89,13 @@ function correcciones(pieza, filas) {
       motivos.push(`e${f.etapa_orden}: la corrección ${mal}.`);
       continue;
     }
+    // La que va sin marca no deja `corrige` en la cue: se mira el texto (C-630).
+    if (f.corrige_marca === "no") {
+      if (!pieza.captions.some((c) => baja(c.text ?? "").includes(baja(f.corrige_es))))
+        motivos.push(`e${f.etapa_orden}: la base cambia «${f.corrige_dice}» por ` +
+                     `«${f.corrige_es}» sin marca y ningún subtítulo lo lee.`);
+      continue;
+    }
     const cue = cues.find((c) => baja(c.corrige.dice) === baja(f.corrige_dice));
     if (!cue) {
       motivos.push(

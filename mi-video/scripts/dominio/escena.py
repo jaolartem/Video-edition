@@ -38,7 +38,8 @@ CLAVE = ("video_slug", "etapa_orden")
 #: los deja vacíos es porque decidió vaciarlos.
 MANDA_QUIEN_COMPONE = (
     "que_pasa", "emocion", "grafico", "trato", "trato_porque", "prioridad",
-    "integridad", "remedio", "corrige_dice", "corrige_es", "sobre_texto",
+    "integridad", "remedio", "corrige_dice", "corrige_es", "corrige_marca",
+    "sobre_texto",
     "quien", "fecha",
     # La propuesta de tablero: es suya, y por eso se pisa cuando redescribe.
     "tablero_propuesto",
@@ -118,7 +119,7 @@ class Escena:
             raise EscenaInvalida(
                 f"{self.slug} e{self.orden}: una descripción sin `que_pasa` no"
                 f" describe nada")
-        corrige_dice, corrige_es = columnas_de_corrige(d.get("corrige"))
+        corrige_dice, corrige_es, corrige_marca = columnas_de_corrige(d.get("corrige"))
         tablero = d.get("tablero")
         valores = {
             "video_slug": self.slug, "etapa_orden": self.orden,
@@ -127,7 +128,8 @@ class Escena:
             "trato_porque": d.get("trato_porque"),
             "prioridad": d.get("prioridad"), "integridad": d.get("integridad"),
             "remedio": d.get("remedio"), "corrige_dice": corrige_dice,
-            "corrige_es": corrige_es, "sobre_texto": self.sobre_texto(),
+            "corrige_es": corrige_es, "corrige_marca": corrige_marca,
+            "sobre_texto": self.sobre_texto(),
             # `quien` decía «gemini» y esa vía se descartó —*«no quiero a
             # Google»*—, así que el campo mentía sobre quién decidió.
             "quien": d.get("quien", "cli"), "fecha": _ahora(),
@@ -357,16 +359,21 @@ def columnas_de_corrige(c):
     reel-09 e1 necesita dos —44→46 y 56→54— y `escena_desc` guardaba una. Un
     objeto `{dice, es}` se guarda como hasta ahora; una lista se guarda como dos
     listas JSON paralelas. `correcciones()` es quien las vuelve a separar.
+
+    **Y la tercera dice si se marca** (C-630): `None` si todas llevan la marca
+    de siempre; «no» —o la lista, si son varias— si alguna trae `marca: false`.
     """
     lista = [c] if isinstance(c, dict) else (c if isinstance(c, list) else [])
-    pares = [(str(x["dice"]), str(x["es"])) for x in lista
-             if isinstance(x, dict) and x.get("dice") and x.get("es")]
-    if not pares:
-        return None, None
-    if len(pares) == 1:
-        return pares[0]
-    return (json.dumps([p[0] for p in pares], ensure_ascii=False),
-            json.dumps([p[1] for p in pares], ensure_ascii=False))
+    trios = [(str(x["dice"]), str(x["es"]), "no" if x.get("marca") is False else "si")
+             for x in lista if isinstance(x, dict) and x.get("dice") and x.get("es")]
+    if not trios:
+        return None, None, None
+    marca = None if all(t[2] == "si" for t in trios) else [t[2] for t in trios]
+    if len(trios) == 1:
+        return trios[0][0], trios[0][1], marca and marca[0]
+    return (json.dumps([t[0] for t in trios], ensure_ascii=False),
+            json.dumps([t[1] for t in trios], ensure_ascii=False),
+            marca and json.dumps(marca))
 
 
 def correcciones(dice, es):

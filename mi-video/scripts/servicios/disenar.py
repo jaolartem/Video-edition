@@ -535,12 +535,12 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
                     destratadas += 1
         # Una o varias: una lista va a las mismas columnas (C-465).
         from dominio.escena import columnas_de_corrige
-        c_dice, c_es = columnas_de_corrige(t.get("corrige"))
+        c_dice, c_es, c_marca = columnas_de_corrige(t.get("corrige"))
         if c_dice:
             con.execute(
-                "update escena_desc set corrige_dice = ?, corrige_es = ?,"
+                "update escena_desc set corrige_dice = ?, corrige_es = ?, corrige_marca = ?,"
                 " fecha = ? where video_slug = ? and etapa_orden = ?",
-                (c_dice, c_es, ahora, pieza.slug, int(beat)))
+                (c_dice, c_es, c_marca, ahora, pieza.slug, int(beat)))
             corregidos += 1
         # **Y un tablero se puede RETIRAR, no solo escribir.**
         #

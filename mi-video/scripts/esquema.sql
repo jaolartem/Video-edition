@@ -728,6 +728,12 @@ CREATE TABLE IF NOT EXISTS escena_desc (
   -- proyecto, convertido en recurso visual en vez de en un parche.
   corrige_dice TEXT,
   corrige_es   TEXT,
+  -- **Y si se marca** (C-630). NULL es la de siempre: la buena en oro,
+  -- palpitando. «no» cambia la palabra del subtitulo en silencio. Jaime,
+  -- reel-21: «una guia» donde la voz dice «esa guia», sin gastar la marca de
+  -- humanidad en lo que no es una cifra, un organismo ni un nombre. Con varias,
+  -- lista JSON paralela a las dos de arriba.
+  corrige_marca TEXT,
   remedio      TEXT CHECK (remedio IN ('ninguno','tablero','recuperar','cortar')),
   quien       TEXT NOT NULL DEFAULT 'ia',
   fecha       TEXT,

@@ -151,6 +151,20 @@ export function corregirLoDicho(slug, filas, captions) {
   let out = captions;
   for (const row of filas) {
     let puesta = false;
+    // **La que no se marca cambia la palabra y ya** (C-630): sin oro, sin
+    // golpes. Por palabra entera, que «esa» no es la de «empresa».
+    if (row.corrige_marca === "no") {
+      const q = row.corrige_dice.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`(?<!\\p{L})${q}(?!\\p{L})`, "iu");
+      out = out.map((c) => {
+        if (puesta || !re.test(c.text ?? "")) return c;
+        puesta = true;
+        return { ...c, text: c.text.replace(re, row.corrige_es) };
+      });
+      if (!puesta) faltas.push(`${slug}: no se pudo cambiar «${row.corrige_dice}» por`
+                               + ` «${row.corrige_es}»: no aparece en ningun subtitulo`);
+      continue;
+    }
     const clave = row.corrige_dice
       .split(/\s+/)
       .reduce((a, b) => (b.length > a.length ? b : a), "");
