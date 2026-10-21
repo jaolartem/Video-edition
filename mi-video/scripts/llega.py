@@ -115,7 +115,8 @@ def revisar(piezas=None):
         puestos = {b.get("beat"): b for b in (p.get("boards") or [])}
         filas = con.execute(
             "select etapa_orden, tablero, componente, corrige_dice, corrige_es,"
-            " camara from escena_desc where video_slug = ? order by etapa_orden",
+            " corrige_marca, camara from escena_desc where video_slug = ?"
+            " order by etapa_orden",
             (slug,)).fetchall()
         for f in filas:
             b = f["etapa_orden"]
@@ -176,7 +177,17 @@ def revisar(piezas=None):
                             f" {llegan.get(k)!r}")
             # 3 · Una correccion declarada tiene que colocarse en un subtitulo.
             from dominio.escena import correcciones as _pares
-            for c_dice, c_es in _pares(f["corrige_dice"], f["corrige_es"]):
+            marca = f["corrige_marca"] or ""
+            calladas = json.loads(marca) if marca.startswith("[") else [marca]
+            for i, (c_dice, c_es) in enumerate(_pares(f["corrige_dice"], f["corrige_es"])):
+                # **La que va sin marca no deja `corrige`: se busca su texto**
+                # (C-630). Pedía la marca y daba en falso «NO sale» en reel-21.
+                if i < len(calladas) and calladas[i] == "no":
+                    if not any(str(c_es).lower() in (c.get("text") or "").lower()
+                               for c in p.get("captions") or []):
+                        faltas.append(f"{slug} e{b}: cambia «{c_dice}» por «{c_es}»"
+                                      f" sin marca y ningún subtítulo lo lee")
+                    continue
                 # **Se compara flojo a proposito.** La correccion puede salir
                 # con otra redaccion que la declarada —`frames.json` gana sobre
                 # `escena_desc` y escribe «FINANZAS» donde la base dice «Ministro
