@@ -102,6 +102,15 @@ export const TRANSICIONES = {
       + " hay nada, se ve el salto",
     placa: false,
   },
+  // **Y el corte que no se tapa** (C-645). Jaime, reel-18, de un glitch en
+  // mitad de «…hacerme rico, la verdad»: «ese glitch daña todo el mensaje y lo
+  // dificulta». Con `corte` la costura dura se seguía tapando sola.
+  seco: {
+    que: "corte seco SIN distorsión en ninguna costura de la etapa, tampoco en"
+      + " las de dentro: el salto se ve y la voz queda intacta. Para la etapa"
+      + " cuya frase cruza la costura",
+    placa: false,
+  },
   glitch: {
     que: "la imagen se distorsiona unos frames sobre la propia costura. Tapa"
       + " el salto sin interrumpir: no hay placa, no hay corte a negro y la"

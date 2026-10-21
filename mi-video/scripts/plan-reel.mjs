@@ -371,7 +371,7 @@ for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
        */
       encuadre: cam.encuadre,
       /** La costura de ENTRADA del beat. Sólo la primera escena la tiene. */
-      transicion: k === 0 ? cam.transicion : "corte",
+      transicion: k === 0 || cam.transicion === "seco" ? cam.transicion : "corte",
       // **El virado va en TODAS las escenas del beat**, igual que el encuadre:
       // el tratamiento es de la etapa, no del trozo. Si sólo lo llevara la
       // primera, el plano volvería a su color a mitad de la etapa y eso no lo

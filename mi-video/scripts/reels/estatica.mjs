@@ -49,7 +49,10 @@ export function glitchesDe(edl, reloj, cubren) {
     const cubierto = cubren.some(
       (b) => at < b.at + b.duration && at + DUR_GLITCH > b.at,
     );
-    if (!cubierto) out.push({ at, duration: DUR_GLITCH });
+    // Y la etapa que pidió `seco` se queda sin máscara (C-645): la escena que
+    // entra por esta costura lo dice.
+    const entra = reloj.escenas.find((e) => Math.abs(e.montado_desde - fin) < 0.05);
+    if (!cubierto && entra?.transicion !== "seco") out.push({ at, duration: DUR_GLITCH });
   }
   return out;
 }

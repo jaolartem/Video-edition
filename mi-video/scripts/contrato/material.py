@@ -60,7 +60,7 @@ CAMARA = (
                        Aguja("scripts/reels/imagen.mjs", "export function filetesDe(reloj) {"),
                        Aguja("src/components/Filete.tsx", "export const Filete: React.FC<{"),),
               efecto="qué media la costura de entrada de esa etapa",
-              lista=("corte", "glitch", "filete"),
+              lista=("corte", "seco", "glitch", "filete"),
               sin_valor="corte",
               nota="El componente escrito, el hueco en el spec y `Reel.tsx`"
                    " dibujándolo — y `cortinillas: []` fijo desde que se"
