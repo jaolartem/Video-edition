@@ -332,7 +332,18 @@ def cuadra_con_el_json(slug, fichero, margen=MARGEN):
 
     debe += _compas.total(slug)
     d = hay - debe
-    if abs(d) <= debe * margen + _cama.cola(slug):
+    # **Y un fotograma por escena** (C-634): el corte redondea cada escena a
+    # fotograma entero, así que diez escenas suman hasta 0,33 s que no están en
+    # el JSON. En una pieza de 19 s eso es más que el 2 %: reel-21 aprobada se
+    # quedó fuera por 14 ms (+1,00 s contra 0,99 de margen).
+    from dominio.pieza import FPS
+
+    try:
+        escenas = len(json.load(open(os.path.join(
+            "work", "scenes", slug, "plan-full.json"), encoding="utf-8"))["escenas"])
+    except (OSError, ValueError, KeyError):
+        escenas = 0
+    if abs(d) <= debe * margen + _cama.cola(slug) + escenas / FPS:
         return None
     reloj = (f" (el corte declara {dice:.2f}s a 1x y esta sale a {VELOCIDAD}x)"
              if acelerada else "")
