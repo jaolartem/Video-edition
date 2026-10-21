@@ -31,6 +31,14 @@ export type Compuesto = {
 
 /** Ancho util de la banda, ya descontadas las zonas seguras. */
 const ANCHO = layout.width - layout.safe.left - layout.safe.right;
+/**
+ * **Y de lado, la mitad libre** (C-647). Con `alinea: der` la banda empieza en
+ * el 44 % del ancho (`CaptionBand`), y el remate se medía contra el cuadro
+ * entero: en reel-20 salía «LA MITAD LES H» cortado por el borde derecho.
+ */
+export const DESDE_EL_LADO = 0.44;
+const anchoDe = (alinea?: "izq" | "der") =>
+  alinea === "der" ? layout.width * (1 - DESDE_EL_LADO) - layout.safe.right : ANCHO;
 /** El tracking, en em, para poder sumarlo al avance. */
 const PISTA = Number.parseFloat(videoText.tracking);
 /**
@@ -59,16 +67,19 @@ const RELLENO_EM = 0.32;
  * Sin rebote y sin fundido: `Easing.out(cubic)` y peso. El rebote esta
  * prohibido por nombre.
  */
-export const Compuesta: React.FC<{ c: Compuesto; desde: number }> = ({
-  c,
-  desde,
-}) => {
+export const Compuesta: React.FC<{
+  c: Compuesto;
+  desde: number;
+  alinea?: "izq" | "der";
+}> = ({ c, desde, alinea }) => {
   const frame = useCurrentFrame();
+  const ancho = anchoDe(alinea);
+  const borde = alinea === "der" ? "flex-end" : "flex-start";
   const cuerpo = Math.round(
     Math.max(
       videoText.caption,
       cuerpoQueCabe({
-        ancho: ANCHO,
+        ancho,
         largo: c.abajo.length,
         registro: "antonBanda",
         pista: PISTA,
@@ -93,8 +104,8 @@ export const Compuesta: React.FC<{ c: Compuesto; desde: number }> = ({
       {c.arriba ? (
       <span
         style={{
-          alignSelf: "flex-start",
-          maxWidth: ANCHO,
+          alignSelf: borde,
+          maxWidth: ancho,
           backgroundColor: color.richBlack,
           color: color.lightNeutral,
           padding: "0.06em 0.24em",
@@ -108,8 +119,8 @@ export const Compuesta: React.FC<{ c: Compuesto; desde: number }> = ({
       ) : null}
       <span
         style={{
-          alignSelf: "flex-start",
-          maxWidth: ANCHO,
+          alignSelf: borde,
+          maxWidth: ancho,
           // Cinta del canon: **texto negro sobre el color**, nunca al reves.
           backgroundColor: oro ? color.gold : color.navy,
           color: oro ? color.richBlack : color.lightNeutral,
@@ -119,7 +130,9 @@ export const Compuesta: React.FC<{ c: Compuesto; desde: number }> = ({
           lineHeight: 1.04,
           letterSpacing: videoText.tracking,
           textTransform: "uppercase",
-          whiteSpace: "nowrap",
+          // De lado no hay cuerpo que quepa por debajo del mínimo: ahí parte
+          // el renglón en vez de salirse del cuadro (C-647).
+          whiteSpace: alinea === "der" ? "normal" : "nowrap",
           padding: "0.04em 0.16em",
           opacity: p2,
           transform: `translateX(${((1 - p2) * layout.width * 0.35).toFixed(1)}px)`,

@@ -1,6 +1,6 @@
 import React from "react";
 import { fontFamily } from "../brand/fonts";
-import { Compuesta } from "./captionBand/Compuesta";
+import { Compuesta, DESDE_EL_LADO } from "./captionBand/Compuesta";
 import { Corregida } from "./captionBand/Corregida";
 import { Plana } from "./captionBand/Plana";
 import { cabeElCcArriba, cc, type Trato } from "../brand/cc";
@@ -217,7 +217,7 @@ export const CaptionBand: React.FC<{
       justifyContent: "flex-end",
       alignItems: alinea === "der" ? "flex-end" : "flex-start",
       ...(alinea === "der"
-        ? { left: layout.width * 0.44, textAlign: "right" as const }
+        ? { left: layout.width * DESDE_EL_LADO, textAlign: "right" as const }
         : {}),
       fontFamily: fontFamily.body,
       // **Sobre un tablero esta banda ya no se dibuja.** Bajaba a 0,68 del
@@ -232,7 +232,7 @@ export const CaptionBand: React.FC<{
     }}
   >
     {compuesto ? (
-      <Compuesta c={compuesto} desde={desde} />
+      <Compuesta c={compuesto} desde={desde} alinea={alinea} />
     ) : (
       <Plana desde={desde} trato={trato}>
         {corrige ? (
