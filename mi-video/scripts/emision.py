@@ -127,8 +127,11 @@ class Emision:
         plan = f"work/scenes/{self.slug}/plan-full.json"
         st = [(os.path.getsize(f), os.path.getmtime(f)) if f and os.path.exists(f)
               else None for f in (self.mp4, plan, "src/brand/lectura.json")]
+        import cama
+
+        # La cola entra en la vara: lo que se descuenta como cola cambia lo medido.
         varas = (suena.OBJETIVO_LUFS, suena.PICO_MAX, suena.AIRE_MAX, IMAGEN, HOLGURA_LUFS,
-                 SEPARA_LU)
+                 SEPARA_LU, "cola", cama.cola(self.slug))
         return hashlib.sha1(json.dumps([self.mp4, st, varas, self.spec], sort_keys=True,
                                        default=str).encode()).hexdigest()[:16]
 
@@ -219,8 +222,16 @@ class Emision:
                     f" {'debajo' if lufs < toda else 'encima'} de la pieza ({lufs} frente a"
                     f" {toda} LUFS)", round(e["desde"], 1), puerta=False))
         negro = _tramos(t, "black_start", "black_end", f["dura"])
+        # **Y la cola que pone `musica.sh` no es un congelado** (C-641): clona
+        # el último fotograma `cama.cola` segundos para que la palabra acabe de
+        # sonar. reel-19, 20-10: 0,7 s «congelados» desde el 26,9 de 27,6, y la
+        # pieza se trabó por lo que la propia línea le había puesto.
+        import cama
+
+        cola = cama.cola(self.slug) + 0.15
         quieto = [q for q in _tramos(t, "freeze_start", "freeze_end", f["dura"])
-                  if not any(a - 0.1 <= q[0] and q[1] <= b + 0.1 for a, b in negro)]
+                  if not any(a - 0.1 <= q[0] and q[1] <= b + 0.1 for a, b in negro)
+                  and not (q[1] >= f["dura"] - 0.05 and q[1] - q[0] <= cola)]
         for regla, tramos, tope, quien in (
                 ("silencio", _tramos(t, "silence_start", "silence_end", f["dura"]),
                  suena.AIRE_MAX, "cosido"),
