@@ -169,6 +169,9 @@ export type Recorte = {
   rotulo?: Rotulo;
 };
 
+/** El blanco y negro de su figura: el mismo que el del recorte (`Recorte.tsx`). */
+const FIGURA = "grayscale(1) contrast(1.06)";
+
 export const Detras: React.FC<DetrasProps> = ({
   elemento,
   src,
@@ -196,7 +199,10 @@ export const Detras: React.FC<DetrasProps> = ({
         src={staticFile(src)}
         transparent
         muted
-        style={filtro ? { filter: filtro } : undefined}
+        // `figura` es la única que parte la imagen a propósito (C-646): él en
+        // blanco y negro, el plano en color. Pedirlo es pedir ese contraste.
+        style={elemento === "figura" ? { filter: FIGURA }
+          : filtro ? { filter: filtro } : undefined}
       />
     </AbsoluteFill>
   </AbsoluteFill>

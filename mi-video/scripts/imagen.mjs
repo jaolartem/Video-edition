@@ -190,6 +190,17 @@ export const DETRAS = {
       + " sube, una carga que se acumula, un año que se repite. El movimiento"
       + " apila porque el beat apila",
   },
+  // **Él mismo, y no una pegatina suya** (C-646). Jaime, reel-22: «la idea es
+  // que yo quede en blanco y negro como contraste, no que un estíquer mío se
+  // quede sobre mí; quiero que toda mi figura quede en blanco y negro con el
+  // efecto de papel rasgado».
+  figura: {
+    que: "nada pasa por detrás: es su figura entera, en su sitio y a su tamaño,"
+      + " en blanco y negro y con el canto de papel rasgado, sobre su propio"
+      + " plano en color. El fondo hace de contraste; no es una segunda figura",
+    para: "la etapa en la que él se separa de lo que le rodea: el contraste"
+      + " entre la persona y la situación",
+  },
 };
 
 /** El bloque del menú, igual que `bloqueVirado`: `camara.mjs` lo empalma. */
