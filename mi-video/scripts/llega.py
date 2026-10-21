@@ -91,6 +91,22 @@ def _enSegundos(anclas):
         return None
 
 
+def _etapas(slug) -> dict:
+    """`{etapa: (desde, hasta)}` en segundos del montaje, del plan de hoy."""
+    try:
+        escenas = json.load(open(os.path.join("work", "scenes", slug, "plan-full.json"),
+                                 encoding="utf-8"))["escenas"]
+    except (OSError, ValueError, KeyError):
+        return {}
+    t, out = 0.0, {}
+    for e in escenas:
+        d = float(e.get("duracion") or 0)
+        a, b = out.get(e.get("beat"), (t, t + d))
+        out[e.get("beat")] = (min(a, t), max(b, t + d))
+        t += d
+    return out
+
+
 def _pisa(capa, ventana):
     """¿Cae esa capa dentro de la ventana del beat? Sin ventana, vale igual."""
     if not ventana:
@@ -228,6 +244,16 @@ def revisar(piezas=None):
             # `float("septiembre")`, o sea **reventar la auditoría entera** el día
             # que alguien la usara — y con ella las cinco guardas de abajo.
             anc = _enSegundos((d.get("props") or {}).get("anclas") if d else None)
+            # **Y un ancla que cae fuera de su etapa es de otro corte** (C-642).
+            # reel-18, 20-10: al montarla en el orden de la grabación (C-636) la
+            # placa de e4 siguió en su segundo viejo y salió encima de e6. Esto
+            # sólo miraba que el tablero estuviera donde decía el ancla, y lo
+            # estaba: lo que no estaba en su sitio era el ancla.
+            suya = _etapas(slug).get(int(b)) if anc is not None else None
+            if suya and not suya[0] - 0.5 <= anc <= suya[1] + 0.5:
+                faltas.append(f"{slug} e{b}: anclado a {anc}s y su etapa va de"
+                              f" {suya[0]:.1f} a {suya[1]:.1f}s — el ancla es de"
+                              f" otro corte: anclalo por texto, a su palabra")
             if anc is not None:
                 puesto = puestos.get(b) or next(
                     (x for x in (p.get("paneles") or [])

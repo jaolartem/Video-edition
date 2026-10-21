@@ -80,6 +80,12 @@ export class Reloj {
    * ninguno, el final de la pieza.
    */
   anclaDe(beat) {
+    // **Su propia escena primero** (C-642). Esto daba por hecho que las etapas
+    // van en orden en el montaje: con reel-18 en el orden de la grabación (1, 2,
+    // 6, 3…) la primera escena «>= 4» era la de e6, y las placas de e3 y e4
+    // salían en el 46,6 s, encima de e6. En una pieza en orden da lo mismo.
+    const suya = this.escenas.find((e) => Number(e.beat) === beat);
+    if (suya) return enFrames(suya.montado_desde);
     for (const e of this.escenas) {
       if (Number(e.beat) >= beat) return enFrames(e.montado_desde);
     }
