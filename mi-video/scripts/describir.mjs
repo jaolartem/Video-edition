@@ -332,6 +332,16 @@ for (const [slug, suyas] of porPiezas(filas)) {
       }
       sql("guardar_escena", [slug, f.orden, d]);
       if (Array.isArray(d.tramos) && d.tramos.length) tramos[f.orden] = d.tramos;
+      // **Y `cortar` saca la etapa, no sólo se apunta** (C-649). reel-22, 21-10:
+      // Jaime pidió quitar «Soy Jaime Olarte» (#936), el compositor contestó
+      // `remedio: cortar` y el tiquet se cerró con e10 sonando en el render.
+      // Una obligatoria no sale por aquí: sube a Jaime como propuesta.
+      if (d.remedio === "cortar") {
+        const no = JSON.parse(sql("quitar_etapa",
+          [slug, f.orden, d.por_que || "el compositor la corta"]) || "null");
+        if (no) sql("proponer", [slug, f.orden, "compositor", `cortar: ${no}`]);
+        console.log(`  ${slug} e${f.orden}: ${no ? `no sale — ${no}` : "sale de la pieza"}`);
+      }
       ok++;
       console.log(
         `  ${slug} e${f.orden} ${String(f.etapa).slice(0, 20).padEnd(20)} ` +

@@ -441,6 +441,17 @@ def dibujable(slug, respuesta):
     return _dib.faltas(Pieza(int(str(slug).split("-")[-1])), list(tableros or []))
 
 
+def quitar_etapa(slug, orden, por_que):
+    """Saca una etapa de la pieza: el `remedio: cortar` del compositor (C-649).
+
+    Devuelve el motivo si no se puede —una obligatoria sólo la quita Jaime— o
+    `null` si salió.
+    """
+    from dominio import quitada
+
+    return quitada.declarar(slug, int(orden), por_que, quien="compositor")
+
+
 def repeticion(toma, primera, segunda):
     """Cuanto sube la segunda entrega de una frase respecto a la primera.
 
@@ -459,6 +470,7 @@ def repeticion(toma, primera, segunda):
 VERBOS = {"escenas_por_describir": escenas_por_describir,
           "repeticion": repeticion,
           "dibujable": dibujable,
+          "quitar_etapa": quitar_etapa,
           "cc_afinado": cc_afinado,
           "bordes_sucios": bordes_sucios,
           "cruces": cruces,
