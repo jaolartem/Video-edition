@@ -102,7 +102,9 @@ NUEVAS = ("vuelve_a", "cierra_con", "devuelto", "huella")
 #: final** y sale en `donde.py`.
 RUTA = {
     "suena":    ("cosido", "bordes"),
-    "sobra":    ("cosido", "texto"),
+    # Lo que sobra lo corta el servicio de redundancia (C-643); `cosido` no
+    # corta, y con él el tiquet paraba la pieza en `repasado` para siempre.
+    "sobra":    ("sin_redundancia", "texto"),
     "falta":    ("cosido", ""),
     "objecion": ("disenado", ""),
     "dato":     ("", ""),
