@@ -187,7 +187,12 @@ def dossier(slug):
     pinta = pintadas(slug)
     out = []
     for f in filas:
-        texto = " ".join(x for x in (f["libreto"], f["grafico"]) if x)
+        # **Del libreto y de lo pintado, no de la instrucción del gráfico**
+        # (C-639). `grafico` es cómo se maqueta —«por encima del 52 % de
+        # altura», «sale a los 5,0 s»— y sus números no se afirman: reel-21,
+        # aprobada, se paró pidiendo respaldo para un «52 %» que no sale en
+        # pantalla. Lo que el gráfico dibuja lo cuenta `pintadas`, su dueño.
+        texto = f["libreto"] or ""
         cifras = sorted({_normal(m.group(0)) for m in CIFRA.finditer(texto)}
                         | set(pinta.get(f["orden"], [])))
         cifras = [c for c in cifras if c]
