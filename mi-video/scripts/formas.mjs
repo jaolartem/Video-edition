@@ -477,8 +477,10 @@ const pilaQueDesborda = (props) => {
  * motor, así que `fuente` y `condicion` no se exigen aquí.
  */
 // `props` y `kind` son de los que reciben la declaración entera (`Fichas`,
-// `TableroDeclarado`): ahí no hay nombres que exigir.
-const DEL_MOTOR = new Set(["fuente", "condicion", "source", "props", "kind"]);
+// `TableroDeclarado`): ahí no hay nombres que exigir. `bloques` y `lado` los
+// pone el montaje del panel —`bloquesDePanel` deriva los bloques de los textos
+// y el lado es el de la pieza—; lo que llega tal cual es cada bloque (C-638).
+const DEL_MOTOR = new Set(["fuente", "condicion", "source", "props", "kind", "bloques", "lado"]);
 const sinSusCampos = (kind, props) => {
   const nombre = piezas().find((n) => n.toLowerCase() === String(kind).toLowerCase());
   const campos = nombre ? camposDe(nombre) : null;
@@ -488,7 +490,12 @@ const sinSusCampos = (kind, props) => {
   // `assertShort(condicion, …)` y sin ella el render de reel-13 murió en
   // `length` (C-434): ahí no la pone nadie más que quien diseña.
   const fuente = fs.readFileSync(`src/components/${nombre}.tsx`, "utf8");
-  const exige = (c) => !DEL_MOTOR.has(c) || fuente.includes(`assertShort(${c},`);
+  // Se mira el último tramo del nombre: el `source` de `resultado: { figure;
+  // source }` también lo pone el motor, que dibuja el pie de las 24 (C-638).
+  const exige = (c) => {
+    const hoja = c.split(".").pop();
+    return !DEL_MOTOR.has(hoja) || fuente.includes(`assertShort(${hoja},`);
+  };
   const faltan = Object.keys(campos).filter((c) => !c.endsWith("?") &&
     exige(c) && (c.includes("[].")
       // Lo de dentro de una lista se exige a cada elemento (C-432).
@@ -504,10 +511,44 @@ const sinSusCampos = (kind, props) => {
             return p[obj] && typeof p[obj] === "object" && p[obj][dentro] == null;
           })()
         : p[c] == null));
-  return faltan.length
+  // **Y un elemento que no es un objeto no trae ninguno.** Arriba sólo se miran
+  // los objetos, así que `bloques: ["¿LE ASESORARON", …]` pasaba entero y
+  // `SidePanel` murió en `b.texto` en el fotograma 150 (reel-22 e1, C-638).
+  const listas = [...new Set(Object.keys(campos).filter((c) => c.includes("[]."))
+    .map((c) => c.split("[].")[0]))];
+  const sueltos = listas.flatMap((l) => {
+    const i = Array.isArray(p[l]) ? p[l].findIndex((x) => !x || typeof x !== "object") : -1;
+    if (i < 0) return [];
+    const suyos = Object.keys(campos).filter((c) => c.startsWith(`${l}[].`))
+      .map((c) => c.slice(l.length + 3));
+    return [`«${nombre}».\`${l}\` trae ${JSON.stringify(p[l][i])} y cada elemento es` +
+      ` un objeto {${suyos.join(", ")}}: escrito así el render muere`];
+  });
+  return [...sueltos, ...(faltan.length
     ? [`«${nombre}» se declara con ${Object.keys(campos).join(", ")} y le faltan ` +
        `${faltan.join(", ")}: con otro nombre no llega a la pantalla`]
-    : [];
+    : [])];
+};
+
+/**
+ * **La prueba de C-638, sobre lo que reel-22 e1 declaró de verdad.** Con los
+ * bloques como cadenas pasó las tres puertas y el render murió en el fotograma
+ * 150; la misma lámina con cada bloque como objeto se monta. La corre
+ * `guardas.mjs`: si alguna vez vuelve a pasar, la línea para.
+ */
+const REEL22_E1 = { familia: "cargada", bloques: ["¿LE ASESORARON", "O LE VENDIERON?"],
+                    lado: "izq", cubre: "panel" };
+export const comprobar = () => {
+  const bien = { ...REEL22_E1, bloques: REEL22_E1.bloques.map((texto) => ({ texto })) };
+  const dice = (props, aguja) => revisarTablero("SidePanel", props).some((m) => m.includes(aguja));
+  return [
+    ...(dice(REEL22_E1, "`bloques` trae") ? [] : ["C-638: los bloques de reel-22 e1" +
+      " escritos como cadenas pasan la revisión, y `SidePanel` muere en `b.texto`"]),
+    ...(dice({ ...bien, bloques: [{ fuerte: true }] }, "bloques[].texto") ? []
+      : ["C-638: un bloque de `SidePanel` sin `texto` pasa la revisión"]),
+    ...revisarTablero("SidePanel", bien).map((m) => `C-638: reel-22 e1 bien escrita` +
+      ` no debería tener faltas y tiene «${m}»`),
+  ];
 };
 
 const main = () => {

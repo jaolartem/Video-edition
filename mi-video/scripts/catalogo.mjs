@@ -79,8 +79,9 @@ const ficha = (fichero) => {
 export const camposDe = (nombre) => {
   let t = fs.readFileSync(path.join(DIR, `${nombre}.tsx`), "utf8");
   // Muchos lo declaran en su carpeta y lo re-exportan: `export type {
-  // ComparacionProps } from "./comparacion/tipos"`.
-  const re = t.match(new RegExp(`export type \\{[^}]*\\b${nombre}Props\\b[^}]*\\}\\s*from\\s*"(\\.[^"]+)"`));
+  // ComparacionProps } from "./comparacion/tipos"`. `SidePanel` sólo lo
+  // importa, y sin leer el `import` sus campos no existían para nadie (C-638).
+  const re = t.match(new RegExp(`(?:import|export) type \\{[^}]*\\b${nombre}Props\\b[^}]*\\}\\s*from\\s*"(\\.[^"]+)"`));
   if (re) {
     const f = path.join(DIR, `${re[1]}.ts`);
     if (fs.existsSync(f)) t = fs.readFileSync(f, "utf8");
@@ -92,9 +93,15 @@ export const camposDe = (nombre) => {
   // `statement` (C-432). Si el tipo del elemento está en el mismo fichero, se
   // añaden sus campos como `nodes[].stage`.
   for (const [k, v] of Object.entries({ ...fuera })) {
-    const el = String(v).match(/^(\w+)(\[\])?/);
-    const dentro = el && /^[A-Z]/.test(el[1]) &&
-      (tipoDe(t, el[1]) ?? tipoDe(t, `${el[1]}Base`));
+    const tipo = String(v).split(" · ")[0];
+    // **O escrito en la misma línea**, sin nombre que buscar: `bloques: {
+    // texto: string; … }[]`. reel-22 e1 los mandó como cadenas y `SidePanel`
+    // murió en `b.texto` en el fotograma 150 (C-638).
+    const suelto = tipo.match(/^\{([^{}]*)\}(\[\])?/);
+    const el = suelto ?? tipo.match(/^(\w+)(\[\])?/);
+    const dentro = suelto
+      ? camposDelCuerpo(`{\n${suelto[1].replace(/;/g, ";\n")}\n}`)
+      : el && /^[A-Z]/.test(el[1]) && (tipoDe(t, el[1]) ?? tipoDe(t, `${el[1]}Base`));
     // `[]` si es lista (`nodes[].stage`); si es un objeto, `izquierda.titulo`:
     // la columna de `Comparacion` se declaró con `etiqueta` y `nota` (C-457).
     if (dentro)
@@ -107,11 +114,15 @@ export const camposDe = (nombre) => {
 /** Los campos de primer nivel de `type <nombre> = { … }` en ese texto. */
 const tipoDe = (t, nombre) => {
   const i = t.search(new RegExp(`(?:export )?type ${nombre}\\s*=\\s*\\{`));
-  if (i < 0) return null;
+  return i < 0 ? null : camposDelCuerpo(t.slice(t.indexOf("{", i)));
+};
+
+/** Los campos de primer nivel de un cuerpo `{ … }`, con un campo por línea. */
+const camposDelCuerpo = (cuerpo) => {
   const fuera = {};
   let prof = 0;
   let doc = "";
-  for (const l of t.slice(t.indexOf("{", i)).split("\n")) {
+  for (const l of cuerpo.split("\n")) {
     const antes = prof;
     prof += (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
     if (antes === 1) {

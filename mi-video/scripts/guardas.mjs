@@ -36,6 +36,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { comprobar as comprobarCamara } from "./camara.mjs";
 import { comprobar as comprobarEslabones } from "./eslabones.mjs";
+import { comprobar as comprobarFormas } from "./formas.mjs";
 
 const RAIZ = path.resolve(process.cwd(), "..");
 const LOG = path.join(RAIZ, "docs/correcciones.md");
@@ -301,6 +302,10 @@ for (const e of entradas) {
 // Lo declarado en `cadena.py` que no corre nadie. El texto del fallo viene ya
 // escrito de alli: quien sabe que falta sabe como decirlo.
 for (const f of comprobarEslabones()) fallos.push(f);
+
+// Lo que la revisión de tableros tiene que rechazar, probado sobre un tablero
+// que tumbó el render (C-638).
+for (const f of comprobarFormas()) fallos.push(f);
 
 for (const r of comprobarCamara())
   fallos.push(
