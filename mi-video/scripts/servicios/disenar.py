@@ -562,8 +562,8 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
             retirados += 1
             continue
         kind, props = t.get("kind"), t.get("props")
-        if not kind and not props and (t.get("camara") or c_dice or comp
-                                       or "voz" in t):
+        if not kind and not props and (t.get("camara") or c_dice or t.get("componente")
+                                       or t.get("cc") or "voz" in t):
             continue          # etapa que solo pide camara: es una entrega valida
         if not kind or not isinstance(props, dict) or not props:
             sin_copy.append(beat)
