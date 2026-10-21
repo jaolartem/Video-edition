@@ -40,15 +40,19 @@ const CABEZA = J.cabeza;
 const ALTURA = 1920;
 
 /**
- * **Si el cc de esa banda le tapa la boca** (C-624): la banda se apoya en su
- * suelo y crece hacia arriba, así que tapa si la boca medida cae por debajo de
- * su techo. Encima de la cabeza no tapa por construcción; sin medida, no se
- * acusa.
+ * **Si el cc de esa banda le tapa la cara** (C-624, C-632): el texto se apoya
+ * en el suelo de la banda y crece hacia arriba hasta dos renglones —un cue se
+ * corta a 36 caracteres—, así que tapa si ese bloque cruza entre sus ojos y su
+ * boca. Por debajo de la boca, sobre la barba, es «pegado a la barbilla», que
+ * es lo que Jaime pidió. Encima de la cabeza no tapa; sin medida, no se acusa.
  */
 const FRANJA = JSON.parse(fs.readFileSync("src/brand/franja.json", "utf8"));
 const SUELO = { barbilla: J.suelo_barbilla, franja: FRANJA.suelo };
-export const tapaLaBoca = (banda, cara) =>
-  banda !== "cabeza" && !!cara?.boca && cara.boca > SUELO[banda] - FRANJA.alto;
+/** Dos renglones de cc: 62 px de cuerpo con interlineado 1,2. Copia consciente. */
+const DOS = (2 * 62 * 1.2) / ALTURA;
+export const tapaLaCara = (banda, cara) =>
+  banda !== "cabeza" && !!cara?.boca &&
+  SUELO[banda] - DOS < cara.boca && SUELO[banda] > (cara.ojos ?? cara.boca);
 
 /** Si el cc cabe en el hueco de encima de su cabeza. Ver `cabeElCcArriba`. */
 export const cabeArriba = (coronilla) =>
@@ -148,8 +152,12 @@ export function trataElCc(pieza, slug, captions) {
     // de la franja y no el de su sitio normal.
     const enGancho = t.desde * FPS < finGancho;
     const cara = caras.get(t.escena);
+    // **Y si la barbilla le tapa la cara, baja a la franja** (C-632): reel-19,
+    // en plano completo, tiene la boca en 0,53-0,57 y la barbilla la cruza;
+    // apoyado en la franja el texto queda debajo, sobre la barba.
     const cual = enGancho ? "franja"
-      : cabeArriba(cara?.coronilla ?? pieza.cara?.coronilla) ? "cabeza" : "barbilla";
+      : cabeArriba(cara?.coronilla ?? pieza.cara?.coronilla) ? "cabeza"
+      : tapaLaCara("barbilla", cara) && !tapaLaCara("franja", cara) ? "franja" : "barbilla";
     const m = t.bandas[cual] ?? t.bandas.barbilla;
     if (!m) continue;
     const corta = t.hasta - t.desde < U.minimo_s;
@@ -181,10 +189,12 @@ export function trataElCc(pieza, slug, captions) {
     escena: e.escena, beat: e.beat, desde: e.desde, hasta: e.hasta,
     banda: e.banda, trato: e.trato,
     // Sólo con cara medida: sin ella el spec de una pieza ya aprobada no cambia.
-    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaBoca(e.banda, e.cara) } : {}),
+    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaCara(e.banda, e.cara) } : {}),
     luz: e.medida.luz, grano: e.medida.grano, movimiento: e.medida.movimiento,
     contraste: e.medida.contraste,
   }));
   return captions.map((c) => ({ ...c, trato: dueña(c).trato,
-    ...(dueña(c).cara?.coronilla ? { coronilla: dueña(c).cara.coronilla } : {}) }));
+    ...(dueña(c).cara?.coronilla ? { coronilla: dueña(c).cara.coronilla } : {}),
+    // La franja se dibuja con `abajo`, como bajo el gancho (C-632).
+    ...(dueña(c).banda === "franja" ? { abajo: true } : {}) }));
 }
