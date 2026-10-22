@@ -45,6 +45,8 @@ BASE = os.path.join("ads", "decisiones.db")
 
 #: Cómo escribe `puerta.mjs` el motivo de una cifra pintada sin fila (C-616).
 SIN_FILA = "la etapa no declara esa cifra"
+#: El motivo de la cara tapada que escribe `reels/puerta.mjs` (C-624).
+TAPA = "le tapa la cara"
 
 
 # El apodo lo hace `dominio.texto`, que es el dueño de cómo se normaliza un
@@ -317,6 +319,17 @@ def main():
                 for b, cs in fuentes.pintadas(
                     str(r.get("video") or "").removesuffix(".mp4")).items()
                 for c in cs]
+        # **Y lo que él aprobó viéndolo no lo para una regla de diseño de
+        # después** (C-652). C-651 subió la vara de la cara a la barbilla el
+        # 21-10, y R18 y R22, aprobadas por Jaime esa misma tarde, se quedaron
+        # sin salir por escenas que él había visto. Es C-499: lo aprobado se
+        # revisa que esté como se dijo, no se vuelve a juzgar. Lo de
+        # cumplimiento —una cifra sin fila— sigue parando.
+        from dominio.segmento import aprobada as _ap
+
+        for r in spec:
+            if r.get("bloqueado") and _ap("reel-%02d" % int(str(r["id"]).split("R")[-1])):
+                r["bloqueado"] = [m for m in r["bloqueado"] if TAPA not in m]
         con_motivo = [(r["id"], r.get("bloqueado") or []) for r in spec
                       if r.get("bloqueado")
                       and (not pedidas or r["id"] in pedidas)]
