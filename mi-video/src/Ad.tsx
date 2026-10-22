@@ -72,6 +72,8 @@ export type CaptionCue = {
   coronilla?: number;
   /** A qué lado va, si el diseñador lo declaró para su etapa (C-633). */
   alinea?: "izq" | "der";
+  /** Arriba aunque no haya holgura: abajo le tapaba la cara (C-651). */
+  arriba?: boolean;
 };
 
 /**
@@ -321,6 +323,7 @@ export const Ad: React.FC<AdProps> = ({
             desde={caption.at}
             abajo={caption.abajo}
             alinea={caption.alinea}
+            arriba={caption.arriba}
             trato={caption.trato}
           />
         )

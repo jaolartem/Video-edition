@@ -64,8 +64,20 @@ export const tapaLaCara = (banda, cara) => {
   if (cara.lado === "der") {
     return SUELO[banda] - TRES < (cara.menton ?? cara.boca) && SUELO[banda] > cara.ojos;
   }
-  return SUELO[banda] - DOS < cara.boca && SUELO[banda] > (cara.ojos ?? cara.boca);
+  // **Y centrado, también hasta la barbilla** (C-651). Jaime, reel-19, 21-10:
+  // «r19 las letras tapan la cara», con el texto bajo la boca y sobre la barba
+  // —lo que C-632 daba por «pegado a la barbilla»—. Es la segunda vez en el
+  // día (reel-20, C-644): la barba es cara.
+  return SUELO[banda] - DOS < (cara.menton ?? cara.boca) && SUELO[banda] > (cara.ojos ?? cara.boca);
 };
+
+/**
+ * **Y si abajo le tapa en las dos bandas, arriba en cuanto caben dos renglones**
+ * (C-651). `cabeArriba` pide 260 px, que es holgura y no necesidad: reel-19
+ * tiene 227–254 px de cielo sobre la cabeza y el texto le caía en la barba.
+ */
+const cabenDos = (coronilla) =>
+  !!coronilla && coronilla * ALTURA - CABEZA.desde - CABEZA.margen >= DOS * ALTURA + 12;
 
 /** Si el cc cabe en el hueco de encima de su cabeza. Ver `cabeElCcArriba`. */
 export const cabeArriba = (coronilla) =>
@@ -172,9 +184,13 @@ export function trataElCc(pieza, slug, captions) {
     // **Y si la barbilla le tapa la cara, baja a la franja** (C-632): reel-19,
     // en plano completo, tiene la boca en 0,53-0,57 y la barbilla la cruza;
     // apoyado en la franja el texto queda debajo, sobre la barba.
-    const cual = enGancho ? "franja"
-      : cabeArriba(cara?.coronilla ?? pieza.cara?.coronilla) ? "cabeza"
+    const coron = cara?.coronilla ?? pieza.cara?.coronilla;
+    const sube = tapaLaCara("barbilla", cara) && tapaLaCara("franja", cara) && cabenDos(coron);
+    // `fuera` es la banda fuera del gancho: la que toman sus cues cuando el
+    // titular ya se fue, aunque la escena empiece debajo de él (C-651).
+    const fuera = cabeArriba(coron) || sube ? "cabeza"
       : tapaLaCara("barbilla", cara) && !tapaLaCara("franja", cara) ? "franja" : "barbilla";
+    const cual = enGancho ? "franja" : fuera;
     const m = t.bandas[cual] ?? t.bandas.barbilla;
     if (!m) continue;
     const corta = t.hasta - t.desde < U.minimo_s;
@@ -182,7 +198,7 @@ export function trataElCc(pieza, slug, captions) {
     // Una escena corta hereda; la primera no tiene de quién, así que se queda
     // con lo suyo — un destello al principio de la pieza no existe.
     const cual2 = corta && previo ? previo : suyo;
-    escenas.push({ ...t, banda: cual, medida: m, trato: cual2, cara });
+    escenas.push({ ...t, banda: cual, fuera, medida: m, trato: cual2, cara });
     previo = cual2;
   }
   if (!escenas.length) return captions;
@@ -206,14 +222,21 @@ export function trataElCc(pieza, slug, captions) {
     escena: e.escena, beat: e.beat, desde: e.desde, hasta: e.hasta,
     banda: e.banda, trato: e.trato,
     // Sólo con cara medida: sin ella el spec de una pieza ya aprobada no cambia.
-    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaCara(e.banda, e.cara) } : {}),
+    // `tapa` se mide en la banda de fuera del gancho: es donde van sus cues
+    // en cuanto el titular se va (C-651).
+    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaCara(e.fuera, e.cara) } : {}),
     luz: e.medida.luz, grano: e.medida.grano, movimiento: e.medida.movimiento,
     contraste: e.medida.contraste,
   }));
+  // La banda de cada cue: la de su escena, y la de fuera del gancho si el
+  // titular ya acabó cuando ella entra (C-651).
+  const bandaDe = (c) => (c.at >= finGancho ? dueña(c).fuera : dueña(c).banda);
   return captions.map((c) => ({ ...c, trato: dueña(c).trato,
     ...(dueña(c).cara?.coronilla ? { coronilla: dueña(c).cara.coronilla } : {}),
     // La franja se dibuja con `abajo`, como bajo el gancho (C-632).
-    ...(dueña(c).banda === "franja" ? { abajo: true } : {}),
+    ...(bandaDe(c) === "franja" ? { abajo: true } : {}),
+    // Y arriba se dibuja aunque no haya la holgura de `cabeElCcArriba`.
+    ...(!c.abajo && bandaDe(c) === "cabeza" ? { arriba: true } : {}),
     // Y el lado que declaró el diseñador para esa etapa (C-633).
     ...(lados[dueña(c).beat] ? { alinea: lados[dueña(c).beat] } : {}) }));
 }

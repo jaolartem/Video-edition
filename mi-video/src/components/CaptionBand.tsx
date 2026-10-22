@@ -154,8 +154,10 @@ export const CaptionBand: React.FC<{
    * en la mitad libre y alineado a ese borde. Sin él, el de siempre.
    */
   alinea?: "izq" | "der";
+  /** Arriba aunque no haya la holgura de `cabeElCcArriba` (C-651): abajo le tapaba la cara. */
+  arriba?: boolean;
 }> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0,
-        coronilla, lado, abajo, alinea, trato = cc.porDefecto }) => (
+        coronilla, lado, abajo, alinea, arriba, trato = cc.porDefecto }) => (
   <div
     style={{
       position: "absolute",
@@ -189,7 +191,7 @@ export const CaptionBand: React.FC<{
       // Si cabe o no lo dice `cabeElCcArriba`, con los números de `cc.json`:
       // estaban aquí sueltos —un 260 y un 24— y hacían falta en tres sitios más,
       // el que mide el fondo de esa banda, el que decide el tratamiento y éste.
-      ...(!abajo && cabeElCcArriba(coronilla)
+      ...(!abajo && (arriba || cabeElCcArriba(coronilla))
         ? {
             top: cc.cabeza.desde,
             // Arriba se comparte con el panel: el cc se queda con su mitad.
