@@ -166,6 +166,21 @@ def listas(con):
     return out
 
 
+def _verificacion_al_dia(con):
+    """Rehace la verificación si alguna entrega es más nueva que la suya (C-650).
+
+    `montar.sh` la deja al runner del lote, y la línea de hoy no pasa por él. Y
+    el masterizado reescribe la entrega con la voz limpia, así que R18 y R22,
+    aprobadas el 21-10, se quedaron en «la verificación es anterior a la
+    entrega» en cada vuelta. La verificación es un documento derivado: si está
+    vieja se vuelve a generar, no se para la pieza.
+    """
+    import subprocess
+
+    if any(any("verificacion es anterior" in x for x in p) for *_, p in listas(con)):
+        subprocess.run(["node", os.path.join("scripts", "verificacion.mjs")], check=False)
+
+
 def anotar(slug, destino, con=None):
     """**Queda escrito que esa pieza salió, y adónde.**
 
@@ -389,6 +404,8 @@ def main():
         print(f"FINALES -> {raiz}")
         hay = False
         salieron = set()
+        if not seco:
+            _verificacion_al_dia(con)
         from dominio.segmento import aprobada as _aprobada
         for pieza, mp4, ver, pega in listas(con):
             if a.piezas and int(pieza.split("R")[-1]) not in a.piezas:
