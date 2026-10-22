@@ -707,10 +707,17 @@ def main():
                 print(f"R{n}: {os.path.basename(f)}  {d:.2f}s sin modificar")
         print(f"\nen {CARPETAS[0]}")
         return
-    hechos, pedidos = [], (a.reels or rutas.piezas())
+    from dominio.segmento import aprobada
+    hechos, pedidos, esperan = [], (a.reels or rutas.piezas()), []
     for n in pedidos:
         if integrar(n, ver=a.ver):
             hechos.append(n)
+        elif not a.ver and aprobada(f"reel-{int(n):02d}"): esperan.append(n)
+    # **Y lo aprobado no se masteriza con la voz cruda** (C-653). Entregar sin
+    # limpiar sirve para VER la pieza; aprobada, el paso siguiente es publicar,
+    # y el 21-10 R18, R22 y R19 salieron a FINALES con la voz del corte porque
+    # la de Adobe llegó minutos después. Se espera a que esté.
+    pedidos = [n for n in pedidos if n not in esperan]
     # **Y se entrega tambien lo que no pudo cambiar de voz.** La aceleracion y
     # el nivelado colgaban de que la voz limpia entrara, asi que una pieza con
     # la pista desfasada —o que aun no hubiera pasado por Adobe— no tenia camino
@@ -754,6 +761,7 @@ def main():
                 f" pieza(s) (codigo {r.returncode}). Sin el, la entrega se queda"
                 f" al nivel del corte —medido: -21 LUFS contra -14— y eso no se"
                 f" ve en el video, se oye al publicarlo.")
+    if esperan: sys.exit(print(f"espera la voz limpia de Adobe de {esperan} en {CARPETAS[0]}") or 1)
 
 
 if __name__ == "__main__":
