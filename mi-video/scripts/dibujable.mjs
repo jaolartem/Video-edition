@@ -13,7 +13,7 @@
  */
 import fs from "fs";
 import { DEJAN_SITIO, canonico, revisarTablero, sinSujeto } from "./formas.mjs";
-import { panelLargo } from "./reels/tableros.mjs";
+import { panelLargo, pieLargo } from "./reels/tableros.mjs";
 
 // `--con-su-cara`: las formas que dibujan a pleno dejandole la columna. Va en
 // el pedido para que el diseñador no elija una que el montaje va a rechazar.
@@ -28,7 +28,7 @@ for (const t of tableros || []) {
   const kind = canonico(t.kind);
   const props = t.props || {};
   const suyas = [...revisarTablero(kind, props), ...(cara ? sinSujeto(kind, props) : []),
-                 ...panelLargo(props)];
+                 ...panelLargo(props), ...pieLargo(t)];
   if (suyas.length) faltas[t.etapa_orden ?? t.etapa ?? t.beat] = suyas;
 }
 console.log(JSON.stringify(faltas));

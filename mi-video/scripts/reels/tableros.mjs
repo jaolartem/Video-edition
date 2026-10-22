@@ -366,6 +366,16 @@ const TOPE_PANEL = Number((fs.readFileSync("src/brand/copy.ts", "utf8")
  * con sólo la primera, un diseño aceptado antes de C-572 llegaba al render y
  * moria en el fotograma 150 —reel-20 y reel-22, cinco veces cada una— (C-581).
  */
+/**
+ * **Y el pie del panel en una línea** (C-654): `SidePanel` tumba el render por
+ * encima de 78 caracteres —copia consciente de su `PIE_MAX`— y la puerta no lo
+ * miraba. reel-20 e7, 21-10: «79 caracteres», dos renders muertos en el 1800.
+ */
+const PIE_MAX = 78;
+export const pieLargo = (t) => (t?.props?.cubre !== "panel" ? [] : [t?.fuente,
+  t?.props?.fuente, t?.props?.source].filter((f) => typeof f === "string" && f.length > PIE_MAX)
+  .map((f) => `pie: «${f}» tiene ${f.length} caracteres y va en una linea (max. ${PIE_MAX});`
+    + " recortalo dejando la cifra y el tramo"));
 export const panelLargo = (props) => (props?.cubre === "panel" ? bloquesDePanel(props) : [])
   .filter((b) => String(b?.texto ?? "").length > TOPE_PANEL)
   .map((b) => `panel: «${b.texto}» tiene ${String(b.texto).length} caracteres y el`
