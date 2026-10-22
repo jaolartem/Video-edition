@@ -176,6 +176,10 @@ export function trataElCc(pieza, slug, captions) {
 
   const escenas = [];
   let previo = null;
+  // La cadena de tratamientos de la banda de fuera del gancho, aparte (C-651):
+  // reel-19 subía sus cues al cielo con el trato medido en la franja —blanco
+  // sobre gris claro— o heredado de una escena corta de esa misma franja.
+  let previoFuera = null;
   for (const t of trasfondo) {
     // Bajo el gancho el cc baja a la franja, así que el fondo que le toca es el
     // de la franja y no el de su sitio normal.
@@ -198,8 +202,12 @@ export function trataElCc(pieza, slug, captions) {
     // Una escena corta hereda; la primera no tiene de quién, así que se queda
     // con lo suyo — un destello al principio de la pieza no existe.
     const cual2 = corta && previo ? previo : suyo;
-    escenas.push({ ...t, banda: cual, fuera, medida: m, trato: cual2, cara });
+    const mf = t.bandas[fuera] ?? m;
+    const suyoFuera = trato(mf, previoFuera, escenaConOro(t.desde, t.hasta));
+    const tratoFuera = corta && previoFuera ? previoFuera : suyoFuera;
+    escenas.push({ ...t, banda: cual, fuera, medida: m, trato: cual2, tratoFuera, cara });
     previo = cual2;
+    previoFuera = tratoFuera;
   }
   if (!escenas.length) return captions;
 
@@ -231,7 +239,8 @@ export function trataElCc(pieza, slug, captions) {
   // La banda de cada cue: la de su escena, y la de fuera del gancho si el
   // titular ya acabó cuando ella entra (C-651).
   const bandaDe = (c) => (c.at >= finGancho ? dueña(c).fuera : dueña(c).banda);
-  return captions.map((c) => ({ ...c, trato: dueña(c).trato,
+  return captions.map((c) => ({ ...c,
+    trato: c.at >= finGancho ? dueña(c).tratoFuera : dueña(c).trato,
     ...(dueña(c).cara?.coronilla ? { coronilla: dueña(c).cara.coronilla } : {}),
     // La franja se dibuja con `abajo`, como bajo el gancho (C-632).
     ...(bandaDe(c) === "franja" ? { abajo: true } : {}),
