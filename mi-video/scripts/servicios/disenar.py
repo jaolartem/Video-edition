@@ -414,20 +414,6 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     if isinstance(respuesta, dict):
         tableros = respuesta.get("tableros") or []
         veredicto = (respuesta.get("pieza") or {}).get("veredicto")
-        # **Un tiquet declarado dentro de un tablero sube a donde se lee**
-        # (C-612). #784 de reel-18, 20-10: el diseñador arregló e8 y escribió
-        # `tiquets: [784]` dentro del tablero; sólo se lee el primer nivel, así
-        # que el tiquet siguió abierto con el trabajo hecho y la pieza volvió a
-        # pararse. Es la misma llave mal puesta que `cubre` (C-589): se corrige
-        # aquí, sin devolver la respuesta ni gastar otra ronda.
-        sueltos = [i for t in tableros if isinstance(t, dict)
-                   for x in (t.pop("tiquets", None),
-                             (t.get("props") or {}).pop("tiquets", None)) if x
-                   for i in (x if isinstance(x, list) else [x])]
-        if sueltos:
-            ya = respuesta.get("tiquets") or []
-            respuesta["tiquets"] = list(dict.fromkeys(
-                (ya if isinstance(ya, list) else [ya]) + sueltos))
     # **Y sin haber MIRADO no se aprueba.** Jaime: *«el tablero no se puede leer
     # bien y el fondo blanco no se entiende; parece que el disenador no reviso
     # esto antes de salir. La revision es parte del proceso normal y debe ser
@@ -451,7 +437,7 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     # **Lo que no se puede dibujar vuelve ahora, no al montar** (C-562). Es la
     # misma regla que `rompe` (`formas.revisarTablero` + `sinSujeto`); dicha
     # tres pasos tarde costo 18 vueltas a reel-19 y reel-21 el 18-10.
-    vuelta = _dib.puerta(pieza, tableros)
+    vuelta = _dib.puerta(pieza, tableros, respuesta)  # y sus tiquets: C-612
     if vuelta:
         return vuelta
     if veredicto == "rota":

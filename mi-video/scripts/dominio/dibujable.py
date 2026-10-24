@@ -57,8 +57,31 @@ def devuelve(pieza, faltas: dict):
         "disenar", pieza.slug) + f" (no se dibujan: {sorted(nuevas)})")
 
 
-def puerta(pieza, tableros):
+def sube_tiquets(respuesta) -> list:
+    """Los `tiquets` declarados dentro de un tablero, al primer nivel. Los subidos.
+
+    **Se coloca, no se devuelve** (C-612). #784 de reel-18, 20-10: el diseñador
+    arregló e8 y escribió `tiquets: [784]` dentro del tablero; `aplicar` sólo lee
+    el primer nivel, así que el tiquet siguió abierto con el trabajo hecho y la
+    pieza volvió a pararse. Es una llave mal puesta, como `cubre` (C-589), y
+    devolverla costaría otra ronda de agente por algo que el código sabe colocar.
+    """
+    sueltos = [i for t in respuesta.get("tableros") or [] if isinstance(t, dict)
+               for x in (t.pop("tiquets", None),
+                         (t.get("props") or {}).pop("tiquets", None)) if x
+               for i in (x if isinstance(x, list) else [x])]
+    if sueltos:
+        ya = respuesta.get("tiquets") or []
+        respuesta["tiquets"] = list(dict.fromkeys(
+            (ya if isinstance(ya, list) else [ya]) + sueltos))
+    return sueltos
+
+
+def puerta(pieza, tableros, respuesta=None):
     """`None` si todo se dibuja; si no, el `Resultado` que lo devuelve.
+
+    Y antes, los tiquets que vengan dentro de un tablero suben a la respuesta
+    (`sube_tiquets`, C-612).
 
     **`cubre` se lee también al lado de `kind`** (C-589). La línea lo mira
     dentro de `props`, y el diseñador lo escribió fuera tres veces el 18 y el
@@ -66,6 +89,8 @@ def puerta(pieza, tableros):
     pleno sin cara, y volvió una ronda entera por una llave mal puesta. Se mueve
     a `props` aquí, antes de mirar y de guardar.
     """
+    if isinstance(respuesta, dict):
+        sube_tiquets(respuesta)
     falta = faltas(pieza, tableros)
     return devuelve(pieza, falta) if falta else None
 
