@@ -164,11 +164,15 @@ REARRANCA = 75
 
 
 def _version():
-    """El HEAD de la copia que corre, o `None` si no se puede leer."""
-    import subprocess
+    """El código que corre, o `None` si no se puede leer.
 
-    r = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
-    return r.stdout.strip() or None
+    En la línea es el despliegue: un commit o un merge en el repo ya no la
+    rearranca, sólo `desplegar.py` (Jaime, 23-10: la aplicación no se guía por
+    git). Fuera de la línea sigue siendo el HEAD.
+    """
+    from . import despliegue
+
+    return despliegue.actual(corto=False)
 
 
 def puesto(vuelta, cada=30):

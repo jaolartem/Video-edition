@@ -119,6 +119,13 @@ TICKET
 # —`montar.sh 3` a mano, o la fase `montado` de una pieza suelta— no cambia
 # nada: se comprueba todo, como hasta hoy.
 del_lote() { [ -n "${EN_LOTE:-}" ]; }
+#: **Lo que mira el CODIGO ya se miro al desplegar.** Guardas, verdad,
+#: contratos, comprobado, techo, nombres y lint comprueban el repositorio, no la
+#: pieza; en la linea —`F:/linea`, con su fichero `DESPLIEGUE`— los paso
+#: `desplegar.py` antes de copiar, y aqui solo podian parar produccion por un
+#: commit a medias de desarrollo: 91 vueltas cortadas en diez dias de octubre.
+#: Lo que mira la PIEZA —la puerta, los recibos, lo que llega— sigue corriendo.
+ya_desplegado() { [ -f DESPLIEGUE ]; }
 
 # **Le pregunta a la cadena, y un ERROR no es «al dia».**
 #
@@ -151,13 +158,13 @@ SOLO_LOTE=0
 case " $* " in *" --solo-lote "*) SOLO_LOTE=1 ;; esac
 solo_lote() { [ "$SOLO_LOTE" = 1 ]; }
 
-del_lote || _guardas || exit 1
+ya_desplegado || del_lote || _guardas || exit 1
 # **Y la fuente de verdad de cada decision, comprobada.** Jaime: *«deja clara
 # en codigo la fuente de verdad»*. Una correccion que se escribe en una copia y
 # un render que lee la otra no falla al corregir: falla al entregar, y calla.
 # Va aqui, al lado de las guardas, y por el mismo motivo — lee ficheros y es
 # barato, asi que se paga antes de gastar el peldano caro.
-del_lote || python scripts/verdad.py
+ya_desplegado || del_lote || python scripts/verdad.py
 # **Y los contratos, que son el corazon de la maquina.** Declaran que dato
 # viaja a cada paso de IA, que frase del prompt no se puede contestar sin el, y
 # que linea de codigo ejecuta lo que se contesta. Sin comprobarlo, un contrato
@@ -167,7 +174,7 @@ del_lote || python scripts/verdad.py
 # No corria en ninguna parte, y ademas resolvia mal todas sus rutas —asi que
 # las 83 agujas daban «no esta» y el parte no lo miraba—. Va aqui por lo mismo
 # que las otras dos: lee ficheros y es barato.
-del_lote || python scripts/contratos.py
+ya_desplegado || del_lote || python scripts/contratos.py
 # **Y con que se comprueba cada decision, que es lo que faltaba.** Jaime:
 # *«para tomar decisiones utilizan solo un mecanismo, los CC por ejemplo, y no
 # el sonido, que es el indicador mas claro de que el CC esta mal puesto»*.
@@ -178,7 +185,7 @@ del_lote || python scripts/contratos.py
 # avisa de las que no tienen ninguna — la lista de huecos es trabajo pendiente,
 # no un defecto de esta corrida. Va aqui por lo mismo que las otras dos: lee
 # ficheros y cuesta menos de un segundo.
-del_lote || python scripts/comprobado.py --solo-huecos
+ya_desplegado || del_lote || python scripts/comprobado.py --solo-huecos
 
 # **El techo de 300 lineas, y aqui porque es donde para.** Jaime: *«maximo 300
 # lineas; 1000 lineas es espagueti»*. Esto imprimia «33 ficheros pasan del
@@ -197,7 +204,7 @@ _techo() {
     return 1
   fi
 }
-del_lote || _techo || exit 1
+ya_desplegado || del_lote || _techo || exit 1
 
 # **Un nombre que no existe no llega a un render.**
 #
@@ -218,7 +225,7 @@ _nombres() {
   echo "$salida"
   return 1
 }
-del_lote || _nombres || exit 1
+ya_desplegado || del_lote || _nombres || exit 1
 
 # **Y el conducto es una guarda, igual que el techo.** Un tiquet que vuelve a
 # `descrito` o a `disenado` lo atiende un servicio, y ese servicio deja recibo:
@@ -481,7 +488,7 @@ if ! del_lote && ! python scripts/llega.py 2>&1 | tail -20; then :; fi
 # del spec recién generado. Un número copiado a mano se queda viejo en el primer
 # render, y entonces la bitácora miente justo cuando hace falta.
 del_lote || node scripts/bitacora.mjs
-del_lote || npm run lint
+ya_desplegado || del_lote || npm run lint
 
 # **Hasta aqui llega lo que es del lote.** `montar-lote.sh` corre esta mitad una
 # vez —con `--solo-lote`— y luego reparte las piezas con `EN_LOTE=1`, que salta

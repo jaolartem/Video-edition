@@ -241,9 +241,10 @@ def _limpios(slug):
 
 
 def _git():
-    r = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                       capture_output=True, text=True)
-    return r.stdout.strip() or None
+    """El commit del código que selló, por el despliegue y no por git."""
+    from dominio import despliegue
+
+    return despliegue.actual()
 
 
 def versiones(n):

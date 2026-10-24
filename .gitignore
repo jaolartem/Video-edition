@@ -20,11 +20,18 @@ mi-video/node_modules/
 __pycache__/
 mi-video/.parcel-cache/
 
-# Lo que SÍ entra, y por qué:
-#   scripts/  src/  docs/  ads/*.json  ads/decisiones.db  skills/
-# La base de decisiones pesa 1 MB y es el registro de todo lo decidido —
-# libretos, elecciones, descripciones, revisiones. Sin ella el repo tiene el
-# código pero no la memoria.
+# Lo que SÍ entra: scripts/  src/  docs/  skills/ — el código y su porqué.
+#
+# **Y la memoria de la línea NO entra** (23-10-2026). Jaime: *«la aplicación no
+# debe estar guiada por git, para eso tiene un sistema de memoria interna»*. La
+# base llegó a 37 MB en 131 commits (158 MiB de pack), el estado de cinco piezas
+# publicadas se quedó sin commitear, y cada worktree arrastraba su copia
+# divergente de la base. Ahora vive en `F:/linea/datos` (ver
+# `scripts/desplegar.py`) y aquí sólo hay una copia local para desarrollar.
+mi-video/ads/
+mi-video/src/reels.json
+mi-video/public/portadas/
+mi-video/DESPLIEGUE
 
 # El diario transitorio de SQLite: existe solo mientras hay una transaccion
 # abierta, y comprometerlo guarda el estado A MEDIAS de una escritura.

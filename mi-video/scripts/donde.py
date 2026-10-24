@@ -41,12 +41,10 @@ BASE = "ads/decisiones.db"
 
 
 def _commit():
-    try:
-        return subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                              capture_output=True, text=True, encoding="utf-8", errors="replace",
-                              cwd="..").stdout.strip()
-    except Exception:                              # noqa: BLE001
-        return "?"
+    """El código que corre: el del despliegue en la línea, el de git fuera."""
+    from dominio import despliegue
+
+    return despliegue.actual() or "?"
 
 
 def estado(slug):
