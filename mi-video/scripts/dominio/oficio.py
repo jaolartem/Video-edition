@@ -104,7 +104,9 @@ def vigente(buzon, slug) -> bool:
     # la fase del buzón no dice nada de ellos; pero con la pieza en la calle
     # nadie los va a contestar. Dos del 25-9 seguían «en vuelo» el 24-10 y
     # bloqueaban `desplegar.py`.
-    if (ahora or {}).get("nombre") == "publicado":
+    # Ni lo de una pieza retirada (`rechazado`): reel-01 a reel-07, depreciadas
+    # por Jaime, tenían pedidos de diseño abiertos que nadie iba a contestar.
+    if (ahora or {}).get("nombre") in ("publicado", "rechazado"):
         return False
     if m.group(2) or buzon not in LA_FASE:
         return True
