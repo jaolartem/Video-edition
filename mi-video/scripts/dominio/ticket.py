@@ -357,12 +357,8 @@ def _huella(pieza, etapa=None):
     descartaron por no poder decir de cual venian.
     """
     try:
-        if etapa is not None:
-            from .segmento import Segmento
-            s = next((x for x in Segmento.de(pieza) if x.n == int(etapa)), None)
-            return f"e{int(etapa)}:{s.huella}" if s else None
-        from . import version
-        return version.huella_edl(pieza)
+        from . import segmento, version
+        return segmento.sello(pieza, etapa) if etapa is not None else version.huella_edl(pieza)
     except Exception:                              # noqa: BLE001
         return None
 
@@ -397,18 +393,12 @@ def caducar(pieza):
     # nada. Contarlo como prueba fue lo que se llevo los 41 —todos los que se
     # han caducado en la vida del proyecto— y entre ellos los que Jaime abrio
     # desde el CLI, que es justo el camino que CLAUDE.md le ofrece.
+    # Y el de una etapa se compara con su etapa, no con la pieza (C-659).
     viejos = [dict(r) for r in cx.execute(
         "select id, dijo, huella from ticket where pieza = ? and respuesta is null"
         " and huella is not null and huella <> ?", (pieza, h))]
-    # Y el de una etapa se compara con su etapa, no con la pieza (C-659).
-    hoy = {}
-    for v in viejos:
-        if str(v["huella"]).startswith("e") and ":" in v["huella"]:
-            e = int(v["huella"][1:].split(":")[0])
-            hoy.setdefault(e, _huella(pieza, e))
-    viejos = [v for v in viejos if not (str(v["huella"]).startswith("e")
-              and ":" in v["huella"]
-              and hoy.get(int(v["huella"][1:].split(":")[0])) == v["huella"])]
+    from .segmento import sigue
+    viejos = [v for v in viejos if not sigue(pieza, v["huella"])]
     if viejos:
         ahora = datetime.datetime.now().isoformat(timespec="seconds")
         cx.executemany(
@@ -417,10 +407,9 @@ def caducar(pieza):
             # distingue a estos lo dice su respuesta, que es donde se lee.
             "update ticket set respuesta = ?, estado = 'descartado', quien ="
             " 'la linea', cerrado = ? where id = ?",
-            [("Caducado con el corte: se abrio sobre un montaje que ya no existe"
-              f" (el de hoy es {h}). Regla de Jaime: «los anteriores se mueren"
-              " cuando la composicion se muere». Si el defecto sigue, vuelve a"
-              " salir en la revision de la entrega nueva.", ahora, v["id"])
+            [(f"Caducado con el corte: su etapa ya no es la que habia (hoy {h})."
+              " Regla de Jaime: «los anteriores se mueren cuando la composicion"
+              " se muere». Si el defecto sigue, vuelve a salir.", ahora, v["id"])
              for v in viejos])
         cx.commit()
     return [v["id"] for v in viejos]

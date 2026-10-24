@@ -321,6 +321,20 @@ def aprobada(slug) -> bool:
     return bool(segs) and all(s.aprobado and es_suya(s.por_quien) for s in segs)
 
 
+def sello(slug, etapa):
+    """La huella de UNA etapa como la lleva un tiquet: `e<n>:<huella>` (C-659)."""
+    s = next((x for x in Segmento.de(slug) if x.n == int(etapa)), None)
+    return f"e{int(etapa)}:{s.huella}" if s else None
+
+
+def sigue(slug, marca) -> bool:
+    """¿La etapa de ese sello está como cuando se puso? Falso si no es de etapa."""
+    marca = str(marca or "")
+    if not (marca.startswith("e") and ":" in marca):
+        return False
+    return sello(slug, marca[1:].split(":")[0]) == marca
+
+
 def _con_corte(cx):
     """La columna `corte` de `segmento`, si la base aún no la tiene."""
     try:
