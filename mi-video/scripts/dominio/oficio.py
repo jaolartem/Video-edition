@@ -95,10 +95,19 @@ def vigente(buzon, slug) -> bool:
     from .fase import camino
     from .pieza import Pieza
 
-    m = re.fullmatch(r"reel-(\d+)", slug or "")
-    if not m or buzon not in LA_FASE:
+    m = re.fullmatch(r"reel-(\d+)(\.[\w-]+)?", slug or "")
+    if not m:
         return True
     ahora = Pieza(int(m.group(1))).fase
+    # **Y lo de una pieza publicada ya no espera** (C-658). Los pedidos con
+    # sufijo —`reel-09.portada`, de `portada.py`— se piden al publicar, así que
+    # la fase del buzón no dice nada de ellos; pero con la pieza en la calle
+    # nadie los va a contestar. Dos del 25-9 seguían «en vuelo» el 24-10 y
+    # bloqueaban `desplegar.py`.
+    if (ahora or {}).get("nombre") == "publicado":
+        return False
+    if m.group(2) or buzon not in LA_FASE:
+        return True
     suya = next((f for f in camino() if f["nombre"] == LA_FASE[buzon]), None)
     return not (ahora and suya) or ahora["orden"] < suya["orden"]
 
