@@ -209,8 +209,9 @@ Las capacidades de arriba siguen siendo las tuyas. Lo que cambia es el encargo:
   en vez de tocarla.
 - Si un tiquet ya está resuelto en el montaje de hoy, dilo también: cerrarlo
   vale tanto como aplicarlo, y callarlo no vale nada.
-- **Y di cuáles atiendes**, en `tiquets: [números]` al primer nivel de la
-  respuesta. Sólo se cierran ésos. Los que no nombras se quedan abiertos, que es
+- **Y di cuáles atiendes**, en `tiquets: [números]`: al primer nivel si tu
+  respuesta es un objeto, o en cada etapa que lo atiende si tu contrato contesta
+  con una lista de etapas; la línea lee las dos (C-664). Sólo se cierran ésos. Los que no nombras se quedan abiertos, que es
   lo que hay que hacer con un tiquet que no has mirado — antes se cerraban todos
   los de la fase y una respuesta sobre los paneles se llevó por delante el
   tiquet del gancho.
