@@ -278,7 +278,7 @@ def abrir(pieza, dijo, segundo=None, tipo="objecion",
          dijo, tipo,
          por_defecto[0] if vuelve_a is None else vuelve_a,
          por_defecto[1] if cierra_con is None else cierra_con,
-         _huella(pieza)))
+         _huella(pieza, beat if beat is not SIN_EDL else None)))
     cx.commit()
     ident = cur.lastrowid
     # **Abrir el tiquet ES el evento.** Jaime: *«el tiquet abierto abre una
@@ -336,8 +336,13 @@ def medir(id_, medida):
     return medida
 
 
-def _huella(pieza):
+def _huella(pieza, etapa=None):
     """La huella del corte sobre el que se abre el ticket. `None` si no se sabe.
+
+    **Con etapa, la de SU etapa: `e<n>:<huella del segmento>`** (C-659). Con la
+    de la pieza entera, un borde movido en e3 mataba los tiquets de e5: W40
+    descartó así 176 de 476, casi todos de etapas que nadie había tocado. Un
+    tiquet habla de su etapa, y caduca cuando su etapa cambia.
 
     **Y se busca por los dos caminos, porque el que la usa es el CLI.** Este
     fichero se importa como `dominio.ticket` desde la linea y se EJECUTA como
@@ -352,6 +357,10 @@ def _huella(pieza):
     descartaron por no poder decir de cual venian.
     """
     try:
+        if etapa is not None:
+            from .segmento import Segmento
+            s = next((x for x in Segmento.de(pieza) if x.n == int(etapa)), None)
+            return f"e{int(etapa)}:{s.huella}" if s else None
         from . import version
         return version.huella_edl(pieza)
     except Exception:                              # noqa: BLE001
@@ -389,8 +398,17 @@ def caducar(pieza):
     # han caducado en la vida del proyecto— y entre ellos los que Jaime abrio
     # desde el CLI, que es justo el camino que CLAUDE.md le ofrece.
     viejos = [dict(r) for r in cx.execute(
-        "select id, dijo from ticket where pieza = ? and respuesta is null"
+        "select id, dijo, huella from ticket where pieza = ? and respuesta is null"
         " and huella is not null and huella <> ?", (pieza, h))]
+    # Y el de una etapa se compara con su etapa, no con la pieza (C-659).
+    hoy = {}
+    for v in viejos:
+        if str(v["huella"]).startswith("e") and ":" in v["huella"]:
+            e = int(v["huella"][1:].split(":")[0])
+            hoy.setdefault(e, _huella(pieza, e))
+    viejos = [v for v in viejos if not (str(v["huella"]).startswith("e")
+              and ":" in v["huella"]
+              and hoy.get(int(v["huella"][1:].split(":")[0])) == v["huella"])]
     if viejos:
         ahora = datetime.datetime.now().isoformat(timespec="seconds")
         cx.executemany(

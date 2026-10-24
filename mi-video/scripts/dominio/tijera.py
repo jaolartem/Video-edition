@@ -231,6 +231,57 @@ class Tijera:
             self.m.edl[clave] = valor
         self._sucio = True
 
+    def restaurar(self) -> list:
+        """Vuelve a poner lo que Jaime aprobó, si un paso lo movió. Las etapas.
+
+        **Lo aprobado no se mueve, y aquí deja de ser una promesa** (C-659).
+        `protegido` sólo lo cuidaba en los pasos que pasan por la tijera; la
+        selección, `fijar` y `revision` reescriben el EDL por su cuenta, y la
+        aprobación se derivaba del corte de hoy: un borde movido la borraba
+        sola. W40: nueve a diecinueve versiones por pieza y 176 tiquets
+        caducados, la mitad después de que Jaime aprobara.
+
+        Se compara por etapa: la etapa entera —sus trozos, su cinta, su
+        detalle— vuelve a ser la que se aprobó, en su sitio por orden de etapa.
+        """
+        from .segmento import congelados
+
+        edl, puestas = self.m.edl, []
+        for etapa, guardadas in sorted(congelados(self.slug).items()):
+            hoy = [i for i in range(len(self)) if self.beat(i) == etapa]
+            if [[round(x, 3) for x in edl["segmentos"][i][:2]] for i in hoy] == [
+                    [round(x, 3) for x in s[:2]] for s, _, _ in guardadas]:
+                continue
+            fuentes = edl.get("fuentes") or []
+            filas = [(s, fuentes[k] if k < len(fuentes) else None, d)
+                     for k, (s, d) in enumerate(zip(edl["segmentos"], edl["detalle"]))
+                     if d.get("beat") != etapa]
+            donde = next((k for k, (_, _, d) in enumerate(filas)
+                          if (d.get("beat") or 0) > etapa), len(filas))
+            filas[donde:donde] = [tuple(g) for g in guardadas]
+            edl["segmentos"] = [s for s, _, _ in filas]
+            edl["detalle"] = [d for _, _, d in filas]
+            if "fuentes" in edl:
+                edl["fuentes"] = [f or d.get("toma") or "" for _, f, d in filas]
+            puestas.append(etapa)
+            self._sucio = True
+        return puestas
+
+    @classmethod
+    def lo_aprobado(cls, slug) -> list:
+        """`restaurar` y guardar, y si hizo falta queda escrito quién lo movió."""
+        t = cls(slug)
+        if not t.existe:
+            return []
+        puestas = t.restaurar()
+        if puestas and t.guardar():
+            import registro
+
+            registro.aviso("tijera", "un paso movio un segmento aprobado",
+                           toma=slug, detalle=f"{slug}: etapas {puestas} vuelven"
+                           " al corte que aprobó Jaime")
+        return puestas
+
     # ── y se escribe ────────────────────────────────────────────────────────
     def guardar(self) -> bool:
         """**La duración se recalcula siempre**: es la suma de los trozos.

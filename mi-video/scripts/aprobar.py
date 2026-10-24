@@ -97,7 +97,7 @@ def veredicto(n, aprobada=True, notas=None, quien="jaime"):
     slug = f"reel-{n:02d}"
     con = _con()
     v = con.execute(
-        "select ve.id, ve.n from version ve join video vi on vi.id = ve.video_id"
+        "select ve.id, ve.n, ve.huella from version ve join video vi on vi.id = ve.video_id"
         " where vi.slug = ? order by ve.n desc limit 1", (slug,)).fetchone()
     if not v:
         con.close()
@@ -118,6 +118,17 @@ def veredicto(n, aprobada=True, notas=None, quien="jaime"):
     con.commit()
     con.close()
     if aprobada:
+        # **Se aprueba lo que Jaime vio, no lo que hay hoy en el EDL** (C-659).
+        # Entre el render y su veredicto la línea puede haber movido el corte;
+        # firmar los segmentos contra ese corte era aprobar algo que nadie vio.
+        # La versión guarda su EDL entero (C-205): si no casa, vuelve primero.
+        from dominio import version as _v
+        por_que = None
+        if v["huella"] and _v.huella_edl(slug) != v["huella"]:
+            _, por_que = _v.restaurar(slug, v["n"])
+        if por_que:
+            registro.aviso("aprobar", "no se pudo volver al corte aprobado",
+                           detalle=f"{slug} v{v['n']}: {por_que}")
         # **Y se firma donde lo miran las guardas: en cada segmento.** Desde el
         # 10-9 «¿esta aprobada?» se contesta con `segmento.aprobada`, y esto
         # solo escribia `aprobacion`: la pieza quedaba en «aprobado» y un

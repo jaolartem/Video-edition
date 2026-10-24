@@ -94,8 +94,15 @@ def _anota(pieza, motivo: str) -> None:
         def _persona(quien):
             return getattr(Autor.de(quien or ""), "tipo", None) == "persona"
 
+        # **Y un aviso ya descartado no se vuelve a levantar** (C-659). En W40,
+        # 165 de los 176 tiquets caducados eran avisos de la puerta («regla de
+        # plano», «la descripción habla de otro texto») que se abrían en cada
+        # montaje y morían en el sellado siguiente. Un `dato` no para nada: se
+        # dice una vez. Lo que se ARREGLÓ y vuelve a pasar sí se levanta, porque
+        # eso es una regresión.
         if any((t.get("dijo") or "").startswith(texto[:60])
-               and (t.get("estado") == "abierto" or _persona(t.get("quien")))
+               and (t.get("estado") in ("abierto", "descartado")
+                    or _persona(t.get("quien")))
                for t in tk.historia(pieza.slug)):
             return
         # **Un aviso es un `dato`: se ve y no para** (C-559). La puerta ya

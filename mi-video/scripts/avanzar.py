@@ -250,6 +250,15 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             registro.aviso("avanzar", "el paso revento",
                            detalle=f"{pieza.slug}: {motivo}"[:600], eco=True)
             break
+        # **Y lo que Jaime aprobó vuelve a su sitio, lo moviera quien lo moviera**
+        # (C-659). Es el único punto por el que pasan todos los pasos; ponerlo
+        # en cada uno de los que escriben el EDL es esperar al siguiente que no.
+        try:
+            from dominio.tijera import Tijera
+            Tijera.lo_aprobado(pieza.slug)
+        except Exception as e:                     # noqa: BLE001
+            registro.aviso("avanzar", "no se pudo devolver lo aprobado",
+                           detalle=f"{pieza.slug}: {type(e).__name__}: {e}"[:600])
         # **Si otro la movio mientras el paso corria, gana el que la movio**
         # (C-579). reel-21, 22:50:32: el visto abrio el #659, su puerta la
         # devolvio a «repasado», y en el mismo segundo este bucle volvio a

@@ -171,15 +171,23 @@ class Segmento:
         if not v:
             cx.close()
             return False
+        _con_corte(cx)
+        # **Y lo que Jaime aprueba se guarda entero, no sólo su huella** (C-659).
+        # Con la huella sola, un paso que movía un borde un milisegundo le
+        # quitaba la aprobación sin que nadie lo decidiera, y ya no había con
+        # qué volver: el corte aprobado no estaba escrito en ningún sitio.
+        corte = (json.dumps(entradas(self.slug, self.n), ensure_ascii=False)
+                 if etiqueta == APROBADO and es_suya(quien) else None)
         cx.execute(
             "insert into segmento (video_id, etapa, etiqueta, huella, quien,"
-            " cuando, autor_id) values (?,?,?,?,?,?,?) on conflict"
+            " cuando, autor_id, corte) values (?,?,?,?,?,?,?,?) on conflict"
             " (video_id, etapa) do update set etiqueta = excluded.etiqueta,"
             " huella = excluded.huella, quien = excluded.quien,"
-            " cuando = excluded.cuando, autor_id = excluded.autor_id",
+            " cuando = excluded.cuando, autor_id = excluded.autor_id,"
+            " corte = excluded.corte",
             (v["id"], self.n, etiqueta, self.huella, quien,
              datetime.datetime.now().isoformat(timespec="seconds"),
-             _quien_es(quien)))
+             _quien_es(quien), corte))
         cx.commit()
         cx.close()
         return True
@@ -313,6 +321,46 @@ def aprobada(slug) -> bool:
     return bool(segs) and all(s.aprobado and es_suya(s.por_quien) for s in segs)
 
 
+def _con_corte(cx):
+    """La columna `corte` de `segmento`, si la base aún no la tiene."""
+    try:
+        cx.execute("alter table segmento add column corte text")
+    except Exception:                              # noqa: BLE001
+        pass
+
+
+def entradas(slug, etapa) -> list:
+    """Lo que la etapa ocupa hoy en el EDL: `[[segmento, fuente, detalle], …]`."""
+    try:
+        edl = json.load(open(os.path.join(RAIZ, "ads", slug, "edl-sell.json"),
+                             encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    fuentes = edl.get("fuentes") or []
+    return [[s, fuentes[i] if i < len(fuentes) else None, d]
+            for i, (s, d) in enumerate(zip(edl.get("segmentos") or [],
+                                           edl.get("detalle") or []))
+            if d.get("beat") == int(etapa)]
+
+
+def congelados(slug) -> dict:
+    """`{etapa: entradas}` de lo que una persona aprobó, tal y como lo aprobó.
+
+    Es lo que `Tijera.restaurar` vuelve a poner si un paso lo movió. Lo
+    aprobado por un oficio no entra: congela sólo quien tiene derecho a
+    aprobar. Un tiquet de esa etapa lo libera con `reabre`, que borra la fila.
+    """
+    cx = _con()
+    _con_corte(cx)
+    filas = cx.execute(
+        "select s.etapa, s.quien, s.corte from segmento s join video v"
+        " on v.id = s.video_id where v.slug = ? and s.etiqueta = ?"
+        " and s.corte is not null", (slug, APROBADO)).fetchall()
+    cx.close()
+    return {int(r["etapa"]): json.loads(r["corte"]) for r in filas
+            if r["corte"] and es_suya(r["quien"])}
+
+
 def reabre(slug, etapa) -> bool:
     """**Un tiquet de Jaime reabre su segmento aprobado, y solo ese** (C-605).
 
@@ -322,8 +370,11 @@ def reabre(slug, etapa) -> bool:
     Jaime» con sus propias palabras. `abre` ya decia que lo hace «un tiquet
     suyo, o Jaime», y nadie lo llamaba.
     """
+    # Y congelado cuenta como aprobado aunque hoy un paso lo haya movido: si no,
+    # el tiquet de Jaime no podría liberar justo la etapa que quiere cambiar.
+    helado = int(etapa) in congelados(slug)
     for s in Segmento.de(slug):
-        if s.n == int(etapa) and s.aprobado:
+        if s.n == int(etapa) and (s.aprobado or helado):
             return s.abre()
     return False
 
