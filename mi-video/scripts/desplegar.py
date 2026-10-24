@@ -81,9 +81,13 @@ def comprobar():
 
 
 def arbol(sha) -> dict:
-    """`{ruta: bytes}` del commit, sin tocar el working tree."""
-    tar = subprocess.run(["git", "archive", sha], cwd=AQUI, capture_output=True,
-                         check=True).stdout
+    """`{ruta: bytes}` del commit, sin tocar el working tree.
+
+    Desde la raíz del repo: `git archive` lanzado en `mi-video/` empaqueta sólo
+    esa carpeta, y sin `docs/` ni `.claude/` el despliegue sale cojo.
+    """
+    tar = subprocess.run(["git", "archive", sha], cwd=os.path.dirname(AQUI),
+                         capture_output=True, check=True).stdout
     out = {}
     with tarfile.open(fileobj=io.BytesIO(tar)) as t:
         for m in t.getmembers():
