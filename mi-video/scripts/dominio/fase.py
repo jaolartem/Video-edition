@@ -152,9 +152,19 @@ CICLO = [
 ]
 
 
+_CON_VECES = []
+
+
 def _con():
     c = basedatos.abrir(BASE)
     c.row_factory = sqlite3.Row
+    if not _CON_VECES:
+        # La columna de las vueltas iguales (C-660), una vez por proceso.
+        try:
+            c.execute("alter table video_fase add column veces integer")
+        except sqlite3.OperationalError:
+            pass
+        _CON_VECES.append(True)
     return c
 
 
@@ -205,14 +215,52 @@ def _fallo_antes(video_id, fase_id, motivo):
     """¿Esta fase ya habia fallado por lo mismo? Entonces no es una espera."""
     con = _con()
     n = con.execute(
-        "select count(*) from video_fase where video_id = ? and fase_id = ?"
-        " and por_que is not null and por_que <> ''", (video_id, fase_id)).fetchone()[0]
+        "select coalesce(sum(coalesce(veces, 1)), 0) from video_fase where video_id = ?"
+        " and fase_id = ? and por_que is not null and por_que <> ''",
+        (video_id, fase_id)).fetchone()[0]
     con.close()
     return n > 1
 
 
+#: A cuántas vueltas iguales se dice en voz alta que la pieza sigue igual (C-660).
+AVISA = (6, 12, 24, 48, 96)
+
+
+def vueltas_atras(video_id, fase) -> list:
+    """Lo que devolvió la pieza desde `fase` desde la última vez que la pasó (C-660)."""
+    con = _con()
+    pasa = con.execute("select coalesce(max(id), 0) from video_fase where video_id = ?"
+                       " and fase_id = ? and (por_que is null or por_que = '')",
+                       (video_id, fase["id"])).fetchone()[0]
+    filas = con.execute("select por_que, coalesce(veces, 1) from video_fase"
+                        " where video_id = ? and id > ?"
+                        " and por_que like ?", (video_id, pasa,
+                                                f"vuelve desde {fase['nombre']}:%")).fetchall()
+    con.close()
+    return [r[0].split(": ", 1)[-1] for r in filas for _ in range(r[1])]
+
+
 def anotar(video_id, fase_id, por_que=None):
     con = _con()
+    # **El mismo estado se cuenta, no se repite** (C-660). El disparador da una
+    # vuelta cada 30 s y anotaba la espera en cada una: el 83 % de las 11.428
+    # filas de W40 era el mismo «espera al visto» o «no llega a una idea»
+    # escrito otra vez, y el registro dejaba de decir cuándo cambió algo. La
+    # fila se queda con la hora en que empezó y cuenta las vueltas en `veces`.
+    ult = con.execute("select id, fase_id, por_que, coalesce(veces, 1) as veces"
+                      " from video_fase where video_id = ? order by id desc limit 1",
+                      (video_id,)).fetchone()
+    if por_que and ult and ult["fase_id"] == fase_id and ult["por_que"] == por_que:
+        con.execute("update video_fase set veces = ? where id = ?",
+                    (ult["veces"] + 1, ult["id"]))
+        con.commit()
+        r = con.execute("select slug from video where id = ?", (video_id,)).fetchone()
+        con.close()
+        if ult["veces"] + 1 in AVISA and r:
+            import registro
+            registro.aviso("avanzar", "la pieza sigue igual", toma=r["slug"],
+                           detalle=f"{r['slug']}: {ult['veces'] + 1} vueltas igual — {por_que}"[:600])
+        return
     con.execute("insert into video_fase (video_id, fase_id, entro, por_que)"
                 " values (?,?,?,?)",
                 (video_id, fase_id, datetime.datetime.now().isoformat(

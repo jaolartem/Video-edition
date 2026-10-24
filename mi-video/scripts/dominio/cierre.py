@@ -195,3 +195,122 @@ def cierra_los_fijados(slug: str) -> list:
                      t.get("cierra_con") or "")
         cerrados.append(int(t["id"]))
     return cerrados
+
+
+#: `mi-video/`, para leer el spec que el render consumio.
+_RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def cierra_por_su_medida(slug: str) -> list:
+    """Los que la linea cierra midiendo, cada uno con la suya. Los cerrados (C-611).
+
+    Bordes por el empalme, cortes limpios, lo fijado y el texto. El de texto va
+    el ultimo: si revienta, los demas ya quedaron cerrados.
+    """
+    return (cierra_los_suyos(slug) + cierra_cortes_limpios(slug)
+            + cierra_los_fijados(slug) + cierra_por_texto(slug))
+
+
+def cierra_por_texto(pieza: str) -> list:
+    """Cierra los tiquets cuyo problema **ya no esta en la pieza**. Los cerrados.
+
+    **Y vive aqui, con las otras medidas, y vuelve a correr** (C-611). Estaba en
+    `ticket.py` como `cerrar_los_resueltos` y su unico llamador era la patrulla
+    del despachador: al retirarla el 7-9 nadie la volvio a enganchar, y lo que
+    `revisar` abre con `cierra_con = texto` no se cerraba nunca.
+
+    **Por que existe.** Jaime, mirando el render: *«tampoco las correcciones ni
+    los tickets»*. Y la pieza decia otra cosa: de las cinco cosas que habia
+    senalado, cuatro ya no estaban — «eso, eso», la repeticion de «la mayoria de
+    los emprendedores», la cola rota de la etapa 3—. Estaban arregladas y sus
+    tickets seguian abiertos, asi que **la lista decia que no se habia hecho
+    nada**.
+
+    Un ticket que no se cierra solo obliga a alguien a repasar la pieza para
+    saber si sigue vigente, y eso es justo lo que la lista tenia que ahorrar.
+
+    Se cierra por lo que se puede medir: **el texto que el ticket cita entre
+    comillas ya no esta en la pieza**. Lo que no cita nada se queda abierto —
+    «el panel es figurativo», «el hook mas movido» no se comprueban contando, y
+    cerrarlos por silencio seria peor que dejarlos.
+
+    **Y «en la pieza» son las dos fuentes, no solo la voz.** Esto comparaba
+    contra `Montaje.texto()`, que es lo HABLADO. El copy de los tableros no esta
+    ahi —sale de `tarjeta`/`placa`, y lo que el render consumio esta en
+    `src/reels.json`—, asi que un ticket como «el tablero dice «MISMA
+    FACTURACION» y la voz ya no lo dice» daba todas las citas ausentes y se
+    cerraba en la primera vuelta del despachador sin haber mirado el tablero. Se
+    mira lo hablado **y** lo rotulado, que es donde puede estar lo que cito.
+    """
+    import re
+
+    from .ticket import RECIBO, abiertos, contestar
+
+    # **Sin lo hablado no se mide** (C-611): con el montaje ilegible, toda cita
+    # que no estuviera en un tablero salia «ausente» y su tiquet se cerraba.
+    hablado = _hablado(pieza)
+    if not hablado.strip():
+        return []
+    dice = hablado + " " + _rotulado(pieza)
+    cerrados = []
+    for t in abiertos(pieza):
+        citas = [c.strip() for c in re.findall(r"«([^»]{6,})»", t.get("dijo") or "")]
+        # Se exige que TODAS las citas hayan desaparecido: un ticket que cita dos
+        # cosas y solo pierde una sigue teniendo razon en la otra.
+        # **Y solo los que se cierran con esta medida** (C-611): con otra,
+        # `contestar` revienta (`CierreAjeno`); con un oficio, lo cierra el.
+        if (t.get("cierra_con") != "texto" or (t.get("vuelve_a") or "") in RECIBO
+                or not citas or any(c.lower() in dice for c in citas)):
+            continue
+        contestar(t["id"],
+                  "cerrado midiendo: lo que citaba ya no esta en la pieza, ni"
+                  " hablado ni rotulado ("
+                  + "; ".join(f"«{c[:40]}»" for c in citas[:2]) + ")",
+                  estado="arreglado", quien="la linea", medida="texto")
+        cerrados.append(t["id"])
+    return cerrados
+
+
+def _hablado(pieza: str) -> str:
+    """Todo lo que se oye en el montaje de hoy, en minusculas."""
+    from .montaje import Montaje
+
+    try:
+        m = Montaje(pieza)
+        return " ".join((m.texto(tr) or "") for tr, _ in m.tramos()).lower()
+    # `SystemExit` tambien: sin transcript, `Montaje` sale asi, y desde la linea
+    # se llevaba la vuelta entera del disparador (C-611).
+    except (Exception, SystemExit):                # noqa: BLE001
+        return ""
+
+
+def _rotulado(pieza: str) -> str:
+    """Todo lo que se lee en pantalla, **del spec que el render consumio**.
+
+    De `src/reels.json` y no de la base: la base es lo que se pidio, el spec es
+    lo que se dibujo. Es la misma distincion que ya hace `servicios/visto.py`.
+    """
+    try:
+        n = int(str(pieza).split("-")[1])
+        spec = json.load(open(os.path.join(_RAIZ, "src", "reels.json"),
+                              encoding="utf-8"))
+    except (OSError, ValueError, IndexError):
+        return ""
+    r = next((x for x in spec if x.get("id") == f"Reel-R{n}"), None)
+    if not r:
+        return ""
+    fuera = []
+
+    def _hojas(x):
+        if isinstance(x, str):
+            fuera.append(x)
+        elif isinstance(x, dict):
+            for v in x.values():
+                _hojas(v)
+        elif isinstance(x, list):
+            for v in x:
+                _hojas(v)
+
+    for cual in ("boards", "tarjetas", "paneles", "lineas", "cta"):
+        _hojas(r.get(cual))
+    return " ".join(fuera).lower()

@@ -68,29 +68,49 @@ CREATE TABLE IF NOT EXISTS incidencia (
   detalle TEXT
 );
 CREATE INDEX IF NOT EXISTS incidencia_cuando ON incidencia (cuando);
+CREATE INDEX IF NOT EXISTS incidencia_asunto ON incidencia (script, asunto, id);
 """
 
 
 def _con():
     con = basedatos.abrir(BASE)
     con.executescript(ESQUEMA)
+    try:
+        con.execute("alter table incidencia add column veces integer")
+    except Exception:                           # noqa: BLE001
+        pass
     return con
 
 
 def anota(nivel, script, asunto, toma=None, detalle=None, eco=True):
     """Deja constancia. Nunca revienta: un log que tumba el proceso no sirve."""
+    veces = 1
     try:
         con = _con()
-        con.execute(
-            "insert into incidencia (cuando, nivel, script, toma, asunto, detalle)"
-            " values (?,?,?,?,?,?)",
-            (datetime.datetime.now().isoformat(timespec="seconds"),
-             nivel, script, toma, asunto,
-             None if detalle is None else str(detalle)))
+        detalle = None if detalle is None else str(detalle)
+        # **Lo mismo dicho otra vez se cuenta, no se escribe** (C-660). En diez
+        # días de W40 hubo 23.326 incidencias, y «la pieza no avanza» sola eran
+        # 9.409: la misma frase en cada vuelta de 30 s. Si la última de ese
+        # script, asunto y pieza dice lo mismo, suma una vuelta.
+        ult = con.execute(
+            "select id, detalle, coalesce(veces, 1) from incidencia where script = ?"
+            " and asunto = ? and coalesce(toma, '') = ? order by id desc limit 1",
+            (script, asunto, toma or "")).fetchone()
+        if ult and ult[1] == detalle:
+            veces = ult[2] + 1
+            con.execute("update incidencia set veces = ? where id = ?", (veces, ult[0]))
+        else:
+            con.execute(
+                "insert into incidencia (cuando, nivel, script, toma, asunto, detalle)"
+                " values (?,?,?,?,?,?)",
+                (datetime.datetime.now().isoformat(timespec="seconds"),
+                 nivel, script, toma, asunto, detalle))
         con.commit()
         con.close()
     except Exception as e:                      # noqa: BLE001
         print(f"  [registro no disponible: {e}]", file=sys.stderr)
+    if veces > 1 and veces not in (6, 12, 24, 48, 96):
+        return
     if eco and nivel != "nota":
         marca = "ERROR" if nivel == "error" else "aviso"
         print(f"  [{marca}] {asunto}" + (f" · {detalle}" if detalle else ""),

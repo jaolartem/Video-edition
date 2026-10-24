@@ -112,7 +112,7 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
                     anotar(pieza.video_id, destino["id"], caduco)
                 actual = destino
 
-    saltos, motivo, atras = 0, None, {}
+    saltos, motivo = 0, None
     while True:
         i = next((k for k, f in enumerate(ruta) if f["id"] == actual["id"]), None)
         if i is None or i + 1 >= len(ruta):
@@ -173,11 +173,9 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         # Se mide, no se supone: `dominio/cierre.py` mira si en el segundo que el
         # tiquet señala queda empalme. Si sigue habiendo, no se cierra.
         try:
-            from dominio.cierre import (cierra_cortes_limpios, cierra_los_fijados,
-                                        cierra_los_suyos)
-            for i in (cierra_los_suyos(pieza.slug) + cierra_cortes_limpios(pieza.slug)
-                      + cierra_los_fijados(pieza.slug)):
-                print(f"  {pieza.slug}: cerrado #{i} por su medida (bordes)")
+            from dominio.cierre import cierra_por_su_medida
+            for i in cierra_por_su_medida(pieza.slug):
+                print(f"  {pieza.slug}: cerrado #{i} por su medida")
         except Exception:                          # noqa: BLE001
             pass
 
@@ -340,8 +338,12 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
             # que no se arregla repitiendo, y entonces vale la regla de siempre
             # —*«el loop no es intentar hacer lo mismo con resultados
             # distintos»*— y se para con el motivo escrito.
-            atras.setdefault(siguiente["nombre"], []).append(r.salida or "?")
-            vueltas = atras[siguiente["nombre"]]
+            # **Y se cuenta entre vueltas del disparador, no dentro de una**
+            # (C-660): el disparador llama con `tope=1`, así que la lista local
+            # nunca pasaba de uno y el «más de tres es un bug» no saltaba jamás.
+            # Lo que ya volvió desde este paso está escrito en `video_fase`.
+            from dominio.fase import vueltas_atras
+            vueltas = vueltas_atras(pieza.video_id, siguiente) + [r.salida or "?"]
             if len(vueltas) > 3:
                 # **Y el error trae el diagnostico, no la invitacion a
                 # buscarlo.** Jaime: *«si pasa mas de 3 veces es un bug, y lo
