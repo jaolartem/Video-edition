@@ -147,8 +147,10 @@ REVISION = (
     " Es una REVISION de lo que el codigo ya hizo, no una composicion desde"
     " cero. Lee el contrato y el pedido una sola vez cada uno, sus hojas de"
     " contacto (`hoja`) y los ficheros de `_comun` que nombre (se leen una"
-    " vez); un fotograma suelto, solo de la escena que te haga dudar. No abras"
-    " otros ficheros, no busques, no ejecutes nada. Si lo hecho cumple, contesta lo minimo que el contrato"
+    " vez); un fotograma suelto, solo de la escena que te haga dudar. Todo con"
+    " Read, nunca troceado con Bash (C-662); Bash solo para `python"
+    " scripts/consulta.py <verbo>` ante una duda concreta. No abras otros"
+    " ficheros ni busques. Si lo hecho cumple, contesta lo minimo que el contrato"
     " admite y cambia solo lo que no cumple. Tope: {lecturas} lecturas y una"
     " escritura; si no basta, dilo en la respuesta y para."
 )

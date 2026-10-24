@@ -176,6 +176,17 @@ class ServicioVisto(Servicio):
         from dominio.nota import Nota
         if any(str(n.que).startswith(MARCA) for n in Nota.subidas(pieza.slug)):
             return Resultado(False, motivo="espera a Jaime: una escena del visto subió")
+        # **Y si las medidas no encuentran nada, no se le llama** (C-663). Jaime,
+        # 23-10-2026, eligiendo dos llamadas por pieza: quien vigila el render es
+        # su aprobación y las guardas en código. El diseñador vuelve a mirar
+        # cuando una medida tiene algo que enseñarle —un silencio largo, una
+        # costura que se oye, algo dicho dos veces, un motivo que la puerta dejó
+        # abierto— y entonces mira con eso delante.
+        alarmas = por_que_mirar(d)
+        if not alarmas:
+            return Resultado(True, salida="visto por medida: nada que enseñar al"
+                                          " diseñador; el ojo lo pone Jaime al aprobar")
+        d["por_que_se_mira"] = alarmas
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
         # **Y va por su propia carpeta, no por la de `disenar`.**
@@ -198,6 +209,24 @@ class ServicioVisto(Servicio):
                 motivo="espera revision del render -> "
                        + contrato.ruta_pedido("visto", pieza.slug))
         return aplicar(pieza, r)
+
+
+def por_que_mirar(d: dict) -> list:
+    """Lo que las medidas del render tienen que enseñar al diseñador (C-663). Vacío es limpio."""
+    import suena
+
+    fuera = []
+    if (d.get("aire_max") or 0) > suena.AIRE_MAX:
+        fuera.append(f"un silencio de {d['aire_max']} s (máximo {suena.AIRE_MAX})")
+    if d.get("costuras"):
+        fuera.append(f"{len(d['costuras'])} costura(s) que se oyen")
+    if d.get("repetido"):
+        fuera.append(f"{len(d['repetido'])} cosa(s) dichas dos veces")
+    if d.get("motivos_abiertos"):
+        fuera.append(f"{len(d['motivos_abiertos'])} motivo(s) que la puerta dejó abiertos")
+    if any("error" in x for x in d.get("se_ve") or [] if isinstance(x, dict)):
+        fuera.append("no se pudo leer qué hay en pantalla")
+    return fuera
 
 
 def aplicar(pieza: Pieza, veredicto) -> Resultado:
