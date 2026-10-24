@@ -77,8 +77,6 @@ if [ ${#falta[@]} -gt 0 ]; then
 fi
 echo "arrancar: todo en su sitio — disparador con $# pieza(s): $*"
 [ "${OFICIOS_POR_BASH:-1}" = "0" ]   && echo "arrancar: oficios por la sesion — la cola: python scripts/dominio/cola.py --lote $*"
-# Y el reloj y los tokens de cada pieza, desde aqui (C-565).
-_py "from dominio import cola; cola.arranca(sys.argv[1:])" "$@"
 # Y si sale pidiendo rearranque, es que el codigo cambio: se vuelve a poner con
 # el nuevo (C-629). Cualquier otra salida es la suya.
 while :; do
