@@ -148,8 +148,8 @@ REVISION = (
     " cero. Lee el contrato y el pedido una sola vez cada uno, sus hojas de"
     " contacto (`hoja`) y los ficheros de `_comun` que nombre (se leen una"
     " vez); un fotograma suelto, solo de la escena que te haga dudar. Todo con"
-    " Read, nunca troceado con Bash (C-662); Bash solo para `python"
-    " scripts/consulta.py <verbo>` ante una duda concreta. No abras otros"
+    " Read, nunca troceado con Bash (C-662); Bash solo para `cd {casa} &&"
+    " python scripts/consulta.py <verbo>` ante una duda concreta. No abras otros"
     " ficheros ni busques. Si lo hecho cumple, contesta lo minimo que el contrato"
     " admite y cambia solo lo que no cumple. Tope: {lecturas} lecturas y una"
     " escritura; si no basta, dilo en la respuesta y para."
@@ -217,7 +217,7 @@ class Oficio:
             contrato=os.path.abspath(self.pedido).replace(
                 ".pedido.json", ".prompt.md"),
             respuesta=os.path.abspath(self.respuesta))
-        return texto + (REVISION.format(lecturas=LECTURAS) if sesion else "")
+        return texto + (REVISION.format(lecturas=LECTURAS, casa=CASA) if sesion else "")
 
     @property
     def respuesta(self) -> str:
