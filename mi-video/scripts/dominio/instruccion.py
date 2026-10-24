@@ -72,12 +72,44 @@ CREATE TABLE IF NOT EXISTS instruccion (
 """
 
 
+#: **A quién va cada una** (C-661). Sin filas, a todos: es como funcionaba, y
+#: una instrucción nueva llega a todos hasta que alguien la reparte. `operador`
+#: no es un buzón: lo que sólo va a él no viaja a ningún oficio.
+REPARTO = """
+CREATE TABLE IF NOT EXISTS instruccion_para (
+  instruccion_id INTEGER NOT NULL REFERENCES instruccion(id),
+  buzon          TEXT NOT NULL,
+  PRIMARY KEY (instruccion_id, buzon)
+)
+"""
+OPERADOR = "operador"
+
+
 def _con():
     cx = basedatos.abrir()
     cx.row_factory = sqlite3.Row
     basedatos.esquema(cx, ESQUEMA)
+    basedatos.esquema(cx, REPARTO)
     _al_dia(cx)
     return cx
+
+
+def repartir(id_, *buzones):
+    """Deja dicho a qué buzones va. Sustituye el reparto entero; repetirlo deja lo mismo.
+
+    Falla con un buzón que no existe, igual que `cerrar` falla sin aguja: un
+    reparto a un nombre equivocado es una instrucción que no llega a nadie.
+    """
+    from .oficio import BUZONES
+
+    malos = [b for b in buzones if b not in BUZONES and b != OPERADOR]
+    if malos or not buzones:
+        raise ValueError(f"instruccion #{id_}: buzones que no existen: {malos or 'ninguno'}")
+    cx = _con()
+    cx.execute("delete from instruccion_para where instruccion_id = ?", (id_,))
+    cx.executemany("insert into instruccion_para values (?, ?)",
+                   [(id_, b) for b in dict.fromkeys(buzones)])
+    cx.commit()
 
 
 def _al_dia(cx):
@@ -168,7 +200,14 @@ def para(paso=None, pieza=None):
         "   and (ambito = 'lote'"
         "        or (ambito = 'pieza' and pieza = ?)"
         "        or (ambito = 'paso' and paso = ?))"
-        " order by veces desc, id", (pieza, paso)).fetchall()
+        # **Y sólo las de este buzón, si están repartidas** (C-661): las 114 iban
+        # enteras a los ocho, 78 KB por pedido para quedarse cada uno con unas
+        # pocas, y cada agente formándose su criterio con las de los demás.
+        "   and (? is null or not exists (select 1 from instruccion_para r"
+        "                                 where r.instruccion_id = instruccion.id)"
+        "        or exists (select 1 from instruccion_para r"
+        "                   where r.instruccion_id = instruccion.id and r.buzon = ?))"
+        " order by veces desc, id", (pieza, paso, paso, paso)).fetchall()
     cx.close()
     return [dict(f) for f in filas]
 
