@@ -27,12 +27,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
 from dominio.texto import comparable as _comparable  # noqa: E402
 from dominio.idioma import Idioma  # noqa: E402
+from dominio.lienzo import Lienzo  # noqa: E402
 
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 FPS = 30
 # Medido sobre render: la Montserrat 800 gasta ~0,70 em por caracter, así que a
 # 62 px caben ~22 por línea en los 950 útiles. 36 da dos líneas con holgura.
+# Es el tope del vertical: en otro lienzo crece con su ancho útil (C-671).
 TOPE = 36
+UTIL_VERTICAL = 950
+
+
+def tope_de(lienzo) -> int:
+    """Cuántos caracteres caben en un subtítulo de ese cuadro."""
+    return int(TOPE * lienzo.util / UTIL_VERTICAL)
 # **Cuantas palabras seguidas se aceptan cambiar de una vez.** Un desajuste
 # de una, dos o tres palabras es una mal oida; de cuatro para arriba ya no es
 # eso, es que la cinta y el montaje no son del mismo corte, y ahi sustituir
@@ -139,7 +147,7 @@ def costuras(slug):
             if a.get("beat") != b.get("beat")]
 
 
-def agrupar(words, cortes=()):
+def agrupar(words, cortes=(), tope=TOPE):
     caps, buf = [], None
     for w in words:
         cierra = w["text"][-1:] in ".?!"
@@ -147,7 +155,7 @@ def agrupar(words, cortes=()):
         # (en reel-18 «cuando» empezaba en 5,02 con la costura en 5,34).
         costura = next((c for c in cortes
                         if (buf["end"] if buf else -1) <= c < w["end"]), None)
-        if buf and (len(buf["text"]) + 1 + len(w["text"]) > TOPE
+        if buf and (len(buf["text"]) + 1 + len(w["text"]) > tope
                     or w["start"] - buf["end"] > 0.7 or costura is not None):
             caps.append(buf); buf = None
         if not buf:
@@ -546,7 +554,8 @@ if __name__ == "__main__":
         base = f"work/subs/reel-{r}"
         caps = agrupar(transcribir(mp4, base + ".wav", base,
                                    Idioma.de_pieza(f"reel-{r}")),
-                       costuras(f"reel-{r}"))
+                       costuras(f"reel-{r}"),
+                       tope_de(Lienzo.de_pieza(f"reel-{r}")))
         caps, n = reconciliar(caps, esperadas(f"reel-{r}"))
         caps, g = glosario(caps)
         todo[f"reel-{r}"] = caps

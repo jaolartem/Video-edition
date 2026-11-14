@@ -289,7 +289,7 @@ export function caminosDe({ slug, plan, edl, desc, lineas, citas = [] }) {
   const faltas = [];
   for (const { at, duration, det, i } of porBeat.values()) {
     const e = plan.escenas[i] ?? plan.escenas[0];
-    const cx = e?.crop ? (e.crop.x + e.crop.w / 2) / 2160 : 0.5;
+    const cx = e?.crop ? (e.crop.x + e.crop.w / 2) / (plan.fuente?.ancho ?? 2160) : 0.5;
     // `slug` y `lineas` viajan porque el gancho los necesita: el nombre del
     // recorte con alfa se deriva de la pieza y del beat, y el rótulo que va
     // detrás de su cabeza es el de la pieza — el mismo que ya resolvió quien

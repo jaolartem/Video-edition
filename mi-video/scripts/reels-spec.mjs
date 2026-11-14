@@ -241,7 +241,7 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
      */
     lado: (() => {
       const e = plan.escenas[0];
-      const cx = e.crop ? (e.crop.x + e.crop.w / 2) / 2160 : 0.5;
+      const cx = e.crop ? (e.crop.x + e.crop.w / 2) / (plan.fuente?.ancho ?? 2160) : 0.5;
       return cx < 0.5 ? "der" : "izq";
     })(),
     /**

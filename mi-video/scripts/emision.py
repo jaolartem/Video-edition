@@ -54,9 +54,9 @@ import fotogramas  # noqa: E402
 import rutas  # noqa: E402
 import suena  # noqa: E402
 from dominio.documento import CAPAS, Documento  # noqa: E402
+from dominio.lienzo import Lienzo  # noqa: E402
 
 FPS = 30
-ANCHO, ALTO = 1080, 1920
 HOLGURA_LUFS = 1.5
 #: Lo que una escena se puede separar de la integrada de su pieza sin avisar.
 SEPARA_LU = 4.0
@@ -150,8 +150,10 @@ class Emision:
 
     def _pieza(self, f) -> list:
         mal = []
-        if (f["ancho"], f["alto"]) != (ANCHO, ALTO):
-            mal.append(f"{f['ancho']}×{f['alto']} y no {ANCHO}×{ALTO}")
+        # El cuadro es el del lienzo de la pieza, no 1080×1920 (C-671).
+        cuadro = Lienzo.de_pieza(self.slug)
+        if (f["ancho"], f["alto"]) != (cuadro.ancho, cuadro.alto):
+            mal.append(f"{f['ancho']}×{f['alto']} y no {cuadro.ancho}×{cuadro.alto}")
         if f["fps"] != FPS:
             mal.append(f"{f['fps']} fps y no {FPS}")
         # La entrega lleva las pausas del compas y la cola de la mezcla, igual

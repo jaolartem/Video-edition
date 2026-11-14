@@ -42,6 +42,39 @@ export const lienzoDe = (formato) => {
   return { formato: f, ...J[f] };
 };
 
+/**
+ * El lienzo que declara una pieza con `formato` en `ads/frames.json`; sin
+ * declararlo, el vertical. Para quien sólo tiene el slug —un plan, un render—
+ * y no el marco entero (C-671).
+ */
+export const lienzoDePieza = (slug) => {
+  let formato;
+  try {
+    const fr = JSON.parse(fs.readFileSync("ads/frames.json", "utf8")).reels ?? {};
+    formato = fr[slug]?.formato;
+  } catch {
+    /* sin frames.json no hay piezas que declaren otro */
+  }
+  return lienzoDe(formato);
+};
+
+/**
+ * El cuadro de la copia de revisión: el lado largo a 1080, el corto en
+ * proporción y par. Sobre el vertical sale `608:1080`, que es lo que llevaban
+ * escrito `musica.sh` y `sonoridad.sh` (C-671).
+ */
+export const revisionDe = (lienzo) => {
+  const largo = Math.max(lienzo.width, lienzo.height);
+  const corto = Math.round((1080 * Math.min(lienzo.width, lienzo.height)) / largo / 2) * 2;
+  return lienzo.width >= lienzo.height ? `1080:${corto}` : `${corto}:1080`;
+};
+
+// `node scripts/lienzo.mjs revision reel-23`: el `scale` de su copia de revisión.
+if (process.argv[1] && process.argv[1].endsWith("lienzo.mjs") && process.argv[2] === "revision") {
+  console.log(revisionDe(lienzoDePieza(process.argv[3])));
+  process.exit(0);
+}
+
 if (process.argv[1] && process.argv[1].endsWith("lienzo.mjs")) {
   for (const f of FORMATOS) {
     const l = lienzoDe(f);

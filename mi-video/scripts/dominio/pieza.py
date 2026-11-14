@@ -40,6 +40,19 @@ class Pieza:
         self.n = int(n)
         self.slug = f"reel-{self.n:02d}"
 
+    @staticmethod
+    def en_pedido(slug: str) -> dict:
+        """Lo que la pieza declara de sí misma y viaja con todo pedido.
+
+        Su lengua y su cuadro, **sólo si no son los de siempre** (C-665,
+        C-671): un pedido en español y vertical queda idéntico al de antes, así
+        que no caduca ninguna respuesta en vuelo.
+        """
+        from .idioma import Idioma
+        from .lienzo import Lienzo
+
+        return {**Idioma.en_pedido(slug), **Lienzo.en_pedido(slug)}
+
     # ── lo que la pieza es ────────────────────────────────────────────────
     @property
     def ruta_edl(self) -> str:

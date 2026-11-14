@@ -19,6 +19,7 @@ import { execFileSync } from "child_process";
 import fs from "fs";
 import { createHash } from "crypto";
 import path from "path";
+import { lienzoDePieza } from "./lienzo.mjs";
 
 const arg = (n, d) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -44,8 +45,12 @@ const out = arg("out", "public/hook.mp4");
 // punch-ins, y ese margen se gasta AL RECORTAR: lo que sale del recorte ya no
 // gana nada por guardarse mas grande. Medido: a 1800 el render de Remotion
 // tarda 2,8x mas por pixeles que la entrega no usa.
-const ANCHO = Number(arg("ancho", "1080"));
-const ALTO = Math.round((ANCHO * 16) / 9);
+// **Y el cuadro es el de la pieza** (C-671): el alto sale de la proporcion de
+// su lienzo, no de un 16/9 escrito para el vertical. De que pieza es lo dice la
+// ruta del plan, igual que en `compas`.
+const LIENZO = lienzoDePieza(path.basename(path.dirname(arg("plan") ?? "")));
+const ANCHO = Number(arg("ancho", String(LIENZO.width)));
+const ALTO = Math.round((ANCHO * LIENZO.height) / LIENZO.width);
 
 /**
  * Tarjeta gráfica para decodificar y codificar. `--cpu` la desactiva.

@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import gpu  # noqa: E402
 import registro  # noqa: E402
 import rutas  # noqa: E402
+from dominio.lienzo import Lienzo  # noqa: E402
 
 BASE = os.path.join("ads", "decisiones.db")
 RAIZ = os.path.join("work", "fragmentos")
@@ -65,13 +66,15 @@ def filtro_de(slug, a, b):
     encuadre final es cosa del render de la pieza, no de este peldaño.
     """
     p = f"work/scenes/{slug}/plan-full.json"
+    # Sin encuadre se llena el cuadro de la pieza, sea cual sea (C-671).
+    llenar = Lienzo.de_pieza(slug).llenar()
     if not os.path.exists(p):
-        return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
+        return llenar
     for e in json.load(open(p, encoding="utf-8")).get("escenas", []):
         if e.get("origen_desde", -1) >= a - 0.2 and e.get("origen_hasta", 0) <= b + 0.2:
             if e.get("filtro"):
                 return e["filtro"]
-    return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
+    return llenar
 
 
 def main():

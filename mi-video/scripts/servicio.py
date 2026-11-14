@@ -321,12 +321,12 @@ def contexto(paso, slug):
              # cada agente pueda modificarlo conforme avanza»*— y **no llegaba
              # al que trabaja**: `estado.marca` no la llamaba nadie y `hecho`
              # estaba vacio en las siete piezas. Declarado y no implementado.
-             # Y la lengua, sólo si no es español (C-665): no caduca nada en vuelo.
-             **_idioma.Idioma.en_pedido(slug), "marcador": _marcador(slug)}
+             # Y su lengua y su cuadro si no son los de siempre (C-665, C-671).
+             **_pieza.Pieza.en_pedido(slug), "marcador": _marcador(slug)}
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 
-from dominio import idioma as _idioma, instruccion as _instruccion, pliego as _pliego  # noqa: E402  C-564, C-665
+from dominio import instruccion as _instruccion, pieza as _pieza, pliego as _pliego  # noqa: E402  C-564, C-671
 from dominio.volcado import _lo_dicho, _referencia, _sin_repetir, _volcar  # noqa: E402
 
 

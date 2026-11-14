@@ -49,11 +49,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gpu  # noqa: E402
+from dominio.lienzo import Lienzo  # noqa: E402
 
 #: A que resolucion se mide. Un quinto del cuadro: la banda del cc sigue siendo
 #: 40x190 px, de sobra para separar una pared lisa de una estanteria, y la
-#: pasada entera cabe en memoria sin pelear.
-ANCHO, ALTO = 216, 384
+#: pasada entera cabe en memoria sin pelear. Del cuadro DE LA PIEZA (C-671):
+#: medir un horizontal a 216x384 lo aplastaba.
+REDUCE = 5
 
 #: Fotogramas por segundo que se muestrean. Seis bastan para ver si la banda se
 #: mueve —lo que buscamos es si CAMBIA, no seguir el movimiento— y dejan la
@@ -108,10 +110,11 @@ def _coronilla(n):
         return json.load(g).get("coronilla")
 
 
-def _gris(video):
+def _gris(video, cuadro):
     """El video entero en gris y reducido, a `MUESTRAS` fps. `None` si falla."""
     import numpy as np
 
+    ANCHO, ALTO = cuadro.ancho // REDUCE, cuadro.alto // REDUCE
     crudo = subprocess.run(
         ["ffmpeg", "-v", "error", *gpu.decodifica(), "-i", video,
          "-vf", f"fps={MUESTRAS},format=gray,scale={ANCHO}:{ALTO}",
@@ -128,7 +131,8 @@ def _medida(cubo, arriba, abajo):
     """Luz, grano y movimiento de esa banda, sobre los fotogramas dados."""
     import numpy as np
 
-    a, b = int(round(ALTO * arriba)), int(round(ALTO * abajo))
+    alto = cubo.shape[1]               # el del cuadro medido, sea cual sea
+    a, b = int(round(alto * arriba)), int(round(alto * abajo))
     if b - a < 2 or len(cubo) < MINIMO:
         return None
     banda = cubo[:, a:b, :]
@@ -167,7 +171,8 @@ def de_la_pieza(n):
     tramos = _escenas(n)
     if not os.path.exists(video) or not tramos:
         return None
-    cubo = _gris(video)
+    cuadro = Lienzo.de_pieza(f"reel-{n:02d}")
+    cubo = _gris(video, cuadro)
     if cubo is None:
         return None
 
@@ -176,7 +181,7 @@ def de_la_pieza(n):
     if coronilla:
         # El cc que sube al hueco de encima de su cabeza se apoya un pelo por
         # debajo de su pelo, para no morderla. El margen lo declara `cc.json`.
-        suelos = {**suelos, "cabeza": coronilla - cabeza["margen"] / 1920.0}
+        suelos = {**suelos, "cabeza": coronilla - cabeza["margen"] / float(cuadro.alto)}
     salida = []
     for tr in tramos:
         i = int(tr["desde"] * MUESTRAS)

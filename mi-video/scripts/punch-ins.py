@@ -39,6 +39,7 @@ import sys
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
+from dominio.lienzo import Lienzo  # noqa: E402
 
 
 
@@ -225,7 +226,12 @@ ENCUADRES = [
 
 #: La salida. Un recorte que acaba por debajo de esto se AMPLIA al escalar, y
 #: ampliar es interpolar: `scale` de 875 a 1080 no inventa detalle.
-SALIDA_W, SALIDA_H = 1080, 1920
+#:
+#: **Es el lienzo de la pieza, no un número** (C-671): `src/brand/lienzos.json`
+#: por `dominio.lienzo`. Aquí el vertical, que es el de una pieza que no declara
+#: otro; el `__main__` lo cambia por el del plan que recorta.
+LIENZO = Lienzo.de()
+SALIDA_W, SALIDA_H = LIENZO.ancho, LIENZO.alto
 
 
 def _gancho_s():
@@ -283,22 +289,24 @@ def frac_nitido(src_h, zoom=1.0):
     tolerancia. El dato estaba escrito en cada escena (`reescalado`) y no lo
     miraba nadie.
     """
-    return (SALIDA_W * 16 / 9) / (src_h * max(zoom, 0.01) * TOLERANCIA)
+    return SALIDA_H / (src_h * max(zoom, 0.01) * TOLERANCIA)
 
 
 def crop_rect(frac, anchor, src_w, src_h):
     """
-    Rectangulo 9:16 con la cabeza siempre a la misma altura del cuadro.
+    Rectangulo con la proporcion del lienzo —9:16 o 16:9— y la cabeza siempre a
+    la misma altura del cuadro.
 
     No hay desplazamiento configurable: el ancla manda y `HEAD_POS` fija donde
     cae dentro del recorte. Cuanto mas cerrado el encuadre, menos abarca — pero
     la cabeza no se mueve.
     """
+    pw, ph = LIENZO.proporcion
     ch = src_h * frac
-    cw = ch * 9 / 16
+    cw = ch * pw / ph
     if cw > src_w:
         cw = src_w
-        ch = cw * 16 / 9
+        ch = cw * ph / pw
     ax, ay = anchor
     x = ax * src_w - cw / 2
     y = ay * src_h - ch * HEAD_POS
@@ -330,15 +338,23 @@ if __name__ == "__main__":
 
     plan = json.load(open(args.plan, encoding="utf-8"))
     escenas = plan["escenas"]
+    LIENZO = Lienzo.de_ruta(args.plan)
+    SALIDA_W, SALIDA_H = LIENZO.ancho, LIENZO.alto
 
     probe = json.loads(subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0",
-         "-show_entries", "stream=width,height", "-of", "json", args.source],
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=width,height:stream_side_data=rotation:stream_tags=rotate",
+         "-of", "json", args.source],
         capture_output=True, text=True, encoding="utf-8", errors="replace").stdout)
-    sw, sh = probe["streams"][0]["width"], probe["streams"][0]["height"]
+    st = probe["streams"][0]
+    sw, sh = st["width"], st["height"]
+    giro = abs(int(float((st.get("side_data_list") or [{}])[0].get("rotation")
+                         or (st.get("tags") or {}).get("rotate") or 0))) % 180
     # El movil graba vertical con metadato de rotacion: ffmpeg lo endereza al
-    # decodificar, asi que el frame real es el alto por el ancho.
-    if sw > sh:
+    # decodificar, asi que el frame real es el alto por el ancho. **Sólo si
+    # gira** (C-671): la camara del CV graba apaisada de verdad, y darle la
+    # vuelta la recortaba de lado. En vertical se conserva lo de siempre.
+    if giro == 90 or (LIENZO.vertical and sw > sh):
         sw, sh = sh, sw
 
     # Pares muy juntos (0,4 s): a mayor separacion el sujeto se ha desplazado
@@ -523,7 +539,7 @@ if __name__ == "__main__":
         piso = frac_nitido(sh)
         if frac < piso:
             blandos.append(f"  {i} {nombre}: el plano solo ya dejaria"
-                           f" {(SALIDA_W * 16 / 9) / (sh * frac):.2f}x, por"
+                           f" {SALIDA_H / (sh * frac):.2f}x, por"
                            f" encima de {TOLERANCIA:.2f}; se abre de"
                            f" {frac:.2f} a {piso:.2f}")
             frac = min(1.0, piso)
@@ -535,7 +551,7 @@ if __name__ == "__main__":
             if z["hasta"] < tope:
                 blandos.append(f"  {i} {nombre}: el acercamiento a"
                                f" {z['hasta']:.2f} dejaria"
-                               f" {(SALIDA_W * 16 / 9) / (sh * frac * z['hasta']):.2f}x;"
+                               f" {SALIDA_H / (sh * frac * z['hasta']):.2f}x;"
                                f" se queda en {tope:.2f} (el plano no se toca)")
                 z["hasta"] = tope
 
@@ -555,10 +571,10 @@ if __name__ == "__main__":
             abierto = True
 
         x, y, cw, ch = crop_rect(frac, (ax, ay), sw, sh)
-        escala = 1080 / cw
+        escala = SALIDA_W / cw
         e["encuadre"] = nombre
         e["crop"] = {"x": x, "y": y, "w": cw, "h": ch}
-        e["filtro"] = f"crop={cw}:{ch}:{x}:{y},scale=1080:1920:flags=lanczos"
+        e["filtro"] = f"crop={cw}:{ch}:{x}:{y},{LIENZO.escala}:flags=lanczos"
         e["reescalado"] = round(escala, 2)
         e["recorrido"] = {"x": round(dx, 3), "y": round(dy, 3)}
 
@@ -660,6 +676,11 @@ if __name__ == "__main__":
         print(f"  (el recorte pedido se pasaba del {(TOLERANCIA - 1) * 100:.0f}%"
               f" de ampliacion admitido)")
     peor = max((e.get("reescalado", 0) for e in escenas), default=0)
+    # El lado libre del cuadro se mide sobre el ancho de la fuente, que en
+    # vertical es siempre el 4K de 2160 y quien lo lee lo da por hecho. Fuera
+    # del vertical se dice (C-671): la apertura del CV es 8K.
+    if not LIENZO.vertical:
+        plan["fuente"] = {"ancho": sw, "alto": sh}
     json.dump(plan, open(args.plan, "w", encoding="utf-8"),
               indent=2, ensure_ascii=False)
     print(f"\nplan actualizado → {args.plan}")

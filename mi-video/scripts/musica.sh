@@ -561,7 +561,7 @@ print(round(d + ((compas.fase(s) - d) % (60/b)), 3) if b else d)" 2>/dev/null ||
 
   ffmpeg -v error -y -hwaccel d3d11va "${ENTRADAS[@]}" \
     -filter_complex "$FILTRO" -map 0:v -map "[out]" \
-    -vf scale=608:1080 \
+    -vf "scale=$(node scripts/lienzo.mjs revision "$(printf 'reel-%02d' "$n")" 2>/dev/null || echo 608:1080)" \
     -c:v h264_amf -quality speed -rc cqp -qp_i 30 -qp_p 30 \
     -pix_fmt yuv420p -movflags +faststart \
     -c:a aac -b:a 96k "out/revision/reel-R$n.mp4"
