@@ -158,22 +158,18 @@ export const POR_CONSTRUIR = {
     cuesta: "scripts/punch-ins.py — el rectángulo final se deriva del zoom;"
       + " haría falta un desplazamiento declarado del ancla",
   },
-  segunda_camara: {
-    que: "una escena grabada con dos cámaras a la vez, para cortar entre"
-      + " ÁNGULOS en vez de entre encuadres del mismo plano",
-    cuesta: "**ya casi.** El material entra: una grabación puede ser una carpeta"
-      + " con los ángulos dentro (`rutas.angulos`) y `scripts/desfase.py` mide"
-      + " por el sonido cuánto separa los relojes, con su confianza — medido,"
-      + " no estimado. Falta lo último: poder decir en esta declaración **qué"
-      + " ángulo lleva cada etapa**, y que el corte lo lea. Se abre el día que"
-      + " haya una grabación a dos cámaras con la que comprobarlo",
-  },
   // Las dos que piden ver dos tomas a la vez, con su coste. Ver `imagen.mjs`.
   ...POR_HACER,
 };
 
 /** Quién hace cada verbo. Fichero y línea literal: `comprobar()` las abre. */
 export const LO_HACE = {
+  // Quién lo declara, lo encuadra y lo corta con la voz del principal (C-672).
+  angulo: [
+    ["scripts/plan-reel.mjs", "...(cam.angulo ? { angulo: cam.angulo } : {}),"],
+    ["scripts/punch-ins.py", 'if e.get("angulo"):'],
+    ["scripts/render-hook.mjs", '"-map", "1:v:0", "-map", "0:a:0"]'],
+  ],
   encuadre: [
     ["scripts/plan-reel.mjs", "encuadre: cam.encuadre,"],
     ["scripts/punch-ins.py", 'pedido = e.get("encuadre")'],
@@ -230,6 +226,8 @@ export const camaraDe = (crudo) => {
     virado: d.virado in VIRADOS ? d.virado : null,
     // Sin `detras` no hay recorte: la pasada de MediaPipe se paga donde se pide.
     detras: d.detras in DETRAS ? d.detras : null,
+    // Sin ángulo, el principal: la cinta de siempre.
+    angulo: typeof d.angulo === "string" && d.angulo ? d.angulo : null,
   };
 };
 
@@ -267,6 +265,15 @@ export const vocabulario = () => ({
   },
   virado: bloqueVirado(),
   detras: bloqueDetras(),
+  angulo: {
+    que: "desde qué cámara se VE la etapa cuando la grabación tiene más de una"
+      + " (una carpeta con `camA`, `camB`…). La voz sigue siendo la del"
+      + " principal; sólo cambia la imagen, sincronizada por el sonido. El"
+      + " ángulo entra entero, sin la serie de encuadres: no es otro plano del"
+      + " mismo 4K, es otra cámara",
+    valores: { "<nombre>": "el fichero del ángulo sin extensión: `camB`" },
+    si_no_dices: "el principal, el primero por orden alfabético",
+  },
   retiradas: Object.fromEntries(
     Object.entries(RETIRADAS).map(([k, v]) => [k, `${v.que} — RETIRADA:`
       + ` ${v.por_que}. En su lugar: ${v.en_su_lugar}`])),

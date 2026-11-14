@@ -106,6 +106,26 @@ export const cinta = (toma) => {
   return a[0];
 };
 
+/**
+ * **Un ángulo de una grabación, por su nombre** (`camB`, sin extensión), y lo
+ * que su reloj va por detrás del principal. Lo mide `scripts/desfase.py` y lo
+ * deja en `work/desfase/<toma>.json`; aquí sólo se lee, y si la medida no es
+ * clara se para: cortar a otro ángulo con el reloj mal es enseñar otra frase
+ * con esta voz (C-672). Para cortar al ángulo en el segundo `t` del principal
+ * se busca `t - desfase` dentro de él.
+ */
+export const angulo = (toma, nombre) => {
+  const f = angulos(toma).find((a) => path.parse(a).name === nombre);
+  if (!f) throw new Error(`la grabacion ${toma} no tiene el angulo «${nombre}»`);
+  const ruta = `${rutas.trabajo}/desfase/${toma}.json`;
+  const d = fs.existsSync(ruta)
+    ? JSON.parse(fs.readFileSync(ruta, "utf8")).angulos?.[path.basename(f)] : null;
+  if (!d?.claro)
+    throw new Error(`sin desfase claro de ${toma}/${path.basename(f)}:`
+      + ` python scripts/desfase.py --toma ${toma}`);
+  return { fichero: f, desfase: d.desfase_s };
+};
+
 /** Ruta del bruto de un reel, resuelta contra `origen`. */
 export const bruto = (reel) => {
   const toma = rutas.tomas[reel];

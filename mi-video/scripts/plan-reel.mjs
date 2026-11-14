@@ -370,6 +370,8 @@ for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
        * un plano más abierto que una cara que se sale.
        */
       encuadre: cam.encuadre,
+      // Sólo si lo pide: un plan sin ángulos queda igual que ayer (C-672).
+      ...(cam.angulo ? { angulo: cam.angulo } : {}),
       /** La costura de ENTRADA del beat. Sólo la primera escena la tiene. */
       transicion: k === 0 || cam.transicion === "seco" ? cam.transicion : "corte",
       // **El virado va en TODAS las escenas del beat**, igual que el encuadre:

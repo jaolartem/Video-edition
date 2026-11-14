@@ -40,6 +40,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
 from dominio.lienzo import Lienzo  # noqa: E402
+import rutas  # noqa: E402
 
 
 
@@ -315,6 +316,28 @@ def crop_rect(frac, anchor, src_w, src_h):
     return int(round(x)), int(round(y)), int(round(cw)), int(round(ch))
 
 
+def _angulo_entero(e, lienzo):
+    """Encuadre de una escena que se ve desde otro ángulo: todo su cuadro."""
+    f = rutas.angulos(e["fuente"])
+    f = next((a for a in f if os.path.splitext(os.path.basename(a))[0]
+              == e["angulo"]), None)
+    if not f:
+        raise SystemExit(f"{e['fuente']} no tiene el angulo «{e['angulo']}»")
+    s = json.loads(subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=width,height", "-of", "json", f],
+        capture_output=True, text=True).stdout)["streams"][0]
+    aw, ah = s["width"], s["height"]
+    pw, ph = lienzo.proporcion
+    cw, ch = (ah * pw / ph, ah) if aw * ph > ah * pw else (aw, aw * ph / pw)
+    cw, ch = int(round(cw)) // 2 * 2, int(round(ch)) // 2 * 2
+    x, y = (aw - cw) // 2, (ah - ch) // 2
+    return {"encuadre": "angulo", "zoom": None,
+            "crop": {"x": x, "y": y, "w": cw, "h": ch},
+            "filtro": f"crop={cw}:{ch}:{x}:{y},{lienzo.escala}:flags=lanczos",
+            "reescalado": round(lienzo.ancho / cw, 2)}
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True)
@@ -427,7 +450,9 @@ if __name__ == "__main__":
         f = e.get("fuente")
         if not f:
             return args.source
-        return os.path.join(os.path.dirname(args.source), f"{f}.mp4")
+        plano = os.path.join(os.path.dirname(args.source), f"{f}.mp4")
+        # Una grabacion en carpeta no tiene `<toma>.mp4` al lado (C-672).
+        return plano if os.path.exists(plano) else rutas.cinta(f)
 
     anclas = {}
     global_ancla = None
@@ -465,6 +490,13 @@ if __name__ == "__main__":
     idx = 0
     blandos = []
     for i, e in enumerate(escenas):
+        # **Otro ángulo entra entero** (C-672): no es un encuadre del mismo 4K
+        # sino otra cámara —la pantalla, en el CV—, así que ni ancla ni serie:
+        # el cuadro completo con la proporción del lienzo, centrado.
+        if e.get("angulo"):
+            e.update(_angulo_entero(e, LIENZO))
+            print(f"  {i} angulo {e['angulo']:9} {e['duracion']:.1f}s")
+            continue
         if e.get("hereda_encuadre") and i > 0:
             prev = escenas[i - 1]
             e.update({k: prev[k] for k in ("encuadre", "crop", "filtro", "reescalado")})

@@ -20,6 +20,7 @@ import fs from "fs";
 import { createHash } from "crypto";
 import path from "path";
 import { lienzoDePieza } from "./lienzo.mjs";
+import { angulo, cinta } from "./rutas.mjs";
 
 const arg = (n, d) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -141,9 +142,24 @@ const compas = (() => {
   } catch { return null; }
 })();
 const pausaDe = (e) => Number(compas?.pausas?.[String(e.indice)] ?? 0) || 0;
-/** El bruto de esta escena: el suyo si lo declara, el del reel si no. */
-const fuenteDe = (e) =>
-  e.fuente ? path.join(path.dirname(source), `${e.fuente}.mp4`) : source;
+/**
+ * El bruto de esta escena: el suyo si lo declara, el del reel si no.
+ *
+ * **Y la grabación puede ser una carpeta** (C-672): el `<toma>.mp4` junto al
+ * del reel sólo existe cuando las dos son ficheros sueltos. Si no está, se le
+ * pregunta a `rutas.cinta`, que sabe de carpetas y de su ángulo principal.
+ */
+const fuenteDe = (e) => {
+  if (!e.fuente) return source;
+  const plano = path.join(path.dirname(source), `${e.fuente}.mp4`);
+  return fs.existsSync(plano) ? plano : cinta(e.fuente);
+};
+/** De dónde sale la IMAGEN: el ángulo que pidió la escena, con su reloj. */
+const imagenDe = (e) => {
+  if (!e.angulo) return null;
+  const a = angulo(e.fuente, e.angulo);
+  return { fichero: a.fichero, desde: Math.max(0, e.origen_desde - a.desfase) };
+};
 // Se comprueba `crop`, no `filtro`: el filtro ya no se lee del plan —se
 // construye aqui con la resolucion de salida— asi que un plan valido puede no
 // traerlo. El recorte es el dato que de verdad hace falta.
@@ -234,8 +250,10 @@ console.error(
 const trozos = [];
 let reutilizados = 0;
 escenas.forEach((e, i) => {
+  const img = imagenDe(e);
   const clave = createHash("sha1").update(JSON.stringify([fuenteDe(e), e.origen_desde,
-    e.duracion, filtroDe(e), pausaDe(e), DECODE, ENCODE])).digest("hex").slice(0, 16);
+    e.duracion, filtroDe(e), pausaDe(e), DECODE, ENCODE,
+    ...(img ? [img] : [])])).digest("hex").slice(0, 16);
   const f = path.join(tmp, `${clave}.mp4`);
   if (fs.existsSync(f)) { trozos.push(f); reutilizados += 1; return; }
   const z = e.zoom ? `  zoom a ${e.zoom.hasta}` : "";
@@ -255,6 +273,13 @@ escenas.forEach((e, i) => {
     // pieza, y por eso el material grabado en otra sesión estaba frenado. No
     // hay dos fuentes en un corte: hay dos cortes.
     "-i", fuenteDe(e),
+    // **Otro ángulo: la imagen de ahí, la voz de aquí** (C-672). Cortar audio y
+    // vídeo del ángulo dejaba la etapa sin voz: la cámara B del CV es la
+    // grabación de pantalla.
+    ...(img
+      ? ["-ss", img.desde.toFixed(3), "-t", String(e.duracion), "-i", img.fichero,
+         "-map", "1:v:0", "-map", "0:a:0"]
+      : []),
     ...(pausaDe(e)
       ? ["-t", (e.duracion + pausaDe(e)).toFixed(3),
          "-vf", `${filtroDe(e)},tpad=stop_mode=clone:stop_duration=${pausaDe(e).toFixed(3)}`]
