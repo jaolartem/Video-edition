@@ -100,7 +100,7 @@ def contorno(toma, a, b):
            f"{abs(hash((toma, round(a, 2), round(b, 2)))) % 10**8}.wav")
     try:
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(a), "-to", str(b),
-                        "-i", f"{rutas.ORIGEN}/{toma}.mp4", "-ar", "16000", "-ac", "1",
+                        "-i", rutas.cinta(toma), "-ar", "16000", "-ac", "1",
                         "-c:a", "pcm_s16le", wav], check=True)
         with wave.open(wav) as w:
             x = np.frombuffer(w.readframes(w.getnframes()),

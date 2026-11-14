@@ -224,7 +224,7 @@ def exportar(n):
         f = f"F:/tmp-video/voz/{slug}-{i:03d}.wav"
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-ss", str(r[0]),
-             "-i", f"{_ru.ORIGEN}/{d['toma']}.mp4",
+             "-i", _ru.cinta(d['toma']),
              "-t", str(round(r[1] - r[0], 3)), "-vn",
              "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1", f], check=True)
         trozos.append(f)

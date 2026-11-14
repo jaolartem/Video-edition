@@ -119,7 +119,7 @@ def main():
             if (not a.todo and ya and ya[1] == hue and os.path.exists(salida)):
                 saltados += 1
                 continue
-            src = f"{rutas.ORIGEN}/{toma}.mp4"
+            src = rutas.cinta(toma)
             # **Codificaba por la tarjeta y decodificaba en CPU.** El bruto es
             # 4K y eso era la mitad del coste: 9,0 s -> 4,7 s en un corte de
             # 12 s, **1,91x**.

@@ -155,7 +155,7 @@ def main():
     for t in rutas.material():
         if t in set(rutas.TOMAS.values()):
             continue
-        hay_mp4 = os.path.exists(f"{rutas.ORIGEN}/{t}.mp4")
+        hay_mp4 = bool(rutas.angulos(t))
         hay_tr = os.path.exists(f"{rutas.TRABAJO}/transcripts/{t}.json")
         falta = ("sin copiar de origen" if not hay_mp4
                  else "sin transcribir — corre transcribir.py" if not hay_tr

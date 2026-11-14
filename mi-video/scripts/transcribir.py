@@ -143,7 +143,7 @@ def audio(toma):
     """El audio de la toma a 16k mono, una sola vez."""
     wav = os.path.join(rutas.temporal(), f"{toma}.16k.wav")
     if not os.path.exists(wav):
-        src = f"{rutas.ORIGEN}/{toma}.mp4"
+        src = rutas.cinta(toma)        # fichero suelto o carpeta (C-672)
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn",
                         "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav],
                        check=True)
