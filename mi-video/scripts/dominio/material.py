@@ -56,7 +56,10 @@ def _palabras(c: Cinta) -> list:
     try:
         c.exigir(cobertura=False)
         return c.palabras()
-    except Exception:                              # noqa: BLE001
+    # **`SystemExit` también** (C-677): `exigir` para así a propósito —una cinta
+    # de una pasada no se sostiene— y aquí eso significa «ésta no cuenta», no
+    # «no busques en ninguna». Se escapaba y tumbaba el abanico entero.
+    except (Exception, SystemExit):                # noqa: BLE001
         return []
 
 
