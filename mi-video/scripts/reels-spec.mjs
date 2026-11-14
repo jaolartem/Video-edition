@@ -53,6 +53,7 @@ import { contrastePisado, empujaTablero } from "./reels/ocupacion.mjs";
 import { imagenDe } from "./reels/imagen.mjs";
 import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad, trataElCc } from "./reels/subtitulos.mjs";
 import { porEscena, rellenar } from "./reels/escenas.mjs";
+import { idiomaDePieza } from "./idioma.mjs";
 import { revisar } from "./reels/puerta.mjs";
 import { apartaDelGancho, armarGancho, bajarEnElGancho, titularDe }
   from "./reels/portada.mjs";
@@ -319,7 +320,7 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
     // El CTA se pinta encima: componer ahi seria trabajar para nadie.
     ...(pieza.cta ? [{ at: pieza.cta.at * FPS, duration: pieza.cta.dur * FPS }] : []),
     { at: pieza.entra, duration: 9 + pieza.sostiene + 9 },
-  ], ventanas);
+  ], ventanas, idiomaDePieza(slug).colgantes);
   // **Y la pieza no se queda desnuda.** Aquí, que es donde está entera: medirlo
   // sobre una sola de sus listas dio 147 s falsos. Ver `reels/pelado.mjs`.
 
@@ -377,7 +378,7 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
    * Se separa en dos: el cálculo va arriba, donde hace falta, y la publicación
    * se queda aquí, para que la escena rellenada cuente ya sin el remate quitado.
    */
-  pieza.rellenadas = rellenar(pieza);
+  pieza.rellenadas = rellenar(pieza, idiomaDePieza(slug).colgantes);
   if (pieza.rellenadas) pieza.escenas = porEscena(pieza, reloj);
   // Y la retirada de arriba se respeta: publicar aquí sin mirar `pisado` es lo
   // que deshacía la única regla que impedía dos capas dibujando lo mismo.

@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from .cinta import Cinta  # noqa: E402
 from .habla import Habla, colgante  # noqa: E402
+from .idioma import Idioma  # noqa: E402
 from .pieza import Pieza  # noqa: E402
 from .tramo import Tramo, TramoInvalido  # noqa: E402
 
@@ -191,7 +192,7 @@ class Montaje:
                         {"donde": "entrada", "en": round(t.desde, 2),
                          "pegada_a": " ".join(p.texto for p in antes[-4:]),
                          "entra": " ".join(p.texto for p in dentro[:6])})
-            if dentro and colgante(dentro[-1].texto):
+            if dentro and colgante(dentro[-1].texto, Idioma.de_cinta(t.cinta)):
                 sigue = [p for p in ws if p.empieza >= t.hasta - 0.001][:5]
                 avisos.append(
                     {"donde": "salida", "en": round(t.hasta, 2),

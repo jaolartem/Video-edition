@@ -33,7 +33,7 @@ from dominio import bordes as _bordes  # noqa: E402
 from dominio.aritmetica import Aritmetica  # noqa: E402
 from dominio.borde import BUSCA, COLA  # noqa: E402,F401
 from dominio.costura import MARGEN, RITMO_OK, TONO_OK, Costura  # noqa: E402,F401
-from dominio.habla import AIRE, ATAQUE, COLGANTES  # noqa: E402,F401
+from dominio.habla import AIRE, ATAQUE  # noqa: E402,F401
 from dominio.senal import ALARGA, GANA, PUERTA, SUENA  # noqa: E402,F401
 from dominio.tijera import Tijera  # noqa: E402
 from dominio.tramo import Tramo  # noqa: E402

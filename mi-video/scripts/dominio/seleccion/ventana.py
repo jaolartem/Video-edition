@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
 import beats  # noqa: E402
 
 from . import pesos  # noqa: E402
+from ..idioma import Idioma  # noqa: E402
 from ..palabra import Palabra  # noqa: E402
 from ..tramo import Tramo  # noqa: E402
 
@@ -156,8 +157,9 @@ class Ventana:
         ws = beats.palabras(self.texto)
         if not ws:
             return 1.0
-        abre = (ws[0] in pesos.COLGANTE) or (self.entra < pesos.PAUSA_IDEA)
-        cierra = (ws[-1] in pesos.COLGANTE) or (self.sale < pesos.PAUSA_IDEA)
+        colgantes = Idioma.de_cinta(self.toma).colgantes
+        abre = (ws[0] in colgantes) or (self.entra < pesos.PAUSA_IDEA)
+        cierra = (ws[-1] in colgantes) or (self.sale < pesos.PAUSA_IDEA)
         return 0.5 * float(abre) + 0.5 * float(cierra)
 
     def invade(self, siguiente: str) -> float:

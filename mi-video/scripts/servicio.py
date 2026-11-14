@@ -322,10 +322,14 @@ def contexto(paso, slug):
              # al que trabaja**: `estado.marca` no la llamaba nadie y `hecho`
              # estaba vacio en las siete piezas. Declarado y no implementado.
              "marcador": _marcador(slug)}
+    # La lengua, sólo si no es español (C-665): así no caduca nada en vuelo.
+    if (lengua := _Idioma.de_pieza(slug).codigo) != _IDIOMA_DE_SIEMPRE:
+        d["idioma"] = lengua
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 
 from dominio import instruccion as _instruccion, pliego as _pliego  # noqa: E402  C-564
+from dominio.idioma import POR_DEFECTO as _IDIOMA_DE_SIEMPRE, Idioma as _Idioma  # noqa: E402  C-665
 from dominio.volcado import _lo_dicho, _referencia, _sin_repetir, _volcar  # noqa: E402
 
 

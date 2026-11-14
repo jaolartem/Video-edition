@@ -20,7 +20,6 @@ se dicen por su nombre.
 """
 from __future__ import annotations
 
-from ..idioma import ES
 
 # ── qué es un enunciado ──────────────────────────────────────────────────────
 #: Por debajo no hay enunciado, hay una palabra suelta.
@@ -139,7 +138,3 @@ SUELO_PODA = 8
 POR_DELANTE = 2
 POR_DETRAS = 4
 
-#: Detrás de una palabra de función la frase NO ha acabado. La lista es la misma
-#: que usan los subtítulos compuestos (C-23) y vive en un solo sitio: dos copias
-#: se separan en cuanto una cambia.
-COLGANTE: frozenset[str] = ES.colgantes

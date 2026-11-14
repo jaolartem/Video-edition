@@ -75,7 +75,7 @@ export const ultimaPalabra = (t) =>
  *
  * Devuelve `{arriba, abajo, tinte}` o `null` si la frase no admite reparto.
  */
-export function partirFrase(texto, preferido) {
+export function partirFrase(texto, preferido, colgantes = COLGANTE) {
   const t = texto.trim();
   const w = t.split(/\s+/).filter(Boolean);
   // Por encima de 62 caracteres no hay reparto que quepa en dos renglones.
@@ -90,7 +90,7 @@ export function partirFrase(texto, preferido) {
     // **No se parte detras de una palabra de funcion**: ahi la frase cuelga y
     // el renglon de abajo -que va grande y en versales- deja de ser un remate
     // para ser un fragmento. Misma regla que decide que cue se compone.
-    if (COLGANTE.has(ultimaPalabra(arriba))) return null;
+    if (colgantes.has(ultimaPalabra(arriba))) return null;
     // El remate tiene que ser un remate: ni una palabra suelta ni un parrafo.
     if (abajo.length < 5 || abajo.length > 34) return null;
     // Y el de arriba tampoco puede ser un parrafo: por encima de 40 caracteres

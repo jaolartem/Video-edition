@@ -13,6 +13,7 @@ puerta y en firme para el arreglo.
 from __future__ import annotations
 
 from .habla import AIRE, ATAQUE, cierra, colgante
+from .idioma import Idioma
 from .tramo import Tramo
 
 #: Lo que se deja después de la última palabra: el aire justo para que la frase
@@ -36,6 +37,8 @@ class Borde:
     def __init__(self, tramo: Tramo, habla):
         self.t = tramo
         self.h = habla
+        #: Qué deja una idea a medias depende de la lengua de su cinta (C-665).
+        self.idioma = Idioma.de_cinta(tramo.cinta)
 
     # ── aritmética: no puede equivocarse, corre siempre ─────────────────────
     def entero(self) -> Tramo | None:
@@ -183,7 +186,7 @@ class Borde:
         nada y el espectador se queda esperando.
         """
         ws, ult = self.h.palabras, self.h.en(self.t)
-        if not ult or not colgante(ult[-1].texto):
+        if not ult or not colgante(ult[-1].texto, self.idioma):
             return None
         # **El conector volando: la primera palabra de la frase siguiente que se
         # coló al final.** Jaime lo vio en el primer render —«hay un conector
@@ -201,7 +204,7 @@ class Borde:
             if ws[j + 1].empieza - ws[j].acaba >= AIRE:
                 break
             j += 1
-            if cierra(ws[j], coma=True) and not colgante(ws[j].texto):
+            if cierra(ws[j], coma=True) and not colgante(ws[j].texto, self.idioma):
                 break
         cand = round(ws[j].acaba, 3)
         if j > k and cand - self.t.hasta <= 3.0:

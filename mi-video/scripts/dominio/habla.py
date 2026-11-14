@@ -20,10 +20,9 @@ AIRE = 0.30
 #: de 120 se cuela el final de lo anterior; 80 es el centro de esa ventana.
 ATAQUE = 0.08
 
-#: Palabras con las que una frase **no puede acabar**: artículos, preposiciones
-#: y conectores. Si el último trozo de una etapa muere en una de éstas, la idea
-#: se quedó sin objeto.
-COLGANTES = ES.no_cierra
+#: Las palabras con las que una frase **no puede acabar** —artículos,
+#: preposiciones y conectores— son de la lengua, no del habla: viven en
+#: `scripts/idiomas/<código>.json` → `no_cierra` y las responde `Idioma`.
 
 #: Con qué cierra una idea. La coma sólo cuenta al buscar la cabeza de ESTA
 #: frase, nunca al cerrarla: con el punto solo, `reel-03` se traía «usted tiene

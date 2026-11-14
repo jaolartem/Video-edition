@@ -18,7 +18,7 @@
  * unidad que hay que auditar.
  */
 import { FPS } from "./reloj.mjs";
-import { partirFrase } from "./texto.mjs";
+import { COLGANTE, partirFrase } from "./texto.mjs";
 
 /**
  * El tratamiento de cada escena, en su orden.
@@ -59,7 +59,7 @@ export const porEscena = (r, reloj) => {
  * Muta `r.captions` a propósito —es la misma lista que viaja en el spec— y
  * devuelve cuántas llenó, que es lo que la pieza publica como `rellenadas`.
  */
-export function rellenar(r) {
+export function rellenar(r, colgantes = COLGANTE) {
   let puestas = 0;
   for (const e of r.escenas) {
     if (e.trato !== "—") continue;
@@ -68,7 +68,7 @@ export function rellenar(r) {
       .sort((x, y) => y.at - x.at);
     for (const c of dentro) {
       if (c.realza || c.corrige || c.compuesto) break;
-      const par = partirFrase(c.text);
+      const par = partirFrase(c.text, undefined, colgantes);
       if (!par) continue;
       c.compuesto = par;
       puestas += 1;

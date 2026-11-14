@@ -228,7 +228,7 @@ const MIN_REMATE = 48;
  * que casi ninguna cabia y el reel 1 se quedo con dos remates en 81 s. **La cue
  * es la unidad correcta; lo que faltaba era mirar la de al lado.**
  */
-export function componer(captions, ocupado, ventanas) {
+export function componer(captions, ocupado, ventanas, colgantes = COLGANTE) {
   const orden = captions.slice().sort((x, y) => x.at - y.at);
   const anterior = new Map();
   orden.forEach((c, i) => anterior.set(c, i ? orden[i - 1] : null));
@@ -240,7 +240,7 @@ export function componer(captions, ocupado, ventanas) {
     if (c.realza || c.corrige) return false;
     if (!/[.!?]$/.test(c.text.trim())) return false;
     const prev = anterior.get(c);
-    if (prev && COLGANTE.has(ultimaPalabra(prev.text))) return false;
+    if (prev && colgantes.has(ultimaPalabra(prev.text))) return false;
     return !tapan.sepulta(c);
   };
 
@@ -263,7 +263,7 @@ export function componer(captions, ocupado, ventanas) {
        */
       const texto = `${prev.text.trim()} ${c.text.trim()}`.replace(/\s+/g, " ");
       const corte = prev.text.trim().split(/\s+/).filter(Boolean).length;
-      const par = partirFrase(texto, corte);
+      const par = partirFrase(texto, corte, colgantes);
       if (par) {
         return {
           cues: [prev, c],
@@ -275,7 +275,7 @@ export function componer(captions, ocupado, ventanas) {
       }
     }
     if (corto) return null;
-    const par = partirFrase(c.text);
+    const par = partirFrase(c.text, undefined, colgantes);
     return par
       ? { cues: [c], at: c.at, duration: c.duration, text: c.text, compuesto: par }
       : null;
@@ -294,7 +294,7 @@ export function componer(captions, ocupado, ventanas) {
      */
     const cupo = b - a > 12 * FPS ? 2 : 1;
     const candidatas = dentro
-      .map((c, i) => ({ c, i, oro: partirFrase(c.text)?.tinte === "gold" }))
+      .map((c, i) => ({ c, i, oro: partirFrase(c.text, undefined, colgantes)?.tinte === "gold" }))
       .sort((x, y) => (x.oro === y.oro ? y.i - x.i : x.oro ? -1 : 1));
     const puestas = [];
     for (const { c } of candidatas) {

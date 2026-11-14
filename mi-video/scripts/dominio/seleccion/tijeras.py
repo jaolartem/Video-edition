@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
 import beats  # noqa: E402
 
 from . import pesos  # noqa: E402
+from ..idioma import Idioma  # noqa: E402
 from ..tramo import TramoInvalido  # noqa: E402
 from .ventana import Ventana  # noqa: E402
 
@@ -71,8 +72,9 @@ class Tijeras:
         if len(ws) <= pesos.SUELO_PALABRAS:
             return v
         ini, fin = 0, len(ws)
+        colgantes = Idioma.de_cinta(v.toma).colgantes
         while (fin - ini > pesos.SUELO_PALABRAS
-               and _cabeza(ws[fin - 1]) in pesos.COLGANTE):
+               and _cabeza(ws[fin - 1]) in colgantes):
             fin -= 1
         while fin - ini > pesos.SUELO_PALABRAS and (
                 not _cabeza(ws[ini]) or ws[ini].texto.strip().endswith("...")):
