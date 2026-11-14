@@ -7,6 +7,7 @@
  * cuatro reglas distintas con el mismo nombre**.
  */
 import fs from "fs";
+import { idioma } from "../idioma.mjs";
 
 export const sinTildes = (t) =>
   t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -59,9 +60,7 @@ const CONJUNCION = new Set([
  * Es una lista cerrada y por eso es fiable: el espanol tiene muchas palabras de
  * contenido y muy pocas de funcion.
  */
-export const COLGANTE = new Set(
-  JSON.parse(fs.readFileSync("scripts/colgantes.json", "utf8")).palabras,
-);
+export const COLGANTE = idioma().colgantes;
 
 export const ultimaPalabra = (t) =>
   sinTildes(String(t).trim()).replace(/[^a-z]+$/, "").split(/\s+/).pop() ?? "";

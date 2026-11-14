@@ -31,6 +31,7 @@ import unicodedata
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
+from dominio.idioma import ES, Idioma  # noqa: E402
 
 # El binario lo elige `gpu.py`, que es el unico que sabe si hay tarjeta.
 WHISPER = gpu.whisper()[0]
@@ -56,14 +57,14 @@ def hook_del_libreto(path, reel):
     return re.split(r"(?<=[.?!])\s+", cuerpo)[0]
 
 
-def transcribir(audio, desde, dur=8.0):
+def transcribir(audio, desde, dur=8.0, idioma: Idioma = ES):
     tmp = "work/_fs.wav"
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-ss", str(desde), "-t", str(dur),
          "-i", audio, "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", tmp],
         check=True)
     subprocess.run(
-        [WHISPER, "-m", MODEL, "-l", "es", "-f", tmp, "-otxt",
+        [WHISPER, "-m", MODEL, *idioma.banderas, "-f", tmp, "-otxt",
          "-of", tmp.replace(".wav", ""), "-nt", "-mc", "0"],
         check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return open(tmp.replace(".wav", ".txt"), encoding="utf-8").read().strip()
@@ -96,7 +97,8 @@ if __name__ == "__main__":
 
     mejor = None
     for a in cand:
-        dicho = transcribir(args.audio, a)
+        dicho = transcribir(args.audio, a,
+                            idioma=Idioma.de_pieza(f"reel-{args.reel:02d}"))
         c = cobertura(dicho, hook)
         marca = ""
         if mejor is None or c > mejor[1]:

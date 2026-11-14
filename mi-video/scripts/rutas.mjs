@@ -57,6 +57,8 @@ export const rutas = {
   publico: cfg.publico ?? "public",
   fuentes: cfg.fuentes ?? {},
   tomas,
+  /** La lengua de cada grabación (toma → código); sin entrada, español. */
+  idiomas: cfg.idiomas ?? {},
 };
 
 /** Carpeta temporal propia, creada si hace falta. Nunca en C:. */

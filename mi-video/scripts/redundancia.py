@@ -108,6 +108,7 @@ def _vecinas(palabras, borde, lado):
 # Quitar tildes lo hace `dominio.texto`, que es su dueño. Estaba copiado aquí
 # palabra por palabra.
 from dominio.texto import _sin_tildes  # noqa: E402
+from dominio.idioma import ES  # noqa: E402
 
 
 CIERRE = re.compile(
@@ -151,9 +152,7 @@ def material_para(slug, faltan, ventana=14, cuantas=6):
 
     # Palabras que no distinguen nada: si puntuaran, ganaria la ventana mas
     # larga en vez de la que dice lo mismo.
-    VACIAS = set("de la que el en y a los las un una es no se lo por con su del"
-                 " al para mas o si le me ya son como pero esta este esa ese"
-                 " sus te tu yo he ha han hay muy tan todo toda".split())
+    VACIAS = ES.claves_vacias
 
     def claves(t):
         return {w for w in _sin_tildes(t or "").split()

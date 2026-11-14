@@ -10,6 +10,8 @@ Aquí se le pregunta al habla, y el habla contesta **una vez y para todos**.
 """
 from __future__ import annotations
 
+from .idioma import ES, Idioma
+
 #: El silencio que basta para que el oído oiga una frontera. Por debajo de eso
 #: el corte entra pegado a la palabra de antes.
 AIRE = 0.30
@@ -21,11 +23,7 @@ ATAQUE = 0.08
 #: Palabras con las que una frase **no puede acabar**: artículos, preposiciones
 #: y conectores. Si el último trozo de una etapa muere en una de éstas, la idea
 #: se quedó sin objeto.
-COLGANTES = {"y", "o", "u", "pero", "porque", "que", "cuando", "si", "de", "del",
-             "la", "el", "los", "las", "un", "una", "unos", "unas", "en", "a",
-             "al", "con", "para", "por", "su", "sus", "se", "le", "les", "lo",
-             "me", "te", "nos", "es", "son", "mi", "tu", "como", "sin", "sobre",
-             "entre", "hasta", "desde", "muy", "mas", "más", "ya", "no"}
+COLGANTES = ES.no_cierra
 
 #: Con qué cierra una idea. La coma sólo cuenta al buscar la cabeza de ESTA
 #: frase, nunca al cerrarla: con el punto solo, `reel-03` se traía «usted tiene
@@ -33,9 +31,9 @@ COLGANTES = {"y", "o", "u", "pero", "porque", "que", "cuando", "si", "de", "del"
 CIERRA = (".", "?", "!")
 
 
-def colgante(txt: str) -> bool:
-    """¿Es una palabra con la que la frase se queda a medias?"""
-    return txt.strip(".,¿?¡!;:").lower() in COLGANTES
+def colgante(txt: str, idioma: Idioma = ES) -> bool:
+    """¿Es una palabra con la que la frase se queda a medias? Lo dice la lengua."""
+    return idioma.colgante(txt)
 
 
 def cierra(p, coma: bool = False) -> bool:

@@ -107,6 +107,7 @@ import wave
 sys.path.insert(0, os.path.dirname(__file__))
 import registro  # noqa: E402
 import rutas  # noqa: E402
+from dominio.idioma import ES  # noqa: E402
 
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 CLI = os.path.join(W, "whisper-cli.exe")
@@ -153,7 +154,7 @@ def _sondar():
     if not os.path.exists(SONDA):
         return {"tarjeta": None, "backend": None,
                 "por_que": f"falta {SONDA}, que es con lo que se sondea"}
-    r = subprocess.run([CLI, "-m", SONDA, "-f", _wav_de_sonda(), "-l", "es",
+    r = subprocess.run([CLI, "-m", SONDA, "-f", _wav_de_sonda(), *ES.banderas,
                         "-nf", "-t", "2"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     err = (r.stderr or b"").decode("utf8", "replace")
@@ -323,7 +324,9 @@ def aviso_si_cae(script):
 # ── la medida ───────────────────────────────────────────────────────────────
 # Las mismas banderas que usa `transcribir.pasada()`. Si alli cambian, aqui
 # tambien: una medida con otras banderas no compara este paso, compara otro.
-BANDERAS = ["-l", "es", "-mc", "0", "-ml", "1", "-sow", "-ojf", "-np", "-nf",
+# La lengua es la de la muestra que se mide, que es española: esto mide
+# velocidad, no oye a ninguna cinta concreta.
+BANDERAS = [*ES.banderas, "-mc", "0", "-ml", "1", "-sow", "-ojf", "-np", "-nf",
             "-bs", "1", "-bo", "1", "-t", "12", "-nfa"]
 
 

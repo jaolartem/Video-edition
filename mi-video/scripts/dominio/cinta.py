@@ -21,6 +21,7 @@ import json
 import os
 
 from .habla import AIRE
+from .idioma import Idioma
 from .palabra import Palabra
 
 #: Habla medida sin una sola palabra por encima de esto: la cinta no sirve.
@@ -75,6 +76,12 @@ class Cinta:
 
     def existe(self) -> bool:
         return os.path.exists(self.transcript)
+
+    # ── en qué se habla ──────────────────────────────────────────────────────
+    @property
+    def idioma(self) -> Idioma:
+        """La lengua en que se oye esta cinta; sin declarar, español (C-665)."""
+        return Idioma.de_cinta(self.nombre)
 
     # ── lo que se midió sobre la onda ────────────────────────────────────────
     def habla(self) -> list:

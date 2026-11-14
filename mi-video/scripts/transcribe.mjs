@@ -14,6 +14,7 @@ import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { toCaptions, transcribe } from "@remotion/install-whisper-cpp";
+import { idiomaDePieza } from "./idioma.mjs";
 
 const WHISPER_DIR = path.join(process.cwd(), "whisper.cpp");
 const WHISPER_VERSION = "1.5.5";
@@ -55,7 +56,7 @@ const whisperCppOutput = await transcribe({
   whisperPath: WHISPER_DIR,
   whisperCppVersion: WHISPER_VERSION,
   inputPath: wav,
-  language: "es",
+  language: idiomaDePieza(slug).codigo,
   /** Imprescindible: sin esto no hay anclaje de tableros ni corte por frase. */
   tokenLevelTimestamps: true,
 });

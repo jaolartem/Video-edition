@@ -1,0 +1,50 @@
+{
+ "_": "Las mismas reglas que `es.json`, para una cinta hablada en ingles. Cada lista dice lo mismo que su gemela en español: el comentario de cada una esta alli. Aqui se apunta solo lo que el ingles cambia.",
+ "whisper": "en",
+ "colgantes": [
+  "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "with",
+  "from", "into", "onto", "about", "over", "under", "between", "through",
+  "without", "within", "than", "as", "and", "or", "nor", "but", "so", "yet",
+  "if", "that", "which", "who", "whom", "whose", "what", "where", "when",
+  "while", "because", "although", "though", "unless", "until", "since",
+  "my", "your", "his", "her", "its", "our", "their", "this", "these",
+  "those", "some", "any", "every", "each", "no", "all", "both", "either",
+  "neither", "another", "other", "such", "more", "most", "less", "very",
+  "is", "are", "was", "were", "be", "been", "being", "am", "has", "have",
+  "had", "do", "does", "did", "will", "would", "can", "could", "should",
+  "shall", "may", "might", "must", "i", "you", "we", "they", "he", "she",
+  "it", "not", "just", "really", "how", "why", "there", "here", "then",
+  "keeps", "kept", "starts", "started", "goes", "went", "gets", "got",
+  "wants", "need", "needs", "let", "lets", "make", "makes"
+ ],
+ "_colgantes": "El ingles casi no flexiona, asi que la lista lleva los auxiliares (is, has, will, can) y los verbos que piden complemento (keeps, starts, wants): detras de «I want» la frase no ha acabado.",
+ "no_cierra": [
+  "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "with",
+  "from", "and", "or", "but", "because", "that", "when", "if", "as",
+  "than", "my", "your", "his", "her", "its", "our", "their", "is", "are",
+  "was", "very", "more", "just", "not", "so", "between", "through",
+  "about", "into", "without", "since", "until", "how", "every", "each",
+  "already", "no"
+ ],
+ "vacias": [
+  "the", "and", "that", "this", "these", "those", "for", "with", "from",
+  "but", "not", "are", "was", "were", "you", "your", "have", "has", "had",
+  "there", "here", "what", "when", "where", "which", "who", "how", "because",
+  "all", "every", "each", "just", "very", "really", "then", "than", "into",
+  "about", "its", "it's", "our", "they", "them", "their", "can", "will",
+  "would", "one", "also", "been", "being", "more", "most"
+ ],
+ "niegan": ["no", "not", "nor", "never", "nothing", "neither", "none", "but", "without"],
+ "claves_vacias": [
+  "the", "and", "that", "this", "these", "those", "for", "with", "from",
+  "but", "not", "are", "was", "were", "you", "your", "have", "has", "had",
+  "there", "here", "what", "when", "which", "who", "they", "them", "their",
+  "very", "just", "really", "into", "about", "been", "being", "more", "most",
+  "also", "will", "would", "can", "could", "every", "each", "all", "than"
+ ],
+ "llanas": [
+  "the", "a", "an", "and", "or", "of", "to", "in", "on", "at", "for",
+  "with", "is", "are", "was", "it", "that", "this", "you", "your", "i",
+  "we", "not", "no", "but", "as", "so", "be", "by", "from"
+ ]
+}

@@ -69,7 +69,7 @@ def _palabras(txt):
     return [w for w in re.findall(r"[a-záéíóúüñ0-9]+", (txt or "").lower())]
 
 
-def transcribir(mp4):
+def transcribir(mp4, idioma):
     """Lo que dice el vídeo entregado, palabra a palabra con su segundo."""
     tmp = os.path.join(os.environ.get("TMPDIR", "F:/tmp-video"), "recon.wav")
     os.makedirs(os.path.dirname(tmp), exist_ok=True)
@@ -78,7 +78,7 @@ def transcribir(mp4):
     import transcribir as _tr
 
     salida = tmp.replace(".wav", ".json")
-    _tr.pasada(tmp, salida)
+    _tr.pasada(tmp, salida, idioma=idioma)
     with open(salida, encoding="utf-8") as f:
         return json.load(f)
 
@@ -149,7 +149,8 @@ def main():
         if cinta is None:
             print(f"  {slug}: falta el transcript de la cinta ({ruta})")
             continue
-        dichas = transcribir(mp4)["segmentos"]
+        from dominio.idioma import Idioma
+        dichas = transcribir(mp4, Idioma.de_pieza(slug))["segmentos"]
         tramos = casar(dichas, cinta)
         largo = sum(b - x for x, b, _ in tramos)
         print(f"  {slug}: {len(tramos)} tramo(s) reconocidos · {largo:.1f}s"

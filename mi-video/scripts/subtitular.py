@@ -26,6 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
 from dominio.texto import comparable as _comparable  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 FPS = 30
@@ -77,7 +78,7 @@ def trozos(wav):
     return list(zip(entradas, salidas))
 
 
-def transcribir(mp4, wav, base):
+def transcribir(mp4, wav, base, idioma):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", mp4,
                     "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav],
                    check=True)
@@ -89,7 +90,7 @@ def transcribir(mp4, wav, base):
                         pieza + ".wav"], check=True)
         subprocess.run(gpu.whisper() + [
                         "-m", os.path.join(W, "ggml-medium.bin"),
-                        "-l", "es", "-mc", "0", "-ml", "1", "-sow",
+                        *idioma.banderas, "-mc", "0", "-ml", "1", "-sow",
                         "-oj", "-of", pieza, "-f", pieza + ".wav"],
                        capture_output=True, check=True)
         with open(pieza + ".json", encoding="utf-8") as fh:
@@ -543,7 +544,8 @@ if __name__ == "__main__":
             faltan.append(r)
             continue
         base = f"work/subs/reel-{r}"
-        caps = agrupar(transcribir(mp4, base + ".wav", base),
+        caps = agrupar(transcribir(mp4, base + ".wav", base,
+                                   Idioma.de_pieza(f"reel-{r}")),
                        costuras(f"reel-{r}"))
         caps, n = reconciliar(caps, esperadas(f"reel-{r}"))
         caps, g = glosario(caps)

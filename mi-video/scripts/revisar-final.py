@@ -15,6 +15,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 import gpu  # noqa: E402
 import rutas  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 # Nunca en C:: es el disco de arranque y ya se lleno una vez a mitad de render.
@@ -35,7 +36,7 @@ def oir(p, ini, fin):
     # whisper.cpp escribe UTF-8; sin decirlo, Python lo lee con la consola de
     # Windows y «dólares» sale «dÃ³lares».
     r = subprocess.run(gpu.whisper() + ["-m",
-                        os.path.join(W, "ggml-medium.bin"), "-l", "es",
+                        os.path.join(W, "ggml-medium.bin"), *Idioma.de_ruta(p).banderas,
                         "-mc", "0", "-nt", "-f", WAV],
                        capture_output=True, text=True, encoding="utf-8",
                        errors="replace")

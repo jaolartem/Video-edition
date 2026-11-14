@@ -27,6 +27,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import registro  # noqa: E402,F401
+from dominio.idioma import ES  # noqa: E402
 
 
 def pal(t):
@@ -44,9 +45,7 @@ ARRANQUE = 20.0
 VECES_MAX = 2
 
 #: Palabras que se repiten sin molestar porque no llevan peso.
-LLANAS = {"que", "de", "la", "el", "los", "las", "un", "una", "y", "no", "en",
-          "es", "se", "su", "sus", "por", "con", "para", "lo", "le", "del",
-          "al", "mas", "pero", "como", "esta", "este", "ya", "si", "a"}
+LLANAS = ES.llanas
 
 
 def machaca(r, arranque=ARRANQUE, veces=VECES_MAX):

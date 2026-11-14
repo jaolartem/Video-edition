@@ -73,6 +73,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import gpu  # noqa: E402
 import registro  # noqa: E402
 import rutas  # noqa: E402
+from dominio.idioma import ES, Idioma  # noqa: E402
 
 W = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 # **Dos peldanos, y el sello dice cual.** Jaime: *«utilizamos los recursos caros
@@ -187,11 +188,15 @@ def recorte(wav, a, b, destino, sr, anchura):
     return len(datos) / anchura / sr
 
 
-def pasada(wav, salida, modelo=None):
-    """whisper sobre una ventana, con granularidad de palabra y alineada."""
+def pasada(wav, salida, modelo=None, idioma: Idioma = ES):
+    """whisper sobre una ventana, con granularidad de palabra y alineada.
+
+    En la lengua de la cinta: con `-l es` fijo, una cinta en inglés salía
+    transcrita al español (C-665).
+    """
     modelo = modelo or MODELO
     r = subprocess.run(gpu.whisper() + ["-m", modelo, "-f", wav,
-                    "-l", "es", "-mc", "0", "-ml", "1", "-sow", "-ojf",
+                    *idioma.banderas, "-mc", "0", "-ml", "1", "-sow", "-ojf",
                     "-of", salida, "-np", "-nf", "-t", str(HILOS),
                     "-dtw", ALINEA[os.path.basename(modelo)], "-nfa"] + VORAZ,
                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -283,6 +288,7 @@ def transcribir(toma, runs, verbose=True, modelo=None, paso=None):
               f"  ·  {d['tarjeta'] if d['backend'] else 'CPU'}")
 
     salto = paso or PASO
+    idioma = Idioma.de_cinta(toma)
     ventanas = []
     t = 0.0
     while t < dur:
@@ -297,7 +303,7 @@ def transcribir(toma, runs, verbose=True, modelo=None, paso=None):
     for k, (a, b) in enumerate(ventanas):
         trozo = os.path.join(tmp, f"v{k:03d}.wav")
         recorte(voz_wav, a, b, trozo, sr, anchura)
-        ws = pasada(trozo, os.path.join(tmp, f"v{k:03d}"), modelo)
+        ws = pasada(trozo, os.path.join(tmp, f"v{k:03d}"), modelo, idioma)
         for w in ws:
             w["a"] += a
             w["b"] += a

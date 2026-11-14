@@ -16,6 +16,7 @@
 import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { idiomaDeCinta } from "./idioma.mjs";
 
 const WHISPER = path.join(process.cwd(), "whisper.cpp", "whisper-cli.exe");
 const MODEL = path.join(process.cwd(), "whisper.cpp", "ggml-medium.bin");
@@ -87,13 +88,14 @@ const normalize = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** En la lengua de la toma: el nombre del wav es el de la grabación. */
 const transcribe = (wav) => {
   const out = wav.replace(/\.wav$/, "");
   const txt = `${out}.txt`;
   if (!fs.existsSync(txt)) {
     execFileSync(
       WHISPER,
-      ["-m", MODEL, "-l", "es", "-f", wav, "-otxt", "-of", out, "-nt"],
+      ["-m", MODEL, "-l", idiomaDeCinta(path.basename(out)).codigo, "-f", wav, "-otxt", "-of", out, "-nt"],
       { stdio: ["ignore", "ignore", "ignore"] },
     );
   }

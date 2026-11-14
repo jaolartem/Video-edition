@@ -20,8 +20,7 @@ se dicen por su nombre.
 """
 from __future__ import annotations
 
-import json
-import os
+from ..idioma import ES
 
 # ── qué es un enunciado ──────────────────────────────────────────────────────
 #: Por debajo no hay enunciado, hay una palabra suelta.
@@ -143,7 +142,4 @@ POR_DETRAS = 4
 #: Detrás de una palabra de función la frase NO ha acabado. La lista es la misma
 #: que usan los subtítulos compuestos (C-23) y vive en un solo sitio: dos copias
 #: se separan en cuanto una cambia.
-COLGANTE: frozenset[str] = frozenset(json.load(open(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__)))), "colgantes.json"),
-    encoding="utf-8"))["palabras"])
+COLGANTE: frozenset[str] = ES.colgantes

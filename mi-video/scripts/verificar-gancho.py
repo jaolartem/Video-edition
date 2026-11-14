@@ -14,6 +14,7 @@ import subprocess, sys, json, os, shutil
 sys.path.insert(0, os.path.dirname(__file__))
 import gpu  # noqa: E402
 import rutas  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 
 WH = os.path.join(os.path.dirname(__file__), "..", "whisper.cpp")
 # El binario lo elige `gpu.py`, que es el unico que sabe si hay tarjeta.
@@ -44,12 +45,12 @@ def trozo(path, ini, fin, wav):
         check=True)
 
 
-def transcribir(wav):
+def transcribir(wav, idioma):
     # -mc 0: sin contexto entre ventanas. Con contexto, un trozo arrastra lo
     # que "leyo" en el anterior y se inventa la continuidad — que es justo lo
     # que este metodo intenta descartar.
     subprocess.run(
-        [MAIN, "-m", MODEL, "-l", "es", "-mc", "0", "-nt", "-oj",
+        [MAIN, "-m", MODEL, *idioma.banderas, "-mc", "0", "-nt", "-oj",
          "-of", wav[:-4], "-f", wav],
         capture_output=True, check=True)
     with open(wav[:-4] + ".json", encoding="utf-8") as fh:
@@ -74,7 +75,7 @@ def main(path):
                 fin = total
             wav = os.path.join(tmp, f"c{int(t*10):04d}.wav")
             trozo(path, t, fin, wav)
-            txt = transcribir(wav)
+            txt = transcribir(wav, Idioma.de_ruta(path))
             print(f"  [{t:5.1f}–{fin:5.1f}]  {txt}")
             texto.append(txt)
             if fin >= total:

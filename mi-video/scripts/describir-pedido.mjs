@@ -27,6 +27,7 @@
 import fs from "node:fs";
 
 import { sql } from "./consulta.mjs";
+import { idioma } from "./idioma.mjs";
 
 /** El prompt vive en el repositorio y se manda literal. No se improvisa. */
 export const PROMPT = fs.readFileSync("scripts/describir.prompt.md", "utf8");
@@ -82,8 +83,7 @@ function portadaDe(slug) {
 //: son enfasis, tres ya es muletilla.
 const ETAPAS_ARRANQUE = 3;
 const VECES_MAX = 2;
-const LLANAS = new Set(("que de la el los las un una y no en es se su sus por"
-  + " con para lo le del al mas pero como esta este ya si a").split(" "));
+const LLANAS = idioma().llanas;
 
 /** Las palabras de contenido que se repiten en las primeras etapas. */
 function machacaEnElArranque(filas) {

@@ -11,6 +11,8 @@ con el nombre que dice cuándo usarlas.
 """
 from __future__ import annotations
 
+from .idioma import ES
+
 import re
 import unicodedata
 
@@ -28,13 +30,7 @@ import unicodedata
 #: contra el nuevo pieza por pieza. Sin esa comparación habría entrado en el
 #: lote entero sin que nadie lo notara — que es exactamente cómo se pierde una
 #: decisión en este proyecto.
-VACIAS: frozenset[str] = frozenset({
-    "que", "de", "la", "el", "en", "los", "las", "un", "una", "por", "con",
-    "para", "del", "se", "su", "sus", "lo", "le", "es", "no", "mas", "pero",
-    "como", "esta", "este", "esto", "usted", "yo", "va", "ya", "si", "al",
-    "y", "a", "o", "sin", "hay", "muy", "todo", "todos", "eso", "ese", "ahi",
-    "tiene", "ser", "son", "esa", "cada", "porque", "cuando", "donde",
-})
+VACIAS: frozenset[str] = ES.vacias
 
 
 def _sin_tildes(t: str) -> str:
@@ -98,7 +94,7 @@ def numerico(t: str) -> str:
 #: porque para comparar de qué habla una frase no aportan; para comparar si dice
 #: lo mismo, deciden. Un texto que pierde el «no» habla de lo mismo y afirma lo
 #: contrario.
-NIEGAN = ("no", "ni", "sin", "nunca", "nada", "tampoco", "jamas", "pero")
+NIEGAN = ES.niegan
 
 
 def dice_lo_mismo(a: str, b: str) -> bool:

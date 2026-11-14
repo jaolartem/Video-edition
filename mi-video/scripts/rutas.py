@@ -45,6 +45,9 @@ FUENTES = _cfg.get("fuentes", {})
 RECOGER = [LIMPIAR, "out/audio-puro"] + (
     [FUENTES["audio"]] if FUENTES.get("audio") else [])
 TOMAS = _cfg.get("tomas", {})
+#: La lengua de cada grabacion (toma -> codigo). Sin entrada, español: lo lee
+#: `dominio.idioma.Idioma.de_cinta`, que es quien sabe que hacer con ella.
+IDIOMAS = _cfg.get("idiomas", {})
 # **Una pieza que deriva de otra usa su cinta** (C-388): se deduce de
 # `deriva_de` en `ads/frames.json`, no se escribe dos veces.
 try:

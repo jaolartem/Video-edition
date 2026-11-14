@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import registro  # noqa: E402
 import rutas  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 
 
 def afinar(toma, tramos, pasadas=4):
@@ -153,7 +154,8 @@ def afinar(toma, tramos, pasadas=4):
             w0 = max(0.0, min(dur - ancho, centro - ancho / 2 + desp))
             trozo = os.path.join(tmp, f"a{k:02d}.wav")
             recorte(voz_wav, w0, min(w0 + ancho, dur), trozo, sr, anchura)
-            ws = pasada(trozo, os.path.join(tmp, f"a{k:02d}"), MODELOS["bueno"])
+            ws = pasada(trozo, os.path.join(tmp, f"a{k:02d}"), MODELOS["bueno"],
+                        Idioma.de_cinta(toma))
             # Por el arranque, como al transcribir (C-610).
             dentro = [w for w in ws if va <= w["a"] + w0 < vb]
             for w in dentro:
