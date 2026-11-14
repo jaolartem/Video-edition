@@ -21,6 +21,7 @@ import { Recortes, type Recorte } from "./components/Detras";
 import type { Trato } from "./brand/cc";
 // Una sola entrada por módulo: eran dos líneas del mismo `./brand/tokens`.
 import { color, mode as modes, type Mode } from "./brand/tokens";
+import { useLienzo } from "./brand/LienzoContexto";
 
 /**
  * Un tablero programado sobre el vídeo.
@@ -166,6 +167,7 @@ export const Ad: React.FC<AdProps> = ({
   virados = [],
   recortes = [],
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const t = modes[mode];
 
@@ -258,7 +260,7 @@ export const Ad: React.FC<AdProps> = ({
               entonces el tablero deja de significar nada. Quién dibuja cada
               forma lo dice `dibujaTablero`,
               en `components/Tablero.tsx`. */}
-          {dibujaTablero(cue, mode)}
+          {dibujaTablero(cue, mode, layout)}
         </Sequence>
       ))}
 

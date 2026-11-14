@@ -11,6 +11,8 @@ import { Tarjeta } from "./components/Tarjeta";
 import { Acumulacion } from "./components/Acumulacion";
 import { Comparacion } from "./components/Comparacion";
 import { FPS, layout } from "./brand/tokens";
+import { lienzoDe, type Lienzo } from "./brand/lienzo";
+import { enSuLienzo } from "./brand/LienzoContexto";
 import {
   COVERS,
   acumulacion,
@@ -37,30 +39,33 @@ import {
 /**
  * Una composición del lote.
  *
- * Todas miden lo mismo y van a los mismos fps —son ads verticales de la misma
- * plantilla— así que eso se declara una vez y no catorce. Lo que cambia de una
- * a otra es el nombre, qué dibuja, cuánto dura y con qué props: exactamente los
- * cuatro argumentos.
+ * Todas van a los mismos fps y salen de la misma plantilla, así que eso se
+ * declara una vez y no catorce. Lo que cambia de una a otra es el nombre, qué
+ * dibuja, cuánto dura, con qué props y **en qué lienzo**: el de la pieza, que
+ * mide el cuadro y se pone en el contexto para quien dibuja dentro (C-670). Sin
+ * lienzo, el vertical, que es lo que han sido siempre.
  */
 const Pieza = <P extends Record<string, unknown>>({
   id,
   componente,
   dura,
   props,
+  lienzo = layout,
 }: {
   id: string;
   componente: React.FC<P>;
   /** Duración en frames. */
   dura: number;
   props: P;
+  lienzo?: Lienzo;
 }) => (
   <Composition
     id={id}
-    component={componente}
+    component={enSuLienzo(componente, lienzo)}
     durationInFrames={dura}
     fps={FPS}
-    width={layout.width}
-    height={layout.height}
+    width={lienzo.width}
+    height={lienzo.height}
     defaultProps={props}
   />
 );
@@ -130,6 +135,7 @@ export const MyComposition = () => {
           id={`Portada-${r.id}`}
           componente={Cover}
           dura={90}
+          lienzo={lienzoDe(r.formato)}
           props={{
             hook: r.portada!.titulo,
             subtitulo: r.portada!.subtitulo,
@@ -148,6 +154,7 @@ export const MyComposition = () => {
           id={r.id}
           componente={Reel}
           dura={Math.round(r.duracion * FPS)}
+          lienzo={lienzoDe(r.formato)}
           props={{ spec: r }}
         />
       ))}

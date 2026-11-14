@@ -2,7 +2,9 @@ import React from "react";
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../../brand/fonts";
 import { cuerpoQueCabe } from "../../brand/medida";
-import { color, layout, videoText } from "../../brand/tokens";
+import { color, videoText } from "../../brand/tokens";
+import { useLienzo } from "../../brand/LienzoContexto";
+import type { Lienzo } from "../../brand/lienzo";
 
 /**
  * El subtítulo compuesto: **dos renglones, dos fuentes, dos superficies.**
@@ -29,16 +31,18 @@ export type Compuesto = {
   tinte: "gold" | "navy";
 };
 
-/** Ancho util de la banda, ya descontadas las zonas seguras. */
-const ANCHO = layout.width - layout.safe.left - layout.safe.right;
 /**
  * **Y de lado, la mitad libre** (C-647). Con `alinea: der` la banda empieza en
  * el 44 % del ancho (`CaptionBand`), y el remate se medía contra el cuadro
  * entero: en reel-20 salía «LA MITAD LES H» cortado por el borde derecho.
  */
 export const DESDE_EL_LADO = 0.44;
-const anchoDe = (alinea?: "izq" | "der") =>
-  alinea === "der" ? layout.width * (1 - DESDE_EL_LADO) - layout.safe.right : ANCHO;
+/** El ancho de la banda en su lienzo: el útil, o la mitad libre si va de lado. */
+const anchoDe = (layout: Lienzo, alinea?: "izq" | "der") => {
+  /** Ancho util de la banda, ya descontadas las zonas seguras. */
+  const ANCHO = layout.util;
+  return alinea === "der" ? layout.width * (1 - DESDE_EL_LADO) - layout.safe.right : ANCHO;
+};
 /** El tracking, en em, para poder sumarlo al avance. */
 const PISTA = Number.parseFloat(videoText.tracking);
 /**
@@ -72,8 +76,9 @@ export const Compuesta: React.FC<{
   desde: number;
   alinea?: "izq" | "der";
 }> = ({ c, desde, alinea }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
-  const ancho = anchoDe(alinea);
+  const ancho = anchoDe(layout, alinea);
   const borde = alinea === "der" ? "flex-end" : "flex-start";
   const cuerpo = Math.round(
     Math.max(

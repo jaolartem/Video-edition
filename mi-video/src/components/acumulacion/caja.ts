@@ -1,4 +1,4 @@
-import { franja } from "../../brand/franja";
+import type { Lienzo } from "../../brand/lienzo";
 import type { Tramo } from "./tipos";
 
 /**
@@ -51,10 +51,10 @@ export const ALTO = 470;
  * mal — no se ve. Los 148 px que quedan por debajo son lo que ocupa la ficha
  * del primer tramo, que se centra en su bloque y sobresale por abajo.
  */
-export const SUELO = franja.techoPx - 148;
+export const sueloEn = (layout: Lienzo): number => layout.franja.techoPx - 148;
 
 /** Techo del gráfico: donde acaba la pila cuando está entera. */
-export const TECHO = SUELO - ALTO;
+export const techoEn = (layout: Lienzo): number => sueloEn(layout) - ALTO;
 
 /** La ficha negra que sostiene la etiqueta de un tramo. */
 export const FICHA = { x: EJE.x + EJE.barra + EJE.hueco, cuerpo: 40 } as const;

@@ -6,7 +6,7 @@ import {
 import { assertShort } from "./brand/copy";
 import { fontFamily } from "./brand/fonts";
 import { useEntrada } from "./brand/horario";
-import { color } from "./brand/tokens";
+import { color, layout } from "./brand/tokens";
 import { PanelDentro, type PanelDentroProps } from "./components/PanelDentro";
 import { Reparto } from "./components/Reparto";
 
@@ -250,12 +250,12 @@ const panelE2 = (sujeto: (typeof LADOS)[number]): PanelDentroProps => ({
 export const Root: React.FC = () => (
   <>
     <Composition id="PanelE1" component={PanelE1} durationInFrames={120}
-                 fps={30} width={1080} height={1920} />
+                 fps={30} width={layout.width} height={layout.height} />
     <Composition id="TableroE2" component={TableroE2} durationInFrames={120}
-                 fps={30} width={1080} height={1920} />
+                 fps={30} width={layout.width} height={layout.height} />
     {LADOS.map((lado) => (
       <Composition key={lado} id={`PanelDentro-${lado}`} component={PanelDentro}
-                   durationInFrames={240} fps={30} width={1080} height={1920}
+                   durationInFrames={240} fps={30} width={layout.width} height={layout.height}
                    defaultProps={panelE2(lado)} />
     ))}
   </>

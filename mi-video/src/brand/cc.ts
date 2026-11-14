@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import ccJson from "./cc.json";
-import { color, layout } from "./tokens";
+import type { Lienzo } from "./lienzo";
+import { color } from "./tokens";
 
 /**
  * **El fondo del subtítulo: los tres tratamientos, y qué comparten.**
@@ -68,7 +69,10 @@ export const cc = {
  * Medido en las siete: sólo reel-06 (coronilla 0,436) tiene sitio; en las otras
  * seis el cc se queda junto a la barbilla, que es donde Jaime lo pidió.
  */
-export const cabeElCcArriba = (coronilla?: number): boolean =>
+export const cabeElCcArriba = (
+  coronilla: number | undefined,
+  layout: Pick<Lienzo, "height">,
+): boolean =>
   !!coronilla &&
   coronilla * layout.height - cc.cabeza.desde - cc.cabeza.margen >=
     cc.cabeza.minimo;

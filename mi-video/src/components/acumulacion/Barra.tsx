@@ -4,7 +4,8 @@ import type { Entrada } from "../../brand/horario";
 import { fontFamily } from "../../brand/fonts";
 import { cuerpoQueCabe } from "../../brand/medida";
 import { color } from "../../brand/tokens";
-import { ALTO, EJE, FICHA, SUELO, TECHO, acentua, aPx, basesDe } from "./caja";
+import { ALTO, EJE, FICHA, acentua, aPx, basesDe, sueloEn, techoEn } from "./caja";
+import { useLienzo } from "../../brand/LienzoContexto";
 import type { Tramo } from "./tipos";
 
 /**
@@ -34,6 +35,10 @@ export const Barra: React.FC<{
   raya: number;
   entra: Entrada;
 }> = ({ tramos, umbral, entradas, raya, entra }) => {
+  const layout = useLienzo();
+  // Del techo de SU franja, no de la vertical (C-670).
+  const SUELO = sueloEn(layout);
+  const TECHO = techoEn(layout);
   const bases = basesDe(tramos);
   const yUmbral = umbral ? SUELO - aPx(umbral.en) : null;
 
@@ -145,7 +150,7 @@ export const Barra: React.FC<{
               position: "absolute",
               left: EJE.x - 34,
               top: yUmbral,
-              width: (1080 - EJE.x - 20) * entra(raya),
+              width: (layout.width - EJE.x - 20) * entra(raya),
               height: 4,
               backgroundColor: color.gold,
             }}

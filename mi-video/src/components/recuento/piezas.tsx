@@ -2,7 +2,8 @@ import React from "react";
 import { fontFamily } from "../../brand/fonts";
 import { cuerpoQueCabe, masLarga } from "../../brand/medida";
 import { color } from "../../brand/tokens";
-import { CAJA, COLUMNA, MARCA } from "./caja";
+import { CAJA, MARCA, cajaEn } from "./caja";
+import { useLienzo } from "../../brand/LienzoContexto";
 
 /**
  * **Los tres bloques con los que se dibuja el recuento**: la cabecera de una
@@ -18,38 +19,41 @@ export const Cabecera: React.FC<{ texto: string; x: number; p: number }> = ({
   texto,
   x,
   p,
-}) => (
-  <div style={{ position: "absolute", left: x, top: CAJA.cabeceras, opacity: p }}>
-    {/* El negro que abraza su texto, no media lámina apagada: es la masa del
-        canon. */}
-    <div
-      style={{
-        display: "inline-block",
-        backgroundColor: color.richBlack,
-        padding: "10px 18px",
-      }}
-    >
+}) => {
+  const { COLUMNA } = cajaEn(useLienzo());
+  return (
+    <div style={{ position: "absolute", left: x, top: CAJA.cabeceras, opacity: p }}>
+      {/* El negro que abraza su texto, no media lámina apagada: es la masa del
+          canon. */}
       <div
         style={{
-          fontFamily: fontFamily.bloque,
-          fontSize: cuerpoQueCabe({
-            ancho: COLUMNA - 40,
-            largo: texto.length,
-            registro: "anton",
-            tope: 58,
-          }),
-          lineHeight: 1,
-          letterSpacing: "0.006em",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-          color: color.lightNeutral,
+          display: "inline-block",
+          backgroundColor: color.richBlack,
+          padding: "10px 18px",
         }}
       >
-        {texto}
+        <div
+          style={{
+            fontFamily: fontFamily.bloque,
+            fontSize: cuerpoQueCabe({
+              ancho: COLUMNA - 40,
+              largo: texto.length,
+              registro: "anton",
+              tope: 58,
+            }),
+            lineHeight: 1,
+            letterSpacing: "0.006em",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            color: color.lightNeutral,
+          }}
+        >
+          {texto}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * **La condición de una columna: para quién está hecho lo que hay ahí.**
@@ -64,33 +68,36 @@ export const Condicion: React.FC<{
   y: number;
   p: number;
   tinte: string;
-}> = ({ lineas, x, y, p, tinte }) => (
-  <div style={{ position: "absolute", left: x, top: y, opacity: p }}>
-    <div
-      style={{
-        display: "inline-block",
-        backgroundColor: color.richBlack,
-        padding: "12px 18px",
-        fontFamily: fontFamily.bloque,
-        fontSize: cuerpoQueCabe({
-          ancho: COLUMNA - 36,
-          largo: masLarga(lineas),
-          registro: "anton",
-          tope: 46,
-        }),
-        lineHeight: 1.08,
-        letterSpacing: "0.006em",
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-        color: tinte,
-      }}
-    >
-      {lineas.map((l) => (
-        <div key={l}>{l}</div>
-      ))}
+}> = ({ lineas, x, y, p, tinte }) => {
+  const { COLUMNA } = cajaEn(useLienzo());
+  return (
+    <div style={{ position: "absolute", left: x, top: y, opacity: p }}>
+      <div
+        style={{
+          display: "inline-block",
+          backgroundColor: color.richBlack,
+          padding: "12px 18px",
+          fontFamily: fontFamily.bloque,
+          fontSize: cuerpoQueCabe({
+            ancho: COLUMNA - 36,
+            largo: masLarga(lineas),
+            registro: "anton",
+            tope: 46,
+          }),
+          lineHeight: 1.08,
+          letterSpacing: "0.006em",
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+          color: tinte,
+        }}
+      >
+        {lineas.map((l) => (
+          <div key={l}>{l}</div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /** Una marca. Se traza desde su base: no aparece, crece. */
 export const Trazo: React.FC<{

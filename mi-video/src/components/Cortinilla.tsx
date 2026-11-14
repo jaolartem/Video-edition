@@ -4,7 +4,8 @@ import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
 import { MotionSound } from "./MotionSound";
 import { Cinta, Fondo } from "./Fondo";
-import { color, duration, ease, layout } from "../brand/tokens";
+import { color, duration, ease } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * La cortinilla: lo que media un corte duro entre dos beats.
@@ -55,6 +56,7 @@ export const Cortinilla: React.FC<CortinillaProps> = ({
   framework,
   sound = false,
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   assertShort(etapa, "label", "Cortinilla.etapa");
 

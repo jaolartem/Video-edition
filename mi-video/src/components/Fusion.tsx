@@ -3,12 +3,13 @@ import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
-import { color, layout, readingFrames, size, tracking } from "../brand/tokens";
+import { color, readingFrames, size, tracking } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { Remate } from "./Remate";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
 import { FileteFicha } from "./fichas/Ficha";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **Dos cosas que el espectador cree separadas y son una sola.**
@@ -55,7 +56,6 @@ export type FusionProps = {
   tiempos?: Record<string, number | (number | undefined)[] | undefined>;
 };
 
-const ANCHO = layout.width - layout.safe.left * 2;
 /** Caja del bloque que se fusiona. */
 const BLOQUE = { y: 200, h: 270 } as const;
 /** Caja de las etiquetas expuestas: dos columnas, dos filas. */
@@ -74,6 +74,8 @@ export const Fusion: React.FC<FusionProps> = ({
   sound = false,
   tiempos,
 }) => {
+  const layout = useLienzo();
+  const ANCHO = layout.width - layout.safe.left * 2;
   const entra = useEntrada();
 
   // El horario. La fusión espera a que las dos mitades se hayan podido leer:

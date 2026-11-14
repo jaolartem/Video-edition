@@ -4,14 +4,15 @@ import { assertShort } from "../brand/copy";
 import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe, masLarga } from "../brand/medida";
-import { color, duration, ease, layout } from "../brand/tokens";
+import { color, duration, ease } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { Remate } from "./Remate";
 import { ZonaTablero } from "./ZonaTablero";
-import { CAJA, DER, IZQ, MEDIO, SUELO, altoDe, marcaEn } from "./recuento/caja";
+import { CAJA, cajaEn } from "./recuento/caja";
 import { horarioDe } from "./recuento/horario";
 import { Cabecera, Condicion, Trazo } from "./recuento/piezas";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **Cuántos hay de un lado y cuántos del otro, y para quién está hecho cada
@@ -96,6 +97,8 @@ export const Recuento: React.FC<RecuentoProps> = ({
   duracion = 420,
   sound = false,
 }) => {
+  const layout = useLienzo();
+  const { DER, IZQ, MEDIO, SUELO, altoDe, marcaEn } = cajaEn(layout);
   const entra = useEntrada();
 
   if (titulo) assertShort(titulo, "title", "Recuento.titulo");

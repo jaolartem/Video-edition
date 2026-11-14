@@ -1,4 +1,4 @@
-import { layout } from "../../brand/tokens";
+import type { Lienzo } from "../../brand/lienzo";
 import { type Lado } from "../Recorte";
 
 /**
@@ -35,7 +35,14 @@ export const T = { premisa: 0, el: 10, unoA: 22, unoB: 76, remate: 130,
  * ESTRUCTURA` y media línea del remate — sin error, sin log, y sólo se vio al
  * sacar el fotograma.
  */
-export const COLUMNA = { x: 470, ancho: 540, arriba: 200, salto: 240 };
+export const RITMO = { arriba: 200, salto: 240 } as const;
+
+/**
+ * **La columna entera en un lienzo.** Dónde empieza y cuánto mide es del
+ * lienzo —`columna` en `lienzos.json`, 470 y 540 en vertical—, porque es ancho
+ * del cuadro; el ritmo de arriba abajo es del panel (C-670).
+ */
+export const columnaEn = (layout: Lienzo) => ({ ...layout.columna, ...RITMO });
 
 //: `MASA` se retiro el 6-9-2026. Era la columna negra bajo su figura, y Jaime
 //: la quito al verla: *«yo no deberia tener cuadrado negro de contraste, el
@@ -50,8 +57,8 @@ export const COLUMNA = { x: 470, ancho: 540, arriba: 200, salto: 240 };
  * Si él va a la derecha, el contenido se va a la izquierda. Con él abajo la
  * columna se queda donde está y el texto de abajo lo tapa menos.
  */
-export const columnaDe = (sujeto: Lado): number =>
-  sujeto === "derecha" ? layout.safe.left : COLUMNA.x;
+export const columnaDe = (sujeto: Lado, layout: Lienzo): number =>
+  sujeto === "derecha" ? layout.safe.left : layout.columna.x;
 
 /**
  * **`abajo` sólo cabe en un panel ligero, y se sabe midiendo.**

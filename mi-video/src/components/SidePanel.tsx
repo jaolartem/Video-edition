@@ -8,15 +8,15 @@ import {
   useCurrentFrame,
 } from "remotion";
 import { assertShort } from "../brand/copy";
-import { franja } from "../brand/franja";
 import { fontFamily } from "../brand/fonts";
-import { color, layout, videoText, tracking } from "../brand/tokens";
+import { color, videoText, tracking } from "../brand/tokens";
 import { Casillas } from "./Casillas";
 // El contrato del panel vive aparte, como el de las otras seis formas: ver
 // `panel/tipos.ts`.
 import type { SidePanelProps } from "./panel/tipos";
 import { Reparto } from "./Reparto";
 import { Volumen as Escena3D } from "./Volumen";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Bloques que se construyen **en el espacio libre del plano abierto**.
@@ -37,6 +37,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   bloques, lado, ladoVolumen, volumen, hueco, fuente,
   casillas, reparto, eje, sfx = null, escalon = LEE, paso = 8,
 }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const frame = useCurrentFrame();
   // **El bloque que no cabe falla, no se recorta.** El `overflow: hidden` de
   // abajo es correcto —impide que una tercera línea se coma la cara— pero

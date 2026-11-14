@@ -54,6 +54,7 @@ import { imagenDe } from "./reels/imagen.mjs";
 import { componer, corregirLoDicho, ideasFuerza, marcaDeHumanidad, trataElCc } from "./reels/subtitulos.mjs";
 import { porEscena, rellenar } from "./reels/escenas.mjs";
 import { revisar } from "./reels/puerta.mjs";
+import { POR_DEFECTO, lienzoDe } from "./lienzo.mjs";
 import { apartaDelGancho, armarGancho, bajarEnElGancho, titularDe }
   from "./reels/portada.mjs";
 
@@ -183,9 +184,15 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
   // recorte más, y la ventana es suya. Ver `reels/portada.mjs`.
   faltas.push(...armarGancho(caminos, imagen, slug));
 
+  // **El lienzo, sólo si no es el vertical** (C-670): una pieza que no lo
+  // declara no lleva el campo, y así su spec —y su huella— sale byte a byte la
+  // de siempre, igual que la portada no cuenta en la huella. Uno que no existe
+  // para aquí: `lienzoDe` no adivina un cuadro.
+  const formato = lienzoDe(marco.formato).formato;
   const pieza = {
     id: idDe(slug),
     video: `${slug}.mp4`,
+    ...(formato === POR_DEFECTO ? {} : { formato }),
     // Los efectos suenan siempre: la puerta de aprobacion se quito.
     sonido: true,
     // Las capas por camino: el gancho, los tableros, los cercanos y las

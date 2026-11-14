@@ -3,10 +3,12 @@ import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
-import { color, layout, readingFrames } from "../brand/tokens";
+import { color, readingFrames } from "../brand/tokens";
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
+import { useLienzo } from "../brand/LienzoContexto";
+import type { Lienzo } from "../brand/lienzo";
 
 /**
  * **Un universo, y lo que cabe dentro de él.** La contención dicha con
@@ -56,14 +58,19 @@ export type AnidadoProps = {
  * PBO más el alcance del dato y mide ~230 px, así que se apoya en el techo de
  * la franja y sube hasta el 818. Con la caja hasta el 860 se pisaban.
  */
-const CAJA = { x: layout.safe.left, y: 240, w: 950, h: 520 } as const;
+const cajaEn = (layout: Lienzo) => {
+  // El ancho es el útil de su lienzo: 950 en vertical, que estaba escrito a
+  // mano dos veces (C-670).
+  const CAJA = { x: layout.safe.left, y: 240, w: layout.util, h: 520 } as const;
 
-/** Cada capa encaja más estrecha que la anterior: izquierda, arriba, ancho, alto. */
-const CAPAS = [
-  { x: 0, y: 0, w: 950, h: 520 },
-  { x: 62, y: 143, w: 782, h: 317 },
-  { x: 148, y: 274, w: 610, h: 159 },
-] as const;
+  /** Cada capa encaja más estrecha que la anterior: izquierda, arriba, ancho, alto. */
+  const CAPAS = [
+    { x: 0, y: 0, w: CAJA.w, h: 520 },
+    { x: 62, y: 143, w: 782, h: 317 },
+    { x: 148, y: 274, w: 610, h: 159 },
+  ] as const;
+  return { CAJA, CAPAS };
+};
 
 export const Anidado: React.FC<AnidadoProps> = ({
   titulo,
@@ -74,6 +81,8 @@ export const Anidado: React.FC<AnidadoProps> = ({
   recorte = "lleno",
   sound = false,
 }) => {
+  const layout = useLienzo();
+  const { CAJA, CAPAS } = cajaEn(layout);
   const entra = useEntrada();
   const textos = [base, capa_media, capa_dentro];
 

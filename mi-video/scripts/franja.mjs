@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { lienzoDe } from "./lienzo.mjs";
 
 // `fileURLToPath` y no `new URL(...).pathname`: **la ruta del repo tiene
 // espacios** y el pathname los trae como `%20`. Es el gotcha 1 del proyecto.
@@ -23,24 +24,48 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
 
 const J = JSON.parse(leer("src/brand/franja.json"));
-const ALTURA = 1920;
 
-export const franja = {
-  suelo: J.suelo,
-  techo: J.suelo - J.alto,
-  alto: J.alto,
-  /** Del suelo de la franja al borde inferior del cuadro: 672 px. */
-  desdeAbajo: Math.round((1 - J.suelo) * ALTURA),
-  /** Lo que un tablero deja libre por abajo: 872 px. */
-  reserva: Math.round((1 - J.suelo + J.alto) * ALTURA),
-  /** El techo, en píxeles desde arriba: 1048. */
-  techoPx: Math.round((J.suelo - J.alto) * ALTURA),
-  cuerpo: J.cuerpo,
+/**
+ * **La franja de un lienzo**, derivada como dice `_derivacion` de `franja.json`:
+ * el suelo es el borde inferior de su zona segura y el alto, su banda. La misma
+ * cuenta que `franjaDe` en `src/brand/franja.ts` (C-670); la altura ya no es un
+ * 1920 escrito aquí, es la de `lienzos.json`.
+ */
+export const franjaDe = (lienzo = lienzoDe()) => {
+  const ALTURA = lienzo.height;
+  const suelo = 1 - lienzo.safe.bottom / ALTURA;
+  const alto = lienzo.captionBand / ALTURA;
+  return {
+    suelo,
+    techo: suelo - alto,
+    alto,
+    /** Del suelo de la franja al borde inferior del cuadro: 672 px en vertical. */
+    desdeAbajo: Math.round((1 - suelo) * ALTURA),
+    /** Lo que un tablero deja libre por abajo: 872 px en vertical. */
+    reserva: Math.round((1 - suelo + alto) * ALTURA),
+    /** El techo, en píxeles desde arriba: 1048 en vertical. */
+    techoPx: Math.round((suelo - alto) * ALTURA),
+    cuerpo: J.cuerpo,
+  };
 };
 
+/** La del vertical, que es la de toda pieza que no declara otro lienzo. */
+export const franja = franjaDe();
+
+/**
+ * **Y la que declara `franja.json` tiene que ser ésa.** Su `suelo` y su `alto`
+ * los leen todavía los scripts de Python; derivada aquí del lienzo, una franja
+ * que no casara con ellos serían dos franjas — y se para, no se avisa.
+ */
+if (franja.suelo !== J.suelo || franja.alto !== J.alto)
+  throw new Error(
+    `franja.json (${J.suelo} / ${J.alto}) no casa con el lienzo vertical ` +
+      `(${franja.suelo} / ${franja.alto}): una de las dos se tocó sin la otra`,
+  );
+
 /** La franja dicha para quien la respeta sin dibujarla: prompts e informes. */
-export const enPorcentaje = () =>
-  `del ${(franja.techo * 100).toFixed(1)}% al ${(franja.suelo * 100).toFixed(1)}%` +
+export const enPorcentaje = (f = franja) =>
+  `del ${(f.techo * 100).toFixed(1)}% al ${(f.suelo * 100).toFixed(1)}%` +
   " de la altura";
 
 /**
@@ -48,11 +73,14 @@ export const enPorcentaje = () =>
  * prompt** para que el número no se escriba dos veces: el prompt pone el
  * criterio, esto pone la cifra vigente.
  */
-export const criterio = () =>
-  `La franja ${enPorcentaje()} (${franja.techoPx}-${ALTURA - franja.desdeAbajo} px` +
-  ` sobre ${ALTURA}) esta RESERVADA al subtitulo: ningun tablero baja hasta` +
-  ` ahi, y debajo de ella vive la interfaz de la plataforma. El tablero dibuja` +
-  ` entre el borde de arriba y ese techo — ${franja.techoPx} px de alto util.`;
+export const criterio = (lienzo = lienzoDe()) => {
+  const f = franjaDe(lienzo);
+  const ALTURA = lienzo.height;
+  return `La franja ${enPorcentaje(f)} (${f.techoPx}-${ALTURA - f.desdeAbajo} px` +
+    ` sobre ${ALTURA}) esta RESERVADA al subtitulo: ningun tablero baja hasta` +
+    ` ahi, y debajo de ella vive la interfaz de la plataforma. El tablero dibuja` +
+    ` entre el borde de arriba y ese techo — ${f.techoPx} px de alto util.`;
+};
 
 /**
  * Qué componente dibuja cada clase de tablero. **Es el mismo reparto que
@@ -121,7 +149,7 @@ if (process.argv[1] && process.argv[1].endsWith("franja.mjs")) {
   console.log(
     `  suelo ${franja.suelo} (borde inferior de la zona segura, ${franja.desdeAbajo} px)` +
       `\n  techo ${franja.techo.toFixed(4)} (${franja.techoPx} px)` +
-      `\n  alto  ${franja.alto.toFixed(4)} (${ALTURA - franja.desdeAbajo - franja.techoPx} px)` +
+      `\n  alto  ${franja.alto.toFixed(4)} (${lienzoDe().height - franja.desdeAbajo - franja.techoPx} px)` +
       `\n  reserva del tablero: ${franja.reserva} px`,
   );
   const filas = invasores();

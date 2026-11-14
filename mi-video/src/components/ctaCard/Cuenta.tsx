@@ -1,10 +1,12 @@
 import React from "react";
 import { fontFamily } from "../../brand/fonts";
 import { cuerpoQueCabe } from "../../brand/medida";
-import { color, layout } from "../../brand/tokens";
+import { color } from "../../brand/tokens";
+import { useLienzo } from "../../brand/LienzoContexto";
+import type { Lienzo } from "../../brand/lienzo";
 
-/** Ancho de cada cuenta. Dos columnas, un filete de 24 px entre ellas. */
-export const ANCHO =
+/** Ancho de cada cuenta en su lienzo. Dos columnas, un filete de 24 px entre ellas. */
+export const anchoEn = (layout: Lienzo): number =>
   (layout.width - layout.safe.left - layout.safe.right - 24) / 2;
 
 /**
@@ -26,82 +28,85 @@ export const Cuenta: React.FC<{
   oro?: boolean;
   /** Progreso de entrada, 0→1. Lo calcula el horario. */
   progreso: number;
-}> = ({ etiqueta, cifra, pie, tachado, oro, progreso }) => (
-  <div
-    style={{
-      width: ANCHO,
-      minHeight: 420,
-      backgroundColor: oro ? color.gold : color.navy,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 22,
-      padding: "34px 26px",
-      opacity: progreso,
-      transform: `translateY(${((1 - progreso) * 26).toFixed(1)}px)`,
-    }}
-  >
+}> = ({ etiqueta, cifra, pie, tachado, oro, progreso }) => {
+  const ANCHO = anchoEn(useLienzo());
+  return (
     <div
       style={{
-        fontFamily: fontFamily.bloque,
-        fontSize: 42,
-        lineHeight: 1.02,
-        textAlign: "center",
-        textTransform: "uppercase",
-        color: oro ? color.richBlack : color.secondaryBlue,
+        width: ANCHO,
+        minHeight: 420,
+        backgroundColor: oro ? color.gold : color.navy,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 22,
+        padding: "34px 26px",
+        opacity: progreso,
+        transform: `translateY(${((1 - progreso) * 26).toFixed(1)}px)`,
       }}
     >
-      {etiqueta}
-    </div>
-    {tachado ? (
       <div
         style={{
           fontFamily: fontFamily.bloque,
-          fontSize: 44,
-          textDecoration: "line-through",
-          textTransform: "uppercase",
-          color: oro ? color.richBlack : color.secondaryBlue,
-          opacity: 0.75,
-        }}
-      >
-        {tachado}
-      </div>
-    ) : null}
-    <div
-      style={{
-        fontFamily: fontFamily.bloque,
-        // El avance de la Anton lo declara `brand/medida`, medido sobre render.
-        // El margen se paga en cuerpo, que es barato.
-        fontSize: cuerpoQueCabe({
-          ancho: ANCHO - 52,
-          largo: cifra.length,
-          registro: "anton",
-          tope: 156,
-        }),
-        lineHeight: 0.94,
-        whiteSpace: "nowrap",
-        textTransform: "uppercase",
-        color: oro ? color.richBlack : color.lightNeutral,
-      }}
-    >
-      {cifra}
-    </div>
-    {pie ? (
-      <div
-        style={{
-          fontFamily: fontFamily.video,
-          fontSize: 28,
-          fontWeight: 800,
-          lineHeight: 1.2,
+          fontSize: 42,
+          lineHeight: 1.02,
           textAlign: "center",
           textTransform: "uppercase",
-          letterSpacing: "0.02em",
           color: oro ? color.richBlack : color.secondaryBlue,
         }}
       >
-        {pie}
+        {etiqueta}
       </div>
-    ) : null}
-  </div>
-);
+      {tachado ? (
+        <div
+          style={{
+            fontFamily: fontFamily.bloque,
+            fontSize: 44,
+            textDecoration: "line-through",
+            textTransform: "uppercase",
+            color: oro ? color.richBlack : color.secondaryBlue,
+            opacity: 0.75,
+          }}
+        >
+          {tachado}
+        </div>
+      ) : null}
+      <div
+        style={{
+          fontFamily: fontFamily.bloque,
+          // El avance de la Anton lo declara `brand/medida`, medido sobre render.
+          // El margen se paga en cuerpo, que es barato.
+          fontSize: cuerpoQueCabe({
+            ancho: ANCHO - 52,
+            largo: cifra.length,
+            registro: "anton",
+            tope: 156,
+          }),
+          lineHeight: 0.94,
+          whiteSpace: "nowrap",
+          textTransform: "uppercase",
+          color: oro ? color.richBlack : color.lightNeutral,
+        }}
+      >
+        {cifra}
+      </div>
+      {pie ? (
+        <div
+          style={{
+            fontFamily: fontFamily.video,
+            fontSize: 28,
+            fontWeight: 800,
+            lineHeight: 1.2,
+            textAlign: "center",
+            textTransform: "uppercase",
+            letterSpacing: "0.02em",
+            color: oro ? color.richBlack : color.secondaryBlue,
+          }}
+        >
+          {pie}
+        </div>
+      ) : null}
+    </div>
+  );
+};

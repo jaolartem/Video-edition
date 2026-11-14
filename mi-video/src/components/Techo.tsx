@@ -9,6 +9,8 @@ import { color, duration, ease, layout, readingFrames, videoText }
 import { Cinta, Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
+import { useLienzo } from "../brand/LienzoContexto";
+import type { Lienzo } from "../brand/lienzo";
 
 /**
  * **Una sola cifra, y sobre qué se aplica.** El tablero de la tasa que sólo
@@ -77,8 +79,8 @@ export type TechoProps = {
   tiempos?: Record<string, number | (number | undefined)[] | undefined>;
 };
 
-/** La cinta del marco, dentro de la zona segura de arriba. */
-const CINTA = { y: layout.safe.top, cuerpo: 46 } as const;
+/** La cinta del marco, dentro de la zona segura de arriba de su lienzo. */
+const cintaEn = (layout: Lienzo) => ({ y: layout.safe.top, cuerpo: 46 }) as const;
 
 /**
  * El bloque de la cifra. **Sangra por la izquierda**, como la premisa de la
@@ -148,6 +150,7 @@ export const Techo: React.FC<TechoProps> = ({
   sound = false,
   tiempos,
 }) => {
+  const CINTA = cintaEn(useLienzo());
   const entra = useEntrada();
 
   assertShort(titulo, "label", "Techo.titulo");

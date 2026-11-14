@@ -1,9 +1,10 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import { color, layout, tracking, videoText } from "../brand/tokens";
+import { color, tracking, videoText } from "../brand/tokens";
 import { ZonaTablero } from "./ZonaTablero";
 import { leerDeclarado } from "./declarado/lineas";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Dibuja **lo que el diseñador declaró**, sea cual sea la forma que le puso.
@@ -45,6 +46,7 @@ export type TableroDeclaradoProps = {
 export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
   props,
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const { cuerpo } = leerDeclarado(props);
 

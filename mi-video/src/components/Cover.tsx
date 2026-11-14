@@ -5,7 +5,6 @@ import { assertShort } from "../brand/copy";
 import {
   duration,
   ease,
-  layout,
   lineHeight,
   mode as modes,
   size,
@@ -18,6 +17,7 @@ import {
   type Mode,
   type Tone,
 } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 export type CoverProps = {
   /**
@@ -92,6 +92,7 @@ export const Cover: React.FC<CoverProps> = ({
   tone = "base",
   accent,
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const base = modes[mode];
   const t = {

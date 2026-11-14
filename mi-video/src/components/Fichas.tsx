@@ -1,13 +1,13 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { useEntrada } from "../brand/horario";
-import { franja } from "../brand/franja";
-import { color, layout, readingFrames } from "../brand/tokens";
+import { color, readingFrames } from "../brand/tokens";
 import { Fondo, type Recorte } from "./Fondo";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
 import { leerDeclarado } from "./declarado/lineas";
 import { Ficha, FileteFicha } from "./fichas/Ficha";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **Bloques planos apilados y separados por filetes.** Cuatro formas declaradas
@@ -47,6 +47,8 @@ export type FichasProps = {
 };
 
 export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const entra = useEntrada();
   const { cuerpo } = leerDeclarado(props);
   if (!cuerpo.length) return null;

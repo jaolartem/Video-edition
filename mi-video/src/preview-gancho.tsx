@@ -3,7 +3,7 @@ import React from "react";
 import { AbsoluteFill, Composition, Img, registerRoot, staticFile } from "remotion";
 import { fontFamily } from "./brand/fonts";
 import { useEntrada } from "./brand/horario";
-import { color } from "./brand/tokens";
+import { color, layout } from "./brand/tokens";
 
 /**
  * **El gancho, rehecho.** Los siete eran la misma lámina y ninguno paraba el
@@ -52,7 +52,7 @@ const Gancho: React.FC = () => {
 
 export const Root: React.FC = () => (
   <Composition id="Gancho" component={Gancho} durationInFrames={90}
-               fps={30} width={1080} height={1920} />
+               fps={30} width={layout.width} height={layout.height} />
 );
 
 registerRoot(Root);

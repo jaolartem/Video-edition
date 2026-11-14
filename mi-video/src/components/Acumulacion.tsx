@@ -11,8 +11,9 @@ import { Barra } from "./acumulacion/Barra";
 import { Total } from "./acumulacion/Cierre";
 import { CINTA, TITULO, cruzaEn } from "./acumulacion/caja";
 import { BARRE, horarioDe } from "./acumulacion/horario";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
 import type { AcumulacionProps } from "./acumulacion/tipos";
+import { useLienzo } from "../brand/LienzoContexto";
 
 export type { AcumulacionProps, Tramo } from "./acumulacion/tipos";
 export { duracionDe } from "./acumulacion/horario";
@@ -84,6 +85,7 @@ export const Acumulacion: React.FC<AcumulacionProps> = ({
   placa, recorte = "lleno",
   sound = false,
 }) => {
+  const layout = useLienzo();
   const entra = useEntrada();
 
   assertShort(title, "title", "Acumulacion.title");

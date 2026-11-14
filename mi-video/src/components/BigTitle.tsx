@@ -1,13 +1,8 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import {
-  color,
-  layout,
-  videoText,
-  accentChoice,
-  type Accent,
-} from "../brand/tokens";
+import { color, videoText, accentChoice, type Accent } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Rótulo de gran formato que **atraviesa** el cuadro.
@@ -77,6 +72,7 @@ export const BigTitle: React.FC<{
   paso = 9,
   angulo = -3.5,
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const t = frame - entraEn;
   const fin = paso + sostiene;

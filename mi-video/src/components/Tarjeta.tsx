@@ -9,7 +9,8 @@ import {
   useCurrentFrame,
 } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import { color, layout, tracking } from "../brand/tokens";
+import { color, tracking } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Tarjeta neo-constructivista: **el plano cuando la toma no sirve**.
@@ -82,6 +83,7 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
   escalon = 8,
   sonido = true,
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const dos = (n: number) => String(n).padStart(2, "0");
 
