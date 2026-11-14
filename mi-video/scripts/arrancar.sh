@@ -24,10 +24,14 @@ _py() { local c="$1"; shift; PYTHONIOENCODING=utf-8 python -c "import sys; sys.p
 # el tope de tokens»*. Los pedidos quedan escritos y la sesion lanza un agente
 # por buzon con `python scripts/dominio/cola.py --lote N…`, con el encargo de
 # revision y su tope. Sin CLI no hace falta el panel Terminal (C-552).
-if [ "${1:-}" = "--agentes" ]; then
-  shift
-  export OFICIOS_POR_BASH=0
-fi
+# **Donde vaya, no sólo el primero** (C-675): `arrancar.sh 23 --agentes` se lo
+# pasaba al disparador como si fuera una pieza, y moría con «unrecognized
+# arguments» después de decir «todo en su sitio».
+piezas=()
+for a in "$@"; do
+  if [ "$a" = "--agentes" ]; then export OFICIOS_POR_BASH=0; else piezas+=("$a"); fi
+done
+set -- "${piezas[@]}"
 if [ $# -eq 0 ]; then
   echo "arrancar: di que piezas. Declaradas: $(_py 'import rutas; print(*rutas.piezas())')"
   exit 1
