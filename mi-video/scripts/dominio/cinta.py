@@ -218,8 +218,13 @@ class Cinta:
         s = Senal(self.nombre)
         if s.muestras[0] is None:
             return []
+        # **Y lo oído y descartado tampoco para aquí** (C-676), igual que en
+        # `huecos()`: una cola de tramo fuera del guion, declarada con su
+        # porqué en `hueco_oido`, no tiene que tumbar la cinta entera.
+        zonas = self._zonas_descartadas()
         return [p for p in self.palabras()
-                if s.calla_entre(p.empieza - AIRE, p.acaba)]
+                if s.calla_entre(p.empieza - AIRE, p.acaba)
+                and not any(d <= p.empieza <= h for d, h in zonas)]
 
     def exigir(self, cobertura: bool = True, varias: bool = True) -> None:
         """La cinta sirve, o se para. Sin avisos que nadie lee.
@@ -278,7 +283,8 @@ class Cinta:
         with open(self.transcript, encoding="utf-8") as f:
             return json.load(f)
 
-    def _descartado(self, a: float, b: float) -> bool:
+    def _zonas_descartadas(self) -> list:
+        """Lo declarado en `hueco_oido` como oído y descartado, `(desde, hasta)`."""
         import basedatos
 
         try:
@@ -288,8 +294,12 @@ class Cinta:
                             (self.nombre,)).fetchall()
             cx.close()
         except Exception:                          # noqa: BLE001
-            return False
-        return any(abs(a - d) < 0.3 and abs(b - h) < 0.3 for d, h in ya)
+            return []
+        return [(d, h) for d, h in ya]
+
+    def _descartado(self, a: float, b: float) -> bool:
+        return any(abs(a - d) < 0.3 and abs(b - h) < 0.3
+                   for d, h in self._zonas_descartadas())
 
     def __str__(self) -> str:
         return self.nombre
