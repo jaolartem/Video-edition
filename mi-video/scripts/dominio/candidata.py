@@ -41,7 +41,7 @@ FINALISTAS = 5
 PASO_VOZ = 0.25
 
 
-def tartamudeo(texto):
+def tartamudeo(texto, idioma=None):
     """
     Cuánto se repite el enunciado consigo mismo. 0 = limpio, 1 = todo repetido.
 
@@ -50,7 +50,7 @@ def tartamudeo(texto):
     porque **repetir las palabras del libreto sube la cobertura** — el
     tartamudeo puntuaba como acierto.
     """
-    ws = _voc.contenido(texto)
+    ws = _voc.contenido(texto, idioma)
     if len(ws) < 4:
         return 0.0
     return 1 - len(set(ws)) / len(ws)
@@ -106,7 +106,7 @@ def parecido(u, v):
     return len(a & b) / max(1, len(a | b))
 
 
-def puntua(beat, u):
+def puntua(beat, u, idioma=None):
     """
     Cuánto dice este enunciado el beat, y cómo de bien lo dice.
 
@@ -118,13 +118,13 @@ def puntua(beat, u):
     tropieza. Sin ese término, la que tropieza gana — porque repite palabras del
     beat y eso subía la cobertura.
     """
-    pedidas = set(_voc.contenido(beat))
+    pedidas = set(_voc.contenido(beat, idioma))
     if not pedidas:
         return 0.0
     cubre = len(pedidas & u["clave"]) / len(pedidas)
     # Penaliza el relleno: mucho texto que no es del beat es divagación.
     sobra = len(u["clave"] - pedidas) / max(1, len(u["clave"]))
-    return cubre - 0.25 * sobra - 0.8 * tartamudeo(u["texto"])
+    return cubre - 0.25 * sobra - 0.8 * tartamudeo(u["texto"], idioma)
 
 
 def dice(texto, termino):

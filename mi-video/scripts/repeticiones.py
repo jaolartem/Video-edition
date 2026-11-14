@@ -27,7 +27,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import registro  # noqa: E402,F401
-from dominio.idioma import ES  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 
 
 def pal(t):
@@ -44,8 +44,6 @@ ARRANQUE = 20.0
 #: de que suene a machaqueo. Tres: dos es enfasis, tres ya es una muletilla.
 VECES_MAX = 2
 
-#: Palabras que se repiten sin molestar porque no llevan peso.
-LLANAS = ES.llanas
 
 
 def machaca(r, arranque=ARRANQUE, veces=VECES_MAX):
@@ -63,13 +61,14 @@ def machaca(r, arranque=ARRANQUE, veces=VECES_MAX):
     """
     import collections
 
+    llanas = Idioma.de_pieza(str(r.get("video", "")).replace(".mp4", "")).llanas
     donde = collections.defaultdict(list)
     for c in r["captions"]:
         t = c["at"] / 30
         if t > arranque:
             break
         for w in pal(c["text"]):
-            if len(w) > 2 and w not in LLANAS:
+            if len(w) > 2 and w not in llanas:
                 donde[w].append(round(t, 1))
     return sorted(((w, cu) for w, cu in donde.items() if len(cu) > veces),
                   key=lambda x: -len(x[1]))

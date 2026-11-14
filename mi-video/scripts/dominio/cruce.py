@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from . import vocabulario as _voc
 from .depuracion import MARGEN, enteras_en
+from .idioma import Idioma
 from .tramo import Tramo
 
 #: Una palabra de contenido: lo bastante larga como para que repetirla signifique
@@ -38,9 +39,9 @@ BORDE = 10
 RESTO_MIN = 0.8
 
 
-def _clave(p) -> str | None:
+def _clave(p, idioma=None) -> str | None:
     """La palabra de contenido de esa `Palabra`, o `None` si no distingue nada."""
-    ws = _voc.contenido(p.texto)
+    ws = _voc.contenido(p.texto, idioma)
     return ws[0] if ws else None
 
 
@@ -62,12 +63,14 @@ def repite_en_el_corte(cola: Tramo, palabras_cola,
     ini = enteras_en(palabras_cabeza, cabeza.desde, cabeza.hasta)
     if not fin or not ini:
         return None
-    antes = {c for c in (_clave(p) for p in fin[-BORDE:])
+    lengua_cola, lengua_cabeza = (Idioma.de_cinta(cola.cinta),
+                                  Idioma.de_cinta(cabeza.cinta))
+    antes = {c for c in (_clave(p, lengua_cola) for p in fin[-BORDE:])
              if c and len(c) >= CONTENIDO}
     if not antes:
         return None
     for p in ini[:BORDE]:
-        if _clave(p) in antes:
+        if _clave(p, lengua_cabeza) in antes:
             # Se cortaría HASTA esa palabra incluida: lo que repite se va y la
             # frase arranca en lo que aporta. Y sólo si queda pieza al otro lado.
             nuevo = round(p.acaba + MARGEN, 3)

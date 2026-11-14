@@ -87,6 +87,16 @@ class Idioma:
         m = _PIEZA.search(os.path.basename(ruta))
         return cls.de_pieza(m.group(0)) if m else cls.de()
 
+    @classmethod
+    def en_pedido(cls, slug: str) -> dict:
+        """Lo que viaja en el pedido: nada si la pieza habla español.
+
+        Así un pedido en español queda idéntico al de antes y no caduca
+        ninguna respuesta en vuelo; los contratos dicen qué hacer con ella.
+        """
+        codigo = cls.de_pieza(slug).codigo
+        return {} if codigo == POR_DEFECTO else {"idioma": codigo}
+
     # ── lo que sabe ──────────────────────────────────────────────────────────
     @property
     def banderas(self) -> list:

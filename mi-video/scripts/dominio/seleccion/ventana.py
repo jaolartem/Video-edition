@@ -49,14 +49,15 @@ def literal(parrafo: str, texto: str, n: int = 4) -> float:
     return len(ga & gb) / max(1, len(ga))
 
 
-def reaparece(cola: str, cabeza: str) -> float:
+def reaparece(cola: str, cabeza: str, idioma=None) -> float:
     """¿Reaparece el final de un trozo al principio del siguiente?
 
     Es la firma del reintento: Jaime se para, y al retomar **vuelve unas
     palabras atrás**. Cortar ahí deja la versión truncada y manda al espectador
     la frase a medias, aunque el silencio sea limpio.
     """
-    a, b = beats.norm(cola)[-pesos.COLA:], beats.norm(cabeza)[:pesos.COLA]
+    a = beats.norm(cola, idioma)[-pesos.COLA:]
+    b = beats.norm(cabeza, idioma)[:pesos.COLA]
     if not a or not b:
         return 0.0
     mejor = 0
@@ -177,11 +178,12 @@ class Ventana:
         ws = beats.palabras(self.texto)
         if len(ws) < 9:
             return 0.0
-        pedidas = set(beats.norm(siguiente))
+        idioma = Idioma.de_cinta(self.toma)
+        pedidas = set(beats.norm(siguiente, idioma))
         if not pedidas:
             return 0.0
         cola = " ".join(ws[-len(ws) // 3:])
-        return len(pedidas & set(beats.norm(cola))) / len(pedidas)
+        return len(pedidas & set(beats.norm(cola, idioma))) / len(pedidas)
 
     def lee(self, parrafo: str, n: int = 4) -> float:
         """Cuánta secuencia EXACTA del libreto reproduce. El detector de lectura.
@@ -211,8 +213,10 @@ class Ventana:
         la toma con mejor voz — que es justo al revés. La poda va después, sobre
         la ganadora.
         """
+        idioma = Idioma.de_cinta(self.toma)
         cubre = float(beats.puntua(
-            parrafo, {"texto": self.texto, "clave": set(beats.norm(self.texto))}))
+            parrafo, {"texto": self.texto,
+                      "clave": set(beats.norm(self.texto, idioma))}, idioma))
         dice = bool(exige) and all(beats.dice(self.texto, t) for t in exige)
         # Cortar dentro de una frase se paga. Jaime lo dijo por su nombre: *«hay
         # silencios entre la misma frase; no significa que sea otra toma, sólo

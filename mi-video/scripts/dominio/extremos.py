@@ -17,6 +17,7 @@ import sys
 
 from . import enunciado as _enun
 from . import vocabulario as _voc
+from .idioma import Idioma
 from .voz import Voz
 
 
@@ -34,7 +35,7 @@ def sin(segs, rangos) -> list:
             if not any(min(t[1], y) - max(t[0], x) > 0.05 for x, y in rangos)]
 
 
-def repetido_por(elegidos, ws, rangos) -> list:
+def repetido_por(elegidos, ws, rangos, idioma=None) -> list:
     """Las unidades elegidas que un tramo declarado vuelve a decir.
 
     **Jaime graba en orden y repite hasta que sale**: *«no paso a la siguiente
@@ -48,11 +49,11 @@ def repetido_por(elegidos, ws, rangos) -> list:
     floja y luego en la buena, que es lo que Jaime llamo *«mutilado,
     repetitivo»*.
     """
-    dicho = {r: set(_voc.contenido(_enun.texto_en(ws, r)))
+    dicho = {r: set(_voc.contenido(_enun.texto_en(ws, r), idioma))
              for r in map(tuple, rangos)}
     malos = []
     for u in elegidos:
-        k = set(_voc.contenido(u.get("texto", "")))
+        k = set(_voc.contenido(u.get("texto", ""), idioma))
         if not k:
             continue
         for r, palabras in dicho.items():
@@ -96,7 +97,8 @@ def abrir(armado, frame, segs, ws) -> list:
     # La unidad de la que sale el propio recorte no cuenta: el tramo no la
     # repite, **es ella**. Sin esto la regla se comia el beat que acababa de
     # conservar (C-47).
-    for u, _, cuanto in [x for x in repetido_por(elegidos, ws, [trozo])
+    for u, _, cuanto in [x for x in repetido_por(elegidos, ws, [trozo],
+                                           Idioma.de_cinta(armado.toma))
                          if x[0] is not dentro]:
         _di(f"  beat {u['beat']}: la apertura dice lo mismo "
             f"({int(cuanto * 100)}% de las palabras) y es posterior. "
@@ -119,7 +121,8 @@ def abrir(armado, frame, segs, ws) -> list:
         armado.declara(
             armado.etapas[0],
             {"a": trozo[0], "b": trozo[1], "texto": txt,
-             "clave": set(_voc.contenido(txt)), "pal": []},
+             "clave": set(_voc.contenido(txt, Idioma.de_cinta(armado.toma))),
+             "pal": []},
             voz=Voz(trozo[0], trozo[1], armado.toma).expresividad,
             delante=True)
         _di("  beat 1: lo cumple la apertura declarada.")

@@ -37,10 +37,10 @@ def _cabeza(w) -> str:
     return (beats.palabras(w.texto) or [""])[0]
 
 
-def _contenido(ws) -> list[tuple]:
+def _contenido(ws, idioma=None) -> list[tuple]:
     """`(índice en ws, primera palabra de contenido)`, sólo de las que aportan."""
     return [(i, n[0]) for i, n in
-            ((i, beats.norm(w.texto)) for i, w in enumerate(ws)) if n]
+            ((i, beats.norm(w.texto, idioma)) for i, w in enumerate(ws)) if n]
 
 
 class Tijeras:
@@ -110,7 +110,7 @@ class Tijeras:
         ws = v.dentro(self.palabras)
         if len(ws) < pesos.SUELO_PODA:
             return v
-        cont = _contenido(ws)
+        cont = _contenido(ws, Idioma.de_cinta(v.toma))
         for n in (4, 3):
             for x in range(len(cont) - 2 * n + 1):
                 g1 = [c[1] for c in cont[x:x + n]]
@@ -143,8 +143,9 @@ class Tijeras:
         sobra: la primera ya cerró su idea.
         """
         ws = v.dentro(self.palabras)
-        fin = beats.norm(cola)[-pesos.COLA:]
-        cabeza = _contenido(ws)[:pesos.COLA]
+        idioma = Idioma.de_cinta(v.toma)
+        fin = beats.norm(cola, idioma)[-pesos.COLA:]
+        cabeza = _contenido(ws, idioma)[:pesos.COLA]
         corte = 0
         for n in range(min(len(fin), len(cabeza)), 0, -1):
             if fin[-n:] == [c[1] for c in cabeza[:n]]:
@@ -172,9 +173,12 @@ class Tijeras:
     @staticmethod
     def _sigue_diciendo(nuevo: Ventana, viejo: Ventana, parrafo: str, exige) -> bool:
         """¿Sigue diciendo la etapa después de podar?"""
+        idioma = Idioma.de_cinta(viejo.toma)
+
         def val(v):
             c = float(beats.puntua(
-                parrafo, {"texto": v.texto, "clave": set(beats.norm(v.texto))}))
+                parrafo, {"texto": v.texto,
+                          "clave": set(beats.norm(v.texto, idioma))}, idioma))
             d = all(beats.dice(v.texto, t) for t in exige) if exige else True
             return (1 if d else 0, c)
         return val(nuevo) >= val(viejo)

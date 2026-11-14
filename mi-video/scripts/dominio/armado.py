@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 
 from .candidata import IGUAL, parecido
+from .idioma import Idioma
 from .poda import podar
 
 
@@ -121,7 +122,7 @@ class Armado:
         for u in self.elegidos:
             i = u["beat"] - 1
             exige = self.etapas[i].debe_decir if i < len(self.etapas) else []
-            r = podar(u, exige)
+            r = podar(u, exige, Idioma.de_cinta(self.toma))
             if not r:
                 continue
             tramos, quitado, que = r

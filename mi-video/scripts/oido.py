@@ -52,6 +52,7 @@ import registro  # noqa: E402
 import rutas  # noqa: E402
 from dominio import texto as tx  # noqa: E402
 from dominio.cinta import Cinta  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 from dominio.libreto import Libreto  # noqa: E402
 from dominio.montaje import Montaje  # noqa: E402
 
@@ -124,20 +125,20 @@ def acuerdos(m):
     return fuera
 
 
-def _densas(ws):
+def _densas(ws, vacias=tx.VACIAS):
     """Sólo las palabras que distinguen algo.
 
     Proponer «que» donde el subtítulo escribe «quemá», o «una» donde escribe
     «alguna», es no proponer nada: son las palabras que se parecen a todo. Es la
     misma criba de `texto.contenido`, aplicada al candidato y no al texto.
     """
-    return [w for w in ws if len(w) > 2 and w not in tx.VACIAS]
+    return [w for w in ws if len(w) > 2 and w not in vacias]
 
 
-def _parecida(palabra, entre):
+def _parecida(palabra, entre, vacias=tx.VACIAS):
     """La más parecida de `entre`, con su parecido. Ninguna si no hay nada."""
     mejor, cuanto = None, 0.0
-    for otra in _densas(entre):
+    for otra in _densas(entre, vacias):
         r = difflib.SequenceMatcher(None, palabra, otra).ratio()
         if r > cuanto:
             mejor, cuanto = otra, r
@@ -152,6 +153,7 @@ def sospechosas(n, todas=False):
     ésas son paráfrasis del hablante y son la mayoría.
     """
     slug = f"reel-{int(n):02d}"
+    vacias = Idioma.de_pieza(slug).vacias
     caps = json.load(open(SUBS, encoding="utf-8")).get(slug)
     if not caps:
         return slug, None, 0.0
@@ -180,7 +182,7 @@ def sospechosas(n, todas=False):
             if not pal:
                 continue
             pal = pal[0]
-            if (len(pal) <= 2 or pal.isdigit() or pal in tx.VACIAS
+            if (len(pal) <= 2 or pal.isdigit() or pal in vacias
                     or pal in todo_el_libreto or pal in hechas):
                 continue
             # Dónde suena, y con eso en qué beat cae y con qué acuerdo se oyó.
@@ -194,8 +196,8 @@ def sospechosas(n, todas=False):
                 en_cinta = tramo.desde + (cuando - linea[i][0])
                 acuerdo = next((a for x, y, a in duda.get(tramo.cinta, [])
                                 if x <= en_cinta <= y), None)
-            candidato, parecido = _parecida(pal, del_libreto.get(beat, ()))
-            oye, suena = _parecida(pal, por_tramo.get(i, ()))
+            candidato, parecido = _parecida(pal, del_libreto.get(beat, ()), vacias)
+            oye, suena = _parecida(pal, por_tramo.get(i, ()), vacias)
             sin_cinta = pal not in dice_la_cinta
             dudoso = acuerdo is not None and acuerdo < SUELO
             # **Cuatro señales, y pesan distinto.** Que la cinta oyera OTRA que

@@ -27,7 +27,7 @@
 import fs from "node:fs";
 
 import { sql } from "./consulta.mjs";
-import { idioma } from "./idioma.mjs";
+import { idioma, idiomaDePieza } from "./idioma.mjs";
 
 /** El prompt vive en el repositorio y se manda literal. No se improvisa. */
 export const PROMPT = fs.readFileSync("scripts/describir.prompt.md", "utf8");
@@ -86,13 +86,13 @@ const VECES_MAX = 2;
 const LLANAS = idioma().llanas;
 
 /** Las palabras de contenido que se repiten en las primeras etapas. */
-function machacaEnElArranque(filas) {
+function machacaEnElArranque(filas, llanas = LLANAS) {
   const cuenta = new Map();
   for (const f of filas.slice(0, ETAPAS_ARRANQUE)) {
     const t = (f.montaje || f.dicho || "").toLowerCase()
       .normalize("NFD").replace(/[̀-ͯ]/g, "");
     for (const w of t.match(/[a-z]+/g) ?? []) {
-      if (w.length > 2 && !LLANAS.has(w)) cuenta.set(w, (cuenta.get(w) ?? 0) + 1);
+      if (w.length > 2 && !llanas.has(w)) cuenta.set(w, (cuenta.get(w) ?? 0) + 1);
     }
   }
   return [...cuenta.entries()].filter(([, n]) => n > VECES_MAX)
@@ -112,7 +112,7 @@ export function entradaDe(slug, filas) {
   // Lo ultimo es el punto: la medida existia y salia por consola, donde no la
   // ve quien elige las tomas. Aqui no se corta nada ni se propone nada — se le
   // pone delante, con su regla al lado: *«al inicio es fluido y rapido»*.
-  const drone = machacaEnElArranque(filas);
+  const drone = machacaEnElArranque(filas, idiomaDePieza(slug).llanas);
   return [
     `Reel: ${slug} — ${filas.length} etapas, en orden.`,
     portada === null ? "" : `La etapa ${portada} es la PORTADA (el gancho).`,

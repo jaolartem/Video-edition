@@ -31,6 +31,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from . import vocabulario as _voc  # noqa: E402
+from .idioma import Idioma  # noqa: E402
 
 # Margen que el detector de silencio deja a cada lado del habla. Recortarlo
 # quita el aire muerto que queda entre corte y corte: son decimas por escena,
@@ -153,6 +154,8 @@ def oraciones(toma):
     if trozo:
         partidas.append(trozo)
 
+    idioma = Idioma.de_cinta(toma)
+
     # Un intento muy largo se parte por su pausa mayor hasta caber. Por encima
     # de MAX_ORACION ya no es un intento: es la toma entera sin cortar.
     def trocear(f):
@@ -217,7 +220,7 @@ def oraciones(toma):
             # una unidad por donde empieza a repetir la siguiente.
             "pal": [[w["start"], w["end"], w["text"]] for w in f],
             "a": a - CENIDO * 0.5, "b": b + CENIDO * 0.5,
-            "texto": txt, "clave": set(_voc.contenido(txt)),
+            "texto": txt, "clave": set(_voc.contenido(txt, idioma)),
             "aire": round(sum(huecos), 2),
             # **Se marca, no se descarta.** Un trozo salido de una oracion
             # partida no acaba en punto aunque sea una idea entera: la

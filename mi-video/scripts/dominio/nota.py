@@ -60,6 +60,7 @@ import basedatos  # noqa: E402
 
 from . import ancla as _an  # noqa: E402
 from . import ticket as tk  # noqa: E402
+from .idioma import Idioma  # noqa: E402
 from .texto import contenido  # noqa: E402
 
 #: Cuánto del ancla tiene que seguir sonando para que la nota NO se dé por
@@ -215,10 +216,12 @@ class Nota:
 
         try:
             m = Montaje(self.slug)
-            hoy = set(contenido(" ".join(m.texto(t) for t, _ in m.tramos())))
+            idioma = Idioma.de_pieza(self.slug)
+            hoy = set(contenido(" ".join(m.texto(t) for t, _ in m.tramos()),
+                                idioma))
         except Exception:                          # noqa: BLE001
             return True                            # sin poder mirar, no archiva
-        pide = contenido(self.ancla.split("|")[0])
+        pide = contenido(self.ancla.split("|")[0], Idioma.de_pieza(self.slug))
         if not pide:
             return True
         return sum(1 for w in pide if w in hoy) / len(pide) >= SUENA_MIN

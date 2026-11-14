@@ -21,7 +21,7 @@ from . import vocabulario as _voc
 from .candidata import dice
 
 
-def podar(u, exige=()):
+def podar(u, exige=(), idioma=None):
     """Quita las repeticiones de DENTRO de una unidad.
 
     ## Que cuenta como repeticion
@@ -59,7 +59,7 @@ def podar(u, exige=()):
         return None
     tok = []
     for w in pal:
-        t = _voc.contenido(w[2])
+        t = _voc.contenido(w[2], idioma)
         tok.append(t[0] if t else "")
     esnum = [bool(re.search(r"\d", w[2])) for w in pal]
 
@@ -198,7 +198,7 @@ def podar(u, exige=()):
         " ".join(w[2] for w in pal[a_:b_]) for a_, b_ in fuera)
 
 
-def unir(u1, u2):
+def unir(u1, u2, idioma=None):
     """Dos frases seguidas de la misma toma, como una sola unidad.
 
     Regla de Jaime: *«a la frase 5 quitale "por cada 100 dolares" en adelante,
@@ -214,11 +214,11 @@ def unir(u1, u2):
     El corte es por palabra y con su tiempo, asi que la union sigue siendo un
     tramo continuo de la misma toma: no se cose nada.
     """
-    wb = set(_voc.contenido(u2["texto"]))
+    wb = set(_voc.contenido(u2["texto"], idioma))
     pal = u1["pal"]
     corte = len(pal)
     for i in range(len(pal) - 1, 3, -1):
-        toks = _voc.contenido(pal[i][2])
+        toks = _voc.contenido(pal[i][2], idioma)
         if toks and not set(toks) <= wb:
             break
         corte = i
@@ -231,5 +231,5 @@ def unir(u1, u2):
     return {**u2, "a": u1["a"], "b": u2["b"], "corte_uno": round(fin, 3),
             "tramos": [[round(u1["a"], 3), round(fin, 3)],
                        [round(u2["a"], 3), round(u2["b"], 3)]],
-            "texto": txt.strip(), "clave": set(_voc.contenido(txt)),
+            "texto": txt.strip(), "clave": set(_voc.contenido(txt, idioma)),
             "aire": round(u1.get("aire", 0) + u2.get("aire", 0), 2)}

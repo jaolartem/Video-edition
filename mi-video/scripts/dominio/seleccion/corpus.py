@@ -30,6 +30,7 @@ import registro  # noqa: E402
 
 from . import pesos  # noqa: E402
 from ..cinta import Cinta, CintaIncompleta  # noqa: E402
+from ..idioma import Idioma  # noqa: E402
 from ..tramo import Tramo  # noqa: E402
 from .ventana import Ventana, reaparece  # noqa: E402
 
@@ -80,7 +81,7 @@ def ventanas(habla, palabras, toma: str = "") -> list[Ventana]:
             if voz > pesos.MAX_VOZ:
                 break
             texto = " ".join(w.texto for w in ws).strip()
-            if len(beats.norm(texto)) < pesos.CONTENIDO_MIN:
+            if len(beats.norm(texto, Idioma.de_cinta(toma))) < pesos.CONTENIDO_MIN:
                 continue
             a, b = habla[i][0], habla[j][1]
             out.append(Ventana(
@@ -91,9 +92,11 @@ def ventanas(habla, palabras, toma: str = "") -> list[Ventana]:
                 # Sobra por delante si el arranque repite la cola del tramo
                 # anterior; queda truncada por detrás si su cola reaparece en el
                 # siguiente.
-                sobra=round(reaparece(dicho[i - 1] if i else "", texto), 2),
+                sobra=round(reaparece(dicho[i - 1] if i else "", texto,
+                                      Idioma.de_cinta(toma)), 2),
                 trunca=round(reaparece(
-                    texto, dicho[j + 1] if j + 1 < len(habla) else ""), 2)))
+                    texto, dicho[j + 1] if j + 1 < len(habla) else "",
+                    Idioma.de_cinta(toma)), 2)))
     return out
 
 

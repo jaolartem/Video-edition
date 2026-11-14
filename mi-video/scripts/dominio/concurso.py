@@ -24,6 +24,7 @@ from . import enunciado as _enun
 from . import vocabulario as _voc
 from .candidata import (FINALISTAS, PASO_VOZ, RELATIVO, UMBRAL, dice,
                         integridad, puntua, trabado)
+from .idioma import Idioma
 from .poda import unir
 from .voz import Voz
 
@@ -40,6 +41,8 @@ class Concurso:
         #: hacia delante necesita mirar más allá de las que quedan libres.
         self.cands = cands
         self.toma = toma
+        #: Lo que cuenta como contenido depende de la lengua de la cinta (C-665).
+        self.idioma = Idioma.de_cinta(toma)
         self.ws = ws
         self.runs = runs
 
@@ -91,9 +94,10 @@ class Concurso:
                 break
             # Freno 2: esto ya es del segmento siguiente.
             if (etapa.siguiente
-                    and puntua(etapa.siguiente, c) > puntua(etapa.parrafo, c) + 0.05):
+                    and puntua(etapa.siguiente, c, self.idioma)
+                    > puntua(etapa.parrafo, c, self.idioma) + 0.05):
                 break
-            junto = unir(junto, c)
+            junto = unir(junto, c, self.idioma)
             # Freno 1: la etapa ya esta dicha.
             if etapa.cumplida_por(junto["texto"]):
                 _di(f"  beat {etapa.n}: barrido hacia delante hasta decir "
@@ -128,7 +132,7 @@ class Concurso:
             _di(f"  beat {etapa.n} ({etapa.nombre}): {etapa.debe_decir} no estaba "
                 f"en ninguna unidad; encontrado en la cinta ({a_:.2f}-{b_:.2f})")
             return {"a": a_, "b": b_, "texto": txt,
-                    "clave": set(_voc.contenido(txt)), "aire": 0.0,
+                    "clave": set(_voc.contenido(txt, self.idioma)), "aire": 0.0,
                     "pal": [[w["start"], w["end"], w["text"]] for w in self.ws
                             if a_ <= w["start"] <= b_]}
         return None
@@ -140,7 +144,7 @@ class Concurso:
         Devuelve `(unidad, cobertura, voz)`. `voz` puede ser `None`: es «no
         medida», que no es lo mismo que «plana» — ver `dominio.voz`.
         """
-        puntuados = [(puntua(etapa.parrafo, u), u) for u in libres]
+        puntuados = [(puntua(etapa.parrafo, u, self.idioma), u) for u in libres]
         exige = etapa.debe_decir
         if exige:
             antes = len(puntuados)

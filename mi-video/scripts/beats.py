@@ -176,9 +176,9 @@ def palabras(t):
     return vocabulario.palabras(t)
 
 
-def norm(t):
+def norm(t, idioma=None):
     """De qué habla un texto, sólo lo que distingue. Regla en `dominio.texto`."""
-    return vocabulario.contenido(t)
+    return vocabulario.contenido(t, idioma)
 
 
 # ── lo que la pieza tiene que decir ──────────────────────────────────────────
@@ -209,9 +209,9 @@ def oraciones(toma):
     return enunciado.oraciones(toma)
 
 
-def tartamudeo(texto):
+def tartamudeo(texto, idioma=None):
     """Cuánto se repite el enunciado consigo mismo. Ver `dominio.candidata`."""
-    return candidata.tartamudeo(texto)
+    return candidata.tartamudeo(texto, idioma)
 
 
 def integridad(texto):
@@ -229,9 +229,9 @@ def parecido(u, v):
     return candidata.parecido(u, v)
 
 
-def puntua(beat, u):
+def puntua(beat, u, idioma=None):
     """Cuánto dice este enunciado el beat. Ver `dominio.candidata`."""
-    return candidata.puntua(beat, u)
+    return candidata.puntua(beat, u, idioma)
 
 
 def dice(texto, termino):
@@ -239,14 +239,14 @@ def dice(texto, termino):
     return candidata.dice(texto, termino)
 
 
-def podar(u, exige=()):
+def podar(u, exige=(), idioma=None):
     """Quita las repeticiones de DENTRO de una unidad. Ver `dominio.poda`."""
-    return poda.podar(u, exige)
+    return poda.podar(u, exige, idioma)
 
 
-def unir(u1, u2):
+def unir(u1, u2, idioma=None):
     """Dos frases seguidas de la misma toma, como una sola unidad. Ver `dominio.poda`."""
-    return poda.unir(u1, u2)
+    return poda.unir(u1, u2, idioma)
 
 
 # ── cómo suena ───────────────────────────────────────────────────────────────

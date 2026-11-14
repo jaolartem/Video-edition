@@ -24,6 +24,7 @@ import estado  # noqa: E402
 import registro  # noqa: E402
 
 from . import pesos  # noqa: E402
+from ..idioma import Idioma  # noqa: E402
 from ..tramo import Tramo, TramoInvalido  # noqa: E402
 from .ventana import Ventana  # noqa: E402
 
@@ -33,8 +34,8 @@ def con_toma(plan) -> list:
     return [k for k in plan if k is not None]
 
 
-def _dicen_lo_mismo(uno: str, otro: str) -> bool:
-    a, b = set(beats.norm(uno)), set(beats.norm(otro))
+def _dicen_lo_mismo(uno: str, otro: str, idioma=None) -> bool:
+    a, b = set(beats.norm(uno, idioma)), set(beats.norm(otro, idioma))
     if not a or not b:
         return False
     return len(a & b) / min(len(a), len(b)) > pesos.IGUALES
@@ -157,12 +158,14 @@ class Reparto:
             for x in range(len(elegidas)):
                 for y in range(x + 1, len(elegidas)):
                     (s1, k1), (s2, k2) = elegidas[x], elegidas[y]
-                    if not _dicen_lo_mismo(vs[k1].texto, vs[k2].texto):
+                    if not _dicen_lo_mismo(vs[k1].texto, vs[k2].texto,
+                                           Idioma.de_cinta(vs[k1].toma)):
                         continue
                     peor = k1 if self.marcas[s1][k1] < self.marcas[s2][k2] else k2
                     malas |= {z for z, w in enumerate(vs)
                               if w.solapa(vs[peor])
-                              and _dicen_lo_mismo(w.texto, vs[peor].texto)}
+                              and _dicen_lo_mismo(w.texto, vs[peor].texto,
+                                                 Idioma.de_cinta(w.toma))}
             if not malas:
                 return plan
             nuevo, _ = self.en_orden(prohibidas=malas)

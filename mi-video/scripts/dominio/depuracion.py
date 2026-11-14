@@ -26,6 +26,7 @@ y este módulo no lo intenta.
 from __future__ import annotations
 
 from . import vocabulario as _voc
+from .idioma import Idioma
 from .tramo import Tramo
 
 #: Por encima de esto el hueco no es ritmo: es tiempo muerto. En formato corto
@@ -125,8 +126,9 @@ def podar_dentro(palabras, tramo: Tramo) -> Tramo:
     el tramo duplicado y **conserva los dos lados**.
     """
     ws = enteras_en(palabras, tramo.desde, tramo.hasta)
-    cont = [(i, _voc.contenido(p.texto)[0]) for i, p in enumerate(ws)
-            if _voc.contenido(p.texto)]
+    idioma = Idioma.de_cinta(tramo.cinta)
+    cont = [(i, _voc.contenido(p.texto, idioma)[0]) for i, p in enumerate(ws)
+            if _voc.contenido(p.texto, idioma)]
     for n in (4, 3):
         for x in range(len(cont) - 2 * n + 1):
             g = [c[1] for c in cont[x:x + n]]
@@ -143,8 +145,8 @@ def podar_dentro(palabras, tramo: Tramo) -> Tramo:
     return tramo
 
 
-def _trigramas(t: str) -> list:
-    w = _voc.contenido(t)
+def _trigramas(t: str, idioma=None) -> list:
+    w = _voc.contenido(t, idioma)
     return [tuple(w[i:i + 3]) for i in range(len(w) - 2)]
 
 
@@ -162,7 +164,8 @@ def sin_repetir(palabras, trozos):
     Devuelve `(los que quedan, los índices que se van)`.
     """
     gramas = [set(_trigramas(t.texto_de(
-        enteras_en(palabras, t.desde, t.hasta, margen=0.0)))) for t in trozos]
+        enteras_en(palabras, t.desde, t.hasta, margen=0.0)),
+        Idioma.de_cinta(t.cinta))) for t in trozos]
     familias = {}
     for i in range(len(trozos)):
         for j in range(i + 1, len(trozos)):

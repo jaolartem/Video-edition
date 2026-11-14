@@ -62,9 +62,15 @@ def palabras(t):
     return list(ws)
 
 
-def contenido(t):
-    """De qué habla un texto, sólo lo que distingue. Regla en `dominio.texto`."""
-    ws = _NORMADO.get(t)
+def contenido(t, idioma=None):
+    """De qué habla un texto, sólo lo que distingue. Regla en `dominio.texto`.
+
+    Lo que no distingue depende de la lengua (C-665), así que la caché la
+    lleva en la clave: sin ella, un texto inglés y uno español iguales en
+    letras compartirían respuesta.
+    """
+    clave = t if idioma is None or idioma.codigo == "es" else (idioma.codigo, t)
+    ws = _NORMADO.get(clave)
     if ws is None:
-        ws = _NORMADO[t] = _tx.contenido(t)
+        ws = _NORMADO[clave] = _tx.contenido(t, idioma)
     return list(ws)

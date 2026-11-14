@@ -68,14 +68,15 @@ def palabras(t: str) -> list[str]:
     return re.sub(r"[^a-z0-9 ]+", " ", _sin_tildes(t)).split()
 
 
-def contenido(t: str) -> list[str]:
+def contenido(t: str, idioma=None) -> list[str]:
     """Para **comparar de qué habla** un trozo: sólo lo que distingue.
 
     Fuera lo de tres letras o menos y las vacías. Es lo que hace que «y el
     banco» y «el banco» cuenten como lo mismo — que es justo lo que se quiere al
     medir redundancia, y justo lo que NO se quiere al buscar un ancla.
     """
-    return [w for w in palabras(t) if len(w) > 2 and w not in VACIAS]
+    vacias = VACIAS if idioma is None else idioma.vacias
+    return [w for w in palabras(t) if len(w) > 2 and w not in vacias]
 
 
 def numerico(t: str) -> str:

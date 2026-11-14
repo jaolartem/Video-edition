@@ -38,6 +38,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 import rutas  # noqa: E402
 import transcribir  # noqa: E402
 
@@ -192,9 +193,10 @@ def main():
                      if orden - 1 < len(frame["beats"]) else [])
             parr = libreto[orden - 1] if orden - 1 < len(libreto) else mensaje
             for uid, d, h, txt in filas:
+                idioma = Idioma.de_pieza(slug)
                 u = {"a": d, "b": h, "texto": txt,
-                     "clave": set(beats.norm(txt))}
-                cubre = round(float(beats.puntua(parr, u)), 3)
+                     "clave": set(beats.norm(txt, idioma))}
+                cubre = round(float(beats.puntua(parr, u, idioma)), 3)
                 dice_ = int(bool(exige) and
                             all(beats.dice(txt, t) for t in exige))
                 con.execute(
