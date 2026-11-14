@@ -2,15 +2,14 @@ import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { assertShort } from "../brand/copy";
-import { franja } from "../brand/franja";
 import {
   duration,
   ease,
-  layout,
   mode as modes,
   videoText,
   type Mode,
 } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Rótulo sobre el vídeo, para sostener la atención en el gancho.
@@ -41,6 +40,8 @@ export const HookTitle: React.FC<{
   cues: TitleCue[];
   mode?: Mode;
 }> = ({ cues, mode = "evidence" }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const frame = useCurrentFrame();
   const t = modes[mode];
 

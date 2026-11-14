@@ -1,5 +1,6 @@
 import React from "react";
-import { layout } from "../../brand/tokens";
+import { useLienzo } from "../../brand/LienzoContexto";
+
 
 const ALTO = 72;
 
@@ -17,6 +18,7 @@ export const Bifurcacion: React.FC<{
   defaultInk: string;
   deliberateInk: string;
 }> = ({ progress, defaultInk, deliberateInk }) => {
+  const layout = useLienzo();
   const w = layout.width - (layout.safe.left + layout.safe.right);
   const mid = w / 2;
   const rama = (hasta: number, tinta: string) => (

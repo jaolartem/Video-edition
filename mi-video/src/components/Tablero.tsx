@@ -16,7 +16,7 @@ import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
 import { Recorte, type Forma, type Lado } from "./Recorte";
 import { LadoDelSujeto, ZonaTablero } from "./ZonaTablero";
-import { COLUMNA } from "./panel/sitio";
+import type { Lienzo } from "../brand/lienzo";
 import { Freeze } from "remotion";
 import type { Mode } from "../brand/tokens";
 
@@ -96,8 +96,13 @@ const SITIO_EN_TABLERO = {
   derecha: { ancho: 720, right: -110, top: 40 },
 } as const;
 
-export const dibujaTablero = (cue: CueDeTablero, mode: Mode) => {
+/**
+ * El lienzo lo trae quien llama, que es un componente y puede pedirlo al
+ * contexto: esto es una función (C-670). La columna de él es la de su lienzo.
+ */
+export const dibujaTablero = (cue: CueDeTablero, mode: Mode, layout: Lienzo) => {
   const props = cue.props as Record<string, unknown>;
+  const COLUMNA = layout.columna;
   /**
    * **Él dentro del tablero, puesto aquí para todas las formas** (T-06).
    *

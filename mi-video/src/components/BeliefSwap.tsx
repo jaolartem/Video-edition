@@ -6,8 +6,9 @@ import { Remate } from "./Remate";
 import type { Recorte } from "./Fondo";
 import { fontFamily } from "./../brand/fonts";
 import { assertShort } from "../brand/copy";
-import { color, duration, ease, layout, readingFrames } from "../brand/tokens";
+import { color, duration, ease, readingFrames } from "../brand/tokens";
 import { ZonaTablero } from "./ZonaTablero";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * La creencia se tacha y la verdad entra en oro. **Dos cintas, nada más.**
@@ -72,6 +73,7 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
   recorte = "cuna",
   duracion,
 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   assertShort(creencia, "statement", "BeliefSwap.creencia");
   assertShort(verdad, "statement", "BeliefSwap.verdad");

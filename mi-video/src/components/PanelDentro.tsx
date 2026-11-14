@@ -6,7 +6,8 @@ import { useEntrada } from "../brand/horario";
 import { color } from "../brand/tokens";
 import { Fondo } from "./Fondo";
 import { Bloque } from "./panel/Cierre";
-import { COLUMNA, T, cabeElSujeto, columnaDe } from "./panel/sitio";
+import { T, cabeElSujeto, columnaDe, columnaEn } from "./panel/sitio";
+import { useLienzo } from "../brand/LienzoContexto";
 import { Recorte, type Lado } from "./Recorte";
 import { Reparto, type Porcion } from "./Reparto";
 import { ZonaTablero } from "./ZonaTablero";
@@ -107,6 +108,8 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
   duracion,
   tiempos,
 }) => {
+  const layout = useLienzo();
+  const COLUMNA = columnaEn(layout);
   const entra = useEntrada();
   // **Y cada bloque entra con su palabra, si el diseño lo ancló** (C-458):
   // con el reloj fijo el reparto de reel-15 e3 salía 2 s y el remate lo barría
@@ -136,7 +139,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
   cabeElSujeto(sujeto, repartos.length, Boolean(pregunta));
   const barre = entra(H.remate, 16);
 
-  const x = columnaDe(sujeto);
+  const x = columnaDe(sujeto, layout);
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
@@ -249,7 +252,7 @@ export const PanelDentro: React.FC<PanelDentroProps> = ({
               position: "absolute",
               left: 0,
               top: 620,
-              width: 1080,
+              width: layout.width,
               padding: "44px 54px",
               backgroundColor: color.richBlack,
               opacity: barre,

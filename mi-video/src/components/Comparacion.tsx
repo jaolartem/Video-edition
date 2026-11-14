@@ -9,8 +9,9 @@ import { Remate } from "./Remate";
 import { ZonaTablero } from "./ZonaTablero";
 import { Columna } from "./comparacion/Columna";
 import { horarioDe } from "./comparacion/horario";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
 import type { ComparacionProps } from "./comparacion/tipos";
+import { useLienzo } from "../brand/LienzoContexto";
 
 export type { Columna, ComparacionProps } from "./comparacion/tipos";
 export { duracionDe } from "./comparacion/horario";
@@ -58,6 +59,7 @@ export const Comparacion: React.FC<ComparacionProps> = ({
   duracion,
   sound = false,
 }) => {
+  const layout = useLienzo();
   const entra = useEntrada();
 
   assertShort(premisa, "title", "Comparacion.premisa");

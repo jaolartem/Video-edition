@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Barra que cruza el cuadro **para traer un gráfico**.
@@ -31,6 +32,7 @@ export const BarWipe: React.FC<{
   grosor?: number;
   tono?: "gold" | "black";
 }> = ({ en, dura = 7, grosor = 0.26, tono = "black" }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const t = frame - (en - dura / 2);
   if (t < 0 || t > dura) return null;

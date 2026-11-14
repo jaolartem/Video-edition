@@ -1,6 +1,7 @@
 import type { BoardCue, CaptionCue } from "../Ad";
 import type { Capa } from "../components/Capas";
 import type { Casilla } from "../components/Casillas";
+import type { Formato } from "../brand/lienzo";
 import type { Motion } from "../brand/sfx";
 import type { Porcion } from "../components/Reparto";
 import type { Recorte } from "../components/Detras";
@@ -37,6 +38,12 @@ import type { Volumen } from "../components/Volumen";
 export type ReelSpec = {
   id: string;
   video: string;
+  /**
+   * El lienzo de la pieza, de `frames.json`. **Sólo viene si no es vertical**,
+   * igual que la portada no cuenta en la huella: así las piezas de siempre no
+   * cambian ni un byte (C-670). Ver `brand/lienzos.json`.
+   */
+  formato?: Formato;
   /** Volumen del plano. `0` renderiza la pieza como pista de solo efectos. */
   volumen?: number;
   /**

@@ -1,12 +1,14 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { ThreeCanvas } from "@remotion/three";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
 import registro from "../brand/volumenes.json";
 import { Compuerta3D, Desvio3D, Fuga3D } from "./volumen/escenas";
 import { Brecha3D, Contencion3D, Foco3D, Franja3D, Umbral3D }
   from "./volumen/masas";
 import { Relevo3D, Tajo3D } from "./volumen/partido";
+import { useLienzo } from "../brand/LienzoContexto";
+import type { Lienzo } from "../brand/lienzo";
 
 /**
  * **La animación del panel, con volumen y con luz.** Sustituye a los palitos.
@@ -93,17 +95,22 @@ const ESCENA: Record<Volumen, React.FC<{ frame: number }>> = {
  * Abajo se para en el techo de la franja: ningún elemento baja de ahí.
  */
 const CAJA = registro.caja;
-const ANCHO = Math.round(layout.width * CAJA.ancho);
-const ALTO = Math.round(layout.height * CAJA.alto);
 
-/** Se aparta del borde: la interfaz de la plataforma muerde los laterales. */
-const MARGEN = Math.round(layout.width * CAJA.margen);
+/** La caja en píxeles de su lienzo: las fracciones de `CAJA`, sobre su cuadro (C-670). */
+const cajaEn = (layout: Lienzo) => {
+  const ANCHO = Math.round(layout.width * CAJA.ancho);
+  const ALTO = Math.round(layout.height * CAJA.alto);
 
-/**
- * Unidades de mundo por píxel del lienzo. A 10,5 de distancia el semiancho
- * visible es 1,92 para los 162 px de medio lienzo: 3,84 / `ANCHO`.
- */
-const MUNDO_POR_PX = 3.84 / ANCHO;
+  /** Se aparta del borde: la interfaz de la plataforma muerde los laterales. */
+  const MARGEN = Math.round(layout.width * CAJA.margen);
+
+  /**
+   * Unidades de mundo por píxel del lienzo. A 10,5 de distancia el semiancho
+   * visible es 1,92 para los 162 px de medio lienzo: 3,84 / `ANCHO`.
+   */
+  const MUNDO_POR_PX = 3.84 / ANCHO;
+  return { ANCHO, ALTO, MARGEN, MUNDO_POR_PX };
+};
 
 export const Volumen: React.FC<{
   nombre: Volumen;
@@ -116,6 +123,8 @@ export const Volumen: React.FC<{
    */
   hueco?: number;
 }> = ({ nombre, lado, hueco = CAJA.ancho + CAJA.margen }) => {
+  const layout = useLienzo();
+  const { ANCHO, ALTO, MARGEN, MUNDO_POR_PX } = cajaEn(layout);
   const frame = useCurrentFrame();
   const Escena = ESCENA[nombre];
   // Lo que se ve del volumen: el hueco menos el margen del borde, y nunca más

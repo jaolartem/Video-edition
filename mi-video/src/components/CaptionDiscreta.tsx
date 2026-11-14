@@ -1,8 +1,8 @@
 import React from "react";
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import { franja } from "../brand/franja";
-import { color, layout, videoText, type ModeTokens } from "../brand/tokens";
+import { color, videoText, type ModeTokens } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **El subtítulo mientras manda el tablero.**
@@ -59,6 +59,8 @@ export const CaptionDiscreta: React.FC<{
   /** Frame en que empieza este subtítulo, para animar dentro de él. */
   desde?: number;
 }> = ({ text, tokens, corrige, desde = 0 }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const frame = useCurrentFrame();
   const p = interpolate(frame, [desde, desde + 4], [0, 1], {
     extrapolateLeft: "clamp",

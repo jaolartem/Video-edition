@@ -1,8 +1,8 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import { franja } from "../brand/franja";
-import { layout, size, tracking, weight } from "../brand/tokens";
+import { size, tracking, weight } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * Las piezas de **registro tipográfico** del canon, escritas una vez.
@@ -38,21 +38,25 @@ import { layout, size, tracking, weight } from "../brand/tokens";
 export const Marco: React.FC<{
   style?: React.CSSProperties;
   children: React.ReactNode;
-}> = ({ style, children }) => (
-  <AbsoluteFill
-    style={{
-      paddingTop: layout.safe.top,
-      paddingBottom: franja.reserva,
-      paddingLeft: layout.safe.left,
-      paddingRight: layout.safe.right,
-      display: "flex",
-      flexDirection: "column",
-      ...style,
-    }}
-  >
-    {children}
-  </AbsoluteFill>
-);
+}> = ({ style, children }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
+  return (
+    <AbsoluteFill
+      style={{
+        paddingTop: layout.safe.top,
+        paddingBottom: franja.reserva,
+        paddingLeft: layout.safe.left,
+        paddingRight: layout.safe.right,
+        display: "flex",
+        flexDirection: "column",
+        ...style,
+      }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
+};
 
 /**
  * Etiqueta en versales con interletrado amplio: el registro mono del sistema.

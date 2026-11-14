@@ -1,6 +1,7 @@
 import React from "react";
 import { interpolate } from "remotion";
-import { color, layout } from "../../brand/tokens";
+import { color } from "../../brand/tokens";
+import { useLienzo } from "../../brand/LienzoContexto";
 
 /**
  * **El corredor de fuga: adónde va la que se desvía.**
@@ -37,6 +38,7 @@ export const Corredor: React.FC<{
   /** Progreso de apertura, 0→1. */
   abre: number;
 }> = ({ desdeY, fuga, lineas, abre }) => {
+  const layout = useLienzo();
   const centro = Math.floor(lineas / 2);
   return (
     <>

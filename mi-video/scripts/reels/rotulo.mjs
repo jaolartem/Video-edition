@@ -14,6 +14,14 @@
  */
 import fs from "node:fs";
 import { FPS } from "./reloj.mjs";
+import { lienzoDe } from "../lienzo.mjs";
+
+/**
+ * La altura del cuadro del gancho, de `lienzos.json` (C-670): estaba escrita dos
+ * veces como 1920. Es la del vertical porque la coronilla que se lee aquí la
+ * mide `sujeto.py` sobre el vertical.
+ */
+const ALTURA = lienzoDe().height;
 
 const J = JSON.parse(fs.readFileSync("src/brand/gancho.json", "utf8"));
 
@@ -48,7 +56,7 @@ export const CANON = {
   /** Cuándo queda armado el bloque del rótulo, ya en frames. Ver `_armado`. */
   armado: Math.round(J.armado * FPS),
   /** El tercio de abajo, en píxeles: ahí no vive el rótulo. */
-  tercioPx: Math.round(J.tercio * 1920),
+  tercioPx: Math.round(J.tercio * ALTURA),
 };
 
 /**
@@ -194,7 +202,7 @@ export function colocar(lineas, src, oro = lineas.length - 1) {
   let cabeza = null;
   if (fs.existsSync(ficha)) {
     const f = JSON.parse(fs.readFileSync(ficha, "utf8"));
-    if (typeof f.coronilla === "number") coronilla = Math.round(f.coronilla * 1920);
+    if (typeof f.coronilla === "number") coronilla = Math.round(f.coronilla * ALTURA);
     if (Array.isArray(f.cabeza) && f.cabeza.length === 2) cabeza = f.cabeza;
   }
   const golpe = cuerpos[oro] ?? cuerpos[cuerpos.length - 1] ?? CANON.primera;

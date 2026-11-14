@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **La transición animada: dos filetes cruzan la costura en diagonal.**
@@ -44,6 +45,7 @@ export const Filete: React.FC<{
   /** Grosor del segundo, el que acompaña. */
   segundo?: number;
 }> = ({ en, dura = 10, grosor = 6, segundo = 3 }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const t = frame - (en - dura / 2);
   if (t < 0 || t > dura) return null;

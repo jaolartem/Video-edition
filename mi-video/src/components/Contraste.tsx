@@ -8,7 +8,8 @@ import {
   useCurrentFrame,
 } from "remotion";
 import { fontFamily } from "../brand/fonts";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **La comparación como texto fuerza, no como tablero.**
@@ -60,6 +61,7 @@ const Lado: React.FC<{
   oro?: boolean;
   desde: "izq" | "der";
 }> = ({ etiqueta, cifra, at, de100, placa, oro, desde }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const p = interpolate(frame, [at, at + 8], [0, 1], {
     extrapolateLeft: "clamp",
@@ -187,6 +189,7 @@ const Lado: React.FC<{
 };
 
 export const Contraste: React.FC<ContrasteProps> = ({ izq, der, pie }) => {
+  const layout = useLienzo();
   const frame = useCurrentFrame();
   const hayPie = interpolate(frame, [der.at + 6, der.at + 14], [0, 1], {
     extrapolateLeft: "clamp",

@@ -3,13 +3,14 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
-import { color, ease, layout, readingFrames } from "../brand/tokens";
-import { franja } from "../brand/franja";
+import { color, ease, readingFrames } from "../brand/tokens";
 import { Fondo, type Recorte } from "./Fondo";
 import { Remate } from "./Remate";
 import { MotionSound } from "./MotionSound";
 import { ZonaTablero } from "./ZonaTablero";
 import { Corredor } from "./desvio/Corredor";
+import { useLienzo } from "../brand/LienzoContexto";
+import type { Franja } from "../brand/franja";
 
 /**
  * **La vía de siempre choca; la otra rodea el bloque y sale.**
@@ -64,25 +65,29 @@ export type DesvioProps = {
  * no había nada, con el subtítulo flotando en el medio. Los números vivían
  * escritos a mano y ninguno miraba cuánto sitio hay.
  */
-const ZONA = franja.techoPx;
-const VIA = { y: Math.round(ZONA * 0.4), alto: 132 } as const;
-const BLOQUE = { x: 790, y: VIA.y - 48, w: 230, h: 228 } as const;
-/** La banda que rodea: sube por aquí y sale por arriba. */
-const RODEO = { x: 636, y: Math.round(ZONA * 0.14), alto: 112 } as const;
-/**
- * **El corredor de fuga: adónde va la que se desvía.**
- *
- * Es lo que llena la mitad de abajo, y no es relleno — es el canon: *«punto de
- * fuga, geometría rota, líneas»*, y el elemento conceptual dice lo que dice el
- * beat. Aquí el beat es *hay otra manera y alguien la encuentra*, así que las
- * líneas se abren desde el bloque que paró a la primera vía hacia un punto que
- * está fuera, y la luz recorre la que sale.
- *
- * Sustituye a lo que el canon acaba de retirar —*«las animaciones de bolitas y
- * palitos se acaban, quitan más de lo que dan»*—: no es una viñeta que aparece,
- * es profundidad que se abre mientras la banda escapa.
- */
-const FUGA = { x: 300, y: ZONA - 40 } as const;
+/** Medida sobre el techo de la franja de su lienzo (C-670). */
+const geometria = (franja: Franja) => {
+  const ZONA = franja.techoPx;
+  const VIA = { y: Math.round(ZONA * 0.4), alto: 132 } as const;
+  const BLOQUE = { x: 790, y: VIA.y - 48, w: 230, h: 228 } as const;
+  /** La banda que rodea: sube por aquí y sale por arriba. */
+  const RODEO = { x: 636, y: Math.round(ZONA * 0.14), alto: 112 } as const;
+  /**
+   * **El corredor de fuga: adónde va la que se desvía.**
+   *
+   * Es lo que llena la mitad de abajo, y no es relleno — es el canon: *«punto de
+   * fuga, geometría rota, líneas»*, y el elemento conceptual dice lo que dice el
+   * beat. Aquí el beat es *hay otra manera y alguien la encuentra*, así que las
+   * líneas se abren desde el bloque que paró a la primera vía hacia un punto que
+   * está fuera, y la luz recorre la que sale.
+   *
+   * Sustituye a lo que el canon acaba de retirar —*«las animaciones de bolitas y
+   * palitos se acaban, quitan más de lo que dan»*—: no es una viñeta que aparece,
+   * es profundidad que se abre mientras la banda escapa.
+   */
+  const FUGA = { x: 300, y: ZONA - 40 } as const;
+  return { ZONA, VIA, BLOQUE, RODEO, FUGA };
+};
 /** Impar, para que haya una central: es la que sale. */
 const LINEAS_FUGA = 9;
 
@@ -95,6 +100,8 @@ export const Desvio: React.FC<DesvioProps> = ({
   duracion,
   sound = false,
 }) => {
+  const layout = useLienzo();
+  const { ZONA, VIA, BLOQUE, RODEO, FUGA } = geometria(layout.franja);
   const frame = useCurrentFrame();
   const entra = useEntrada();
 

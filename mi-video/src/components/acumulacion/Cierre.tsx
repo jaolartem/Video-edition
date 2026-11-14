@@ -1,7 +1,8 @@
 import React from "react";
 import { fontFamily } from "../../brand/fonts";
 import { cuerpoQueCabe } from "../../brand/medida";
-import { color, layout } from "../../brand/tokens";
+import { color } from "../../brand/tokens";
+import { useLienzo } from "../../brand/LienzoContexto";
 
 /**
  * **Lo que cierra la acumulación**: la cifra que la pila demuestra, y el pie que
@@ -41,6 +42,7 @@ export const Total: React.FC<{
   /** 0 → 1: el barrido cruzando. Lo emite quien conoce el horario. */
   barre: number;
 }> = ({ figura, barre }) => {
+  const layout = useLienzo();
   if (barre <= 0) {
     return null;
   }

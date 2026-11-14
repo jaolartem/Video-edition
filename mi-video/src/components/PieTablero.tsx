@@ -1,10 +1,10 @@
 import React from "react";
 import { fontFamily } from "../brand/fonts";
-import { franja } from "../brand/franja";
 import { useEntrada } from "../brand/horario";
 import { cuerpoQueCabe } from "../brand/medida";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
 import PIE from "../brand/pie.json";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **El pie de un tablero: FUERA de la zona segura, en una línea y en afirmativo.**
@@ -67,6 +67,8 @@ export const PieTablero: React.FC<{
    */
   desde?: number;
 }> = ({ linea, desde = 0 }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const entra = useEntrada();
   const texto = (linea ?? "").trim();
   if (!texto) return null;

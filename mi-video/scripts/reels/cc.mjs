@@ -33,12 +33,18 @@
 import fs from "node:fs";
 import { trasfondoDe } from "./material.mjs";
 import { ladoDelCcDe } from "./base.mjs";
+import { lienzoDe } from "../lienzo.mjs";
 
 const J = JSON.parse(fs.readFileSync("src/brand/cc.json", "utf8"));
 const U = J.umbrales;
 const CABEZA = J.cabeza;
-/** La altura del cuadro. Copia consciente de `layout.height`, como en `franja.mjs`. */
-const ALTURA = 1920;
+/**
+ * La altura del cuadro, de `lienzos.json` (C-670): era una copia consciente de
+ * `layout.height`. Es la del vertical porque las bandas que se miden aquí —la
+ * barbilla, la franja, la cabeza— las mide `trasfondo.py` sobre el vertical;
+ * cuando mida otro lienzo, esta altura pasa a ser la de la pieza.
+ */
+const ALTURA = lienzoDe().height;
 
 /**
  * **Si el cc de esa banda le tapa la cara** (C-624, C-632): el texto se apoya

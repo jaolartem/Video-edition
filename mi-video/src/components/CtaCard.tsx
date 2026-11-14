@@ -10,13 +10,13 @@ import { horarioDe } from "./ctaCard/horario";
 import {
   accentChoice,
   color,
-  layout,
   mode as modes,
   size,
   tone as tones,
   tracking,
 } from "../brand/tokens";
 import type { CtaCardProps } from "./ctaCard/tipos";
+import { useLienzo } from "../brand/LienzoContexto";
 
 export type { CtaCardProps } from "./ctaCard/tipos";
 
@@ -64,6 +64,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
   duracion,
   placa, recorte = "cuna",
 }) => {
+  const layout = useLienzo();
   const entra = useEntrada();
   const base = modes[mode];
   const t = {
@@ -91,7 +92,9 @@ export const CtaCard: React.FC<CtaCardProps> = ({
       <AbsoluteFill
         style={{
           top: layout.safe.top - 60,
-          bottom: layout.safe.bottom - 300,
+          // Sobre la interfaz de la plataforma, no sobre la zona segura (C-670):
+          // `safe.bottom - 300` en vertical, y en horizontal se salía del cuadro.
+          bottom: layout.interfaz - 40,
           backgroundColor: t.ground,
           opacity: abre * 0.93,
         }}
@@ -100,7 +103,7 @@ export const CtaCard: React.FC<CtaCardProps> = ({
       <AbsoluteFill
         style={{
           paddingTop: layout.safe.top - 20,
-          paddingBottom: layout.safe.bottom - 260,
+          paddingBottom: layout.interfaz,
           paddingLeft: layout.safe.left,
           paddingRight: layout.safe.right,
           display: "flex",

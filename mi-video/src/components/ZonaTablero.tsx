@@ -1,6 +1,5 @@
 import React from "react";
-import { franja } from "../brand/franja";
-import { COLUMNA } from "./panel/sitio";
+import { useLienzo } from "../brand/LienzoContexto";
 import type { Lado } from "./Recorte";
 
 /**
@@ -10,7 +9,7 @@ import type { Lado } from "./Recorte";
  *
  * Jaime, 10-9-2026: *«ahora todos los tableros deben mostrar mi cara en la
  * composición; la base son los del R-02»*. La medida es la de ese panel
- * —`panel/sitio.ts :: COLUMNA`—, no otra: el contenido vive en la columna
+ * —`columna` del lienzo, ver `panel/sitio.ts`—, no otra: el contenido vive en la columna
  * contraria a la suya.
  */
 export const LadoDelSujeto = React.createContext<Lado | null>(null);
@@ -53,6 +52,8 @@ export const LadoDelSujeto = React.createContext<Lado | null>(null);
 export const ZonaTablero: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const lado = React.useContext(LadoDelSujeto);
   const caja = {
     position: "absolute" as const,
@@ -71,14 +72,17 @@ export const ZonaTablero: React.FC<{ children: React.ReactNode }> = ({
   // reel-02 e3 (`acumulacion`), el título y las etiquetas salían por la
   // derecha. Encoger conserva la composición entera en el ancho que queda, y
   // se centra en alto para no dejar la mitad de abajo vacía.
-  const k = (LIENZO - COLUMNA.x) / LIENZO;
-  const alto = 1920 - franja.reserva;
+  // Maquetadas al ancho de su lienzo —el cuadro entero—, encogen a lo que le
+  // queda fuera de la columna de él (C-670: eran 1080 y 1920 escritos aquí).
+  const LIENZO = layout.width;
+  const k = (LIENZO - layout.columna.x) / LIENZO;
+  const alto = layout.height - franja.reserva;
   return (
     <div
       style={{
         ...caja,
-        left: lado === "izquierda" ? COLUMNA.x : 0,
-        right: lado === "derecha" ? COLUMNA.x : 0,
+        left: lado === "izquierda" ? layout.columna.x : 0,
+        right: lado === "derecha" ? layout.columna.x : 0,
       }}
     >
       <div
@@ -97,6 +101,3 @@ export const ZonaTablero: React.FC<{ children: React.ReactNode }> = ({
     </div>
   );
 };
-
-/** El ancho para el que están maquetadas las formas: el cuadro entero. */
-const LIENZO = 1080;

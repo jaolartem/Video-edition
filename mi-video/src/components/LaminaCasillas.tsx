@@ -1,11 +1,11 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import { franja } from "../brand/franja";
-import { color, layout } from "../brand/tokens";
+import { color } from "../brand/tokens";
 import type { Motion } from "../brand/sfx";
 import { Casillas, type Casilla } from "./Casillas";
 import { Fondo, type Recorte } from "./Fondo";
 import { ZonaTablero } from "./ZonaTablero";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **Casillas a cuadro completo: la lámina que se tacha mientras se dice.**
@@ -22,6 +22,8 @@ import { ZonaTablero } from "./ZonaTablero";
 export const LaminaCasillas: React.FC<{ props: Record<string, unknown> }> = ({
   props,
 }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
   const casillas = (props.casillas ?? []) as Casilla[];
   if (!casillas.length) return null;
   const placa = typeof props.placa === "string" ? props.placa : undefined;

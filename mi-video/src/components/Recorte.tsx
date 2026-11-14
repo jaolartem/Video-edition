@@ -1,6 +1,7 @@
 import React from "react";
 import { OffthreadVideo, staticFile } from "remotion";
 import { color } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * **La pegatina: él recortado, en blanco y negro y con canto de papel rasgado.**
@@ -216,6 +217,7 @@ export const Recorte: React.FC<RecorteProps> = ({
   entra = 1,
   trim = 0,
 }) => {
+  const layout = useLienzo();
   const cuadro = forma === "cuadro";
   // El sitio explícito gana; si no, el del lado. `?? SITIO.izquierda` sigue
   // cubriendo un `lado` que llegue del spec sin ser ninguno de los tres.
@@ -294,7 +296,7 @@ export const Recorte: React.FC<RecorteProps> = ({
           ...donde,
           width: ancho,
           // El recorte conserva la proporción del cuadro: es el mismo plano.
-          height: Math.round((ancho * 1920) / 1080),
+          height: Math.round((ancho * layout.height) / layout.width),
           opacity: entra,
           pointerEvents: "none",
           // **El corte de abajo también rasgado.** Lo cortaba la caja de

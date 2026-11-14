@@ -4,9 +4,9 @@ import { Compuesta, DESDE_EL_LADO } from "./captionBand/Compuesta";
 import { Corregida } from "./captionBand/Corregida";
 import { Plana } from "./captionBand/Plana";
 import { cabeElCcArriba, cc, type Trato } from "../brand/cc";
-import { franja } from "../brand/franja";
-import { layout, videoText, type ModeTokens } from "../brand/tokens";
+import { videoText, type ModeTokens } from "../brand/tokens";
 import type { Compuesto } from "./captionBand/Compuesta";
+import { useLienzo } from "../brand/LienzoContexto";
 
 export type { Compuesto } from "./captionBand/Compuesta";
 
@@ -157,99 +157,103 @@ export const CaptionBand: React.FC<{
   /** Arriba aunque no haya la holgura de `cabeElCcArriba` (C-651): abajo le tapaba la cara. */
   arriba?: boolean;
 }> = ({ text, tokens, corrige, palpita, realza, compuesto, desde = 0,
-        coronilla, lado, abajo, alinea, arriba, trato = cc.porDefecto }) => (
-  <div
-    style={{
-      position: "absolute",
-      left: layout.safe.left,
-      right: layout.safe.right,
-      /**
-       * 760 px desde abajo: **los subtitulos van pegados a la barbilla**.
-       *
-       * Peticion de Jaime. Con 420 la banda caia en el 68-78% de altura —lejos
-       * de la cara, donde la vista ya no esta— y el ojo tenia que viajar entre
-       * el rostro y el texto en cada frase.
-       *
-       * Sigue muy por encima de la interfaz de la plataforma, que ocupa los
-       * 400 px inferiores.
-       */
-      /**
-       * Encima de la cabeza **sólo si de verdad cabe**; si no, junto a la
-       * barbilla, que es donde Jaime lo pidió en su día.
-       *
-       * El hueco no es igual en las siete: medido sobre los cortes, va de −7 px
-       * (reel-05, donde su cabeza entra POR ENCIMA de la zona segura) a 565 px
-       * (reel-06, sentado y reclinado). Sólo R4 y R6 tienen sitio para dos
-       * renglones; en las otras cinco subir el subtítulo lo metería sobre su
-       * frente.
-       *
-       * La primera versión lo subía en las siete porque el dato de la coronilla
-       * era falso —predicho desde el ancla de movimiento, que devolvía siempre
-       * 0,32— y con él todas parecían tener 340 px libres. Ahora se mide.
-       */
-      // `abajo` gana siempre: es la única que sabe que arriba hay otra capa.
-      // Si cabe o no lo dice `cabeElCcArriba`, con los números de `cc.json`:
-      // estaban aquí sueltos —un 260 y un 24— y hacían falta en tres sitios más,
-      // el que mide el fondo de esa banda, el que decide el tratamiento y éste.
-      ...(!abajo && (arriba || cabeElCcArriba(coronilla))
-        ? {
-            top: cc.cabeza.desde,
-            // Arriba se comparte con el panel: el cc se queda con su mitad.
-            ...(lado === "der"
-              ? { right: layout.width * 0.44 }
-              : { left: layout.width * 0.44 }),
-            // Acaba un pelo antes de la coronilla, para no morderla. Sin
-            // `Math.max`: aquí ya se sabe que hay 260 px o más, y un suelo
-            // artificial era lo que la metía sobre su cara cuando no cabía.
-            maxHeight:
-              (coronilla ?? 0) * layout.height -
-              cc.cabeza.desde -
-              cc.cabeza.margen,
-            justifyContent: "flex-end" as const,
-          }
-        : // Bajo el gancho se apoya en el suelo de la franja —672 px, el borde
-          // inferior de la zona segura— y no en la barbilla: ahí es donde el
-          // rótulo tiene garantizado no llegar. Ver `abajo`.
-          { bottom: abajo ? franja.desdeAbajo : layout.captionBottom }),
-      minHeight: layout.captionBand,
-      display: "flex",
-      flexDirection: "column",
-      // El borde de abajo es el que no se mueve; lo que crece, crece hacia
-      // arriba. Ver la cabecera del componente.
-      justifyContent: "flex-end",
-      alignItems: alinea === "der" ? "flex-end" : "flex-start",
-      ...(alinea === "der"
-        ? { left: layout.width * DESDE_EL_LADO, textAlign: "right" as const }
-        : {}),
-      fontFamily: fontFamily.body,
-      // **Sobre un tablero esta banda ya no se dibuja.** Bajaba a 0,68 del
-      // cuerpo y se quedaba donde estaba —incluso encima de la coronilla, o sea
-      // encima del propio tablero—. Ahora ese caso lo lleva `CaptionDiscreta`,
-      // que es lo que la instruccion T-02 pedia y llevaba escrito sin usarse.
-      fontSize: videoText.caption,
-      fontWeight: 800,
-      lineHeight: 1.2,
-      letterSpacing: videoText.tracking,
-      color: tokens.text,
-    }}
-  >
-    {compuesto ? (
-      <Compuesta c={compuesto} desde={desde} alinea={alinea} />
-    ) : (
-      <Plana desde={desde} trato={trato}>
-        {corrige ? (
-          <Corregida texto={text} corrige={corrige} desde={desde} palpita={palpita} />
-        ) : realza ? (
-          <Corregida
-            texto={text}
-            corrige={{ dice: realza, es: realza }}
-            factor={1.22}
-            desde={desde}
-          />
-        ) : (
-          text
-        )}
-      </Plana>
-    )}
-  </div>
-);
+        coronilla, lado, abajo, alinea, arriba, trato = cc.porDefecto }) => {
+  const layout = useLienzo();
+  const franja = layout.franja;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: layout.safe.left,
+        right: layout.safe.right,
+        /**
+         * 760 px desde abajo: **los subtitulos van pegados a la barbilla**.
+         *
+         * Peticion de Jaime. Con 420 la banda caia en el 68-78% de altura —lejos
+         * de la cara, donde la vista ya no esta— y el ojo tenia que viajar entre
+         * el rostro y el texto en cada frase.
+         *
+         * Sigue muy por encima de la interfaz de la plataforma, que ocupa los
+         * 400 px inferiores.
+         */
+        /**
+         * Encima de la cabeza **sólo si de verdad cabe**; si no, junto a la
+         * barbilla, que es donde Jaime lo pidió en su día.
+         *
+         * El hueco no es igual en las siete: medido sobre los cortes, va de −7 px
+         * (reel-05, donde su cabeza entra POR ENCIMA de la zona segura) a 565 px
+         * (reel-06, sentado y reclinado). Sólo R4 y R6 tienen sitio para dos
+         * renglones; en las otras cinco subir el subtítulo lo metería sobre su
+         * frente.
+         *
+         * La primera versión lo subía en las siete porque el dato de la coronilla
+         * era falso —predicho desde el ancla de movimiento, que devolvía siempre
+         * 0,32— y con él todas parecían tener 340 px libres. Ahora se mide.
+         */
+        // `abajo` gana siempre: es la única que sabe que arriba hay otra capa.
+        // Si cabe o no lo dice `cabeElCcArriba`, con los números de `cc.json`:
+        // estaban aquí sueltos —un 260 y un 24— y hacían falta en tres sitios más,
+        // el que mide el fondo de esa banda, el que decide el tratamiento y éste.
+        ...(!abajo && (arriba || cabeElCcArriba(coronilla, layout))
+          ? {
+              top: cc.cabeza.desde,
+              // Arriba se comparte con el panel: el cc se queda con su mitad.
+              ...(lado === "der"
+                ? { right: layout.width * 0.44 }
+                : { left: layout.width * 0.44 }),
+              // Acaba un pelo antes de la coronilla, para no morderla. Sin
+              // `Math.max`: aquí ya se sabe que hay 260 px o más, y un suelo
+              // artificial era lo que la metía sobre su cara cuando no cabía.
+              maxHeight:
+                (coronilla ?? 0) * layout.height -
+                cc.cabeza.desde -
+                cc.cabeza.margen,
+              justifyContent: "flex-end" as const,
+            }
+          : // Bajo el gancho se apoya en el suelo de la franja —672 px, el borde
+            // inferior de la zona segura— y no en la barbilla: ahí es donde el
+            // rótulo tiene garantizado no llegar. Ver `abajo`.
+            { bottom: abajo ? franja.desdeAbajo : layout.captionBottom }),
+        minHeight: layout.captionBand,
+        display: "flex",
+        flexDirection: "column",
+        // El borde de abajo es el que no se mueve; lo que crece, crece hacia
+        // arriba. Ver la cabecera del componente.
+        justifyContent: "flex-end",
+        alignItems: alinea === "der" ? "flex-end" : "flex-start",
+        ...(alinea === "der"
+          ? { left: layout.width * DESDE_EL_LADO, textAlign: "right" as const }
+          : {}),
+        fontFamily: fontFamily.body,
+        // **Sobre un tablero esta banda ya no se dibuja.** Bajaba a 0,68 del
+        // cuerpo y se quedaba donde estaba —incluso encima de la coronilla, o sea
+        // encima del propio tablero—. Ahora ese caso lo lleva `CaptionDiscreta`,
+        // que es lo que la instruccion T-02 pedia y llevaba escrito sin usarse.
+        fontSize: videoText.caption,
+        fontWeight: 800,
+        lineHeight: 1.2,
+        letterSpacing: videoText.tracking,
+        color: tokens.text,
+      }}
+    >
+      {compuesto ? (
+        <Compuesta c={compuesto} desde={desde} alinea={alinea} />
+      ) : (
+        <Plana desde={desde} trato={trato}>
+          {corrige ? (
+            <Corregida texto={text} corrige={corrige} desde={desde} palpita={palpita} />
+          ) : realza ? (
+            <Corregida
+              texto={text}
+              corrige={{ dice: realza, es: realza }}
+              factor={1.22}
+              desde={desde}
+            />
+          ) : (
+            text
+          )}
+        </Plana>
+      )}
+    </div>
+  );
+};
