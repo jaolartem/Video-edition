@@ -237,7 +237,31 @@ export class Forma {
  * El orden es por cuántas veces se pidió: lo de arriba es lo que el lote usa de
  * verdad y lo primero que hay que construir.
  */
+/**
+ * **Los clips de la biblioteca de apoyo**, por id, con lo que muestran. Se leen
+ * aquí para que el catálogo del diseñador diga cuáles hay —elegir un B-roll
+ * por lo que enseña— y para que un id que no existe pare antes del render
+ * (C-673). La biblioteca vive en `src/brand/apoyo.json` y en ningún otro sitio.
+ */
+const CLIPS = (() => {
+  try {
+    return JSON.parse(fs.readFileSync("src/brand/apoyo.json", "utf8")).clips ?? {};
+  } catch {
+    return {};
+  }
+})();
+
 export const FORMAS = [
+  // **El B-roll propio: la voz sigue y la imagen es un clip.** No es un
+  // gráfico, pero ocupa el plano igual que uno y se elige con el mismo mando.
+  new Forma("Apoyo", "un clip propio de la biblioteca de apoyo bajo la voz:"
+            + " Alfred en pantalla, el guion escrito… en marcha, nunca congelado",
+            { clip: "el id del clip. Los que hay: " + (Object.entries(CLIPS)
+                .map(([k, c]) => `\`${k}\` (${c.muestra})`).join("; ") || "ninguno todavía"),
+              forma: "completo | panel. Sin decirlo, panel si el clip es vertical"
+                + " y el cuadro no",
+              etiqueta: "label" },
+            ["clip"]),
   // **Las formas las diseña el diseñador, no este fichero.**
   //
   // Regla de Jaime: *«deja que el diseñador diseñe las formas»*, y antes *«no es
@@ -451,6 +475,14 @@ export const revisarTablero = (kind, props) => {
   // **tumban el render** si un texto se pasa de su tope.
   const cerradas = figurasCerradas(kind, props);
   const f = forma(kind);
+  // Un clip que no está en la biblioteca, o cuyo fichero falta, tumba el render
+  // a mitad: se dice aquí, que es antes (C-673).
+  if (kind === "Apoyo" && props?.clip) {
+    const c = CLIPS[props.clip];
+    if (!c) return [`«Apoyo» pide el clip \`${props.clip}\`, que no está en src/brand/apoyo.json`];
+    if (!fs.existsSync(`public/${c.fichero}`))
+      return [`«Apoyo» \`${props.clip}\`: falta public/${c.fichero}`];
+  }
   return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props),
           ...pilaQueDesborda(props)];
 };

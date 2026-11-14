@@ -12,6 +12,7 @@ import { Fichas } from "./Fichas";
 import { LaminaCasillas } from "./LaminaCasillas";
 import { Techo, type TechoProps } from "./Techo";
 import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
+import { Apoyo, type ApoyoProps } from "./Apoyo";
 import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
 import { Recorte, type Forma, type Lado } from "./Recorte";
@@ -193,6 +194,12 @@ const laForma = (cue: CueDeTablero, mode: Mode) => {
    */
   if (cue.kind === "Techo")
     return <Techo {...(cue.props as TechoProps)} />;
+  /**
+   * **Un clip propio bajo la voz** —Alfred en pantalla, el guion escrito—, de
+   * la biblioteca `src/brand/apoyo.json`. Ver `Apoyo.tsx` (C-673).
+   */
+  if (cue.kind === "Apoyo")
+    return <Apoyo {...(cue.props as ApoyoProps)} />;
   if (cue.kind === "desvio")
     return <Desvio {...(cue.props as DesvioProps)} />;
   /**
