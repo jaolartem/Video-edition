@@ -107,6 +107,10 @@ class ServicioRevalidar(Servicio):
                 f["historial"] = [{"error": str(e)[:160]}]
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")
+        # **Y el modo de tiquets va sobre SU contrato** (C-700): el alcance se
+        # calculaba y no se ponía encima, así que este oficio nunca leyó cómo
+        # contestar un tiquet; reel-23 contestó dos veces con `tiquets: []`.
+        prompt, _ = alc.sobre(prompt, {})
         r = contrato.pedir("revalidar", pieza.slug, prompt, filas)
         if r is None:
             return Resultado(
