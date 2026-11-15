@@ -452,8 +452,11 @@ def sin_recibo(pieza=None):
     ahi, diciendo que se atendio algo que nadie miro. Los lee `recibos.py`.
     """
     cx = _con()
+    # Tantos huecos como servicios hay (C-698): escrito «(?, ?)» a mano, el
+    # tercero reventaba el despachador entero con «Incorrect number of bindings».
     q = ("select id, pieza, cuando, vuelve_a, cerrado, quien from ticket"
-         " where estado <> 'abierto' and vuelve_a in (?, ?)")
+         " where estado <> 'abierto' and vuelve_a in ("
+         + ", ".join("?" for _ in RECIBO) + ")")
     args = list(RECIBO)
     if pieza:
         q += " and pieza = ?"
