@@ -1,7 +1,8 @@
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { color, tracking, videoText } from "../brand/tokens";
+import { Fondo, type Recorte } from "./Fondo";
 import { ZonaTablero } from "./ZonaTablero";
 import { leerDeclarado } from "./declarado/lineas";
 import { useLienzo } from "../brand/LienzoContexto";
@@ -48,11 +49,22 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
 }) => {
   const layout = useLienzo();
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const { cuerpo } = leerDeclarado(props);
 
   if (!cuerpo.length) return null;
 
   const tranquila = String(props.familia ?? "tranquila") !== "cargada";
+  /**
+   * **La placa de la pieza, en marcha, debajo de lo que es plano** (C-703). Una
+   * forma declarada sin componente propio caía aquí sobre negro liso, y negro
+   * liso es quieto: reel-23 e9 («CODE IS / CHEAP») fue lo único que emisión
+   * siguió midiendo congelado cuando las fichas ya iban sobre la placa. La placa
+   * llega en `props.placa` como a toda forma —la de la pieza, de respaldo— y
+   * sólo va cuando el tablero ES el plano, nunca acompañando.
+   */
+  const placa = typeof props.placa === "string" ? props.placa : undefined;
+  const recorte = (typeof props.recorte === "string" ? props.recorte : "lleno") as Recorte;
 
   /**
    * **`cubre` decide si el elemento ES el plano o lo acompaña, y lo dice el
@@ -90,6 +102,9 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
         background: acompana || !tranquila ? "transparent" : color.richBlack,
       }}
     >
+      {placa && tranquila && !acompana ? (
+        <Fondo placa={placa} recorte={recorte} fuerza={0.9} deriva={durationInFrames} />
+      ) : null}
       {/**
        * **La franja del subtítulo no se toca, y aquí se hace imposible tocarla.**
        *
