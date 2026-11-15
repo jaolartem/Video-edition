@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill } from "remotion";
+import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { useEntrada } from "../brand/horario";
 import { color, readingFrames } from "../brand/tokens";
 import { Fondo, type Recorte } from "./Fondo";
@@ -76,6 +76,23 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
     entradas.push(t);
     t += Math.max(14, readingFrames(l.texto));
   }
+  /**
+   * **Y entre entrada y entrada, el filete de lectura** (C-701): la ficha que
+   * se está diciendo lleva una raya que la recorre hasta que entra la
+   * siguiente; la última, hasta que la lámina acaba. Es lo que mueve la lámina
+   * cuando ya entró todo —4,3 s quietos en reel-23 e5— y lo que mueve es lo
+   * que se está leyendo, no un adorno. Ver `Ficha.lectura`.
+   */
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  const lectura = (i: number) => {
+    const desde = entradas[i];
+    const hasta = i + 1 < entradas.length ? entradas[i + 1] : durationInFrames;
+    return interpolate(frame, [desde, Math.max(desde + 1, hasta)], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  };
 
   const ancho = layout.width - layout.safe.left - layout.safe.right;
   // **Sin reserva de pie.** Se guardaban 150 px al fondo de la lámina para la
@@ -148,6 +165,7 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
                       alto={altoFila}
                       ancho={Math.floor(ancho / fila.length) - 2}
                       progreso={entra(entradas[cuerpo.indexOf(l)])}
+                      lectura={lectura(cuerpo.indexOf(l))}
                       alterna={i % 2 === 1}
                     />
                   </div>
@@ -165,6 +183,7 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
                 alto={altoBloque}
                 ancho={ancho}
                 progreso={entra(entradas[cuerpo.indexOf(l)])}
+                lectura={lectura(cuerpo.indexOf(l))}
                 alterna={i % 2 === 1}
               />
             </React.Fragment>

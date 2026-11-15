@@ -501,10 +501,10 @@ def placas_que_existen(slug=None):
                          " ESA placa. No declares `placa` en un tablero para"
                          " cambiarla: la pieza la hereda sola y"
                          " `scripts/reels/fondo.mjs` para el render si dos capas"
-                         " pintan placas distintas. Tres placas en una pieza son"
-                         " tres piezas cosidas. Si crees que la asignada no"
-                         " sirve al argumento central, dilo en `por_que` y no la"
-                         " cambies por tu cuenta.",
+                         " pintan placas distintas. Si la asignada no sirve, dilo en"
+                         " `por_que`. Si está «sin declarar», decláral(a) TÚ, una vez,"
+                         " en `pieza.placa: {\"placa\": \"<nombre>\", \"por_que\":"
+                         " \"…\"}` (C-702): sin placa los tableros salen negros y quietos.",
         "que_son": "Fotomontajes reales, con perspectiva y grano de papel. NO"
                    " son texturas: un corredor de archivadores con un solo cajon"
                    " enfrente ARGUMENTA. Se genero un collage por codigo una vez"

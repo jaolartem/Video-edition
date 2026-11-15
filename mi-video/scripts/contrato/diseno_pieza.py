@@ -33,7 +33,7 @@ NIVEL_PIEZA = (
                    " un tablero — es de la pieza, y no se ve mirando uno."),
     Clave("portada",
               dispara=(Aguja("scripts/servicios/portada.py", "def guardar(slug, respuesta):"),
-                       Aguja("scripts/servicios/disenar.py", "    _portada(pieza.slug, respuesta)"),
+                       Aguja("scripts/servicios/disenar.py", "    _pieza(pieza.slug, respuesta)"),
                        Aguja("scripts/publicar.py", "subir(png, os.path.join(raiz, f\"{pieza}-portada.png\"), seco)"),),
               efecto="la imagen que se ve ANTES de darle al play",
               obligatoria=True,

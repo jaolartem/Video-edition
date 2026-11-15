@@ -5,6 +5,7 @@ import {
   interpolate,
   staticFile,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 import { color } from "../brand/tokens";
 
@@ -141,8 +142,14 @@ export const Fondo: React.FC<FondoProps> = ({
   ventana,
 }) => {
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  // **La deriva dura toda la lámina** (C-701). Cada forma pasaba la suya
+  // —`t + 90`, `duracion + 60`— y donde acababa, el plano se clavaba: emisión
+  // midió 2 congelados al final de reel-23 e5 con la placa puesta. La medida
+  // es sobre el cuadro entero, así que lo único que la pasa es la placa en
+  // marcha, y tiene que estarlo mientras la lámina esté.
   const escala = deriva
-    ? interpolate(frame, [0, deriva], [1, 1.06], {
+    ? interpolate(frame, [0, Math.max(deriva, durationInFrames)], [1, 1.06], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
       })

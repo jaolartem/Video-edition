@@ -29,7 +29,15 @@ export const Ficha: React.FC<{
   progreso: number;
   /** Alterna la superficie de las fichas que no son la de oro. */
   alterna?: boolean;
-}> = ({ linea, indice, alto, ancho, progreso, alterna = false }) => {
+  /**
+   * **El filete de lectura, 0→1** (C-701): una raya que recorre el pie de la
+   * ficha mientras es la que se está diciendo, hasta que entra la siguiente —y
+   * la última, hasta que la lámina acaba—. Es lo que hace que una lista nunca
+   * se quede clavada entre entrada y entrada: emisión midió 4,3 s quietos en
+   * reel-23 e5 con las cuatro filas ya dentro. Lo reparte quien apila.
+   */
+  lectura?: number;
+}> = ({ linea, indice, alto, ancho, progreso, alterna = false, lectura = 0 }) => {
   const tinta = linea.oro ? color.richBlack : color.lightNeutral;
   const menor = linea.oro ? color.richBlack : color.secondaryBlue;
   // El cuerpo cede antes que el texto: el avance de la Anton lo declara
@@ -48,6 +56,7 @@ export const Ficha: React.FC<{
   return (
     <div
       style={{
+        position: "relative",
         width: ancho,
         height: alto,
         display: "flex",
@@ -99,6 +108,18 @@ export const Ficha: React.FC<{
       >
         {linea.texto}
       </div>
+      {lectura > 0 && lectura < 1 ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            bottom: 0,
+            height: 4,
+            width: `${(lectura * 100).toFixed(2)}%`,
+            backgroundColor: linea.oro ? color.richBlack : color.gold,
+          }}
+        />
+      ) : null}
     </div>
   );
 };

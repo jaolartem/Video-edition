@@ -458,8 +458,8 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
         return Resultado(False, motivo=_peg.motivo(quietos))
 
     # La portada es de la pieza y no de una etapa: `servicios/portada.py`.
-    from .portada import guardar as _portada
-    _portada(pieza.slug, respuesta)
+    from .placa import de_la_pieza as _pieza  # portada y placa (C-702)
+    _pieza(pieza.slug, respuesta)
     con = _con()
     ahora = datetime.datetime.now().isoformat(timespec="seconds")
     puestos, encuadrados, corregidos = 0, 0, 0
