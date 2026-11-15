@@ -429,15 +429,16 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     # donde se puede releer cuando algo salga mal.
     visto = (respuesta.get("mirado") if isinstance(respuesta, dict) else None)
     if not visto:
-        return Resultado(
-            False,
-            motivo="la respuesta no trae «mirado»: hay que revisar los"
+        return Resultado(False, motivo="la respuesta no trae «mirado»: hay que revisar los"
                    " fotogramas de cada escena ANTES de aprobar y decir que se"
                    " vio — letras que no se leen, colores que no se ven,"
                    " composicion rota. Es parte del proceso, no un extra.")
     # **Lo que no se puede dibujar vuelve ahora, no al montar** (C-562). Es la
     # misma regla que `rompe` (`formas.revisarTablero` + `sinSujeto`); dicha
     # tres pasos tarde costo 18 vueltas a reel-19 y reel-21 el 18-10.
+    # **Y ningún tiquet sin respuesta** (C-691): atendido o devuelto a su paso.
+    if (falta := _abierto.exige_todos(pieza.slug, "disenado", "disenar", respuesta)):
+        return Resultado(False, motivo=falta)
     vuelta = _dib.puerta(pieza, tableros, respuesta)  # y sus tiquets: C-612
     if vuelta:
         return vuelta

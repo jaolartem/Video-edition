@@ -547,7 +547,7 @@ def recolocar(pieza):
     return n
 
 
-def encaminar(id_, fase):
+def encaminar(id_, fase, avisar=True):
     """Dice a qué paso vuelve la pieza por este ticket. Vuelve a poder volver.
 
     **Por qué se puede cambiar y por qué se borra `devuelto`.** El destino de un
@@ -560,6 +560,8 @@ def encaminar(id_, fase):
     cx.execute("update ticket set vuelve_a = ?, devuelto = null where id = ?",
                (fase or "", id_))
     cx.commit()
+    if not avisar:      # lo recoge `puertas.del_tiquet` en la vuelta (C-691)
+        return
     from dominio import puertas  # reencaminar también es el evento (C-411)
     puertas.del_tiquet_de(id_)
 

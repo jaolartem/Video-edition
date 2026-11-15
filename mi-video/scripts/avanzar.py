@@ -179,6 +179,8 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
         except Exception:                          # noqa: BLE001
             pass
 
+        for i in _abierto.reabre_saltados(pieza.slug):  # C-691
+            print(f"  {pieza.slug}: #{i} vuelve a su paso: lo contestó sin nombrarlo")
         vencidas = _abierto.vencidas(pieza.slug, actual["nombre"], orden)
         if vencidas:
             uno = vencidas[0]

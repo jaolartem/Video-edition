@@ -238,6 +238,12 @@ Las capacidades de arriba siguen siendo las tuyas. Lo que cambia es el encargo:
   lo que hay que hacer con un tiquet que no has mirado — antes se cerraban todos
   los de la fase y una respuesta sobre los paneles se llevó por delante el
   tiquet del gancho.
+- **Y ninguno se queda sin respuesta** (C-691). Cada tiquet de `datos.tiquets`
+  va en `tiquets` (lo atiendes, o ya está resuelto) o en `no_son_mios:
+  [{"id": 1096, "paso": "revalidado", "por_que": "…"}]`, con el paso que sabe
+  atenderlo: `revalidado` elige tomas y bordes, `descrito` decide plano y
+  tratamiento, `cosido` y los subtítulos van con su texto. Una respuesta que se
+  salta alguno se rechaza y se vuelve a pedir.
 """
 
 
@@ -400,3 +406,96 @@ def modo(prompt, payload, slug, fase):
 # herramientas quedan iguales, lo que cambia es el alcance; esto es POO»*.
 # Ahora es un objeto y aqui queda lo que si es de este fichero: que hay abierto,
 # que quedo vencido y como se cierra.
+
+
+def _nombrados(respuesta) -> set:
+    """Los números que la respuesta atiende o devuelve, en cualquiera de sus formas."""
+    fuera = set()
+
+    def _ids(xs):
+        for x in xs or []:
+            i = x.get("id") if isinstance(x, dict) else x
+            fuera.add(str(i).strip().lstrip("t"))
+
+    filas = respuesta if isinstance(respuesta, list) else []
+    if isinstance(respuesta, dict):
+        _ids(respuesta.get("tiquets"))
+        _ids(respuesta.get("no_son_mios"))
+        filas = respuesta.get("tableros") or respuesta.get("etapas") or []
+    for f in filas:
+        if isinstance(f, dict):
+            _ids(f.get("tiquets"))
+            _ids(f.get("no_son_mios"))
+    return fuera
+
+
+def sin_contestar(slug, fase, respuesta) -> list:
+    """Los tiquets de `fase` que la respuesta ni atiende ni devuelve (C-691).
+
+    reel-23, 15-11-2026: el pedido de `disenar` llevaba los quince tiquets de
+    Jaime sobre el render y uno de emisión; la respuesta sólo nombró el de
+    emisión, la línea la aceptó, y los quince —ya devueltos una vez— pararon la
+    pieza en `cortado` sin que nadie los hubiera mirado.
+    """
+    dichos = _nombrados(respuesta)
+    return [t[0] for t in suyas(slug) if t[2] == fase
+            and str(t[0]).startswith("t") and str(t[0])[1:] not in dichos]
+
+
+def exige_todos(slug, fase, paso, respuesta):
+    """El motivo del rechazo si la respuesta se salta tiquets; `None` si no.
+
+    Rechazar es apartar la respuesta y dejar el pedido en pie, como hace el
+    esquema: la pregunta vuelve a la cola. Si no se salta ninguno, encamina los
+    que dice que no son suyos.
+    """
+    faltan = sin_contestar(slug, fase, respuesta)
+    if not faltan:
+        devuelve_ajenos(respuesta)
+        return None
+    import servicio as contrato
+
+    contrato._archivar(paso, slug, "rechazada", solo_respuesta=True)
+    return (f"la respuesta no dice nada de {', '.join(faltan[:6])}: cada tiquet"
+            " va en `tiquets` o en `no_son_mios` con su paso (C-691)")
+
+
+def devuelve_ajenos(respuesta) -> list:
+    """Encamina al paso que dice la respuesta los tiquets que no son suyos."""
+    from . import ticket as _t
+    from .fase import camino
+
+    ruta = {f["nombre"] for f in camino()}
+    hechos = []
+    for x in (respuesta.get("no_son_mios") or []) if isinstance(respuesta, dict) else []:
+        if isinstance(x, dict) and x.get("paso") in ruta:
+            i = int(str(x.get("id")).strip().lstrip("t"))
+            _t.encaminar(i, x["paso"], avisar=False)
+            hechos.append(i)
+    return hechos
+
+
+def reabre_saltados(slug) -> list:
+    """Los tiquets que su paso contestó sin nombrarlos vuelven a él, una vez.
+
+    Es la otra mitad de `sin_contestar` (C-691): lo que ya se saltó antes de
+    que existiera la regla tenía gastada su vuelta, y `vencidas` paraba la pieza
+    para siempre. Si el paso contestó después de la devolución y el tiquet sigue
+    abierto, no lo miró: se le devuelve el turno. Ya no puede saltárselo otra
+    vez sin que se le rechace la respuesta, así que no es un bucle.
+    """
+    from . import ticket as _t
+
+    try:
+        cx = basedatos.abrir(BASE)
+        filas = cx.execute("select id, vuelve_a, devuelto from ticket where pieza"
+                           " = ? and estado = 'abierto' and devuelto is not null",
+                           (slug,)).fetchall()
+        cx.close()
+    except sqlite3.Error:
+        return []
+    vuelven = [r[0] for r in filas
+               if r[1] in _t.RECIBO and _t.recibo(slug, r[1], r[2])]
+    for i in vuelven:
+        _t.encaminar(i, dict((r[0], r[1]) for r in filas)[i], avisar=False)
+    return vuelven
