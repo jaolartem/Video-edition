@@ -88,3 +88,48 @@ def por_escena(n, video, muestras=3) -> list:
             fuera.append({**t, **({"coronilla": cuerpo["coronilla"]} if cuerpo else {}),
                           **{k: v for k, v in (cara or {}).items() if k != "visto"}})
     return fuera
+
+
+#: Cuánto puede separarse la nariz del punto medio entre los ojos, en fracción
+#: de la distancia entre ellos, para contar como mirada de frente. Girado hacia
+#: el computador la nariz se va a un lado y los ojos se juntan (C-683).
+DE_FRENTE = 0.3
+
+
+def de_frente(video, momentos) -> tuple[int, int]:
+    """`(de frente, mirados)`: en cuántos fotogramas se le ven los ojos a cámara.
+
+    Jaime, 14-11-2026: *«cuando dice que estoy yo en cámara, siempre tengo que
+    estar mostrando los ojos y hablando directamente a la cámara»*, y *«lo que
+    está grabado mirando el computador es porque no va en cámara»*. De espaldas
+    no hay cara; de lado la hay, pero con la nariz fuera del centro.
+    """
+    import numpy as np
+    import mediapipe as mp
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
+    from .sujeto import _fotograma
+
+    if not os.path.exists(MODELO):
+        return 0, 0
+    opts = vision.FaceDetectorOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=MODELO),
+        min_detection_confidence=CONFIANZA)
+    frente, mirados = 0, 0
+    with vision.FaceDetector.create_from_options(opts) as det:
+        for t in momentos:
+            img = _fotograma(video, t, ancho=480)
+            if img is None:
+                continue
+            mirados += 1
+            r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB,
+                                    data=np.ascontiguousarray(img)))
+            if not r.detections:
+                continue
+            kp = max(r.detections, key=lambda x: x.bounding_box.width
+                     * x.bounding_box.height).keypoints
+            ojos = abs(kp[0].x - kp[1].x)
+            if ojos > 0.01 and abs(kp[2].x - (kp[0].x + kp[1].x) / 2) / ojos < DE_FRENTE:
+                frente += 1
+    return frente, mirados

@@ -72,6 +72,18 @@ class ServicioVerificar(Servicio):
             vuelta = _devuelve_el_borde(pieza, voz)
             if vuelta:
                 return vuelta
+        # **Y la toma que no le enseña los ojos vuelve a quien la eligió** (C-683):
+        # otra que mire a cámara, y si no la hay, panel. Ver `dominio/mirada.py`.
+        from dominio import mirada as _mirada
+
+        mira = next((m for m in paran if _mirada.REGLA in m), None)
+        if mira:
+            from dominio.abierto import etapa_de
+
+            from .base import devuelve
+            return devuelve(pieza, _mirada.REGLA, mira.split(": ", 1)[-1],
+                            atiende="revalidado", etapa=etapa_de(mira),
+                            cierra_con="tramos")
         # Se devuelve el primero y se cuentan los demas: el motivo tiene que
         # caber en una linea del log y ser accionable. La lista entera esta en
         # `verificar.py --avisa`.

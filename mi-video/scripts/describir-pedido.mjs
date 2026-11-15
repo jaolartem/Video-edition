@@ -28,6 +28,7 @@ import fs from "node:fs";
 
 import { sql } from "./consulta.mjs";
 import { idioma, idiomaDePieza } from "./idioma.mjs";
+import { FRAMES } from "./reels/material.mjs";
 
 /** El prompt vive en el repositorio y se manda literal. No se improvisa. */
 export const PROMPT = fs.readFileSync("scripts/describir.prompt.md", "utf8");
@@ -126,6 +127,14 @@ export function entradaDe(slug, filas) {
       [
         `## Etapa ${f.orden} de «${f.estructura}»: ${f.etapa}`,
         `Funcion: ${f.mensaje ?? "(no declarada)"}`,
+        // **La edición, si el guion de Jaime la trae** (C-683): la columna VIDEO.
+        // Llegaba sólo el AUDIO, y el que compone improvisaba lo que ya estaba
+        // decidido —reel-23 salió con tableros negros donde decía «a cámara»—.
+        ...((v) => v ? [`EDICION DECIDIDA POR JAIME (columna VIDEO de su guion): «${v}».`
+          + " No la cambies: tu trato y tu plano la cumplen. «A cámara» es plano"
+          + " en cuadro, sus ojos de frente hablando a cámara; lo que no va a"
+          + " cámara va cubierto con lo que el VIDEO dice."] : [])(
+          FRAMES.reels?.[slug]?.beats?.[f.orden - 1]?.video),
         "Libreto:",
         f.libreto,
         // **Lo que dice el montaje, no lo que se eligio.** Son cosas

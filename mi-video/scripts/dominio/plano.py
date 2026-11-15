@@ -119,5 +119,7 @@ def bloques(slug) -> list:
 
 
 def reparos(slug) -> list:
-    """Lo que hay que arreglar de los planos de esa pieza."""
-    return [r for r in (b.reparo() for b in bloques(slug)) if r]
+    """Lo que hay que arreglar de los planos de esa pieza, mirada incluida."""
+    from . import mirada
+
+    return [r for r in (b.reparo() for b in bloques(slug)) if r] + mirada.reparos(slug)

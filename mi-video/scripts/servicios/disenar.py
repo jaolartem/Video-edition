@@ -46,7 +46,7 @@ from contrato.marca import ENTRADA_GANCHO, ESTILO, PRIORIDAD  # noqa: E402,F401
 
 from dominio import abierto as _abierto, quitada as _quitada  # noqa: E402
 import fotogramas as _fotogramas  # noqa: E402
-from dominio import remate as _remate  # noqa: E402
+from dominio import libreto as _libreto, remate as _remate  # noqa: E402
 from dominio.mudo import sin_copy as _sin_copy  # noqa: E402
 from dominio.arco import arco  # noqa: E402
 from dominio.encargo import (guardar_tablero as _guardar,  # noqa: E402
@@ -249,7 +249,8 @@ def resumen_pieza(slug):
                     "emocion": f["emocion"],
                     "plano": f["plano"],
                     "lleva_tablero": bool(_pide_tablero(f)),
-                    "ya_montado": ya})
+                    # Y la edición de Jaime, si su guion la trae (C-683).
+                    "ya_montado": ya, **_libreto.en_pedido(slug, f["etapa_orden"])})
     return out
 
 

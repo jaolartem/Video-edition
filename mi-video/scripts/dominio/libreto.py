@@ -112,6 +112,28 @@ def escribir_derivadas(ruta: str = FRAMES) -> list:
     return cambian
 
 
+def video_de(slug: str, orden: int) -> str | None:
+    """**La edición que Jaime decidió para esa etapa**, si su guion la trae (C-683).
+
+    Es la columna VIDEO del guion, transcrita por `scripts/guion.py`: qué va a
+    cámara, qué va cubierto y con qué. No es una sugerencia para el que compone:
+    es lo decidido, y el trato y el diseño la cumplen. Sin guion, `None`.
+    """
+    try:
+        with open(FRAMES, encoding="utf-8") as f:
+            beats = (json.load(f)["reels"].get(slug) or {}).get("beats") or []
+    except (OSError, KeyError, ValueError):
+        return None
+    i = int(orden) - 1
+    return (beats[i].get("video") or None) if 0 <= i < len(beats) else None
+
+
+def en_pedido(slug: str, orden: int) -> dict:
+    """`{"video_decidido": …}` para el pedido de esa etapa, o `{}` sin guion."""
+    v = video_de(slug, orden)
+    return {"video_decidido": v} if v else {}
+
+
 def origen_de(slug: str) -> tuple:
     """`(origen, {etapa del origen: etapa suya})`, o `(None, {})` si no deriva."""
     try:
