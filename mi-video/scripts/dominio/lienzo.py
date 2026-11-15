@@ -43,6 +43,10 @@ class Lienzo:
     banda: int
     #: Lo que queda entre los márgenes seguros: donde cabe una línea de texto.
     util: int
+    #: Desde abajo, en píxeles: donde se apoya el cc pegado a la barbilla y el
+    #: borde inferior de la zona segura. De ahí salen las bandas del cc (C-692).
+    cc_abajo: int
+    seguro_abajo: int
 
     # ── cómo nace ────────────────────────────────────────────────────────────
     @classmethod
@@ -55,7 +59,8 @@ class Lienzo:
         d = todos[formato]
         return cls(formato, int(d["width"]), int(d["height"]),
                    int(d["captionBand"]),
-                   int(d["width"]) - int(d["safe"]["left"]) - int(d["safe"]["right"]))
+                   int(d["width"]) - int(d["safe"]["left"]) - int(d["safe"]["right"]),
+                   int(d["captionBottom"]), int(d["safe"]["bottom"]))
 
     @classmethod
     def de_pieza(cls, slug: str) -> "Lienzo":
@@ -84,6 +89,16 @@ class Lienzo:
         return {} if formato == POR_DEFECTO else {"formato": formato}
 
     # ── lo que sabe ──────────────────────────────────────────────────────────
+    @property
+    def suelo_cc(self) -> float:
+        """Suelo del cc pegado a la barbilla, en fracción de la altura: 1160/1920."""
+        return (self.alto - self.cc_abajo) / self.alto
+
+    @property
+    def suelo_franja(self) -> float:
+        """Suelo de la franja bajo un tablero: el borde de la zona segura, 1248/1920."""
+        return (self.alto - self.seguro_abajo) / self.alto
+
     @property
     def vertical(self) -> bool:
         return self.alto > self.ancho

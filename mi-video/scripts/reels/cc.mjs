@@ -33,18 +33,41 @@
 import fs from "node:fs";
 import { trasfondoDe } from "./material.mjs";
 import { ladoDelCcDe } from "./base.mjs";
-import { lienzoDe } from "../lienzo.mjs";
+import { lienzoDe, lienzoDePieza } from "../lienzo.mjs";
+import { franjaDe } from "../franja.mjs";
 
 const J = JSON.parse(fs.readFileSync("src/brand/cc.json", "utf8"));
 const U = J.umbrales;
 const CABEZA = J.cabeza;
 /**
- * La altura del cuadro, de `lienzos.json` (C-670): era una copia consciente de
- * `layout.height`. Es la del vertical porque las bandas que se miden aquí —la
- * barbilla, la franja, la cabeza— las mide `trasfondo.py` sobre el vertical;
- * cuando mida otro lienzo, esta altura pasa a ser la de la pieza.
+ * **Las bandas del cc, del lienzo de la pieza** (C-692). Eran las del vertical
+ * para todas —`ALTURA`, `SUELO`, `DOS`, `TRES` escritas una vez—, así que sobre
+ * el horizontal de reel-23 el suelo de la barbilla caía en 0,604 de un cuadro
+ * donde el cc se dibuja en 0,94: la puerta daba por tapada una cara que el
+ * texto no tocaba y no dejaba renderizar. Los suelos se derivan como los pinta
+ * `CaptionBand` —`captionBottom` y el borde de la zona segura— y los del
+ * vertical tienen que seguir siendo los que declaran `cc.json` y `franja.json`.
  */
-const ALTURA = lienzoDe().height;
+export const bandasDe = (lienzo) => {
+  const altura = lienzo.height;
+  return {
+    altura,
+    suelo: {
+      barbilla: (altura - lienzo.captionBottom) / altura,
+      franja: franjaDe(lienzo).suelo,
+    },
+    /** Dos y tres renglones de cc: 62 px de cuerpo con interlineado 1,2. */
+    dos: (2 * 62 * 1.2) / altura,
+    tres: (3 * 62 * 1.2) / altura,
+  };
+};
+/** Las del vertical, que es el de toda pieza que no declara otro lienzo. */
+const V = bandasDe(lienzoDe());
+if (V.suelo.barbilla !== J.suelo_barbilla)
+  throw new Error(
+    `cc.json declara suelo_barbilla ${J.suelo_barbilla} y el lienzo vertical da` +
+      ` ${V.suelo.barbilla}: una de las dos se tocó sin la otra`,
+  );
 
 /**
  * **Si el cc de esa banda le tapa la cara** (C-624, C-632): el texto se apoya
@@ -53,10 +76,6 @@ const ALTURA = lienzoDe().height;
  * boca. Por debajo de la boca, sobre la barba, es «pegado a la barbilla», que
  * es lo que Jaime pidió. Encima de la cabeza no tapa; sin medida, no se acusa.
  */
-const FRANJA = JSON.parse(fs.readFileSync("src/brand/franja.json", "utf8"));
-const SUELO = { barbilla: J.suelo_barbilla, franja: FRANJA.suelo };
-/** Dos renglones de cc: 62 px de cuerpo con interlineado 1,2. Copia consciente. */
-const DOS = (2 * 62 * 1.2) / ALTURA;
 /**
  * **Y de lado, por debajo de la barbilla** (C-644). Alineado a la derecha la
  * caja empieza en el 44 % del ancho, las cues de 36 caracteres salen en tres
@@ -64,17 +83,16 @@ const DOS = (2 * 62 * 1.2) / ALTURA;
  * barbilla le tapa la mandíbula. Jaime, reel-20: *«hay letras que tapan la
  * cara»*, con la boca a 0,41 y el bloque subiendo hasta 0,49.
  */
-const TRES = (3 * 62 * 1.2) / ALTURA;
-export const tapaLaCara = (banda, cara) => {
+export const tapaLaCara = (banda, cara, b = V) => {
   if (banda === "cabeza" || !cara?.boca) return false;
   if (cara.lado === "der") {
-    return SUELO[banda] - TRES < (cara.menton ?? cara.boca) && SUELO[banda] > cara.ojos;
+    return b.suelo[banda] - b.tres < (cara.menton ?? cara.boca) && b.suelo[banda] > cara.ojos;
   }
   // **Y centrado, también hasta la barbilla** (C-651). Jaime, reel-19, 21-10:
   // «r19 las letras tapan la cara», con el texto bajo la boca y sobre la barba
   // —lo que C-632 daba por «pegado a la barbilla»—. Es la segunda vez en el
   // día (reel-20, C-644): la barba es cara.
-  return SUELO[banda] - DOS < (cara.menton ?? cara.boca) && SUELO[banda] > (cara.ojos ?? cara.boca);
+  return b.suelo[banda] - b.dos < (cara.menton ?? cara.boca) && b.suelo[banda] > (cara.ojos ?? cara.boca);
 };
 
 /**
@@ -82,13 +100,13 @@ export const tapaLaCara = (banda, cara) => {
  * (C-651). `cabeArriba` pide 260 px, que es holgura y no necesidad: reel-19
  * tiene 227–254 px de cielo sobre la cabeza y el texto le caía en la barba.
  */
-const cabenDos = (coronilla) =>
-  !!coronilla && coronilla * ALTURA - CABEZA.desde - CABEZA.margen >= DOS * ALTURA + 12;
+const cabenDos = (coronilla, b = V) =>
+  !!coronilla && coronilla * b.altura - CABEZA.desde - CABEZA.margen >= b.dos * b.altura + 12;
 
 /** Si el cc cabe en el hueco de encima de su cabeza. Ver `cabeElCcArriba`. */
-export const cabeArriba = (coronilla) =>
+export const cabeArriba = (coronilla, b = V) =>
   !!coronilla &&
-  coronilla * ALTURA - CABEZA.desde - CABEZA.margen >= CABEZA.minimo;
+  coronilla * b.altura - CABEZA.desde - CABEZA.margen >= CABEZA.minimo;
 
 /**
  * El tratamiento de una medida, con el margen puesto del lado que toca.
@@ -158,6 +176,7 @@ export function trataElCc(pieza, slug, captions) {
     [x.escena, lados[x.beat] ? { ...x, lado: lados[x.beat] } : x]));
   const finGancho = titular ? titular.at + titular.duration : 0;
   const FPS = 30;
+  const b = bandasDe(lienzoDePieza(slug)); // las bandas de SU cuadro (C-692)
 
   /**
    * **La escena que lleva oro no va en negativo.**
@@ -195,11 +214,11 @@ export function trataElCc(pieza, slug, captions) {
     // en plano completo, tiene la boca en 0,53-0,57 y la barbilla la cruza;
     // apoyado en la franja el texto queda debajo, sobre la barba.
     const coron = cara?.coronilla ?? pieza.cara?.coronilla;
-    const sube = tapaLaCara("barbilla", cara) && tapaLaCara("franja", cara) && cabenDos(coron);
+    const sube = tapaLaCara("barbilla", cara, b) && tapaLaCara("franja", cara, b) && cabenDos(coron, b);
     // `fuera` es la banda fuera del gancho: la que toman sus cues cuando el
     // titular ya se fue, aunque la escena empiece debajo de él (C-651).
-    const fuera = cabeArriba(coron) || sube ? "cabeza"
-      : tapaLaCara("barbilla", cara) && !tapaLaCara("franja", cara) ? "franja" : "barbilla";
+    const fuera = cabeArriba(coron, b) || sube ? "cabeza"
+      : tapaLaCara("barbilla", cara, b) && !tapaLaCara("franja", cara, b) ? "franja" : "barbilla";
     const cual = enGancho ? "franja" : fuera;
     const m = t.bandas[cual] ?? t.bandas.barbilla;
     if (!m) continue;
@@ -238,7 +257,7 @@ export function trataElCc(pieza, slug, captions) {
     // Sólo con cara medida: sin ella el spec de una pieza ya aprobada no cambia.
     // `tapa` se mide en la banda de fuera del gancho: es donde van sus cues
     // en cuanto el titular se va (C-651).
-    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaCara(e.fuera, e.cara) } : {}),
+    ...(e.cara?.boca ? { boca: e.cara.boca, tapa: tapaLaCara(e.fuera, e.cara, b) } : {}),
     luz: e.medida.luz, grano: e.medida.grano, movimiento: e.medida.movimiento,
     contraste: e.medida.contraste,
   }));

@@ -140,6 +140,7 @@ export function armarGancho(capas, imagen, slug) {
  * distingue una decisión de una pérdida.
  */
 export function apartaDelGancho(pieza, slug) {
+  if ((pieza.formato ?? "vertical") !== "vertical") return []; // C-692
   const titular = titularDe(pieza);
   if (!titular) return [];
   const fin = titular.at + titular.duration;
@@ -209,6 +210,11 @@ export function bajarEnElGancho(captions, titular) {
  */
 export function faltasDelGancho(r) {
   const out = [];
+  // **El gancho del canon es del vertical** (C-692): el tercio de la interfaz
+  // de Meta y el rótulo detrás de la cabeza no existen en una pantalla de
+  // escritorio. reel-23 abre como dice su guion —la pantalla de Claude— y esto
+  // la paraba por «capa de texto dentro del gancho» sin rótulo que leer.
+  if ((r.formato ?? "vertical") !== "vertical") return out;
   const g = titularDe(r);
   if (!g) {
     out.push(

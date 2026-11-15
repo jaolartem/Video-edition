@@ -67,21 +67,25 @@ MUESTRAS = 6
 MINIMO = 2
 
 
-def _marca():
+def _marca(cuadro):
     """Lo declarado: los suelos de las tres bandas, su alto y la regla de la cabeza.
 
-    Las tres son la misma banda apoyada en tres sitios: el alto sale de
-    `franja.json` —que es donde vive `layout.captionBand`— y el suelo de la
-    franja tambien, porque es la banda de T-02 y ese numero tiene dueño.
+    **Del lienzo de la pieza** (C-692): medía las bandas del vertical sobre el
+    horizontal, y `cc.mjs` daba por tapada una cara que el cc no tocaba. Los del
+    vertical siguen siendo los que declaran `cc.json` y `franja.json`, y se
+    comprueba: dos números para una banda son dos bandas.
     """
     raiz = os.path.join("src", "brand")
     with open(os.path.join(raiz, "cc.json"), encoding="utf-8") as f:
         cc = json.load(f)
     with open(os.path.join(raiz, "franja.json"), encoding="utf-8") as f:
         fr = json.load(f)
-    return (fr["alto"],
-            {"barbilla": cc["suelo_barbilla"], "franja": fr["suelo"]},
-            cc["cabeza"])
+    alto = cuadro.banda / cuadro.alto
+    suelos = {"barbilla": cuadro.suelo_cc, "franja": cuadro.suelo_franja}
+    declarado = (cc["suelo_barbilla"], fr["suelo"], fr["alto"])
+    if cuadro.vertical and (suelos["barbilla"], suelos["franja"], alto) != declarado:
+        raise SystemExit("trasfondo: cc.json/franja.json no casan con el lienzo vertical")
+    return alto, suelos, cc["cabeza"]
 
 
 def _escenas(n):
@@ -176,7 +180,7 @@ def de_la_pieza(n):
     if cubo is None:
         return None
 
-    alto, suelos, cabeza = _marca()
+    alto, suelos, cabeza = _marca(cuadro)
     coronilla = _coronilla(n)
     if coronilla:
         # El cc que sube al hueco de encima de su cabeza se apoya un pelo por
