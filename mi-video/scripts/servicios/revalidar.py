@@ -205,9 +205,14 @@ def aplicar(pieza: Pieza, veredictos) -> str:
             # respuesta con `tramos` declaraba segundos de una cinta con el
             # nombre de otra — el mismo fallo de C-115, reintroducido en el
             # lado de la escritura despues de arreglarlo en el de la medida.
+            # **Y una etapa que aún no tiene trozo es de la cinta de la pieza**
+            # (C-679): sin esto, la etapa que faltaba —la que un tiquet pedía
+            # reponer— se descartaba con un aviso que nadie leía.
+            import rutas
+
             toma = v.get("toma") or next(
                 (d.get("toma") for d in (pieza.edl or {}).get("detalle", [])
-                 if d.get("beat") == beat), None)
+                 if d.get("beat") == beat), None) or rutas.TOMAS.get(pieza.slug)
             if not toma:
                 registro.aviso(
                     "revalidar", "no se sabe de que cinta es la etapa",
