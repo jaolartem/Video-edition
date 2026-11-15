@@ -243,6 +243,11 @@ Las capacidades de arriba siguen siendo las tuyas. Lo que cambia es el encargo:
   atenderlo: `revalidado` elige tomas y bordes, `descrito` decide plano y
   tratamiento, `cosido` y los subtítulos van con su texto. Una respuesta que se
   salta alguno se rechaza y se vuelve a pedir.
+- **Y «no se puede» también es respuesta** (C-699): lo que no tiene arreglo con
+  lo que hay va en `descartados: [{"id": 1139, "por_que": "la cinta no tiene
+  voz; sin segundos no se declara"}]`. Se cierra como descartado con tu porqué,
+  que es información para Jaime; decirlo en prosa con `tiquets: []` no cierra
+  nada y se vuelve a pedir.
 """
 
 
@@ -420,11 +425,13 @@ def _nombrados(respuesta) -> set:
     if isinstance(respuesta, dict):
         _ids(respuesta.get("tiquets"))
         _ids(respuesta.get("no_son_mios"))
+        _ids(respuesta.get("descartados"))
         filas = respuesta.get("tableros") or respuesta.get("etapas") or []
     for f in filas:
         if isinstance(f, dict):
             _ids(f.get("tiquets"))
             _ids(f.get("no_son_mios"))
+            _ids(f.get("descartados"))
     return fuera
 
 
@@ -451,12 +458,48 @@ def exige_todos(slug, fase, paso, respuesta):
     faltan = sin_contestar(slug, fase, respuesta)
     if not faltan:
         devuelve_ajenos(respuesta)
+        descarta_declarados(respuesta, paso)
         return None
     import servicio as contrato
 
     contrato._archivar(paso, slug, "rechazada", solo_respuesta=True)
     return (f"la respuesta no dice nada de {', '.join(faltan[:6])}: cada tiquet"
-            " va en `tiquets` o en `no_son_mios` con su paso (C-691)")
+            " va en `tiquets`, en `no_son_mios` con su paso o en `descartados`"
+            " con su porqué (C-691, C-699)")
+
+
+def descarta_declarados(respuesta, paso) -> list:
+    """**«No se puede» es una respuesta, con su porqué** (C-699).
+
+    CLAUDE.md lo dice desde el principio —*«descartado» es una respuesta
+    legítima: «no se puede, la toma no existe» es información*— y la respuesta
+    de un oficio no tenía dónde decirlo: sólo `tiquets` (lo hice) o
+    `no_son_mios` (es de otro). reel-23, 15-11-2026: la cinta 8K que pedía el
+    #1139 es muda, el servicio lo dijo en prosa dos veces con `tiquets: []`, y
+    cada vez se rechazó y se volvió a pedir. Lo que se cierra con una medida no
+    se puede descartar desde aquí (`CierreAjeno`): se queda abierto y se dice.
+    """
+    from . import ticket as _t
+
+    hechos = []
+    filas = respuesta if isinstance(respuesta, list) else []
+    if isinstance(respuesta, dict):
+        filas = [respuesta, *(respuesta.get("tableros") or respuesta.get("etapas") or [])]
+    for f in filas:
+        for x in (f.get("descartados") or []) if isinstance(f, dict) else []:
+            if not (isinstance(x, dict) and x.get("id")):
+                continue
+            i = int(str(x["id"]).strip().lstrip("t"))
+            cx = _t._con()
+            fila = cx.execute("select cierra_con from ticket where id = ?", (i,)).fetchone()
+            cx.close()
+            try:
+                _t.contestar(i, f"descartado por {paso}: {x.get('por_que') or 'sin porqué'}",
+                             estado="descartado", medida=(fila["cierra_con"] if fila else ""))
+                hechos.append(i)
+            except (_t.CierreAjeno, _t.SinRecibo) as e:
+                print(f"  #{i}: {paso} quiso descartarlo y no puede — {str(e)[:120]}")
+    return hechos
 
 
 def devuelve_ajenos(respuesta) -> list:
