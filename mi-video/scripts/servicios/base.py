@@ -332,9 +332,15 @@ class ServicioScript(Servicio):
         # trae las dos mitades y nadie la guardaba. Va en este punto porque los
         # que llaman son dos y este es el unico por el que pasa entera. C-371.
         import registro
+        # **Cabeza y cola, no solo la cola** (C-693): un error de Remotion es una
+        # linea de mensaje y cien de pila; con las 25 ultimas quedaba la pila y
+        # se perdia el mensaje — reel-23 estuvo hora y media muriendo en el
+        # fotograma 647 sin que el registro dijera por que.
+        lineas = salida.strip().splitlines()
+        if len(lineas) > 30:
+            lineas = lineas[:12] + ["    […]"] + lineas[-15:]
         registro.aviso(self.nombre, "el paso no pudo, y esto es lo que dijo",
-                       toma=pieza.slug, eco=False,
-                       detalle=chr(10).join(salida.strip().splitlines()[-25:]))
+                       toma=pieza.slug, eco=False, detalle=chr(10).join(lineas))
         return Resultado(False, motivo=ultima[:160], salida=salida)
 
 

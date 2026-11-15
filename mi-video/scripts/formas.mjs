@@ -484,7 +484,37 @@ export const revisarTablero = (kind, props) => {
       return [`«Apoyo» \`${props.clip}\`: falta public/${c.fichero}`];
   }
   return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props),
-          ...pilaQueDesborda(props)];
+          ...pilaQueDesborda(props), ...oroSinLinea(kind, props)];
+};
+
+/**
+ * **El oro de un tablero declarado apunta al texto de una línea** (C-693).
+ * `declarado/lineas.ts` lanza si `oro` no casa con ninguna, y lo lanzaba en el
+ * render: reel-23, 15-11-2026, `oro: 2` en una `ListaNumerada` mató `render.mjs`
+ * en el fotograma 647 en cada vuelta, hora y media. La misma regla aquí, donde
+ * se rechaza antes de guardar. Se busca en TODO texto de las props —un
+ * superconjunto de las líneas que el componente saca—, así que nunca rechaza
+ * un oro que el componente aceptaría.
+ */
+const DECLARADOS = new Set(["fichas", "evidencecard", "bandafecha", "listanumerada",
+                            "tablerodeclarado"]);
+const limpio = (s) => String(s).toLowerCase().normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+const textos = (v) => typeof v === "string" ? [v]
+  : Array.isArray(v) ? v.flatMap(textos)
+  : v && typeof v === "object" ? Object.values(v).flatMap(textos) : [];
+const oroSinLinea = (kind, props) => {
+  // Las que llegan enteras a `leerDeclarado`: la familia de `Fichas`, y
+  // cualquier nombre que el catálogo no conoce, que cae en `TableroDeclarado`.
+  if (!DECLARADOS.has(String(kind).toLowerCase()) && forma(kind)) return [];
+  const oro = props?.oro;
+  if (oro === undefined || oro === null || oro === false || oro === ""
+      || String(oro).toLowerCase() === "ninguno") return [];
+  const busca = limpio(oro).slice(0, 14);
+  const resto = Object.fromEntries(Object.entries(props).filter(([k]) => k !== "oro"));
+  if (busca && textos(resto).some((t) => limpio(t).includes(busca))) return [];
+  return [`\`oro: ${JSON.stringify(oro)}\` no casa con ninguna línea del tablero: el oro` +
+          " es el TEXTO exacto de la línea que el tablero demuestra, o `false`"];
 };
 
 /**

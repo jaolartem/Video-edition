@@ -24,6 +24,15 @@ class ServicioVerificar(Servicio):
         import verificar
 
         mal = verificar.revisar(pieza.slug)
+        # **Y lo que el render no puede dibujar vuelve al diseñador desde aquí**
+        # (C-693). `dibujable` miraba la respuesta del diseñador al llegar, no lo
+        # guardado, y una regla nueva en `formas` no alcanzaba a lo ya escrito:
+        # reel-23 murió en el render en cada vuelta por un `oro: 2`.
+        from dominio import dibujable as _dib
+
+        mal_dib = _dib.faltas(pieza, _tableros_guardados(pieza.slug))
+        if mal_dib and (vuelta := _dib.devuelve(pieza, mal_dib)):
+            return vuelta
         if not mal:
             return Resultado(True, salida="pasa la puerta")
         # **Lo que no para, se anota. Todo, sin excepcion.**
@@ -93,6 +102,29 @@ class ServicioVerificar(Servicio):
         # `verificar.py --avisa`.
         resto = f" (+{len(paran) - 1} mas)" if len(paran) > 1 else ""
         return Resultado(False, motivo=paran[0].split(": ", 1)[-1][:140] + resto)
+
+
+def _tableros_guardados(slug) -> list:
+    """Los tableros que el render va a dibujar, tal como quedaron en la base."""
+    import json
+    import sqlite3
+
+    import basedatos
+
+    con = basedatos.abrir("ads/decisiones.db")
+    con.row_factory = sqlite3.Row
+    filas = con.execute("select etapa_orden, tablero from escena_desc where"
+                        " video_slug = ? and tablero is not null", (slug,)).fetchall()
+    con.close()
+    out = []
+    for r in filas:
+        try:
+            t = json.loads(r["tablero"])
+        except ValueError:
+            continue
+        if isinstance(t, dict) and t.get("kind"):
+            out.append({"etapa_orden": r["etapa_orden"], **t})
+    return out
 
 
 def _anota(pieza, motivo: str) -> None:
