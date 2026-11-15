@@ -28,5 +28,14 @@ export function faltasDeApoyo(props) {
   // ampliación que nunca ocurre.
   if (props.forma !== undefined && !FORMAS_APOYO.includes(props.forma))
     return [`«Apoyo» forma \`${props.forma}\`: es ${FORMAS_APOYO.join(", ")} (C-696)`];
+  // El plano bajo la ampliación, si es otro clip: tiene que existir y declarar
+  // su monitor; sólo tiene sentido con `amplia` (C-704).
+  if (props.fondo_clip !== undefined) {
+    const f = CLIPS[props.fondo_clip];
+    if (!f) return [`«Apoyo» pide de fondo el clip \`${props.fondo_clip}\`, que no está en la biblioteca`];
+    if (props.forma !== "amplia") return ["`fondo_clip` sólo va con `forma: \"amplia\"`"];
+    if (!f.monitor || !f.recorte)
+      return [`el clip \`${props.fondo_clip}\` no declara monitor y silueta: no puede ser el plano de una ampliación`];
+  }
   return [];
 }

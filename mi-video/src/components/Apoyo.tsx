@@ -43,6 +43,9 @@ type Clip = {
   orientacion: "vertical" | "horizontal";
   insignia: string | null;
   derechos: string;
+  /** Dónde está el monitor dentro del clip (fracciones) y su silueta con alfa (C-704). */
+  monitor?: Monitor;
+  recorte?: string;
 };
 
 const CLIPS = (biblioteca as { clips: Record<string, Clip> }).clips;
@@ -69,6 +72,13 @@ export type ApoyoProps = {
    */
   sujeto_src?: string;
   sujeto_trim?: number;
+  /**
+   * Sólo con `amplia`: **el plano es otro clip de la biblioteca** (C-704), y la
+   * pantalla nace del monitor que ESE clip declara. Jaime, 15-11-2026: la toma
+   * 8K en que se gira a cámara y mira al computador no tiene voz; entra como
+   * clip de apoyo bajo la voz de la otra cinta —*«sí, por apoyo»*—.
+   */
+  fondo_clip?: string;
 };
 
 /** Cuánto empuja el cuadro en toda la escena: movimiento, no zoom. */
@@ -99,7 +109,7 @@ const cuadroQueCrece = (frame: number, m: Monitor, espera: number, crece: number
 
 export const Apoyo: React.FC<ApoyoProps> = ({
   clip, forma, etiqueta, desde = 0, monitor, espera = ESPERA, crece = CRECE,
-  sujeto_src, sujeto_trim = 0,
+  sujeto_src, sujeto_trim = 0, fondo_clip,
 }) => {
   const lienzo = useLienzo();
   const frame = useCurrentFrame();
@@ -109,6 +119,9 @@ export const Apoyo: React.FC<ApoyoProps> = ({
   if (!c) throw new Error(`Apoyo: el clip «${clip}» no está en src/brand/apoyo.json`);
   if (forma === "amplia" && !monitor)
     throw new Error(`Apoyo «amplia» sin monitor: el spec no supo dónde está en «${clip}»`);
+  const fondo = fondo_clip ? CLIPS[fondo_clip] : undefined;
+  if (fondo_clip && !fondo)
+    throw new Error(`Apoyo: el clip de fondo «${fondo_clip}» no está en src/brand/apoyo.json`);
   const enPanel = (forma ?? (c.orientacion === "vertical" && lienzo.width > lienzo.height
     ? "panel" : "completo")) === "panel";
   const amplia = forma === "amplia" && monitor
@@ -133,6 +146,16 @@ export const Apoyo: React.FC<ApoyoProps> = ({
     // ampliación. Después, el mismo empuje lento que `completo`.
     return (
       <AbsoluteFill style={{ background: `rgba(0,0,0,${amplia.p})` }}>
+        {/* El plano, si es otro clip: debajo de todo y desde su fotograma 0. */}
+        {fondo ? (
+          <AbsoluteFill style={{ opacity: 1 - amplia.p }}>
+            <OffthreadVideo
+              src={staticFile(fondo.fichero)}
+              muted
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </AbsoluteFill>
+        ) : null}
         <div
           style={{
             position: "absolute",

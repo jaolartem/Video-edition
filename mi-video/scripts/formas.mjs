@@ -251,6 +251,10 @@ export const FORMAS = [
                 + " sólo donde la cinta declara su monitor (rutas.json → monitores) y el sitio lo"
                 + " pone el spec. Con amplia, opcionales `espera` (fotogramas quieto en el"
                 + " monitor, 12) y `crece` (fotogramas hasta llenar el cuadro, 20)",
+              fondo_clip: "sólo con amplia (C-704): el PLANO es otro clip de la biblioteca —uno"
+                + " con `monitor` y `recorte` declarados, p. ej. él girándose a cámara y"
+                + " mirando al monitor— y la pantalla nace del monitor de ese clip. La voz"
+                + " sigue siendo la del corte; `espera` es el fotograma en que mira al monitor",
               etiqueta: "label" },
             ["clip"]),
   // **Las formas las diseña el diseñador, no este fichero.**

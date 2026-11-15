@@ -17,7 +17,28 @@
  */
 import { lienzoDePieza } from "../lienzo.mjs";
 import { rutas } from "../rutas.mjs";
+import { CLIPS } from "./apoyo.mjs";
 import { sujetoDe } from "./material.mjs";
+
+/**
+ * **El monitor de un clip de la biblioteca** (C-704): cuando el plano bajo la
+ * ampliación es otro clip (`fondo_clip`), el monitor y la silueta son los que
+ * ese clip declara en `apoyo.json` —los puso la ingesta, `scripts/apoyo.py`—,
+ * en fracciones de su cuadro, que es el de la pieza.
+ */
+export function monitorDelClip(id, lienzo) {
+  const c = CLIPS[id];
+  if (!c) return { falta: `el clip de fondo «${id}» no está en src/brand/apoyo.json` };
+  const m = c.monitor;
+  if (!m) return { falta: `el clip «${id}» no declara dónde está su monitor (ingesta con --monitor)` };
+  if (!c.recorte)
+    return { falta: `el clip «${id}» no tiene silueta: lo ampliado le taparía (ingesta con --delante)` };
+  return {
+    x: Math.round(m.x * lienzo.width), y: Math.round(m.y * lienzo.height),
+    w: Math.round(m.w * lienzo.width), h: Math.round(m.h * lienzo.height),
+    sujeto: c.recorte,
+  };
+}
 
 export const AMPLIA = "amplia";
 
@@ -62,6 +83,13 @@ export function ampliaDesdeElMonitor(tableros, reloj, slug, faltas) {
   const lienzo = lienzoDePieza(slug);
   const huecos = reloj.limites();
   for (const t of amplias) {
+    if (t.props.fondo_clip) {
+      const r = monitorDelClip(t.props.fondo_clip, lienzo);
+      if (r.falta) { faltas.push(`${slug} e${t.beat}: Apoyo «amplia» — ${r.falta}`); continue; }
+      const { sujeto, ...monitor } = r;
+      t.props = { ...t.props, monitor, sujeto_src: sujeto, sujeto_trim: 0 };
+      continue;
+    }
     const h = huecos.find((x) => t.at >= x.a && t.at < x.b);
     const r = h ? monitorDe(h.escena, lienzo) : { falta: "no cae sobre ninguna escena" };
     const sujeto = sujetoDe(slug, t.beat);
