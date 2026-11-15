@@ -32,7 +32,7 @@ VIVE = 0.8
 class Borde:
     """El trozo `tramo`, mirado por sus extremos, contra el habla de su cinta."""
 
-    __slots__ = ("t", "h")
+    __slots__ = ("t", "h", "idioma")
 
     def __init__(self, tramo: Tramo, habla):
         self.t = tramo
