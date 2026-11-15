@@ -17,6 +17,7 @@
  */
 import { lienzoDePieza } from "../lienzo.mjs";
 import { rutas } from "../rutas.mjs";
+import { sujetoDe } from "./material.mjs";
 
 export const AMPLIA = "amplia";
 
@@ -48,8 +49,12 @@ export function monitorDe(escena, lienzo) {
 
 /**
  * Pone `props.monitor` a cada `Apoyo` con `forma: "amplia"`, desde la escena
- * sobre la que cae. Lo que no se puede resolver se dice en `faltas`, y el
- * render no sale con una ampliación desde ningún sitio.
+ * sobre la que cae, **y su recorte**: el clip se pinta encima del plano, y sin
+ * el recorte con alfa delante tapa lo que está delante del monitor —Jaime,
+ * 15-11-2026: *«la imagen de la pantalla tapa mi brazo»*—. El recorte es el de
+ * su etapa, el mismo que usan los tableros con él dentro (`sujetoDe`), desde el
+ * fotograma en que el tablero arranca dentro de ella. Lo que no se puede
+ * resolver se dice en `faltas`, y el render no sale.
  */
 export function ampliaDesdeElMonitor(tableros, reloj, slug, faltas) {
   const amplias = tableros.filter((t) => t.kind === "Apoyo" && t.props?.forma === AMPLIA);
@@ -59,11 +64,16 @@ export function ampliaDesdeElMonitor(tableros, reloj, slug, faltas) {
   for (const t of amplias) {
     const h = huecos.find((x) => t.at >= x.a && t.at < x.b);
     const r = h ? monitorDe(h.escena, lienzo) : { falta: "no cae sobre ninguna escena" };
+    const sujeto = sujetoDe(slug, t.beat);
+    if (!r.falta && !sujeto)
+      r.falta = `sin recorte en public/recorte/${slug}-e${t.beat}.webm, el clip le taparía`
+        + " el brazo: falta la pasada de scripts/dominio/sujeto.py sobre este corte";
     if (r.falta) {
       faltas.push(`${slug} e${t.beat}: Apoyo «amplia» — ${r.falta}`);
       continue;
     }
-    t.props = { ...t.props, monitor: r };
+    t.props = { ...t.props, monitor: r, sujeto_src: sujeto,
+                sujeto_trim: Math.max(0, Math.round(t.at - reloj.anclaDe(t.beat))) };
   }
   return tableros;
 }

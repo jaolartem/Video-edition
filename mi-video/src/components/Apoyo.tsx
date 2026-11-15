@@ -60,6 +60,15 @@ export type ApoyoProps = {
   espera?: number;
   /** Sólo con `amplia`: fotogramas que tarda en llenar el cuadro. */
   crece?: number;
+  /**
+   * Sólo con `amplia`: su recorte con alfa (`recorte/<pieza>-eN.webm`) y desde
+   * qué fotograma. Va ENCIMA del clip mientras está en el monitor: lo que está
+   * delante del monitor —su cabeza, su hombro, su brazo— sigue delante. Jaime,
+   * 15-11-2026, al ver el primer fotograma: *«la imagen de la pantalla tapa mi
+   * brazo»*. Lo pone el spec, como el monitor.
+   */
+  sujeto_src?: string;
+  sujeto_trim?: number;
 };
 
 /** Cuánto empuja el cuadro en toda la escena: movimiento, no zoom. */
@@ -90,6 +99,7 @@ const cuadroQueCrece = (frame: number, m: Monitor, espera: number, crece: number
 
 export const Apoyo: React.FC<ApoyoProps> = ({
   clip, forma, etiqueta, desde = 0, monitor, espera = ESPERA, crece = CRECE,
+  sujeto_src, sujeto_trim = 0,
 }) => {
   const lienzo = useLienzo();
   const frame = useCurrentFrame();
@@ -136,6 +146,26 @@ export const Apoyo: React.FC<ApoyoProps> = ({
         >
           {video}
         </div>
+        {/* Él, delante del monitor, hasta que la pantalla lo llena todo. */}
+        {sujeto_src && amplia.p < 1 ? (
+          <AbsoluteFill
+            style={{
+              opacity: interpolate(amplia.p, [0.7, 1], [1, 0], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }),
+              pointerEvents: "none",
+            }}
+          >
+            <OffthreadVideo
+              src={staticFile(sujeto_src)}
+              trimBefore={sujeto_trim > 0 ? sujeto_trim : undefined}
+              transparent
+              muted
+              style={{ width: "100%", height: "100%" }}
+            />
+          </AbsoluteFill>
+        ) : null}
         {c.insignia ? (
           <div style={{ position: "absolute", inset: 0, opacity: amplia.p }}>
             <Insignia texto={c.insignia} lienzo={lienzo} />
