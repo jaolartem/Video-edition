@@ -44,45 +44,78 @@ def _a_camara(slug) -> set:
         return set()
 
 
+def _memo(slug):
+    ruta = os.path.join("work", "scenes", slug, "mirada.json")
+    return ruta, (json.load(open(ruta, encoding="utf-8")) if os.path.exists(ruta) else {})
+
+
+def cuenta(trozos, memo) -> tuple[int, int]:
+    """`(de frente, mirados)` en `MUESTRAS` fotogramas repartidos por los trozos
+    `[(cinta, desde, hasta)]`, aunque la etapa esté hecha de varios."""
+    import rutas
+
+    from .rostro import de_frente
+
+    largo = sum(h - d for _c, d, h in trozos)
+    frente = mirados = 0
+    for k in range(MUESTRAS):
+        pos, punto = largo * (k + 1) / (MUESTRAS + 1), None
+        for c, d, h in trozos:
+            if pos <= h - d:
+                punto = (c, d + pos)
+                break
+            pos -= h - d
+        if punto is None:
+            continue
+        clave = f"{punto[0]}:{punto[1]:.2f}"
+        if clave not in memo:
+            memo[clave] = list(de_frente(rutas.cinta(punto[0]), [punto[1]]))
+        frente, mirados = frente + memo[clave][0], mirados + memo[clave][1]
+    return frente, mirados
+
+
+def en_dossier(slug, fila, toma, tramos) -> dict:
+    """La fila del dossier con la mirada medida, si la etapa lleva VIDEO de Jaime:
+    la de su toma y la de cada candidata.
+
+    Sin esto, quien elige la toma de una etapa «a cámara» elegía a ciegas: el
+    pedido no traía ni hoja ni fotogramas, así que la puerta la devolvía por la
+    mirada y el compositor volvía a escoger sin ver (C-685). Medirlo es código.
+    """
+    if not fila.get("video_decidido"):
+        return fila
+    ruta, memo = _memo(slug)
+
+    def _dice(trozos):
+        k, n = cuenta(trozos, memo)
+        return f"{k} de {n} fotogramas de frente" if n else None
+
+    fila["mirada"] = _dice([(toma, d, h) for d, h in tramos])
+    for c in fila.get("candidatas") or []:
+        c["mirada"] = _dice([(c["toma"], c["desde"], c["hasta"])])
+    with open(ruta, "w", encoding="utf-8") as fh:
+        json.dump(memo, fh)
+    return fila
+
+
 def reparos(slug) -> list:
     """Las etapas que van a cámara y en su toma no se le ven los ojos de frente."""
     plan = os.path.join("work", "scenes", slug, "plan-full.json")
     etapas = _a_camara(slug)
     if not etapas or not os.path.exists(plan):
         return []
-    import rutas
-
-    from .rostro import de_frente
-
     with open(plan, encoding="utf-8") as f:
         escenas = [e for e in json.load(f).get("escenas") or []
                    if e.get("beat") in etapas and not e.get("angulo")]
-    guardado = os.path.join("work", "scenes", slug, "mirada.json")
-    memo = json.load(open(guardado, encoding="utf-8")) if os.path.exists(guardado) else {}
+    ruta, memo = _memo(slug)
     fuera = []
     for beat in sorted({e["beat"] for e in escenas}):
-        suyas = [e for e in escenas if e["beat"] == beat]
-        largo = sum(e["origen_hasta"] - e["origen_desde"] for e in suyas)
-        frente = mirados = 0
-        for k in range(MUESTRAS):
-            # Repartidos por la etapa entera, aunque esté hecha de varios trozos.
-            pos, t, e = largo * (k + 1) / (MUESTRAS + 1), None, None
-            for e in suyas:
-                d = e["origen_hasta"] - e["origen_desde"]
-                if pos <= d:
-                    t = e["origen_desde"] + pos
-                    break
-                pos -= d
-            if t is None:
-                continue
-            clave = f"{e['fuente']}:{t:.2f}"
-            if clave not in memo:
-                memo[clave] = list(de_frente(rutas.cinta(e["fuente"]), [t]))
-            frente, mirados = frente + memo[clave][0], mirados + memo[clave][1]
+        frente, mirados = cuenta([(e["fuente"], e["origen_desde"], e["origen_hasta"])
+                                  for e in escenas if e["beat"] == beat], memo)
         if mirados and frente / mirados < BASTA:
             fuera.append(f"{REGLA} b{beat}: va a cámara y en la toma no se le ven"
                          f" los ojos de frente ({frente} de {mirados} fotogramas)"
                          " — otra toma que mire a cámara, y si no la hay, panel")
-    with open(guardado, "w", encoding="utf-8") as f:
+    with open(ruta, "w", encoding="utf-8") as f:
         json.dump(memo, f)
     return fuera

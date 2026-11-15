@@ -49,7 +49,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
-from dominio import costura as _cs, libreto as _libreto  # noqa: E402
+from dominio import costura as _cs, libreto as _libreto, mirada as _mirada  # noqa: E402
 import depurar  # noqa: E402
 import transcribir  # noqa: E402
 import rutas  # noqa: E402
@@ -582,7 +582,7 @@ def dossier(slug):
             inten = beats.intensidad(toma, m["desde"], m["hasta"], pal)
         except Exception:                          # noqa: BLE001
             inten = {}
-        out.append({
+        out.append(_mirada.en_dossier(slug, {
             "beat": beat,
             "etapa": d["det"].get("etapa"),
             #: Lo que el libreto pedia para esta etapa. `None` si no hay.
@@ -621,7 +621,7 @@ def dossier(slug):
             # **Y las otras candidatas.** Sin esto solo se puede contestar «vale
             # o no vale»; con esto se puede elegir.
             "candidatas": candidatas(slug, beat),
-        })
+        }, toma, d["tramos"]))
         ultimo = (toma, max(y for _, y in d["tramos"]))
     return out
 
