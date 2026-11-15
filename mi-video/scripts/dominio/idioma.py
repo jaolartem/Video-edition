@@ -48,6 +48,9 @@ class Idioma:
     niegan: tuple
     claves_vacias: frozenset
     llanas: frozenset
+    #: El modelo de whisper con que se oye bien esta lengua (fichero en
+    #: `whisper.cpp/`). Sin declararlo, `medium`, el de siempre.
+    modelo: str = "ggml-medium.bin"
 
     # ── cómo nace ────────────────────────────────────────────────────────────
     @classmethod
@@ -68,7 +71,8 @@ class Idioma:
                 vacias=frozenset(d["vacias"]),
                 niegan=tuple(d["niegan"]),
                 claves_vacias=frozenset(d["claves_vacias"]),
-                llanas=frozenset(d["llanas"]))
+                llanas=frozenset(d["llanas"]),
+                modelo=d.get("modelo") or "ggml-medium.bin")
         return _CARGADAS[codigo]
 
     @classmethod

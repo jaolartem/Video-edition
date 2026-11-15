@@ -117,7 +117,11 @@ def preparar(toma, rehacer=False, pasadas=None, barato=False):
         return "sin tramos de voz"
     runs = json.load(open(cuts, encoding="utf-8"))["segmentos"]
     print(f"── {toma} ──")
-    modelo = MODELOS["barato" if barato else "bueno"]
+    # El bueno es el de la lengua de la cinta (C-680): `large-v3` para el inglés.
+    from transcribir import bueno
+    from .idioma import Idioma
+
+    modelo = MODELOS["barato"] if barato else bueno(Idioma.de_cinta(toma))
     # **Un solo camino.** Jaime, tras ver que los dos fallos de la sesion
     # salian del afinado y no del barrido: *«prefiero que los hagas desde el
     # principio con el proceso nuevo y compares al final»*, y *«no podemos

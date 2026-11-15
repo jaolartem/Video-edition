@@ -121,7 +121,13 @@ VORAZ = ["-bs", "1", "-bo", "1"]
 # Cada modelo trae sus propias cabezas de alineamiento, de ahí el nombre; y el
 # binario calla el DTW con flash attention puesta (`t_dtw` = -1), de ahí `-nfa`.
 # Medido: 11,7 s por ventana contra 12,5 s sin él. Ver C-610.
-ALINEA = {"ggml-small.bin": "small", "ggml-medium.bin": "medium"}
+ALINEA = {"ggml-small.bin": "small", "ggml-medium.bin": "medium",
+          "ggml-large-v3.bin": "large.v3"}
+
+
+def bueno(idioma: Idioma = ES) -> str:
+    """El modelo bueno para esa lengua: el que declara su `idiomas/<código>.json`."""
+    return os.path.join(W, idioma.modelo)
 
 # Lo que el modelo dice cuando se queda sin voz. No es transcripcion, es relleno
 # aprendido de YouTube — y ademas delata que ahi hay silencio (aprendizaje 30).

@@ -57,7 +57,7 @@ def afinar(toma, tramos, pasadas=4):
     sustituyen a las que habia, y el resto queda igual. Asi no hay dos ficheros
     describiendo la misma cinta (aprendizaje 33).
     """
-    from transcribir import (LARGA, MODELOS, VENTANA, a_cinta, alucinado, atascado, audio, limpio, medoide, pasada, recorte, sin_fantasmas, sin_silencios)
+    from transcribir import (LARGA, MODELOS, VENTANA, bueno, a_cinta, alucinado, atascado, audio, limpio, medoide, pasada, recorte, sin_fantasmas, sin_silencios)
 
     ruta = f"work/transcripts/{toma}.json"
     d = json.load(open(ruta, encoding="utf-8"))
@@ -154,8 +154,8 @@ def afinar(toma, tramos, pasadas=4):
             w0 = max(0.0, min(dur - ancho, centro - ancho / 2 + desp))
             trozo = os.path.join(tmp, f"a{k:02d}.wav")
             recorte(voz_wav, w0, min(w0 + ancho, dur), trozo, sr, anchura)
-            ws = pasada(trozo, os.path.join(tmp, f"a{k:02d}"), MODELOS["bueno"],
-                        Idioma.de_cinta(toma))
+            ws = pasada(trozo, os.path.join(tmp, f"a{k:02d}"),
+                        bueno(Idioma.de_cinta(toma)), Idioma.de_cinta(toma))
             # Por el arranque, como al transcribir (C-610).
             dentro = [w for w in ws if va <= w["a"] + w0 < vb]
             for w in dentro:
