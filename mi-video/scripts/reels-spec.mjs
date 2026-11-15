@@ -37,6 +37,7 @@ import { FPS, Reloj } from "./reels/reloj.mjs";
 // Las tres importaciones de `material.mjs` que había aquí eran una.
 import { FRAMES, caraDe, duracionDelCorte, edlDe, idDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
 import { colocaPaneles } from "./reels/paneles.mjs";
+import { ampliaDesdeElMonitor } from "./reels/monitor.mjs";
 import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
 // **El pie sale de `cifras.mjs`, que es su dueño y llevaba sin correr desde que
 // se escribió.** El que corría era una copia en `base.mjs` que casaba la fila de
@@ -157,6 +158,9 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
   // la tarjeta no lo ve nadie.
   const cta = ctaDe(slug, marco, duracion);
   acotarAlCta(tableros, cta);
+  // Un `Apoyo` que se amplía desde el monitor recibe aquí dónde está el monitor
+  // de SU escena; si la cinta no lo declara, es falta y no sale (C-696).
+  ampliaDesdeElMonitor(tableros, reloj, slug, faltas);
 
   const marca = marcaDeHumanidad(
     slug, marco.senala, ideasFuerza(slug, reloj, marco.beats, captions), cta,

@@ -439,8 +439,8 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     # **Y ningún tiquet sin respuesta** (C-691): atendido o devuelto a su paso.
     if (falta := _abierto.exige_todos(pieza.slug, "disenado", "disenar", respuesta)):
         return Resultado(False, motivo=falta)
-    vuelta = _dib.puerta(pieza, tableros, respuesta)  # y sus tiquets: C-612
-    if vuelta:
+    _abierto.agenda_por_construir(pieza.slug, respuesta)  # C-697
+    if (vuelta := _dib.puerta(pieza, tableros, respuesta)):  # y sus tiquets: C-612
         return vuelta
     if veredicto == "rota":
         # **Y la escena vuelve a quien la decide** (C-387). Jaime, 11-9-2026:

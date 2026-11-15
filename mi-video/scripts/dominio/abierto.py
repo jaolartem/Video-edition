@@ -120,7 +120,6 @@ def _tiquets(slug):
     El paso lo declara el propio tiquet en `vuelve_a`, que es donde ya estaba.
     """
     try:
-        from . import ticket as _t
         cx = basedatos.abrir(BASE)
         cx.row_factory = sqlite3.Row
         filas = cx.execute(
@@ -499,3 +498,22 @@ def reabre_saltados(slug) -> list:
     for i in vuelven:
         _t.encaminar(i, dict((r[0], r[1]) for r in filas)[i], avisar=False)
     return vuelven
+
+
+def agenda_por_construir(slug, respuesta) -> list:
+    """**Lo que un oficio pide y no existe queda como tiquet** (C-697).
+
+    El menú decía «dilo en `por_que`: no se descarta, se agenda», y nadie lo
+    agendaba: era prosa en una respuesta que se archiva. reel-23, 15-11-2026: la
+    ampliación desde el monitor quedó pedida así y la pieza siguió como si no.
+    Cada entrada de `por_construir` abre un tiquet de la pieza entera, sin paso
+    —es trabajo de la máquina, no de un oficio—, y `donde.py` lo enseña hasta
+    que se construye o se descarta.
+    """
+    pide = respuesta.get("por_construir") if isinstance(respuesta, dict) else None
+    if not pide:
+        return []
+    from . import ticket as _t
+    return [_t.abrir(slug, f"por construir, lo pide el diseñador: {q}",
+                     tipo="dato", etapa="pieza")
+            for q in pide if isinstance(q, str) and q.strip()]

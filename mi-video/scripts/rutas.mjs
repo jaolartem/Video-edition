@@ -59,6 +59,8 @@ export const rutas = {
   tomas,
   /** La lengua de cada grabación (toma → código); sin entrada, español. */
   idiomas: cfg.idiomas ?? {},
+  /** Dónde está el monitor en el cuadro de cada grabación (C-696). */
+  monitores: cfg.monitores ?? {},
 };
 
 /** Carpeta temporal propia, creada si hace falta. Nunca en C:. */

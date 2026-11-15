@@ -72,9 +72,9 @@ COMO_COMBINAR = {
                  " carga cognitiva, coherencia visual, objetivo emocional. Y por"
                  " el canon de las 26 láminas: la técnica es de reel, la forma es"
                  " de esta marca.",
-    "si_pides_algo_por_construir": "Puedes pedirlo. Dilo claro en `por_que` para"
-                                   " que se sepa que esa pieza cuesta código"
-                                   " antes de verse — no se descarta, se agenda.",
+    "si_pides_algo_por_construir": "Pídelo en `por_construir: [\"qué, para qué"
+                                   " etapa\"]` al primer nivel: cada entrada abre su"
+                                   " tiquet (C-697). En prosa no se agenda.",
     "cuantas": "En el gancho, seis entradas mínimo. Fuera del gancho, algo cambia"
                " cada tres a cinco segundos. Jaime: «mucho movimiento, mucha"
                " dopamina» — pero cada cosa que se mueve deja algo entendido.",

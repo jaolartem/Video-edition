@@ -408,9 +408,11 @@ def menu() -> dict:
                         " cambia: fuera de la ventana declarada la pista sale"
                         " sin tocar, y sin declaración sale idéntica.",
         "por_construir": {k: v["que"] for k, v in POR_CONSTRUIR.items()},
-        "si_pides_algo_por_construir": "Dilo en `por_que`. No se descarta: se"
-                                       " agenda. Lo que no vale es componer"
-                                       " suponiendo que ya está.",
+        "si_pides_algo_por_construir": "Pídelo en `por_construir: [\"…\"]` al"
+                                       " primer nivel de la respuesta: abre su"
+                                       " tiquet y queda agendado (C-697). Lo que"
+                                       " no vale es componer suponiendo que ya"
+                                       " está.",
     }
 
 
