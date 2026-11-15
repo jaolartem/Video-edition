@@ -177,8 +177,31 @@ def vencidas(slug, fase_actual, orden):
     # con las siete piezas diciendo «tiene correcciones sin aplicar y su paso ya
     # quedo atras», y reel-01 estaba EN `descrito` con su correccion PARA
     # `descrito`. Igual no es atras — es ahora.
+    espera = _esperan_al_render(slug)
     return [t for t in suyas(slug)
-            if orden.get(t[2]) is not None and orden[t[2]] < aqui]
+            if orden.get(t[2]) is not None and orden[t[2]] < aqui
+            and t[0] not in espera]
+
+
+def _esperan_al_render(slug) -> set:
+    """Los tiquets de emisión que ya devolvieron la pieza: sólo los mide un render.
+
+    reel-23, 15-11-2026: once «congelado» medidos sobre el render de la víspera
+    (#1008-1018) iban a `cortado`; la pieza volvió, pasó otra vez, y `vencidas`
+    la paró en `verificado` porque seguían abiertos. Pero sólo `emision`,
+    después de un render nuevo, puede cerrarlos, así que nunca había render
+    (C-690). Ya devueltos, esperan a la medida; si el render nuevo sigue mal,
+    `emision` no la devuelve otra vez y la sube a Jaime («ya volvió y sigue»).
+    """
+    try:
+        cx = basedatos.abrir(BASE)
+        filas = cx.execute("select id from ticket where pieza = ? and estado ="
+                           " 'abierto' and cierra_con = 'emision' and devuelto"
+                           " is not null", (slug,)).fetchall()
+        cx.close()
+    except sqlite3.Error:
+        return set()
+    return {f"t{r[0]}" for r in filas}
 
 
 #: **La capa de instrucción del contrato**, cuando lo que hay son tiquets.
