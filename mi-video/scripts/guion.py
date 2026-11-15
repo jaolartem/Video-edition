@@ -18,6 +18,9 @@ Así que la declaración no la redacta nadie: la copia esto, mecánicamente.
   llegue, no lo decide nadie.
 - `--aprobado` es obligatorio: **una pieza entra desde un guion aprobado**. Si no
   hay guion, se construye como propuesta y Jaime lo aprueba antes de esto.
+- Volver a declarar con un VIDEO distinto abre un tiquet a `descrito` por cada
+  etapa que cambió (C-695): el cambio del guion es de Jaime y la máquina lo
+  lleva a quien compone, no se queda en el JSON.
 
 Lo demás de la pieza (formato, pilar, mecanismo…) se conserva si ya estaba, o se
 pasa la primera vez con sus opciones. Escribe `ads/frames.json` de la línea en la
@@ -92,11 +95,38 @@ def declarar(ruta_guion, slug, aprobado, estructura=None, extra=None):
         "beats": [{"etapa": b["etapa"], "video": b["video"]} for b in bs],
         "libreto": [b["texto"] for b in bs],
     })
+    antes = (d["reels"].get(slug) or {}).get("beats") or []
     d["reels"][slug] = pieza
     with open(FRAMES, "w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(d, ensure_ascii=False, indent=1)
                 + ("\n" if texto.endswith("\n") else ""))
+    _devuelve_al_compositor(slug, antes, pieza["beats"])
     return len(bs)
+
+
+def _devuelve_al_compositor(slug, antes, ahora) -> list:
+    """**Un VIDEO que cambia en el guion vuelve a su compositor** (C-695).
+
+    La columna VIDEO es la edición decidida (C-683) y el que compone la lee del
+    pedido; pero lo ya compuesto no se enteraba de que cambió. reel-23,
+    15-11-2026: Jaime quitó la cartela del bloque 1 y la pieza siguió adelante
+    con la descripción vieja de la apertura. Cada etapa cuyo VIDEO cambió abre
+    su tiquet a `descrito` con el texto nuevo; la primera declaración no abre
+    ninguno, porque no hay nada compuesto que devolver.
+    """
+    cambian = [i for i, (a, b) in enumerate(zip(antes, ahora), 1)
+               if (a.get("video") or "") != (b.get("video") or "")]
+    if not antes or not cambian:
+        return []
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from dominio import ticket
+    ids = [ticket.abrir(slug, f"Guion: cambió el VIDEO de la etapa {i} —"
+                        f" «{ahora[i - 1]['video']}». Lo compuesto para esa etapa"
+                        " se revisa contra esto.", tipo="objecion",
+                        vuelve_a="descrito", etapa=i) for i in cambian]
+    print(f"{slug}: VIDEO distinto en {len(ids)} etapa(s) -> tiquet(s) a descrito"
+          f" {', '.join('#' + str(x) for x in ids)}")
+    return ids
 
 
 def main():
