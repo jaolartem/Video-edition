@@ -299,6 +299,13 @@ def cerrar(slug, fase, por_que, atendidos=None):
     for i in tiquets:
         from . import ticket as _t
 
+        # **La prueba movida no se cierra con palabras** (C-687): la cierra
+        # `cierre.atiende_las_movidas` cuando lo declarado vuelve a casar.
+        import fijar
+
+        if _medida(i) == fijar.MOVIDA:
+            print(f"  el tiquet #{i} se cierra midiendo, no declarandolo", flush=True)
+            continue
         try:
             _t.contestar(i, por_que[:400], "arreglado", "la linea", _medida(i))
             cerrados.append(i)

@@ -423,15 +423,16 @@ def _con_prueba_viva(slug, fjs):
     return vivas
 
 
-def _prueba_casa(slug):
-    """Cierra el tiquet de la prueba movida cuando vuelve a casar entera."""
-    from dominio import ticket as _t
+def casan(slug, beat) -> bool:
+    """Si todas las declaraciones de esa etapa casan con el transcript de hoy.
 
-    for t in _t.abiertos(slug):
-        if (t["cierra_con"] or "") == MOVIDA:
-            _t.contestar(t["id"], f"{slug}: las declaraciones vuelven a casar"
-                         f" con el transcript de hoy, una por una.",
-                         "arreglado", "la linea", MOVIDA)
+    Es la medida que cierra el tiquet de la prueba movida (C-687): lo cierra
+    `dominio.cierre.atiende_las_movidas`, midiendo, y nadie con palabras.
+    """
+    suyas = [f for f in fijados(slug) if f["beat"] == int(beat) and f.get("toma")]
+    return bool(suyas) and all(
+        not f.get("huella") or huella(f["toma"], f["desde"], f["hasta"]) == f["huella"]
+        for f in suyas)
 
 
 def _al_compositor(slug, movidas):
@@ -469,8 +470,12 @@ def _al_compositor(slug, movidas):
             f" porque:"
             f" lo que caduco es la prueba, no la decision. ACOTADO A ESTA"
             f" ETAPA: mira el tramo con la cinta de hoy delante y vuelve a"
-            f" declararlo, o di por que ya no procede."),
-            tipo="falta", vuelve_a="descrito", cierra_con=MOVIDA)
+            f" declararlo en `tramos`. Se cierra solo cuando lo declarado vuelve"
+            f" a casar; decir que la decision sigue no lo cierra."),
+            # A `revalidado`, que es quien declara tramos con las palabras y los
+            # segundos de hoy delante (C-687). En `descrito` se cerraba con un
+            # «sigue valiendo» y en la vuelta siguiente se abria otra vez.
+            tipo="falta", vuelve_a="revalidado", cierra_con=MOVIDA)
 
 
 def _leidos_declarados(slug, por_beat, transcribir):

@@ -208,7 +208,39 @@ def cierra_por_su_medida(slug: str) -> list:
     el ultimo: si revienta, los demas ya quedaron cerrados.
     """
     return (cierra_los_suyos(slug) + cierra_cortes_limpios(slug)
-            + cierra_los_fijados(slug) + cierra_por_texto(slug))
+            + cierra_los_fijados(slug) + atiende_las_movidas(slug)
+            + cierra_por_texto(slug))
+
+
+def atiende_las_movidas(slug: str) -> list:
+    """Los tiquets de la prueba movida: se cierran midiendo, y van a `revalidado`.
+
+    `fijar` los abre cuando un tramo declarado ya no casa con el transcript de
+    hoy. reel-23, 15-11-2026: iban a `descrito`, el compositor los cerraba con
+    «la decision sigue valiendo» sin declarar nada, `fijar` los volvia a abrir
+    (#1060-1064, luego #1068-1072) y `vencidas` paraba la pieza (C-687). La
+    funcion que tenia que cerrarlos midiendo no la llamaba nadie.
+
+    Se cierra el que su etapa ya casa (`fijar.casan`), y el que sigue abierto y
+    apunta a otro paso se encamina a `revalidado`, una vez: `encaminar` le
+    devuelve su turno.
+    """
+    import fijar
+
+    from . import ticket as _t
+
+    cerrados = []
+    for t in _t.abiertos(slug):
+        if (t.get("cierra_con") or "") != fijar.MOVIDA or t.get("beat") is None:
+            continue
+        if fijar.casan(slug, t["beat"]):
+            _t.contestar(int(t["id"]), f"medido: lo declarado de e{t['beat']} casa"
+                         " con el transcript de hoy", "arreglado", "la linea",
+                         fijar.MOVIDA)
+            cerrados.append(int(t["id"]))
+        elif (t.get("vuelve_a") or "") != "revalidado":
+            _t.encaminar(int(t["id"]), "revalidado")
+    return cerrados
 
 
 def cierra_por_texto(pieza: str) -> list:
