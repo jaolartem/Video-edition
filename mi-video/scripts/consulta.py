@@ -93,7 +93,12 @@ def abanico(frase, cintas=None, tope=12):
     """Dónde está dicha esa frase **en todo el material**, y cómo de bien.
 
         python scripts/consulta.py abanico '["el 21 de septiembre"]'
+
+    Un número en el sitio de las cintas es el tope (C-686): un compositor pidió
+    `["…", 12]` en reel-23 y se quedó sin buscar tomas a cámara por un TypeError.
     """
+    if isinstance(cintas, int):
+        cintas, tope = None, cintas
     return _abanico(frase, cintas, tope)
 
 
