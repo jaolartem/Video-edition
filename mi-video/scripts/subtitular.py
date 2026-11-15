@@ -97,7 +97,7 @@ def transcribir(mp4, wav, base, idioma):
                         "-t", f"{b - a:.3f}", "-i", wav, "-c:a", "pcm_s16le",
                         pieza + ".wav"], check=True)
         subprocess.run(gpu.whisper() + [
-                        "-m", os.path.join(W, "ggml-medium.bin"),
+                        "-m", os.path.join(W, idioma.modelo),
                         *idioma.banderas, "-mc", "0", "-ml", "1", "-sow",
                         "-oj", "-of", pieza, "-f", pieza + ".wav"],
                        capture_output=True, check=True)
