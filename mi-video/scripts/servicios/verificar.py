@@ -76,9 +76,18 @@ class ServicioVerificar(Servicio):
         # otra que mire a cámara, y si no la hay, panel. Ver `dominio/mirada.py`.
         from dominio import mirada as _mirada
 
-        mira = next((m for m in paran if _mirada.REGLA in m), None)
-        if mira:
-            return _devuelve_la_mirada(pieza, mira, _mirada.REGLA)
+        # **Todas las etapas a la vez, no una por vuelta** (C-689): reel-23 iba
+        # e5, luego e9, y cada una costaba dos oficios y un cuarto de hora. Cada
+        # una abre su tiquet y la pieza vuelve al paso más temprano de todos.
+        miras = [m for m in paran if _mirada.REGLA in m]
+        if miras:
+            from dominio.fase import camino
+
+            ruta = [f["nombre"] for f in camino()]
+            vueltas = [_devuelve_la_mirada(pieza, m, _mirada.REGLA) for m in miras]
+            vuelven = [v for v in vueltas if getattr(v, "volver_a", None) in ruta]
+            return (min(vuelven, key=lambda v: ruta.index(v.volver_a))
+                    if vuelven else vueltas[0])
         # Se devuelve el primero y se cuentan los demas: el motivo tiene que
         # caber en una linea del log y ser accionable. La lista entera esta en
         # `verificar.py --avisa`.
