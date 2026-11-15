@@ -181,6 +181,14 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
 
         for i in _abierto.reabre_saltados(pieza.slug):  # C-691
             print(f"  {pieza.slug}: #{i} vuelve a su paso: lo contestó sin nombrarlo")
+        # Y el tiquet que tiene su turno devuelve la pieza en la vuelta, no sólo
+        # al abrirse: `del_tiquet` lo decía y nadie lo llamaba aquí (C-691).
+        from dominio import puertas as _puertas
+        if (dicho := _puertas.del_tiquet([int(pieza.slug[-2:])])):
+            for linea in dicho:
+                print(linea)
+            motivo = "vuelve al paso que atiende sus tiquets"
+            break
         vencidas = _abierto.vencidas(pieza.slug, actual["nombre"], orden)
         if vencidas:
             uno = vencidas[0]
