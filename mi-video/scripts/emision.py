@@ -234,6 +234,12 @@ class Emision:
         quieto = [q for q in _tramos(t, "freeze_start", "freeze_end", f["dura"])
                   if not any(a - 0.1 <= q[0] and q[1] <= b + 0.1 for a, b in negro)
                   and not (q[1] >= f["dura"] - 0.05 and q[1] - q[0] <= cola)]
+        # **Un congelado bajo un tablero es del diseñador** (C-694): el corte no
+        # mueve lo que está quieto dentro de una lámina. reel-23, 15-11-2026:
+        # las listas de e5 y e16 devolvían la pieza a `cortado` en cada render.
+        laminas = [(x["at"] / FPS, (x["at"] + x["duration"]) / FPS)
+                   for x in self.spec.get("boards") or []]
+        bajo_lamina = lambda a, b: any(x - 0.1 <= a and b <= y + 0.1 for x, y in laminas)
         for regla, tramos, tope, quien in (
                 ("silencio", _tramos(t, "silence_start", "silence_end", f["dura"]),
                  suena.AIRE_MAX, "cosido"),
@@ -244,8 +250,12 @@ class Emision:
                 med = parte[k]["medido"]
                 med[regla] = round(max(med.get(regla, 0), b - a), 2)
                 if b - a > tope:
-                    fallos[k].append(Alerta(regla, quien, f"{b - a:.1f} s de {regla} desde el"
-                                            f" {a:.1f} (tope {tope} s)", round(a, 1)))
+                    de_lamina = regla == "congelado" and bajo_lamina(a, b)
+                    fallos[k].append(Alerta(
+                        regla, "disenado" if de_lamina else quien,
+                        f"{b - a:.1f} s de {regla} desde el {a:.1f} (tope {tope} s)"
+                        + (" — bajo un tablero: lo quieto es la lámina" if de_lamina else ""),
+                        round(a, 1)))
 
 
 def _juntas(alertas) -> list:
@@ -309,6 +319,13 @@ def atender(n) -> tuple[list, str | None]:
     for k, d, a in fallos:
         clave = _clave(k, a["regla"])
         ya = next((t for t in suyos if t["dijo"].split(" — ")[0] == clave), None)
+        # Y el que ya iba a `cortado` por un congelado de lámina cambia de dueño
+        # (C-694), una vez: `encaminar` le devuelve el turno.
+        if ya and a["quien"] == "disenado" and (ya.get("vuelve_a") or "") == "cortado":
+            ticket.encaminar(ya["id"], "disenado", avisar=False)
+            dicho.append(f"  #{ya['id']} {clave} -> disenado: lo quieto es la lámina")
+            vuelven.append("disenado")
+            continue
         # **Y si alguien lo encaminó a otra fase, manda esa** (C-602): reel-18,
         # 19-10, el #725 (firma de 0,76 s) se mandó a `revisado` para Jaime y
         # esto devolvía la pieza a `disenado` cada medio minuto, en bucle.
