@@ -78,12 +78,7 @@ class ServicioVerificar(Servicio):
 
         mira = next((m for m in paran if _mirada.REGLA in m), None)
         if mira:
-            from dominio.abierto import etapa_de
-
-            from .base import devuelve
-            return devuelve(pieza, _mirada.REGLA, mira.split(": ", 1)[-1],
-                            atiende="revalidado", etapa=etapa_de(mira),
-                            cierra_con="tramos")
+            return _devuelve_la_mirada(pieza, mira, _mirada.REGLA)
         # Se devuelve el primero y se cuentan los demas: el motivo tiene que
         # caber en una linea del log y ser accionable. La lista entera esta en
         # `verificar.py --avisa`.
@@ -180,3 +175,34 @@ def _devuelve_el_borde(pieza, motivo: str):
     # Y se cierra midiendo el borde: `cierre.cierra_cortes_limpios` (C-560).
     return devuelve(pieza, SOBRE_LA_VOZ, texto, atiende=paso, etapa=beat,
                     cierra_con="bordes")
+
+
+def _devuelve_la_mirada(pieza, motivo: str, regla: str):
+    """Primero a `revalidado`, otra toma; si ya se buscó, a `descrito`, panel.
+
+    reel-23, 15-11-2026, e5: el compositor de `revalidar` contestó «ninguna
+    candidata mira a cámara, va panel», pero el panel es plano y componente, que
+    los decide `descrito`, así que nada cambió y la puerta la devolvió otra vez
+    al mismo sitio (#1074, #1075). Y a la tercera, para: si tampoco el panel
+    quita el reparo, es otra cosa y se cuenta (C-688).
+    """
+    from dominio import ticket as tk
+    from dominio.abierto import etapa_de
+
+    from .base import devuelve
+
+    etapa = etapa_de(motivo)
+    antes = [t for t in tk.historia(pieza.slug)
+             if (t.get("dijo") or "").startswith(regla)
+             and etapa_de(t.get("dijo")) == etapa and t.get("estado") != "abierto"]
+    texto = motivo.split(": ", 1)[-1]
+    fue = {t.get("vuelve_a") or "" for t in antes}
+    if "descrito" in fue:
+        return Resultado(False, motivo=f"{texto[:120]} — ya se buscó otra toma y"
+                                       " se pidió panel, y sigue")
+    if "revalidado" in fue:
+        return devuelve(pieza, regla, texto + " — ya se buscó otra toma en"
+                        " revalidado y no la hay: va panel, plano `fuera` o"
+                        " tablero encima", atiende="descrito", etapa=etapa)
+    return devuelve(pieza, regla, texto, atiende="revalidado", etapa=etapa,
+                    cierra_con="tramos")
