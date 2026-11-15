@@ -49,7 +49,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import beats  # noqa: E402
-from dominio import costura as _cs  # noqa: E402
+from dominio import costura as _cs, libreto as _libreto  # noqa: E402
 import depurar  # noqa: E402
 import transcribir  # noqa: E402
 import rutas  # noqa: E402
@@ -588,6 +588,9 @@ def dossier(slug):
             #: Lo que el libreto pedia para esta etapa. `None` si no hay.
             "libreto": _lib[beat - 1] if 1 <= beat <= len(_lib) else None,
             "trato": d["det"].get("trato"),
+            # La edición de Jaime: quien elige la toma tiene que saber si va a
+            # cámara, porque entonces sólo vale una que le enseñe los ojos (C-683).
+            **_libreto.en_pedido(slug, beat),
             **m,
             "intensidad": inten.get("intensidad"),
             # **Con signo, y por eso hacen falta las dos.** `intensidad` mide
