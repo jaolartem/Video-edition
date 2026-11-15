@@ -33,7 +33,6 @@ no existe» es información. Lo que no vale es que desaparezca.
 from __future__ import annotations
 
 import datetime
-import json
 import os
 import sqlite3
 import sys
@@ -128,7 +127,10 @@ RUTA = {
 #: El pedido y la respuesta no son papeleo: son **el sitio donde la decision de
 #: un paso se hace visible al siguiente**. Sin ellos los dos papeles se
 #: colapsan en uno y la revision deja de tener entrada.
-RECIBO = {"descrito": "describir", "disenado": "disenar"}
+#:
+#: Y `revalidado` también es un servicio (C-698): sin su acuse, un tiquet que
+#: ese paso se saltaba paraba la pieza para siempre en el paso siguiente.
+RECIBO = {"descrito": "describir", "disenado": "disenar", "revalidado": "revalidar"}
 
 
 class SinRecibo(Exception):

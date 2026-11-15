@@ -36,6 +36,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import registro  # noqa: E402
+from dominio import abierto as _abierto  # noqa: E402
 from .base import Pieza, Resultado, Servicio  # noqa: E402
 
 PROMPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -112,6 +113,11 @@ class ServicioRevalidar(Servicio):
                 False,
                 motivo="espera veredicto -> "
                        + contrato.ruta_pedido("revalidar", pieza.slug))
+        # **Y ningún tiquet sin respuesta** (C-691, aquí desde C-698): el #1139
+        # de reel-23 salió con `tiquets: []`, se aceptó, y la pieza se paró en
+        # `cosido` con el tiquet vencido.
+        if (falta := _abierto.exige_todos(pieza.slug, "revalidado", "revalidar", r)):
+            return Resultado(False, motivo=falta)
         hecho = aplicar(pieza, r)
         # Y se recuerda el segmento como queda DESPUES de aplicar: con la huella
         # de antes, la vuelta siguiente preguntaria por su propio arreglo.
@@ -148,7 +154,6 @@ def aplicar(pieza: Pieza, veredictos) -> str:
       selección se rehaga.
     """
     import datetime
-    import sqlite3
     import basedatos
 
     con = basedatos.abrir("ads/decisiones.db")
