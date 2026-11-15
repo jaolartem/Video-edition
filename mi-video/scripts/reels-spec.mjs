@@ -37,7 +37,6 @@ import { FPS, Reloj } from "./reels/reloj.mjs";
 // Las tres importaciones de `material.mjs` que había aquí eran una.
 import { FRAMES, caraDe, duracionDelCorte, edlDe, idDe, marcoDe, planDe, subsDe } from "./reels/material.mjs";
 import { colocaPaneles } from "./reels/paneles.mjs";
-import { pelado } from "./reels/pelado.mjs";
 import { correccionesDe, descDe, tablerosDe } from "./reels/base.mjs";
 // **El pie sale de `cifras.mjs`, que es su dueño y llevaba sin correr desde que
 // se escribió.** El que corría era una copia en `base.mjs` que casaba la fila de
@@ -328,12 +327,13 @@ const spec = Object.keys(FRAMES.reels).filter(cortada).map((slug) => {
     ...(pieza.cta ? [{ at: pieza.cta.at * FPS, duration: pieza.cta.dur * FPS }] : []),
     { at: pieza.entra, duration: 9 + pieza.sostiene + 9 },
   ], ventanas, idiomaDePieza(slug).colgantes);
-  // **Y la pieza no se queda desnuda.** Aquí, que es donde está entera: medirlo
-  // sobre una sola de sus listas dio 147 s falsos. Ver `reels/pelado.mjs`.
+  // **El plano «pelado» ya no es falta: la regla se retiró (C-682).** Jaime,
+  // 14-11-2026: «no vale esa regla, y de hecho no debería existir». Una cara
+  // hablando sin nada encima no es un olvido de composición.
 
   // Y el panel que caía dentro del gancho se corre detrás de él: se pintaba
   // encima del rótulo, que son los dos bloques compitiendo otra vez.
-  faltas.push(...pelado(pieza, slug), ...apartaDelGancho(pieza, slug));
+  faltas.push(...apartaDelGancho(pieza, slug));
 
   // **El subtítulo del gancho baja a su franja**, y va DESPUÉS de componer:
   // componer es lo último que puede meter texto en esa ventana, así que marcar

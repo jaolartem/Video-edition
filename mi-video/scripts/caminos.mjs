@@ -324,8 +324,8 @@ export const construir = (ctx) => {
  * **Lo desnudo NO se mide aquí**, y el intento costó un informe equivocado:
  * `capas` es sólo una de las listas que dibujan —al lado viven `boards`,
  * `paneles`, `tarjetas` y `recortes`— así que contar huecos sobre ella sola dio
- * 147 s en las siete cuando son 25 s en dos. Vive en `reels-spec.mjs :: pelado`,
- * que es el único sitio donde la pieza está entera.
+ * 147 s en las siete cuando son 25 s en dos. Vivió en `reels-spec.mjs :: pelado`,
+ * que es el único sitio donde la pieza está entera, y se retiró: C-682.
  */
 export const revisarPieza = (capas) => {
   const faltas = [];
