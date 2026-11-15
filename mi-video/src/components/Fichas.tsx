@@ -50,6 +50,8 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
   const layout = useLienzo();
   const franja = layout.franja;
   const entra = useEntrada();
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const { cuerpo } = leerDeclarado(props);
   if (!cuerpo.length) return null;
 
@@ -83,8 +85,6 @@ export const Fichas: React.FC<FichasProps> = ({ props, numerada = false }) => {
    * cuando ya entró todo —4,3 s quietos en reel-23 e5— y lo que mueve es lo
    * que se está leyendo, no un adorno. Ver `Ficha.lectura`.
    */
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
   const lectura = (i: number) => {
     const desde = entradas[i];
     const hasta = i + 1 < entradas.length ? entradas[i + 1] : durationInFrames;
