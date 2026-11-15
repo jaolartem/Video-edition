@@ -419,17 +419,7 @@ def main():
     # avise: `migrar()` es idempotente por diseno —«se puede correr las veces
     # que haga falta»— y tarda menos de un segundo. Corriendola aqui, la base
     # nunca puede ir por detras de lo declarado.
-    try:
-        import db
-
-        db.migrar()
-    except Exception as e:                          # noqa: BLE001
-        # Y si la migracion revienta, se para: recorrer con la base a medias es
-        # exactamente como se perdio reel-07.
-        registro.aviso("avanzar", "lo declarado no entra en la base",
-                       detalle=f"{type(e).__name__}: {str(e)[:300]}", eco=True)
-        raise SystemExit("avanzar: `ads/frames.json` no entra en la base."
-                         " No se recorre nada con la base por detras.")
+    _declarado()
 
     # **Devolver una pieza a una fase es del motor, no de un apano.**
     #
@@ -492,8 +482,27 @@ def main():
     _una_vuelta(a)
 
 
+def _declarado():
+    """Lo declarado entra en la base. Va en `main` y en cada vuelta (C-684)."""
+    try:
+        import db
+
+        db.migrar()
+    except Exception as e:                          # noqa: BLE001
+        # Y si la migracion revienta, se para: recorrer con la base a medias es
+        # exactamente como se perdio reel-07.
+        registro.aviso("avanzar", "lo declarado no entra en la base",
+                       detalle=f"{type(e).__name__}: {str(e)[:300]}", eco=True)
+        raise SystemExit("avanzar: `ads/frames.json` no entra en la base."
+                         " No se recorre nada con la base por detras.")
+
+
 def _una_vuelta(a) -> int:
     """Un recorrido completo de todas las piezas. Devuelve cuanto se movio."""
+    # **Y en cada vuelta, no sólo al arrancar** (C-684): el disparador entra por
+    # aquí, y un guion declarado con la línea en marcha no llegaba a la base
+    # hasta que alguien migraba a mano — que es lo que el cerrojo prohíbe.
+    _declarado()
     piezas = list(a.reels or rutas.piezas())
     # **Y una respuesta que llego tarde devuelve su pieza al paso que la espera.**
     #
