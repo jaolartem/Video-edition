@@ -298,7 +298,7 @@ DISENO = Contrato(
                    " de forzar al diseñador a elegir entre ocho cajas."),
         Clave("tablero.cubre",
               dispara=(Aguja("scripts/reels/capas.mjs", "export function repartirPorCubre(declarados) {"),
-                       Aguja("src/components/TableroDeclarado.tsx", 'const acompana = cubre === "panel" || cubre === "banda";'),),
+                       Aguja("src/components/ZonaTablero.tsx", 'return cubre === "panel" || cubre === "banda";'),),
               efecto="si el elemento TOMA el cuadro, lo acompaña, o no existe",
               obligatoria=True,
               lista=("pleno", "panel", "banda", "cc"),
