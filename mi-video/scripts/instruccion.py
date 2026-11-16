@@ -252,6 +252,25 @@ INSTRUCCIONES = (
             Aguja("../docs/piso.md", "**Y es la fuente de lo decidido, corte a corte.**"),
         ),
     ),
+    Instruccion(
+        codigo="T-09",
+        paso="todos",
+        clase="montaje",
+        enunciado=(
+            "Antes de renderizar, la hoja guía: un fotograma por segundo del spec"
+            " de hoy, sacado del bundle y sin render. La pieza espera a las puertas"
+            " del render hasta que Jaime la aprueba sobre ese spec; lo que diga de"
+            " un segundo es un tiquet con --de montaje. Jaime, 16-11-2026: «de acá"
+            " en adelante antes de renderizar yo quiero ver una hoja guía con cada"
+            " fotograma segundo a segundo, sale más barato que tener el producto"
+            " renderizado»."
+        ),
+        agujas=(
+            Aguja("scripts/montar.sh", 'PYTHONIOENCODING=utf-8 python scripts/guia.py "$n" || exit 1'),
+            Aguja("scripts/guia.py", "class Guia:"),
+            Aguja("scripts/dominio/oficio.py", 'if buzon == "guia":'),
+        ),
+    ),
 )
 
 

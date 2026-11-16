@@ -108,6 +108,12 @@ def vigente(buzon, slug) -> bool:
     # por Jaime, tenían pedidos de diseño abiertos que nadie iba a contestar.
     if (ahora or {}).get("nombre") in ("publicado", "rechazado"):
         return False
+    # **Y la hoja guía sólo espera con la pieza a las puertas del render**
+    # (C-717): la pide `montar.sh` desde `verificado`. Con la pieza de vuelta
+    # atrás, un pedido suyo en pie pararía `verificar` por una guía que se va a
+    # sacar otra vez con el spec nuevo.
+    if buzon == "guia":
+        return bool(ahora) and ahora.get("nombre") == "verificado"
     if m.group(2) or buzon not in LA_FASE:
         return True
     suya = next((f for f in camino() if f["nombre"] == LA_FASE[buzon]), None)

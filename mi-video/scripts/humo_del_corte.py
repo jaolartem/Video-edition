@@ -184,8 +184,27 @@ def _el_horizontal_compone_su_tablero(h):
            "la puerta del diseño no deja en horizontal una forma no compuesta para él")
 
 
+def _la_guia_va_antes_del_render(h):
+    """El render no sale sin la hoja guía aprobada sobre su spec. C-717.
+
+    Jaime, 16-11-2026: *«antes de renderizar yo quiero ver una hoja guía con
+    cada fotograma segundo a segundo»*.
+    """
+    import guia
+
+    m = open("scripts/montar.sh", encoding="utf-8").read()
+    h.mide("C-717", -1 < m.find("scripts/guia.py") < m.find("node scripts/render.mjs"),
+           "montar.sh pide la hoja guía antes de renderizar")
+    g = guia.Guia.__new__(guia.Guia)
+    g.huella = "h1"
+    h.mide("C-717", g.aprobada({"aprobada": True, "huella": "h1"})
+           and not g.aprobada({"aprobada": True, "huella": "h0"}),
+           "y una aprobación de otro spec no vale")
+
+
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba
 #: `humo.py` con cada prueba de aquí, que es la razón por la que se partió.
 PRUEBAS = (_lo_publicado_queda_escrito, _lo_firmado_se_puede_volver_a_poner,
            _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido,
-           _un_tablero_sin_encargo_caduca, _el_horizontal_compone_su_tablero)
+           _un_tablero_sin_encargo_caduca, _el_horizontal_compone_su_tablero,
+           _la_guia_va_antes_del_render)

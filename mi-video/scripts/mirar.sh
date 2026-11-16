@@ -84,6 +84,24 @@ PY
   exit 0
 fi
 
+# **Un fotograma por segundo, para la hoja guía** (C-717). Jaime, 16-11-2026:
+# «antes de renderizar yo quiero ver una hoja guía con cada fotograma segundo a
+# segundo». Del bundle y con un solo Chrome (`mirar.mjs`), sin render. Lo pide
+# `guia.py`, que compone las hojas.
+if [ "${1:-}" = "--segundos" ]; then
+  N="${2:?pieza}"; SALIDA="${3:?carpeta}"
+  bundle
+  mkdir -p "$SALIDA"
+  PYTHONIOENCODING=utf-8 python - "$N" <<'PY' | node scripts/mirar.mjs "$SALIDA" "$BUNDLE"
+import json, sys
+n = int(sys.argv[1])
+r = next(p for p in json.load(open("src/reels.json", encoding="utf-8")) if p["id"] == f"Reel-R{n}")
+ultimo = int(float(r["duracion"]) * 30) - 1
+for s in range(int(float(r["duracion"])) + 1):
+    print(f"Reel-R{n} s{s:03d} {min(s * 30 + 15, ultimo)}")
+PY
+  exit 0
+fi
 N="${1:?pieza}"; POR_ESCENA="${2:-3}"; DESDE="${3:-}"; HASTA="${4:-}"
 SLUG=$(printf 'reel-%02d' "$N")
 PLAN="work/scenes/$SLUG/plan-full.json"

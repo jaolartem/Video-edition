@@ -601,6 +601,14 @@ for r in "${REELS[@]}"; do
     exit 1
   fi
   RENDERIZADA=0
+  # **Y antes de renderizar, la hoja guía** (C-717). Jaime, 16-11-2026: «de acá
+  # en adelante antes de renderizar yo quiero ver una hoja guía con cada
+  # fotograma segundo a segundo, sale más barato que tener el producto
+  # renderizado». `guia.py` la saca del bundle y deja la pieza esperándole con
+  # un pedido abierto; con su aprobación sobre este spec, pasa.
+  if _hay_que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
+    PYTHONIOENCODING=utf-8 python scripts/guia.py "$n" || exit 1
+  fi
   if _hay_que render "$n" || [ ! -f "$DESTINO/reels/reel-R$n.mp4.huella" ]; then
     node scripts/render.mjs "$n"
     RENDERIZADA=1
