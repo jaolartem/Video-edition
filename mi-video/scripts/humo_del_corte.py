@@ -221,6 +221,12 @@ def _el_palote_es_recurso(h):
            "el palote se dibuja en horizontal y en vertical")
     h.mide("C-718", bool(pide("horizontal", {"texto": ["X"]})),
            "y sin `accion` no entra")
+    lado = {"accion": "senalar", "cubre": "panel", "lado": "derecha",
+            "acciones": [{"accion": "investigar", "en": 0}, {"accion": "guion", "en": 2}]}
+    h.mide("C-719", not pide("horizontal", lado),
+           "y acompaña a cámara, a un lado y encadenando acciones")
+    m = open("scripts/mirar.mjs", encoding="utf-8").read()
+    h.mide("C-720", "!antes.has(d)" in m, "mirar.mjs borra lo que deja en el temporal")
 
 
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba

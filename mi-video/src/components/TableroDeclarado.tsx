@@ -3,7 +3,7 @@ import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remo
 import { fontFamily } from "../brand/fonts";
 import { color, tracking, videoText } from "../brand/tokens";
 import { Fondo, type Recorte } from "./Fondo";
-import { ZonaTablero } from "./ZonaTablero";
+import { ZonaTablero, acompanaAlPlano } from "./ZonaTablero";
 import { leerDeclarado } from "./declarado/lineas";
 import { useLienzo } from "../brand/LienzoContexto";
 
@@ -74,7 +74,6 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
    * eso llevaba cinco ciclos idéntico. `pleno` toma el cuadro; `panel` y
    * `banda` acompañan al plano sin taparle la cara.
    */
-  const cubre = String(props.cubre ?? "pleno");
   /**
    * **Y `zona` dice dónde cae dentro del cuadro, que no es lo mismo.**
    *
@@ -90,7 +89,7 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
    * tablero —justo encima de la franja del subtítulo, nunca dentro— que es donde
    * el encargo lo pedía: *«al pie, el filete y EL LINK ESTÁ ABAJO»*.
    */
-  const acompana = cubre === "panel" || cubre === "banda";
+  const acompana = acompanaAlPlano(props);
   const alPie = acompana || String(props.zona ?? "") === "pie";
 
   return (

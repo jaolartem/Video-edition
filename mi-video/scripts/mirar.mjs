@@ -21,6 +21,7 @@
 // de veinte escenas son 5 minutos y se acaba mirando menos; a 1,9 s son 2, y
 // mirar deja de doler.
 import { openBrowser, selectComposition, renderStill } from "@remotion/renderer";
+import fs from "fs";
 import path from "path";
 import process from "process";
 
@@ -52,6 +53,9 @@ if (trabajos.length === 0) process.exit(0);
 // `angle` es lo mismo que usa el render completo: Chrome compone por D3D11 y no
 // por software. Aqui no cambia el reloj —el freno era otro— pero tampoco vale la
 // pena dibujar por software teniendo la tarjeta.
+// Las carpetas de assets que ya había antes de esta corrida: no son suyas.
+const tmpAntes = process.env.TMP || process.env.TEMP;
+const antes = new Set(tmpAntes && fs.existsSync(tmpAntes) ? fs.readdirSync(tmpAntes) : []);
 const navegador = await openBrowser("chrome", { chromiumOptions: { gl: "angle" } });
 
 // Una composicion se elige UNA vez por id: son ~0,6 s de leer el bundle y no
@@ -89,6 +93,20 @@ for (const t of trabajos) {
 }
 
 await navegador.close({ silent: true });
+
+// **Y lo que deja cada fotograma se borra** (C-720). `renderStill` copia el
+// vídeo de la pieza a una carpeta `remotion-v4*-assets*` del temporal y no la
+// borra: 220 MB por fotograma. El 16-11 eran 590 carpetas y 151 GB en
+// `F:/tmp-video`, F: con 107 MB libres y los renders muriendo por disco. Se
+// borran las que nacieron en esta corrida, y sólo esas.
+const tmp = process.env.TMP || process.env.TEMP;
+if (tmp && fs.existsSync(tmp)) {
+  for (const d of fs.readdirSync(tmp)) {
+    const ruta = path.join(tmp, d);
+    if (/^remotion-v4.*-assets/.test(d) && !antes.has(d))
+      fs.rmSync(ruta, { recursive: true, force: true });
+  }
+}
 process.stdout.write("\n");
 if (fallos) {
   console.error(`${fallos} de ${trabajos.length} fotogramas no salieron`);

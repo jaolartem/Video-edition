@@ -21,6 +21,7 @@
  */
 import { FPS } from "./reloj.mjs";
 import { Tramos } from "./tramos.mjs";
+import { acompanaAlPlano } from "./capas.mjs";
 import { informe } from "./informe.mjs";
 import { faltasDePaneles } from "./paneles.mjs";
 import { faltasDeFondo } from "./fondo.mjs";
@@ -133,7 +134,8 @@ export const mudo = (r) => {
  */
 function presencia(r) {
   const fin = Math.round(r.duracion * FPS);
-  const tapa = new Tramos([...r.boards, ...r.tarjetas]);
+  // Un tablero que lo acompaña —el palote en su esquina— no le quita el plano.
+  const tapa = new Tramos([...r.boards.filter((b) => !acompanaAlPlano(b)), ...r.tarjetas]);
   const libres = [0, 1, 2].filter((i) => {
     const a = (fin * i) / 3;
     const b = (fin * (i + 1)) / 3;
@@ -191,7 +193,7 @@ export function revisar(spec) {
    * cubre la etapa es del diseñador—: se dice, con la medida, y no se publica.
    */
   // Bajo un tablero el cc es otro y la cara no se ve: no cuenta.
-  const bajoTablero = (r, e) => (r.boards ?? []).some((b) =>
+  const bajoTablero = (r, e) => (r.boards ?? []).some((b) => !acompanaAlPlano(b) &&
     b.at <= ((e.desde + e.hasta) / 2) * FPS && ((e.desde + e.hasta) / 2) * FPS < b.at + b.duration);
   for (const r of spec)
     for (const e of (r.cc ?? []).filter((x) => x.tapa && !bajoTablero(r, x)))

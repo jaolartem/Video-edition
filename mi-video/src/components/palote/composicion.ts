@@ -1,4 +1,5 @@
 import type { Lienzo } from "../../brand/lienzo";
+import type { ElEnElPlano } from "../ZonaTablero";
 import type { Accion } from "./accion";
 
 /**
@@ -78,4 +79,65 @@ export const compone = (layout: Lienzo, papel: Accion, texto: string[], aire: nu
     opciones.push({ ...arriba, caja: { ...arriba.caja, w: ancho }, escena, k: escala(escena) });
   }
   return opciones.reduce((a, b) => (b.k > a.k ? b : a));
+};
+
+/** Dónde va él cuando acompaña el plano en vez de taparlo. */
+export type Sitio = "arriba" | "abajo" | "izquierda" | "derecha";
+
+/** Lo que mide acompañando: un quinto del lado corto del cuadro, con lo que lleve. */
+const QUINTO = 0.2;
+/** Lo que deja por encima de la coronilla cuando va arriba. */
+const SOBRE_EL = 18;
+/** Por defecto, dónde cae la coronilla: la medida en reel-23 es 0,197–0,217. */
+const CORONILLA = 0.2;
+
+/**
+ * **Él acompañando: pequeño, en su sitio y sin taparle la cara** (`cubre:
+ * "panel"` + `lado`).
+ *
+ * Jaime: *«deja que el muñequito aparezca, solamente ponlo en un sitio que no
+ * estorbe tanto: ponlo arriba, ponlo abajo, ponlo a un lado»*, y *«tampoco
+ * estoy viendo las ayudas visuales»*: lo que él saca a cámara —la calavera—
+ * no se tapa. Así que mide un quinto del cuadro y vive en el borde que se
+ * declara, dentro de la zona segura y sobre la franja del subtítulo:
+ *
+ * - `izquierda` / `derecha` — de pie en esa esquina, con el texto encima.
+ * - `abajo` — de pie sobre la franja, en el centro de la mitad que él deja
+ *   libre (el `lado` de la pieza, que llega por `DondeEstaEl`).
+ * - `arriba` — colgado del margen de arriba, en esa misma mitad libre. Si la
+ *   pieza no dice cuál es, va al centro y entonces **no baja de su
+ *   coronilla** —la mide `sujeto.py`; sin ella, el 0,2 de reel-23—: se encoge
+ *   lo que haga falta, nunca le pisa la cabeza. Medido en reel-23: centrado,
+ *   arriba le cabían 40 px y abajo caía sobre la barbilla; en la mitad libre,
+ *   los dos caben enteros.
+ */
+export const acompana = (
+  layout: Lienzo, papel: Accion, texto: string[], sitio: Sitio, plano: ElEnElPlano, aire: number,
+): Composicion => {
+  const suelo = layout.height - layout.franja.reserva - aire;
+  const util = layout.width - layout.safe.left - layout.safe.right;
+  const hueco = (plano.coronilla ?? CORONILLA) * layout.height - layout.safe.top - SOBRE_EL;
+  const sobreEl = sitio === "arriba" && !plano.libre;
+  const alto = Math.max(40, Math.min(Math.min(layout.width, layout.height) * QUINTO, sobreEl ? hueco : Infinity));
+  const k = Math.min(alto / papel.alto, (util * 0.4) / papel.ancho);
+  const w = papel.ancho * k;
+  const h = papel.alto * k;
+  /** El centro de la mitad libre; sin ella, el del cuadro. */
+  const medio = plano.libre === "izq" ? layout.width / 4 : plano.libre === "der" ? layout.width * 0.75 : layout.width / 2;
+  const x = sitio === "izquierda" ? layout.safe.left
+    : sitio === "derecha" ? layout.width - layout.safe.right - w
+      : medio - w / 2;
+  const escena = { x, y: sitio === "arriba" ? layout.safe.top + alto - h : suelo - h, w, h };
+  const larga = Math.max(1, ...texto.map((l) => l.length));
+  const base = 40 * layout.tablero.cuerpo;
+  if (sitio === "arriba") {
+    const caja = { x: escena.x + w + HUECO / 2, y: escena.y, w: util * 0.3, h };
+    const cuerpoTexto = Math.min(base, caja.w / (larga * AVANCE), h / Math.max(1, texto.length * 0.96));
+    return { caja, centra: false, enMedio: true, cuerpoTexto, escena, k };
+  }
+  const ancho = w + HUECO * 2;
+  const cuerpoTexto = Math.min(base, ancho / (larga * AVANCE));
+  const altoTexto = texto.length * cuerpoTexto * 0.96;
+  const caja = { x: escena.x - HUECO, y: escena.y - altoTexto - HUECO / 4, w: ancho, h: altoTexto };
+  return { caja, centra: true, enMedio: false, cuerpoTexto, escena, k };
 };

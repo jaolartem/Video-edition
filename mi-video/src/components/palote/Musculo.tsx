@@ -3,6 +3,7 @@ import { color } from "../../brand/tokens";
 import type { Accion, Escena, Escenario } from "./accion";
 import { bulto } from "./Cuerpo";
 import { CURVA, NEUTRA, Pista, articula, type Articulaciones, type Clave, type Pose } from "./rig";
+import { reposo } from "./reposo";
 import { conVida } from "./vida";
 
 /**
@@ -112,16 +113,19 @@ const monta = (e: Escenario): Escena => {
   for (let s = PRIMER_BOMBEO; s + REVIENTA < e.dur; s += PERIODO) bombeos.push(s);
   const pista = new Pista<Pose>(NEUTRA, [...claves, ...bombeos.flatMap(bombeo)]);
   const golpes = [21, ...bombeos.map((s) => s + REVIENTA)];
+  // Entre bombeo y bombeo, sus gestos: con 12 s de etapa el bucle solo se lee
+  // como un GIF. Los dos brazos le quedan libres: el bíceps sigue puesto.
+  const varia = reposo({ desde: PRIMER_BOMBEO + 30, libres: ["D", "I"] });
   return {
     fotograma: (f) => {
       // Entre bombeo y bombeo, posa: pasa el peso de una pierna a otra y el
       // bíceps late. Nunca se queda clavado en la pose.
       const posa = Math.min(1, Math.max(0, (f - 40) / 30));
-      const pose = conVida((g) => pista.en(g), f, 1.2 + 2.6 * posa);
+      const pose = conVida((g) => varia(pista.en(g), g), f, 1.2 + 2.6 * posa);
       pose.biceps += 0.05 * posa * Math.sin((2 * Math.PI * f) / 18);
       const cuerpo = articula(pose);
       const ultimo = golpes.filter((g) => g <= f).pop() ?? -99;
-      return { cuerpo, delante: <Pop a={cuerpo} t={f - ultimo} /> };
+      return { cuerpo, pose, delante: <Pop a={cuerpo} t={f - ultimo} /> };
     },
     sonidos: [
       { motion: "whoosh", at: 12 },

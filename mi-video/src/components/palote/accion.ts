@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Motion } from "../../brand/sfx";
-import type { Articulaciones } from "./rig";
+import type { Articulaciones, Pose } from "./rig";
 
 /**
  * **Lo que una acción del palote le debe al tablero**, y lo que el tablero le
@@ -21,11 +21,19 @@ export type Escenario = {
   dur: number;
   /** Los nombres de las dos tablas, para quien las dibuja. */
   tablas: [string, string];
+  /**
+   * Hacia dónde queda lo que acompaña, `1` a la derecha y `-1` a la izquierda:
+   * a pleno, el texto; acompañándolo, él. Hacia ahí señala, y lo que lanza sale
+   * hacia el otro lado, que es el borde del cuadro y no su cara.
+   */
+  senal: 1 | -1;
 };
 
 /** Un fotograma de la acción: el cuerpo y lo que va detrás y delante de él. */
 export type Fotograma = {
   cuerpo: Articulaciones;
+  /** La pose de la que sale el cuerpo: lo que se mezcla al pasar de una acción a otra. */
+  pose: Pose;
   detras?: React.ReactNode;
   delante?: React.ReactNode;
 };

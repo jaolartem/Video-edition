@@ -7,6 +7,7 @@ import {
   useCurrentFrame,
 } from "remotion";
 import { dibujaTablero } from "./components/Tablero";
+import { DondeEstaEl, acompanaAlPlano } from "./components/ZonaTablero";
 // Sólo los tipos: **quién dibuja cada forma vive en `components/Tablero.tsx`**,
 // y aquí se declara nada más el contrato de lo que el spec puede pedir.
 import type { CausalChainProps } from "./components/CausalChain";
@@ -193,7 +194,7 @@ export const Ad: React.FC<AdProps> = ({
    * no sólo cómo de grande. Ver la instrucción T-02 abajo.
    */
   const bajoTablero = boards.some(
-    (b) => frame >= b.at && frame < b.at + b.duration,
+    (b) => frame >= b.at && frame < b.at + b.duration && !acompanaAlPlano(b.props),
   );
 
   /**
@@ -249,6 +250,7 @@ export const Ad: React.FC<AdProps> = ({
           `components/Detras.tsx`. */}
       <Recortes lista={recortes} filtro={filtro} />
 
+      <DondeEstaEl.Provider value={{ coronilla: coronilla ?? null, libre: lado ?? null }}>
       {boards.map((cue, i) => (
         <Sequence
           key={`${cue.at}-${i}`}
@@ -263,6 +265,7 @@ export const Ad: React.FC<AdProps> = ({
           {dibujaTablero(cue, mode, layout)}
         </Sequence>
       ))}
+      </DondeEstaEl.Provider>
 
       {/* Bandas de ruido: lo que hace que se lea como señal y no como zoom. */}
       {g > 0 ? (

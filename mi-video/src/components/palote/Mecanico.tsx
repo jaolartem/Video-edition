@@ -1,7 +1,9 @@
 import { color } from "../../brand/tokens";
 import type { Accion, Escena, Escenario } from "./accion";
-import { CURVA, HUESO, NEUTRA, Pista, alcanza, articula, corto, hacia, type Clave, type Pose, type Punto } from "./rig";
+import { andar, POR_PASO, ZANCADA } from "./andar";
+import { CURVA, NEUTRA, Pista, alcanza, articula, corto, hacia, rampa, type Clave, type Pose, type Punto } from "./rig";
 import { Chispa, Motor, PINZA, Pinza, borne, cable, mango } from "./Taller";
+import { reposo } from "./reposo";
 import { conVida } from "./vida";
 
 /**
@@ -20,38 +22,11 @@ import { conVida } from "./vida";
  * la corriente en oro de una tabla a la otra mientras dure el tablero.
  */
 
-/** Lo que abre la pierna al andar, en grados, y lo que avanza cada paso. */
-const PASO = 18;
-const ZANCADA = 2 * (HUESO.muslo + HUESO.pierna) * Math.sin((PASO * Math.PI) / 180);
-const POR_PASO = 10;
 const AGARRA = 18;
 const ANDA = 32;
 /** Cada cuánto corre un pulso por el cable, y cuánto tarda en cruzarlo. */
 const PULSO = 26;
 const CRUZA = 18;
-
-const rampa = (f: number, a: number, b: number) => Math.min(1, Math.max(0, (f - a) / (b - a)));
-
-/** El andar: las piernas siguen a la cadera por el suelo, sin patinar. */
-const andar = (p: Pose, peso: number, desde: number): Pose => {
-  if (peso <= 0) return p;
-  const fase = (Math.PI * (p.x - desde)) / ZANCADA;
-  const s = Math.sin(fase);
-  const muslo = { D: PASO * s, I: -PASO * s };
-  const rodilla = { D: -38 * Math.max(0, Math.cos(fase)), I: -38 * Math.max(0, -Math.cos(fase)) };
-  const mezcla = (a: number, b: number) => a + (b - a) * peso;
-  return {
-    ...p,
-    caderaD: mezcla(p.caderaD, muslo.D),
-    rodillaD: mezcla(p.rodillaD, rodilla.D - 4),
-    caderaI: mezcla(p.caderaI, muslo.I),
-    rodillaI: mezcla(p.rodillaI, rodilla.I - 4),
-    pieD: mezcla(p.pieD, 90 - muslo.D - rodilla.D),
-    pieI: mezcla(p.pieI, 90 - muslo.I - rodilla.I),
-    hombroI: mezcla(p.hombroI, 4 + 24 * s),
-    tronco: mezcla(p.tronco, 7),
-  };
-};
 
 const monta = (e: Escenario): Escena => {
   const ancho = Math.min(340, e.ancho * 0.33);
@@ -138,6 +113,8 @@ const monta = (e: Escenario): Escena => {
     { f: cae + 31, c: CURVA.sale, frente: 0 },
   ]);
 
+  // En jarras, entre pulso y pulso, sus gestos. El pie ya lleva el compás.
+  const varia = reposo({ desde: jarras + 20, libres: ["D", "I"], sin: ["pie"] });
   const poseEn = (f: number) => {
     const p = andar(pista.en(f), rampa(f, ANDA, ANDA + 5) * (1 - rampa(f, llega - 5, llega)), x0);
     // El calambre: tiembla entero un instante, y se le pasa.
@@ -148,7 +125,7 @@ const monta = (e: Escenario): Escena => {
     const golpe = f > jarras + 6 ? Math.max(0, Math.sin((2 * Math.PI * (f - jarras - 6)) / 16)) : 0;
     p.pieD += 24 * golpe;
     p.rodillaD -= 6 * golpe;
-    return p;
+    return varia(p, f);
   };
   return {
     fotograma: (f) => {
@@ -157,7 +134,8 @@ const monta = (e: Escenario): Escena => {
       const cabeza = articula(vida).cabeza;
       const frente = { x: cabeza.x - 34 + 70 * m.barre, y: cabeza.y - 14 - 8 * Math.sin(Math.PI * m.barre) };
       const seca = alcanza(vida, frente, m.frente, "D", -1);
-      const cuerpo = articula(alcanza(seca, m, m.peso, "D", f < 30 ? -1 : 1));
+      const pose = alcanza(seca, m, m.peso, "D", f < 30 ? -1 : 1);
+      const cuerpo = articula(pose);
       const antebrazo =
         (Math.atan2(cuerpo.manoD.x - cuerpo.codoD.x, cuerpo.manoD.y - cuerpo.codoD.y) * 180) / Math.PI;
       // La pinza: en el suelo, luego en la mano siguiendo el antebrazo, y al
@@ -172,6 +150,7 @@ const monta = (e: Escenario): Escena => {
       const llegaPulso = ultimo === undefined ? -99 : f - ultimo - CRUZA;
       return {
         cuerpo,
+        pose,
         detras: (
           <>
             <Motor cx={-D} ancho={ancho} alto={alto} nombre={e.tablas[0]} haciaDentro={1}

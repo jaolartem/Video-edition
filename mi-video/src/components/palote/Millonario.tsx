@@ -3,6 +3,7 @@ import { fontFamily } from "../../brand/fonts";
 import { color } from "../../brand/tokens";
 import type { Accion, Escena, Escenario } from "./accion";
 import { CURVA, NEUTRA, Pista, alcanza, articula, asienta, azar, type Clave, type Pose, type Punto } from "./rig";
+import { reposo } from "./reposo";
 import { conVida } from "./vida";
 
 /**
@@ -157,14 +158,18 @@ const monta = (e: Escenario): Escena => {
   const tiros: number[] = [];
   for (let s = PRIMER_TIRO; s + SUELTA < e.dur; s += PERIODO) tiros.push(s);
   const pista = new Pista<Pose>(NEUTRA, [...claves, ...tiros.flatMap(tiro)]);
-  const cuerpoEn = (f: number) => {
+  // Mientras tira, la izquierda deja la jarra de vez en cuando: se rasca, mira
+  // el reloj, se coloca la chistera.
+  const varia = reposo({ desde: 90, libres: ["I"] });
+  const poseEn = (f: number) => {
     const p = conVida((g) => pista.en(g), f);
     const m = manos.en(f);
     const c = articula(p).cadera;
     const enJarras = alcanza(p, { x: c.x - 16, y: c.y - 20 }, m.jarra, "I", -1);
     const bolsillo = { x: c.x + 26 + m.escarba * 0.5, y: c.y + 10 + m.escarba };
-    return articula(alcanza(enJarras, bolsillo, m.bolsillo, "D", 1));
+    return varia(alcanza(enJarras, bolsillo, m.bolsillo, "D", 1), f);
   };
+  const cuerpoEn = (f: number) => articula(poseEn(f));
   // Salen de la mano en tres tandas seguidas, cada una de donde está la mano.
   const billetes: Billete[] = tiros.flatMap((s, n) => {
     const desde = [0, 1, 2].map((d) => cuerpoEn(s + SUELTA + d).manoD);
@@ -185,7 +190,8 @@ const monta = (e: Escenario): Escena => {
   const tocan = billetes.map(aterriza);
   return {
     fotograma: (f) => {
-      const cuerpo = cuerpoEn(f);
+      const pose = poseEn(f);
+      const cuerpo = articula(pose);
       const cae = Math.min(1, CURVA.cae(Math.min(1, f / 9)));
       const asiento = {
         x: cuerpo.cabeza.x + Math.sin((cuerpo.arriba * Math.PI) / 180) * 30,
@@ -197,6 +203,7 @@ const monta = (e: Escenario): Escena => {
         (Math.atan2(cuerpo.manoD.y - cuerpo.codoD.y, cuerpo.manoD.x - cuerpo.codoD.x) * 180) / Math.PI;
       return {
         cuerpo,
+        pose,
         delante: (
           <>
             <Chistera en={asiento} giro={giroSombrero} />

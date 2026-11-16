@@ -18,6 +18,7 @@
  * unidad que hay que auditar.
  */
 import { FPS } from "./reloj.mjs";
+import { acompanaAlPlano } from "./capas.mjs";
 import { COLGANTE, partirFrase } from "./texto.mjs";
 
 /**
@@ -33,9 +34,9 @@ export const porEscena = (r, reloj) => {
   const texto = r.captions.filter((c) => c.realza || c.corrige || c.compuesto);
   return reloj.limites().map(({ n, a, b, escena }) => {
     const pisa = (x) => x.at < b && x.at + x.duration > a;
-    const trato = r.boards.some(pisa) || r.tarjetas.some(pisa)
+    const trato = r.boards.some((x) => pisa(x) && !acompanaAlPlano(x)) || r.tarjetas.some(pisa)
       ? "tablero"
-      : r.paneles.some(pisa)
+      : r.paneles.some(pisa) || r.boards.some(pisa)
         ? "animacion"
         : texto.some(pisa)
           ? "texto"

@@ -15,6 +15,26 @@ import type { Lado } from "./Recorte";
 export const LadoDelSujeto = React.createContext<Lado | null>(null);
 
 /**
+ * **Dónde está él en el plano**: su coronilla, en fracción de altura, y el
+ * lado que deja libre (`lado` de la pieza, el del panel). Lo pone `Ad` con lo
+ * que mide `sujeto.py` y lo lee quien acompaña el plano sin taparlo —el palote
+ * `arriba` o `abajo`—, para irse a la mitad libre y no bajar a su cabeza.
+ * Fuera de una pieza, nada: quien lo lee pone su medida de respaldo.
+ */
+export type ElEnElPlano = { coronilla: number | null; libre: "izq" | "der" | null };
+export const DondeEstaEl = React.createContext<ElEnElPlano>({ coronilla: null, libre: null });
+
+/**
+ * **Si un tablero acompaña el plano en vez de ser el plano**: `cubre` es
+ * `panel` o `banda`. Lo declara el diseñador; `pleno`, o nada, toma el cuadro.
+ * Acompañando no lleva placa, no cambia el subtítulo y no le tapa la cara.
+ */
+export const acompanaAlPlano = (props: Record<string, unknown> | undefined) => {
+  const cubre = String(props?.cubre ?? "pleno");
+  return cubre === "panel" || cubre === "banda";
+};
+
+/**
  * **La caja dentro de la que dibuja un tablero.** Del borde de arriba al techo
  * de la franja del subtítulo, y ni un píxel más abajo.
  *

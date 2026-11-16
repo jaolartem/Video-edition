@@ -359,13 +359,15 @@ export const FORMAS = [
               sujeto_css: "el filtro del tratamiento. Lo pone el spec desde"
                 + " `escena_desc.color`" },
             ["repartos", "fuente"]),
-  // **El palote: el personaje que actúa la idea.** Jaime: «utiliza animación de
-  // bolitas y palotes… el personaje sirve de alivio cómico» y «que quede como
-  // recurso recurrente». Sin `accion` no hay qué actuar; cuándo pedirlo y qué
-  // hace cada una lo dice la cabecera de `Palote.tsx`, que es lo que lee el
-  // catálogo. `texto` y `tablas` tienen su tope en el componente (`assertShort`).
-  new Forma("Palote", "un personaje de palotes actúa la idea al lado del texto: alivio cómico, recurso recurrente",
-            { accion: "millonario (code is cheap) | musculo (muscle memory) | mecanico (conecta dos tablas)", texto: "statement", tablas: "label" }, ["accion"]),
+  // **El palote: el segundo al mando.** Jaime: «utiliza animación de bolitas y
+  // palotes… el personaje sirve de alivio cómico», «que quede como recurso
+  // recurrente» y «tiene que estar ahí como segundo al mando… en todo». Sin
+  // `accion` no hay qué actuar; cuándo pedir cada una, acompañándolo
+  // (`cubre: "panel"` + `lado`) o encadenadas, lo dice la cabecera de
+  // `Palote.tsx`, que es lo que lee el catálogo. `texto` y `tablas` tienen su
+  // tope en el componente (`assertShort`).
+  new Forma("Palote", "segundo al mando: un personaje de palotes actúa la idea, a pleno o acompañándolo a él (`cubre: panel`), alivio cómico y recurso recurrente",
+            { accion: "ideas: millonario | musculo | mecanico · proceso: investigar | curriculum | guion | aplicacion · gestos: senalar | pensar | aprobar | celebrar | encoger | saludar | caminar", acciones: "[{accion, en}]: lo que hace después en la etapa, `en` en segundos desde que empieza", lado: "con `cubre: panel`: arriba | abajo | izquierda | derecha (por defecto)", texto: "statement", tablas: "label" }, ["accion"]),
 ];
 
 

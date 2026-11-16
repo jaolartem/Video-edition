@@ -235,6 +235,32 @@ export const azar = (i: number): number => {
   return s - Math.floor(s);
 };
 
+/** Los canales que son ángulos: se mezclan por el camino corto. */
+const NO_ANGULO = new Set<keyof Pose>(["x", "alza", "pecho", "espalda", "biceps"]);
+
+/**
+ * **De una pose a otra**, a `w` del camino. Ángulo a ángulo y no punto a punto,
+ * por lo mismo que las claves: el brazo describe un arco y mide siempre lo
+ * mismo. Es lo que encadena una acción con la siguiente sin que salte.
+ */
+export const mezclaPose = (a: Pose, b: Pose, w: number): Pose => {
+  const fuera = { ...a };
+  for (const k of Object.keys(a) as (keyof Pose)[])
+    fuera[k] = NO_ANGULO.has(k) ? a[k] + (b[k] - a[k]) * w : a[k] + corto(b[k] - a[k]) * w;
+  return fuera;
+};
+
+/** La pose vista en el espejo: lo que hace con la derecha lo hace con la izquierda. */
+export const espejo = (p: Pose): Pose => ({
+  ...p, x: -p.x, tronco: -p.tronco, cuello: -p.cuello,
+  hombroI: -p.hombroD, codoI: -p.codoD, hombroD: -p.hombroI, codoD: -p.codoI,
+  caderaI: -p.caderaD, rodillaI: -p.rodillaD, caderaD: -p.caderaI, rodillaD: -p.rodillaI,
+  pieI: -p.pieD, pieD: -p.pieI,
+});
+
+/** De 0 a 1 entre los fotogramas `a` y `b`, recta y sujeta en los dos bordes. */
+export const rampa = (f: number, a: number, b: number) => Math.min(1, Math.max(0, (f - a) / (b - a)));
+
 /** Una oscilación que se apaga: el asentarse de lo que acaba de llegar. */
 export const asienta = (t: number, amplitud: number, periodo = 10, amortigua = 0.22) =>
   t < 0 ? 0 : amplitud * Math.exp(-amortigua * t) * Math.cos((2 * Math.PI * t) / periodo);

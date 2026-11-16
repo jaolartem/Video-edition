@@ -76,13 +76,24 @@ export function faltaMezcla(slug, declarados) {
   ];
 }
 
+/**
+ * Las formas que **saben acompañar por sí mismas**: con `cubre: panel` se
+ * dibujan con su componente, sin fondo y en su esquina, y no como bloques del
+ * `SidePanel`, que tira el `kind`. El palote acompañándolo es eso (Jaime: «que
+ * el muñequito forme parte del ambiente»): por el `SidePanel` saldría su
+ * `accion` escrita en un bloque.
+ */
+const ACOMPANAN_SOLAS = new Set(["Palote"]);
+
+/** Si una capa acompaña el plano —`panel` o `banda`— en vez de taparlo. */
+export const acompanaAlPlano = (b) => ["panel", "banda"].includes(String(b?.props?.cubre ?? "pleno"));
+
 export function repartirPorCubre(declarados) {
   const pleno = [];
   const panel = [];
   for (const b of declarados) {
-    const c = String(b.props?.cubre ?? "pleno");
-    if (c === "panel" || c === "banda") panel.push(b);
-    else if (c !== "cc") pleno.push(b);
+    if (acompanaAlPlano(b) && !ACOMPANAN_SOLAS.has(b.kind)) panel.push(b);
+    else if (String(b.props?.cubre ?? "pleno") !== "cc") pleno.push(b);
   }
   return { pleno, panel };
 }
