@@ -133,7 +133,32 @@ def _lo_publicado_queda_escrito(h):
            "y publicar la anota, no solo copia el fichero")
 
 
+def _un_tablero_sin_encargo_caduca(h):
+    """Un tablero puesto sin `grafico` vuelve al diseño cuando el `grafico` llega.
+
+    reel-23 e12, 16-11-2026: un `Apoyo` compuesto sin encargo guardaba
+    `encargo: null`, y `null` se leía como fila de antes. El compositor escribió
+    la cadena de cuatro bloques y el diseñador no la vio nunca. C-715.
+    """
+    import inspect
+    import json as _json
+
+    from dominio import encargo as _enc
+    from dominio.escena import Escena
+
+    sin = _json.dumps({"kind": "Apoyo", "props": {"clip": "x"}, "encargo": None})
+    antes = _json.dumps({"kind": "Apoyo", "props": {"clip": "x"}})
+    h.mide("C-715", _enc.tablero_desfasado({"tablero": sin, "grafico": "Cadena"}),
+           "un tablero puesto sin encargo caduca cuando llega el grafico")
+    h.mide("C-715", not _enc.tablero_desfasado({"tablero": sin, "grafico": ""})
+           and not _enc.tablero_desfasado({"tablero": antes, "grafico": "Cadena"}),
+           "y sin grafico sigue valiendo; la fila de antes, tambien")
+    h.mide("C-715", "guardar_tablero(" in inspect.getsource(Escena.poner_tablero),
+           "el tablero que entra por consulta lo escribe guardar_tablero, con huella")
+
+
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba
 #: `humo.py` con cada prueba de aquí, que es la razón por la que se partió.
 PRUEBAS = (_lo_publicado_queda_escrito, _lo_firmado_se_puede_volver_a_poner,
-           _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido)
+           _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido,
+           _un_tablero_sin_encargo_caduca)

@@ -285,16 +285,22 @@ def tablero_desfasado(fila):
     **Las filas sin huella no cuentan como desfasadas**: son las de antes de que
     esto existiera y darlas por caducadas devolvería el lote entero al paso de
     diseño de golpe.
+
+    **Pero una huella vacía sí es una huella** (C-715): dice que el tablero se
+    compuso cuando la etapa no tenía `grafico`. reel-23 e12, 16-11-2026: un
+    `Apoyo` puesto sin encargo; el compositor escribió después la cadena de
+    cuatro bloques y la propuesta no llegó nunca al diseñador, porque `null` se
+    leía como «fila de antes». Sólo la clave ausente es de antes.
     """
     import json
 
     if not fila.get("tablero"):
         return False
     try:
-        guardada = (json.loads(fila["tablero"]) or {}).get("encargo")
+        t = json.loads(fila["tablero"]) or {}
     except (TypeError, ValueError):
         return False
-    return bool(guardada) and guardada != huella_del_encargo(fila.get("grafico"))
+    return "encargo" in t and t["encargo"] != huella_del_encargo(fila.get("grafico"))
 
 
 def guardar_tablero(con, slug, beat, kind, props, ahora):
@@ -311,9 +317,9 @@ def guardar_tablero(con, slug, beat, kind, props, ahora):
     g = con.execute(
         "select grafico from escena_desc where video_slug = ? and etapa_orden = ?",
         (slug, beat)).fetchone()
-    con.execute(
+    return con.execute(
         "update escena_desc set tablero = ?, fecha = ?"
         " where video_slug = ? and etapa_orden = ?",
         (json.dumps({"kind": kind, "props": props,
-                     "encargo": huella_del_encargo(g["grafico"] if g else None)},
-                    ensure_ascii=False), ahora, slug, beat))
+                     "encargo": huella_del_encargo(g[0] if g else None)},
+                    ensure_ascii=False), ahora, slug, beat)).rowcount

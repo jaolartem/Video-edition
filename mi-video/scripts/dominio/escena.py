@@ -318,8 +318,11 @@ class Escena:
         # es la **proyeccion** que leen los pasos que aun no han cambiado —
         # `escena.mjs`, `llega.py`, `mudo.py`— con un solo autor, este. La misma
         # figura que `estado.json` con la base: manda uno, publica el otro.
-        entero = json.dumps({"kind": tablero["kind"], "props": props},
-                            ensure_ascii=False)
+        # Y la escribe `encargo.guardar_tablero`, con la huella dentro: escrita
+        # aquí aparte, el tablero que entraba por `consulta.py` no llevaba
+        # huella y no caducaba nunca (C-715).
+        from .encargo import guardar_tablero
+
         et = con.execute(
             "select e.id from etapa e join video v on v.id = e.video_id"
             " where v.slug = ? and e.orden = ?", (self.slug, self.orden)).fetchone()
@@ -333,10 +336,8 @@ class Escena:
                 "insert or replace into etapa_tablero (etapa_id, tablero_id,"
                 " estado, quien, fecha) values (?,?,'aplicado',?,?)",
                 (et[0], cur.lastrowid, "disenador", _ahora()))
-        n = con.execute(
-            f"update {TABLA} set tablero = ?, fecha = ?"
-            f" where video_slug = ? and etapa_orden = ?",
-            (entero, _ahora(), self.slug, self.orden)).rowcount
+        n = guardar_tablero(con, self.slug, self.orden, tablero["kind"], props,
+                            _ahora())
         con.commit()
         con.close()
         if not n:
