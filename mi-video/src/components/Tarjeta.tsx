@@ -7,10 +7,12 @@ import {
   Sequence,
   staticFile,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 import { fontFamily } from "../brand/fonts";
 import { color, tracking } from "../brand/tokens";
 import { useLienzo } from "../brand/LienzoContexto";
+import { Fondo, type Recorte } from "./Fondo";
 
 /**
  * Tarjeta neo-constructivista: **el plano cuando la toma no sirve**.
@@ -61,6 +63,14 @@ export type TarjetaProps = {
    * silencio porque `staticFile` no avisa de un fichero que no esta.
    */
   sonido?: boolean;
+  /**
+   * **La placa de la pieza, en marcha, detrás** (C-709). Al despachar la
+   * Tarjeta a este componente (C-706) salió sobre negro liso y emisión midió 15
+   * congelados en reel-23 bajo e6, e14 y e19: los bloques entran y luego nada
+   * cambia. La placa la pone el spec, como a toda forma; aquí sólo se pinta.
+   */
+  placa?: string;
+  recorte?: Recorte;
 };
 
 const TONO = {
@@ -82,9 +92,12 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
   pie,
   escalon = 8,
   sonido = true,
+  placa,
+  recorte = "lleno",
 }) => {
   const layout = useLienzo();
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const dos = (n: number) => String(n).padStart(2, "0");
 
   const entra = (desde: number, dura = 9) =>
@@ -112,6 +125,9 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
+      {placa ? (
+        <Fondo placa={placa} recorte={recorte} fuerza={0.9} deriva={durationInFrames} />
+      ) : null}
       {sonido ? (
         <>
           {bloques.map((b, i) => (
