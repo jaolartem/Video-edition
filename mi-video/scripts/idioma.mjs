@@ -22,6 +22,8 @@ export const idioma = (codigo = POR_DEFECTO) => {
       noCierra: new Set(d.no_cierra),
       vacias: new Set(d.vacias),
       llanas: new Set(d.llanas),
+      /** Lo que cuenta como cifra en esta lengua (C-710); sin declarar, la del español. */
+      cifra: d.cifra ? new RegExp(d.cifra, "gi") : null,
     });
   }
   return cargadas.get(codigo);

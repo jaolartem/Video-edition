@@ -342,5 +342,7 @@
   "y",
   "ya"
  ],
- "_llanas": "Las que se repiten sin molestar: `repeticiones.machaca` y `describir-pedido.mjs` no las cuentan como machaqueo del arranque."
+ "_llanas": "Las que se repiten sin molestar: `repeticiones.machaca` y `describir-pedido.mjs` no las cuentan como machaqueo del arranque.",
+ "cifra": "(\\$\\s?[\\d.,]+|\\d[\\d.,]*\\s?(?:%|mil|millones|dólares|dolares|años|anos|semanas|meses|puntos)|\\b\\d{2,}[.,]\\d+\\b)",
+ "_cifra": "Lo que cuenta como cifra en esta lengua: dinero, porcentajes, plazos y cantidades con su unidad, en digitos o en palabras. Lo leen `fuentes.py` (el que pregunta el respaldo) y `reels/cifras.mjs` (el que pinta), por `Idioma`/`idioma.mjs`: antes la expresion era una sola, en espanol, y una pieza en ingles —reel-23, 15-11-2026: «forty-plus tools», «5 YEARS TEACHING»— pasaba el respaldo con «ninguna cifra en pantalla» (C-710)."
 }

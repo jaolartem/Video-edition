@@ -45,6 +45,7 @@ import rutas  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dominio.escena import correcciones as _correcciones  # noqa: E402
+from dominio.idioma import Idioma  # noqa: E402
 
 BASE = "ads/decisiones.db"
 PROMPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -193,7 +194,10 @@ def dossier(slug):
         # aprobada, se paró pidiendo respaldo para un «52 %» que no sale en
         # pantalla. Lo que el gráfico dibuja lo cuenta `pintadas`, su dueño.
         texto = f["libreto"] or ""
-        cifras = sorted({_normal(m.group(0)) for m in CIFRA.finditer(texto)}
+        # En la lengua de la pieza (C-710): con la expresión del español sola,
+        # «forty-plus tools» y «five years» no eran cifras y el respaldo pasaba.
+        patron = Idioma.de_pieza(slug).patron_cifra
+        cifras = sorted({_normal(m.group(0)) for m in patron.finditer(texto)}
                         | set(pinta.get(f["orden"], [])))
         cifras = [c for c in cifras if c]
         # **El precio no necesita fuente externa: es de la casa.** Se marca aqui
@@ -267,6 +271,31 @@ def cargar(slug, respuesta):
 # **una sola cadena**, escrita en el contrato: un agente la invento por su
 # cuenta y funciono, y lo que funciona por casualidad se rompe a la tercera.
 HIPOTETICO = "CASO_HIPOTETICO"
+
+
+def fuente_declarada(slug, texto) -> bool:
+    """**La fuente de un tablero se ELIGE del json, no se redacta** (C-711).
+
+    Jaime, 15-11-2026, al ver «Basado en el recorrido profesional…» al pie de
+    reel-23 e5: *«esa no es la fuente, están utilizando el json»*. Vale «sin
+    cifra», o un texto que sea una de las fuentes de la pieza —rótulo, cita u
+    organismo de las filas de `dato`—, que es lo que `datos_respaldados` lleva
+    al pedido. Una pieza sin filas sólo admite «sin cifra».
+    """
+    def limpio(s):
+        return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+    t = limpio(texto)
+    if not t or t == "sin cifra":
+        return True
+    con = _con()
+    filas = con.execute(
+        "select f.rotulo, f.cita, f.organismo from dato d"
+        "  join video v on v.id = d.video_id join fuente f on f.id = d.fuente_id"
+        " where v.slug = ?", (slug,)).fetchall()
+    con.close()
+    return any(limpio(c) and (limpio(c) == t or limpio(c) in t or t in limpio(c))
+               for f in filas for c in f)
 
 
 def sin_respaldo(slug):

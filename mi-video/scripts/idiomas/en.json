@@ -325,5 +325,7 @@
   "from"
  ],
  "modelo": "ggml-large-v3.bin",
- "_modelo": "Con `medium` el inglés de Jaime sale roto: «Claude» se oye «CloudWatt», «forty-plus» «for the plus», «firm» «film» (reel-23, 14-11-2026). `large-v3` lo decidió Jaime ese día. El español sigue con `medium`."
+ "_modelo": "Con `medium` el inglés de Jaime sale roto: «Claude» se oye «CloudWatt», «forty-plus» «for the plus», «firm» «film» (reel-23, 14-11-2026). `large-v3` lo decidió Jaime ese día. El español sigue con `medium`.",
+ "cifra": "(\\$\\s?[\\d.,]+|\\d[\\d.,]*\\s?\\+?\\s?(?:%|k\\b|thousand|million|dollars|years?|weeks?|months?|minutes?|days?|hours?|percent)|\\d[\\d.,]*\\s?\\+?(?:\\s[A-Za-z]+)?\\s(?:tools|skills|clients?)\\b|\\b\\d{2,}[.,]\\d+\\b|\\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)(?:[- ]plus)?(?:\\s(?:hundred|thousand|million))?(?:\\s[A-Za-z]+)?\\s(?:percent|dollars|years?|weeks?|months?|minutes?|days?|hours?|tools|skills|clients?)\\b)",
+ "_cifra": "Lo que cuenta como cifra en esta lengua: dinero, porcentajes, plazos y cantidades con su unidad, en digitos o en palabras. Lo leen `fuentes.py` (el que pregunta el respaldo) y `reels/cifras.mjs` (el que pinta), por `Idioma`/`idioma.mjs`: antes la expresion era una sola, en espanol, y una pieza en ingles —reel-23, 15-11-2026: «forty-plus tools», «5 YEARS TEACHING»— pasaba el respaldo con «ninguna cifra en pantalla» (C-710)."
 }

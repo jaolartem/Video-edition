@@ -206,6 +206,28 @@ INSTRUCCIONES = (
             Aguja("scripts/servicios/disenar.py", '"cara_en_todo_tablero": cara,'),
         ),
     ),
+    Instruccion(
+        codigo="T-07",
+        paso="revalidar",
+        clase="montaje",
+        enunciado=(
+            "Elegir es comparar opciones por lo que se VE, no tomar la primera."
+            " Una toma de espaldas en cuadro no pasa nunca: se cambia o se cubre."
+            " Entre candidatas que cumplen la etapa gana la que mira a camara y"
+            " la que ensena el gancho visual (la calavera, lo que Jaime puso en"
+            " cuadro a proposito). Las minucias —medio segundo de borde, un"
+            " numeral— van despues de eso. Jaime, 15-11-2026: «dejas pasar"
+            " escenas de espalda y no tomas las escenas con gancho visual, casi"
+            " que tomas la primera escena, no evaluan entre opciones y se quedan"
+            " por minucias sin importancia»."
+        ),
+        agujas=(
+            Aguja("scripts/revalidar.prompt.md",
+                  "gana la que mira a cámara y la que enseña el gancho visual"),
+            Aguja("scripts/dominio/mirada.py", "def en_dossier("),
+            Aguja("scripts/servicios/verificar.py", "_devuelve_la_mirada("),
+        ),
+    ),
 )
 
 

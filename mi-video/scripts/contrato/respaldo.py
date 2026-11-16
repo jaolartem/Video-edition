@@ -41,7 +41,7 @@ RESPALDO = Contrato(
                    " pregunta a `cifras.mjs` como la puerta; y el tablero viaja"
                    " entero porque su pie suele decir de qué estudio sale (C-616)."),
         Campo("cifras",
-              manda=Aguja("scripts/fuentes.py", "for m in CIFRA.finditer(texto)"),
+              manda=Aguja("scripts/fuentes.py", "for m in patron.finditer(texto)"),
               exige=(Prompt("scripts/fuentes.prompt.md", "tal como sale en la pieza"),),
               nota="Derivada de un regex sobre libreto+grafico. El prompt pide la"
                    " cifra «tal como sale en la pieza» como si el modelo la"

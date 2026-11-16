@@ -168,14 +168,25 @@ class ServicioVisto(Servicio):
         # tramo está bien nunca más pasa por diseñador»*. reel-11 volvió a pedir
         # visto con las seis etapas firmadas (C-456).
         from dominio.segmento import Segmento
+
+        # **Un pedido de visto que ya no se va a hacer se retira** (C-712). Si
+        # el paso sale por cualquiera de las tres puertas de abajo, el pedido
+        # escrito en una vuelta anterior sigue en la cola: reel-23 llevó tres
+        # renders con un visto de las 19:17 en pie, un agente lo contestó sobre
+        # fotogramas viejos y devolvió etapas ya buenas (#1170).
+        def _sin(resultado):
+            if os.path.exists(contrato.ruta_pedido("visto", pieza.slug)):
+                contrato._archivar("visto", pieza.slug, "sin_vigencia")
+            return resultado
+
         segs = Segmento.de(pieza.slug)
         if segs and all(s.aprobado for s in segs):
-            return Resultado(True, salida="todos sus tramos están aprobados")
+            return _sin(Resultado(True, salida="todos sus tramos están aprobados"))
         # **Y lo que subió a Jaime se le espera a él** (C-594): sin esto el
         # mismo visto se volvía a pedir sobre el mismo render.
         from dominio.nota import Nota
         if any(str(n.que).startswith(MARCA) for n in Nota.subidas(pieza.slug)):
-            return Resultado(False, motivo="espera a Jaime: una escena del visto subió")
+            return _sin(Resultado(False, motivo="espera a Jaime: una escena del visto subió"))
         # **Y si las medidas no encuentran nada, no se le llama** (C-663). Jaime,
         # 23-10-2026, eligiendo dos llamadas por pieza: quien vigila el render es
         # su aprobación y las guardas en código. El diseñador vuelve a mirar
@@ -184,8 +195,8 @@ class ServicioVisto(Servicio):
         # abierto— y entonces mira con eso delante.
         alarmas = por_que_mirar(d)
         if not alarmas:
-            return Resultado(True, salida="visto por medida: nada que enseñar al"
-                                          " diseñador; el ojo lo pone Jaime al aprobar")
+            return _sin(Resultado(True, salida="visto por medida: nada que enseñar al"
+                                               " diseñador; el ojo lo pone Jaime al aprobar"))
         d["por_que_se_mira"] = alarmas
         prompt = (open(PROMPT, encoding="utf-8").read()
                   if os.path.exists(PROMPT) else "")

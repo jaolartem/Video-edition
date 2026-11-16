@@ -46,6 +46,7 @@ from contrato.marca import ENTRADA_GANCHO, ESTILO, PRIORIDAD  # noqa: E402,F401
 
 from dominio import abierto as _abierto, quitada as _quitada  # noqa: E402
 import fotogramas as _fotogramas  # noqa: E402
+import fuentes as _fuentes  # noqa: E402
 from dominio import libreto as _libreto, remate as _remate  # noqa: E402
 from dominio.mudo import sin_copy as _sin_copy  # noqa: E402
 from dominio.arco import arco  # noqa: E402
@@ -570,17 +571,11 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
         if not kind or not isinstance(props, dict) or not props:
             sin_copy.append(beat)
             continue
-        # **`fuente` ES la linea del pie, y por eso entra como `pie`.**
-        #
-        # Entraba como `props.source` y cada componente decidia si la dibujaba y
-        # como: cinco pies distintos en la misma pieza, y en cinco tableros del
-        # lote un parrafo de tres y cuatro renglones dentro de la lamina. Desde
-        # la instruccion de Jaime del 6-9-2026 el pie va **fuera de la zona
-        # segura y en UNA linea**, la dibuja `PieTablero` y el destino es uno.
-        #
-        # `source` se sigue escribiendo porque es lo declarado y hay filas
-        # antiguas que solo lo tienen; `scripts/reels/cifras.mjs` lee los dos.
+        # `fuente` ES la línea del pie, y se ELIGE del json, no se redacta (C-711).
         if t.get("fuente") and t["fuente"] != "sin cifra":
+            if not _fuentes.fuente_declarada(pieza.slug, t["fuente"]):
+                return Resultado(False, motivo=f"e{beat}: `fuente` «{t['fuente'][:70]}» no es una"
+                                 " fuente declarada de la pieza: se elige del json; sin dato, «sin cifra»")
             props = {**props, "source": t["fuente"], "pie": t["fuente"]}
         # **Y lo de presentación entra en `props` venga donde venga.** reel-08
         # e3 trajo `sujeto` junto a `kind`, no dentro de `props`: se perdió su

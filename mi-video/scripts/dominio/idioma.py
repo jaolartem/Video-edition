@@ -51,6 +51,9 @@ class Idioma:
     #: El modelo de whisper con que se oye bien esta lengua (fichero en
     #: `whisper.cpp/`). Sin declararlo, `medium`, el de siempre.
     modelo: str = "ggml-medium.bin"
+    #: Lo que cuenta como cifra en esta lengua (C-710): la expresión que leen
+    #: `fuentes.py` y `reels/cifras.mjs`. Sin declararla, la del español.
+    cifra: str = ""
 
     # ── cómo nace ────────────────────────────────────────────────────────────
     @classmethod
@@ -72,7 +75,8 @@ class Idioma:
                 niegan=tuple(d["niegan"]),
                 claves_vacias=frozenset(d["claves_vacias"]),
                 llanas=frozenset(d["llanas"]),
-                modelo=d.get("modelo") or "ggml-medium.bin")
+                modelo=d.get("modelo") or "ggml-medium.bin",
+                cifra=d.get("cifra") or "")
         return _CARGADAS[codigo]
 
     @classmethod
@@ -110,6 +114,12 @@ class Idioma:
     def colgante(self, txt: str) -> bool:
         """¿Deja esta palabra la idea a medias si la etapa acaba en ella?"""
         return txt.strip(".,¿?¡!;:").lower() in self.no_cierra
+
+    @property
+    def patron_cifra(self):
+        """Lo que cuenta como cifra en esta lengua, compilado (C-710)."""
+        import re
+        return re.compile(self.cifra or Idioma.de(POR_DEFECTO).cifra, re.IGNORECASE)
 
 
 _CARGADAS: dict = {}

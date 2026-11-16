@@ -39,6 +39,7 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
+import { idiomaDePieza } from "../idioma.mjs";
 
 const CAMPOS = JSON.parse(
   fs.readFileSync(new URL("./cifras.json", import.meta.url), "utf8"),
@@ -73,6 +74,12 @@ const LEGAL = 190;
  */
 export const CIFRA =
   /(\$\s?[\d.,]+|\d[\d.,]*\s?(?:%|mil|millones|dólares|dolares|años|anos|semanas|meses|puntos)|\b\d{2,}[.,]\d+\b)/gi;
+/**
+ * **La de la lengua de la pieza** (C-710): la declara `scripts/idiomas/<codigo>.json`
+ * y la lee `fuentes.py` igual. Con la del español sola, reel-23 pintaba «5 YEARS
+ * TEACHING» y «40+ TOOLS» y el respaldo contestaba «ninguna cifra en pantalla».
+ */
+export const patronDe = (slug) => idiomaDePieza(slug).cifra ?? CIFRA;
 
 /**
  * La misma cifra escrita de dos maneras es una cifra, no dos.
@@ -97,8 +104,8 @@ export const normalizar = (c) => {
 };
 
 /** Las cifras que lleva un texto, ya normalizadas. */
-const enTexto = (t) =>
-  [...String(t).matchAll(CIFRA)].map((m) => normalizar(m[0])).filter(Boolean);
+const enTexto = (t, patron = CIFRA) =>
+  [...String(t).matchAll(patron)].map((m) => normalizar(m[0])).filter(Boolean);
 
 /**
  * Aplana un valor declarado a las líneas de texto que lleva dentro. Copia
@@ -123,7 +130,7 @@ const aLineas = (v, prof = 0) => {
  * El pie no cuenta: lo que se comprueba es lo rotulado, y el pie es justo lo
  * que responde por ello. Contarlo haría que una cifra se respaldara a sí misma.
  */
-export const cifrasDe = (props) => {
+export const cifrasDe = (props, patron = CIFRA) => {
   const fuera = [];
   for (const [k, v] of Object.entries(props ?? {})) {
     if (AL_PIE.has(k)) continue;
@@ -131,7 +138,7 @@ export const cifrasDe = (props) => {
     if (NO_ES_TEXTO.has(k) && !Array.isArray(v)) continue;
     for (const t of aLineas(v)) {
       if (t.length > LEGAL) continue;
-      fuera.push(...enTexto(t));
+      fuera.push(...enTexto(t, patron));
     }
   }
   return [...new Set(fuera)];
@@ -249,7 +256,7 @@ export function pieDe(slug, b, faltas) {
   const condicion =
     txt(props.condicion) || txt(props.condition) || txt(props.limitation);
 
-  const pintadas = cifrasDe(props);
+  const pintadas = cifrasDe(props, patronDe(slug));
   const filas = datos(slug, b.beat)
     .filter((f) => f.respalda === "si" || f.respalda === "parcial");
   let r = null;
@@ -331,7 +338,7 @@ export function sinRespaldo(slug, piezas) {
   const fuera = [];
   for (const b of piezas) {
     const declaradas = datos(slug, b.beat).flatMap((r) => r.tokens);
-    for (const c of cifrasDe(b.props ?? b)) {
+    for (const c of cifrasDe(b.props ?? b, patronDe(slug))) {
       if (declaradas.includes(c) || deCasa(c)) continue;
       fuera.push({ beat: b.beat, cifra: c });
     }
