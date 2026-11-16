@@ -106,6 +106,14 @@ class Guia:
             "se_aprueba_con": f"python scripts/guia.py {self.n} --aprobar --de \"…\"",
         }, cli=False)
 
+    def al_dia(self) -> bool:
+        """Si el pedido en pie enseña el spec de hoy. Sin pedido, también (C-723)."""
+        try:
+            with open(servicio.ruta_pedido(PASO, self.slug), encoding="utf-8") as f:
+                return (json.load(f).get("datos") or {}).get("huella") == self.huella
+        except FileNotFoundError:
+            return True
+
     def aprobada(self, r) -> bool:
         return bool(r and r.get("aprobada") and r.get("huella") == self.huella)
 

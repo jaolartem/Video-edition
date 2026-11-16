@@ -112,8 +112,15 @@ def vigente(buzon, slug) -> bool:
     # (C-717): la pide `montar.sh` desde `verificado`. Con la pieza de vuelta
     # atrás, un pedido suyo en pie pararía `verificar` por una guía que se va a
     # sacar otra vez con el spec nuevo.
+    #
+    # **Y sólo la guía del spec de hoy** (C-723). reel-23, 16-11: la pieza
+    # volvió a `verificado` con otro spec y la línea esperaba la guía de las
+    # 10:41; como esperaba, `montar.sh` no corría, y es `montar.sh` quien saca
+    # la nueva. La espera vieja tapaba a la que tenía que sustituirla.
     if buzon == "guia":
-        return bool(ahora) and ahora.get("nombre") == "verificado"
+        from guia import Guia
+        return (bool(ahora) and ahora.get("nombre") == "verificado"
+                and Guia(int(m.group(1))).al_dia())
     if m.group(2) or buzon not in LA_FASE:
         return True
     suya = next((f for f in camino() if f["nombre"] == LA_FASE[buzon]), None)

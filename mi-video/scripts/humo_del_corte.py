@@ -200,6 +200,9 @@ def _la_guia_va_antes_del_render(h):
     h.mide("C-717", g.aprobada({"aprobada": True, "huella": "h1"})
            and not g.aprobada({"aprobada": True, "huella": "h0"}),
            "y una aprobación de otro spec no vale")
+    o = open("scripts/dominio/oficio.py", encoding="utf-8").read()
+    h.mide("C-723", "Guia(int(m.group(1))).al_dia()" in o,
+           "y la guía de un spec viejo no tapa a la nueva")
 
 
 def _el_palote_es_recurso(h):
