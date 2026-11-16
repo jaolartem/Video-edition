@@ -359,6 +359,13 @@ export const FORMAS = [
               sujeto_css: "el filtro del tratamiento. Lo pone el spec desde"
                 + " `escena_desc.color`" },
             ["repartos", "fuente"]),
+  // **El palote: el personaje que actúa la idea.** Jaime: «utiliza animación de
+  // bolitas y palotes… el personaje sirve de alivio cómico» y «que quede como
+  // recurso recurrente». Sin `accion` no hay qué actuar; cuándo pedirlo y qué
+  // hace cada una lo dice la cabecera de `Palote.tsx`, que es lo que lee el
+  // catálogo. `texto` y `tablas` tienen su tope en el componente (`assertShort`).
+  new Forma("Palote", "un personaje de palotes actúa la idea al lado del texto: alivio cómico, recurso recurrente",
+            { accion: "millonario (code is cheap) | musculo (muscle memory) | mecanico (conecta dos tablas)", texto: "statement", tablas: "label" }, ["accion"]),
 ];
 
 

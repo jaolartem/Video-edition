@@ -202,9 +202,30 @@ def _la_guia_va_antes_del_render(h):
            "y una aprobación de otro spec no vale")
 
 
+def _el_palote_es_recurso(h):
+    """El personaje de palotes se dibuja en los dos cuadros y exige su acción. C-718.
+
+    Jaime, 16-11-2026: *«utiliza animación de bolitas y palotes»*, *«que ese
+    personaje quede como recurso recurrente»*.
+    """
+    import json as _json
+    import subprocess
+
+    def pide(f, props):
+        e = {"formato": f, "tableros": [{"etapa_orden": 1, "kind": "Palote", "props": props}]}
+        return _json.loads(subprocess.run(
+            ["node", "scripts/dibujable.mjs"], capture_output=True, text=True,
+            encoding="utf-8", input=_json.dumps(e)).stdout or "{}")
+    bien = {"accion": "musculo", "texto": ["JUDGMENT IS", "MUSCLE MEMORY"]}
+    h.mide("C-718", not pide("horizontal", bien) and not pide("vertical", bien),
+           "el palote se dibuja en horizontal y en vertical")
+    h.mide("C-718", bool(pide("horizontal", {"texto": ["X"]})),
+           "y sin `accion` no entra")
+
+
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba
 #: `humo.py` con cada prueba de aquí, que es la razón por la que se partió.
 PRUEBAS = (_lo_publicado_queda_escrito, _lo_firmado_se_puede_volver_a_poner,
            _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido,
            _un_tablero_sin_encargo_caduca, _el_horizontal_compone_su_tablero,
-           _la_guia_va_antes_del_render)
+           _la_guia_va_antes_del_render, _el_palote_es_recurso)

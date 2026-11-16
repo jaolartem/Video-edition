@@ -14,6 +14,7 @@ import { Techo, type TechoProps } from "./Techo";
 import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
 import { Apoyo, type ApoyoProps } from "./Apoyo";
 import { Tarjeta, type TarjetaProps } from "./Tarjeta";
+import { Palote, type PaloteProps } from "./Palote";
 import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
 import { Recorte, type Forma, type Lado } from "./Recorte";
@@ -243,6 +244,12 @@ const laForma = (cue: CueDeTablero, mode: Mode) => {
    */
   if (cue.kind === "Tarjeta")
     return <Tarjeta {...(props as unknown as TarjetaProps)} />;
+  /**
+   * **El palote**: el personaje que actúa la idea, alivio cómico y recurso
+   * recurrente. Ver `Palote.tsx`.
+   */
+  if (cue.kind === "Palote")
+    return <Palote {...(props as unknown as PaloteProps)} />;
   if (cue.kind === "TableroDeclarado")
     return <TableroDeclarado kind={cue.kind} props={props} />;
   return <TableroDeclarado kind={cue.kind} props={props} />;
