@@ -246,6 +246,10 @@ def _un_tropiezo_no_aparta_lo_declarado(h):
     h.mide("C-721", not casa_la_huella("when you ask AI for your job",
                                        huella_de_texto(viejo)),
            "y una palabra que se va, sí")
+    import fijar
+    from dominio import ticket as _t
+    h.mide("C-722", fijar.MOVIDA in _t.MIDEN_SOLAS,
+           "y la prueba movida se cierra midiendo, sin esperar el acuse")
 
 
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba

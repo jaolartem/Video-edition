@@ -132,6 +132,14 @@ RUTA = {
 #: ese paso se saltaba paraba la pieza para siempre en el paso siguiente.
 RECIBO = {"descrito": "describir", "disenado": "disenar", "revalidado": "revalidar"}
 
+#: **Y lo que se cierra midiendo el transcript no espera el acuse** (C-722).
+#: La prueba movida (`fijar.MOVIDA`) se cierra cuando lo declarado vuelve a
+#: casar, y eso lo mide `fijar.casan`, no lo dice nadie. reel-23, 16-11: el
+#: #1215 casaba y seguía abierto porque `revalidar` no tenía pedido desde el
+#: día antes; el `SinRecibo` se tragaba en la vuelta y la pieza se quedó parada
+#: en `cosido` por un tiquet ya atendido.
+MIDEN_SOLAS = ("prueba movida",)
+
 
 class SinRecibo(Exception):
     """Un tiquet de servicio que se cierra sin que el servicio haya contestado.
@@ -497,7 +505,8 @@ def contestar(id_, respuesta, estado="contestado", quien="la linea", medida=""):
         suyo = cx.execute("select pieza, cuando, vuelve_a from ticket"
                           " where id = ?", (id_,)).fetchone()
         if suyo and (suyo["vuelve_a"] or "") in RECIBO:
-            if not recibo(suyo["pieza"], suyo["vuelve_a"], suyo["cuando"]):
+            if medida not in MIDEN_SOLAS and not recibo(
+                    suyo["pieza"], suyo["vuelve_a"], suyo["cuando"]):
                 raise SinRecibo(
                     f"ticket #{id_} vuelve a «{suyo['vuelve_a']}» y no hay"
                     f" respuesta de ese servicio para {suyo['pieza']} posterior"
