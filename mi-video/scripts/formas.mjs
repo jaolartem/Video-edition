@@ -368,7 +368,7 @@ export const FORMAS = [
   // `Palote.tsx`, que es lo que lee el catálogo. `texto` y `tablas` tienen su
   // tope en el componente (`assertShort`).
   new Forma("Palote", "segundo al mando: un personaje de palotes actúa la idea, a pleno o acompañándolo a él (`cubre: panel`), alivio cómico y recurso recurrente",
-            { accion: "ideas: millonario | musculo | mecanico · proceso: investigar | curriculum | guion | aplicacion · gestos: senalar | pensar | aprobar | celebrar | encoger | saludar | caminar", acciones: "[{accion, en}]: lo que hace después en la etapa, `en` en segundos desde que empieza", lado: "con `cubre: panel`: arriba | abajo | izquierda | derecha (por defecto)", texto: "statement", tablas: "label" }, ["accion"]),
+            { accion: "ideas: millonario | musculo | mecanico · proceso: investigar | curriculum | guion | aplicacion · gestos: senalar | pensar | aprobar | celebrar | encoger | saludar | caminar", acciones: "[{accion, en}]: lo que hace después en la etapa, `en` en segundos desde que empieza", lado: "con `cubre: panel`: arriba | abajo | izquierda | derecha (por defecto); a un lado es lo segundo del cuadro, más de medio alto", textoAl: "a un lado: frente (al otro lado de él) | encima (del muñeco)", texto: "statement", tablas: "label" }, ["accion"]),
 ];
 
 

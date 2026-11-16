@@ -146,12 +146,17 @@ class Guia:
         }, cli=False)
 
     def al_dia(self) -> bool:
-        """Si el pedido en pie enseña el spec de hoy. Sin pedido, también (C-723)."""
+        """Si el pedido en pie enseña el spec de hoy y los segundos que faltan (C-723, C-728).
+
+        Sin los segundos, un pedido de antes de C-728 —con los 117— seguía «al
+        día» y la línea esperaba sobre él sin sacar la tanda que le toca a Jaime.
+        """
         try:
             with open(servicio.ruta_pedido(PASO, self.slug), encoding="utf-8") as f:
-                return (json.load(f).get("datos") or {}).get("huella") == self.huella
+                d = json.load(f).get("datos") or {}
         except FileNotFoundError:
             return True
+        return d.get("huella") == self.huella and d.get("por_aprobar") == self.faltan()
 
     def aprobada(self, r) -> bool:
         return bool(r and r.get("aprobada") and r.get("huella") == self.huella)

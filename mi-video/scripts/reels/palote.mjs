@@ -14,6 +14,7 @@ export const ACCIONES_PALOTE = ["millonario", "musculo", "mecanico", "investigar
   "curriculum", "guion", "aplicacion", "senalar", "pensar", "aprobar", "celebrar",
   "encoger", "saludar", "caminar"];
 const LADOS = ["arriba", "abajo", "izquierda", "derecha"];
+const TEXTO_AL = ["frente", "encima"];
 
 const fuera = (campo, v, validos) => (v === undefined || v === null || validos.includes(v) ? []
   : [`«Palote».\`${campo}\` = «${v}» no existe; hay: ${validos.join(", ")}. Esto NO avisa,`
@@ -22,6 +23,7 @@ const fuera = (campo, v, validos) => (v === undefined || v === null || validos.i
 export function faltasDePalote(props) {
   const p = props ?? {};
   return [...fuera("accion", p.accion, ACCIONES_PALOTE), ...fuera("lado", p.lado, LADOS),
+    ...fuera("textoAl", p.textoAl, TEXTO_AL),
     ...(Array.isArray(p.acciones) ? p.acciones : [])
       .flatMap((a) => fuera("acciones[].accion", a?.accion, ACCIONES_PALOTE))];
 }

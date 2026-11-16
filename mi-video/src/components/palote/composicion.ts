@@ -84,6 +84,66 @@ export const compone = (layout: Lienzo, papel: Accion, texto: string[], aire: nu
 /** Dónde va él cuando acompaña el plano en vez de taparlo. */
 export type Sitio = "arriba" | "abajo" | "izquierda" | "derecha";
 
+/** Dónde va el texto cuando él va a un lado: enfrente, al otro lado de Jaime, o encima del muñeco. */
+export type TextoAl = "frente" | "encima";
+/** Lo que mide a su lado: lo segundo del cuadro después de Jaime. */
+const A_SU_LADO = 0.56;
+/** La columna que ocupa cada uno, en fracción del ancho útil. */
+const COLUMNA = 0.3;
+
+/**
+ * **A su lado, el muñeco es lo segundo del cuadro** (C-729). Jaime, 16-11,
+ * viendo e14 de reel-23 con el muñeco a un quinto del alto: *«tiene que ser
+ * muchísimo más grande… aparte de mí, lo segundo; tiene que competir con mi
+ * cara… bien formado, no un muñequito perdido en la mitad de la nada; métele
+ * composición»*, y *«si estoy yo en la mitad, en un lado MUSCLE MEMORY y en el
+ * otro el muñeco»*.
+ *
+ * Mide algo más de la mitad del alto y está de pie sobre la franja, centrado en
+ * su columna (`COLUMNA` del ancho útil, en el borde de `sitio`). El texto va:
+ * - `frente` (por defecto): en la columna del otro borde, grande, a la altura
+ *   de su cara. Medido en e14 de reel-23: el muñeco sale el doble de alto que
+ *   con el texto encima.
+ * - `encima`: sobre el muñeco, en su misma columna, cuando él ocupa la otra
+ *   mitad.
+ * Si una línea no cabe grande, se parte por palabras.
+ */
+const aSuLado = (
+  layout: Lienzo, papel: Accion, texto: string[], sitio: Sitio, plano: ElEnElPlano, aire: number,
+  textoAl: TextoAl,
+): Composicion => {
+  const suelo = layout.height - layout.franja.reserva - aire;
+  const util = layout.width - layout.safe.left - layout.safe.right;
+  const col = util * COLUMNA;
+  const izq = (s: Sitio) => (s === "izquierda" ? layout.safe.left : layout.width - layout.safe.right - col);
+  const otro: Sitio = sitio === "izquierda" ? "derecha" : "izquierda";
+  const base = 64 * layout.tablero.cuerpo;
+  const medir = (lineas: string[], ancho: number) =>
+    Math.min(base, ancho / (Math.max(1, ...lineas.map((l) => l.length)) * AVANCE));
+  const partir = (ancho: number) =>
+    medir(texto, ancho) >= base * 0.75 ? texto : texto.flatMap((l) => l.split(/\s+/));
+  const cara = (plano.coronilla ?? CORONILLA) * layout.height;
+  if (textoAl === "frente") {
+    const lineas = partir(col);
+    const cuerpoTexto = medir(lineas, col);
+    const h = lineas.length * cuerpoTexto * 0.96;
+    const caja = { x: izq(otro), y: cara + layout.height * 0.12 - h / 2, w: col, h };
+    const k = Math.min((layout.height * A_SU_LADO) / papel.alto, col / papel.ancho);
+    const w = papel.ancho * k;
+    const escena = { x: izq(sitio) + (col - w) / 2, y: suelo - papel.alto * k, w, h: papel.alto * k };
+    return { caja, centra: true, enMedio: true, cuerpoTexto, escena, k };
+  }
+  const lineas = partir(col);
+  const cuerpoTexto = medir(lineas, col);
+  const h = lineas.length * cuerpoTexto * 0.96;
+  const caja = { x: izq(sitio), y: Math.max(layout.safe.top, cara), w: col, h };
+  const alto = Math.min(layout.height * A_SU_LADO, suelo - (caja.y + h + HUECO / 2));
+  const k = Math.min(alto / papel.alto, col / papel.ancho);
+  const w = papel.ancho * k;
+  const escena = { x: izq(sitio) + (col - w) / 2, y: suelo - papel.alto * k, w, h: papel.alto * k };
+  return { caja, centra: true, enMedio: false, cuerpoTexto, escena, k };
+};
+
 /** Lo que mide acompañando: un quinto del lado corto del cuadro, con lo que lleve. */
 const QUINTO = 0.2;
 /** Lo que deja por encima de la coronilla cuando va arriba. */
@@ -101,7 +161,7 @@ const CORONILLA = 0.2;
  * no se tapa. Así que mide un quinto del cuadro y vive en el borde que se
  * declara, dentro de la zona segura y sobre la franja del subtítulo:
  *
- * - `izquierda` / `derecha` — de pie en esa esquina, con el texto encima.
+ * - `izquierda` / `derecha` — a su lado y grande: ver `aSuLado` (C-729).
  * - `abajo` — de pie sobre la franja, en el centro de la mitad que él deja
  *   libre (el `lado` de la pieza, que llega por `DondeEstaEl`).
  * - `arriba` — colgado del margen de arriba, en esa misma mitad libre. Si la
@@ -113,7 +173,10 @@ const CORONILLA = 0.2;
  */
 export const acompana = (
   layout: Lienzo, papel: Accion, texto: string[], sitio: Sitio, plano: ElEnElPlano, aire: number,
+  textoAl?: TextoAl,
 ): Composicion => {
+  if (sitio === "izquierda" || sitio === "derecha")
+    return aSuLado(layout, papel, texto, sitio, plano, aire, textoAl ?? "frente");
   const suelo = layout.height - layout.franja.reserva - aire;
   const util = layout.width - layout.safe.left - layout.safe.right;
   const hueco = (plano.coronilla ?? CORONILLA) * layout.height - layout.safe.top - SOBRE_EL;
@@ -124,9 +187,7 @@ export const acompana = (
   const h = papel.alto * k;
   /** El centro de la mitad libre; sin ella, el del cuadro. */
   const medio = plano.libre === "izq" ? layout.width / 4 : plano.libre === "der" ? layout.width * 0.75 : layout.width / 2;
-  const x = sitio === "izquierda" ? layout.safe.left
-    : sitio === "derecha" ? layout.width - layout.safe.right - w
-      : medio - w / 2;
+  const x = medio - w / 2;
   const escena = { x, y: sitio === "arriba" ? layout.safe.top + alto - h : suelo - h, w, h };
   const larga = Math.max(1, ...texto.map((l) => l.length));
   const base = 40 * layout.tablero.cuerpo;

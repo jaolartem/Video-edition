@@ -11,7 +11,7 @@ import { DondeEstaEl, ZonaTablero, acompanaAlPlano } from "./ZonaTablero";
 import type { Accion, Escenario } from "./palote/accion";
 import { aplicacion } from "./palote/Aplicacion";
 import { encadena, juntas } from "./palote/cadena";
-import { acompana, compone, type Sitio } from "./palote/composicion";
+import { acompana, compone, type Sitio, type TextoAl } from "./palote/composicion";
 import { Cuerpo } from "./palote/Cuerpo";
 import { curriculum } from "./palote/Curriculum";
 import { aprobar, caminar, celebrar, encoger, pensar, saludar, senalar } from "./palote/Gestos";
@@ -39,9 +39,10 @@ import { musculo } from "./palote/Musculo";
  *   hacer que leída. Una o dos por pieza: si toma el cuadro en cada beat deja
  *   de ser un respiro.
  * - **Acompañándolo** (`cubre: "panel"` + `lado`): mientras él habla a cámara.
- *   Fondo transparente, un quinto del cuadro, en `arriba`, `abajo`,
- *   `izquierda` o `derecha` —dentro de la zona segura, sobre el subtítulo y
- *   sin bajar de su coronilla—. Jaime: *«si yo aparezco en la cara y el
+ *   Fondo transparente. En `izquierda` o `derecha` es lo segundo del cuadro
+ *   después de él —más de medio alto, con `MUSCLE MEMORY` grande enfrente o
+ *   encima (`textoAl`)—: Jaime, *«tiene que competir con mi cara»* (C-729).
+ *   En `arriba` o `abajo`, un quinto del cuadro, sin bajar de su coronilla. Jaime: *«si yo aparezco en la cara y el
  *   muñequito también aparece, no pasa nada; ponlo en un sitio que no estorbe
  *   tanto»*. Va en el lado contrario a lo que él saca a cámara: sus ayudas
  *   visuales no se tapan nunca. Así puede salir en muchos beats.
@@ -113,6 +114,11 @@ export type PaloteProps = {
   lado?: Sitio;
   /** Las líneas que van a su lado, en Anton versales. Cada entrada es una línea. */
   texto?: string[];
+  /**
+   * A su lado (`lado` izquierda o derecha), dónde va el texto: `frente`, al
+   * otro lado de él (por defecto), o `encima` del muñeco (C-729).
+   */
+  textoAl?: TextoAl;
   /** Qué línea va en oro: su texto exacto. Una sola. */
   oro?: string;
   /** Las dos tablas que conecta el mecánico, de izquierda a derecha. */
@@ -156,6 +162,7 @@ export const Palote: React.FC<PaloteProps> = ({
   cubre = "pleno",
   lado,
   texto = [],
+  textoAl,
   oro,
   tablas = ["TABLE A", "TABLE B"],
   sound = true,
@@ -183,7 +190,7 @@ export const Palote: React.FC<PaloteProps> = ({
   const sitio = lado ?? "derecha";
   const zona = layout.height - layout.franja.reserva;
   const { caja, escena, k, centra, enMedio, cuerpoTexto } = conEl
-    ? acompana(layout, papel, texto, sitio, plano, AIRE)
+    ? acompana(layout, papel, texto, sitio, plano, AIRE, textoAl)
     : compone(layout, papel, texto, AIRE);
   const suelo = escena.y + escena.h;
   const cx = escena.x + escena.w / 2;

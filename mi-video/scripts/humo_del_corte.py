@@ -258,6 +258,12 @@ def _el_palote_es_recurso(h):
     h.mide("C-728", Fotogramas(base, "c").contenido(375) == Fotogramas(base, "otro").contenido(375)
            and a.contenido(75) != b.contenido(75),
            "y lo que Jaime aprobó sigue aprobado: sólo vuelve lo que cambió")
+    comp = open("src/components/palote/composicion.ts", encoding="utf-8").read()
+    h.mide("C-729", "const A_SU_LADO = 0.56;" in comp and 'textoAl ?? "frente"' in comp,
+           "y a su lado el muñeco es lo segundo del cuadro, con el texto enfrente")
+    h.mide("C-729", bool(pide("horizontal", {"accion": "musculo", "cubre": "panel",
+                                             "lado": "derecha", "textoAl": "al-lado"})),
+           "y un `textoAl` que no existe no pasa la puerta")
     lz = _json.load(open("src/brand/lienzos.json", encoding="utf-8"))
     ad = open("src/Ad.tsx", encoding="utf-8").read()
     h.mide("C-727", (lz["horizontal"]["tablero"].get("empuje") or 0) > 0
