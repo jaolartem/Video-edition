@@ -128,8 +128,20 @@ def escribe(slug):
 
         d["segmentos"] = [x.como_json() for x in _sg.Segmento.de(slug)]
         d["aprobada"] = _sg.aprobada(slug)
-    except Exception:                              # noqa: BLE001
-        pass
+        # **Y las etapas del guion que no tienen toma, dichas** (C-713). Un
+        # segmento que no está en el EDL desaparecía del JSON sin rastro:
+        # reel-23 e17, «Starting with tax season», se quedó en `sin_toma` por
+        # lectura plana y nadie que abriera el marcador podía saber que faltaba.
+        edl = json.load(open(os.path.join(RAIZ, "ads", slug, "edl-sell.json"),
+                             encoding="utf-8"))
+        d["sin_toma"] = [{"etapa": h.get("beat"), "motivo": h.get("motivo"),
+                          "libreto": h.get("libreto"),
+                          "obligatorio": h.get("obligatorio")}
+                         for h in edl.get("sin_toma") or []]
+    except Exception as e:                         # noqa: BLE001
+        # Y lo que no se pudo publicar se dice: un JSON sin segmentos que no
+        # avisa es igual que uno vacío, y lo trata igual quien lo lee.
+        d["falta"] = f"no se pudo publicar segmentos: {e}"[:200]
     d["visto_por_ultima_vez"] = _ahora()
     return _guarda(slug, d)
 

@@ -411,11 +411,9 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
 
     # El veredicto de pieza puede parar, y es del que monta: tres tableros con
     # la misma forma no es un defecto de ninguno de los tres.
-    tableros = respuesta
-    veredicto = None
-    if isinstance(respuesta, dict):
-        tableros = respuesta.get("tableros") or []
-        veredicto = (respuesta.get("pieza") or {}).get("veredicto")
+    es_dict = isinstance(respuesta, dict)
+    tableros = (respuesta.get("tableros") or []) if es_dict else respuesta
+    veredicto = (respuesta.get("pieza") or {}).get("veredicto") if es_dict else None
     # **Y sin haber MIRADO no se aprueba.** Jaime: *«el tablero no se puede leer
     # bien y el fondo blanco no se entiende; parece que el disenador no reviso
     # esto antes de salir. La revision es parte del proceso normal y debe ser
@@ -430,10 +428,8 @@ def aplicar(pieza: Pieza, respuesta) -> Resultado:
     # donde se puede releer cuando algo salga mal.
     visto = (respuesta.get("mirado") if isinstance(respuesta, dict) else None)
     if not visto:
-        return Resultado(False, motivo="la respuesta no trae «mirado»: hay que revisar los"
-                   " fotogramas de cada escena ANTES de aprobar y decir que se"
-                   " vio — letras que no se leen, colores que no se ven,"
-                   " composicion rota. Es parte del proceso, no un extra.")
+        return Resultado(False, motivo="la respuesta no trae «mirado»: revisa los fotogramas"
+                         " de cada escena ANTES de aprobar y di qué viste.")
     # **Lo que no se puede dibujar vuelve ahora, no al montar** (C-562). Es la
     # misma regla que `rompe` (`formas.revisarTablero` + `sinSujeto`); dicha
     # tres pasos tarde costo 18 vueltas a reel-19 y reel-21 el 18-10.

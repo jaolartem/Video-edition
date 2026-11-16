@@ -218,59 +218,46 @@ class Segmento:
 
     @property
     def tiene(self):
-        """Las entidades colgadas de este segmento: tablero, camara, voz, tipo.
+        """**Lo decidido sobre este segmento**: trato, plano, tablero, cámara, voz.
 
-        Jaime, 10-9-2026: *«revisa que el Json tenga acceso al nuevo modelo»*.
-        Sin esto, `tablero` y `panel` dejaban de ser columnas y seguian sin
-        llegar al que trabaja: el oficio abre el marcador y nada mas, asi que
-        una entidad que no se publica aqui **no existe para el**.
+        Jaime, 10-9-2026: *«revisa que el Json tenga acceso al nuevo modelo»*; y
+        15-11-2026: *«el json tiene toda la información de cada corte y de cada
+        elemento sobre el que se ha decidido»*. El oficio abre el marcador y nada
+        más, así que lo que no se publica aquí **no existe para él**.
 
-        Se lee por las tablas de conexion, que es donde vive el estado de cada
-        una en ESTA etapa: un tablero `propuesto` y uno `aplicado` son la misma
-        entidad en dos momentos, y el oficio necesita ver los dos.
+        **Se lee de la fuente única, `escena_desc`** (C-713), la que `verdad.py`
+        declara para el tablero. Esto leía `etapa_tablero`, `etapa_camara` y
+        `etapa_voz`, que el diseño no escribe —0 filas en reel-14, 22 y 23—, y la
+        consulta del tipo pedía columnas que no existen y reventaba; el `except`
+        se lo tragaba. Así el JSON llevaba cada corte sin un solo elemento
+        decidido, y el diseñador de reel-23 escribió «las props completas a
+        ciegas» y redactó una fuente. Y si no se puede leer, se dice en `falta`.
         """
         import json as _j
 
-        fuera = {}
+        def suelto(v):
+            try:
+                return _j.loads(v) if isinstance(v, str) and v[:1] in "{[" else v
+            except ValueError:
+                return v
+
         try:
             cx = _con()
-            e = cx.execute(
-                "select e.id from etapa e join video v on v.id = e.video_id"
-                " where v.slug = ? and e.orden = ?", (self.slug, self.n)).fetchone()
-            if not e:
-                cx.close()
-                return fuera
-            eid = e["id"]
-            for r in cx.execute(
-                    "select t.kind, t.props, et.estado from etapa_tablero et"
-                    " join tablero t on t.id = et.tablero_id"
-                    " where et.etapa_id = ?", (eid,)):
-                try:
-                    props = _j.loads(r["props"])
-                except Exception:                  # noqa: BLE001
-                    props = {}
-                fuera.setdefault("tableros", []).append(
-                    {"estado": r["estado"], "kind": r["kind"], "props": props})
-            for tabla, ent, campos in (
-                    ("etapa_camara", "camara", ("encuadre", "movimiento")),
-                    ("etapa_voz", "voz", ("trato", "sobre", "dura")),
-                    ("etapa_tipo", "tipo_escena", ("trato", "plano", "densidad"))):
-            
-                r = cx.execute(
-                    f"select {', '.join(campos)} from {tabla} c"
-                    f" join {ent} x on x.id = c.{'tipo_id' if ent == 'tipo_escena' else ent + '_id'}"
-                    f" where c.etapa_id = ?", (eid,)).fetchone()
-                if r:
-                    clave = "tipo" if ent == "tipo_escena" else ent
-                    fuera[clave] = {k: r[k] for k in campos}
+            r = cx.execute(
+                "select trato, plano, tablero, camara, voz, cc_lado, corrige_dice,"
+                " corrige_es from escena_desc where video_slug = ? and etapa_orden = ?",
+                (self.slug, self.n)).fetchone()
             ps = [dict(x) for x in cx.execute(
                 "select p.bloques, p.cubre, p.lado, ep.hueco from etapa_panel ep"
-                " join panel p on p.id = ep.panel_id where ep.etapa_id = ?", (eid,))]
-            if ps:
-                fuera["paneles"] = ps
+                " join panel p on p.id = ep.panel_id join etapa e on e.id = ep.etapa_id"
+                " join video v on v.id = e.video_id where v.slug = ? and e.orden = ?",
+                (self.slug, self.n))]
             cx.close()
-        except Exception:                          # noqa: BLE001
-            pass
+        except Exception as e:                     # noqa: BLE001
+            return {"falta": f"no se pudo leer lo decidido: {e}"[:160]}
+        fuera = {k: suelto(r[k]) for k in r.keys() if r[k] not in (None, "")} if r else {}
+        if ps:
+            fuera["paneles"] = ps
         return fuera
 
     def como_json(self):
