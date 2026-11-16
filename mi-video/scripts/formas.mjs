@@ -47,6 +47,7 @@ import fs from "node:fs";
 import { cerrada } from "./biblioteca.mjs";
 import { camposDe, piezas } from "./catalogo.mjs";
 import { CLIPS, faltasDeApoyo } from "./reels/apoyo.mjs";
+import { faltasDeTarjeta } from "./reels/tarjeta.mjs";
 
 const DIR_C = "src/components";
 
@@ -472,10 +473,8 @@ export const revisarTablero = (kind, props) => {
   const f = forma(kind);
   // Un clip que no está en la biblioteca, cuyo fichero falta o con una forma
   // que no existe tumba el render a mitad: se dice aquí, que es antes (C-673).
-  if (kind === "Apoyo") {
-    const malApoyo = faltasDeApoyo(props);
-    if (malApoyo.length) return malApoyo;
-  }
+  if (kind === "Apoyo" && faltasDeApoyo(props).length) return faltasDeApoyo(props);
+  if (kind === "Tarjeta" && faltasDeTarjeta(props).length) return faltasDeTarjeta(props);
   return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props),
           ...pilaQueDesborda(props), ...oroSinLinea(kind, props)];
 };
