@@ -46,6 +46,7 @@ type Datos = {
     suelo: string;
     serie: string | null;
     formas?: string[];
+    empuje?: number;
   };
 };
 
@@ -62,6 +63,11 @@ export type Composicion = {
   readonly serie: string | null;
   /** Las formas comprobadas en este cuadro; sin lista, todas. La pide `dibujable.mjs`. */
   readonly formas?: readonly string[];
+  /**
+   * Cuánto se acerca un tablero a pleno por segundo, en fracción de escala
+   * (C-727). Sin él, 0: el tablero no se mueve, como siempre.
+   */
+  readonly empuje?: number;
 };
 
 export class Lienzo {

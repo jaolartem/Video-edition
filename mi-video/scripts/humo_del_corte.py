@@ -255,6 +255,12 @@ def _el_palote_es_recurso(h):
     otro["edl"] = {"x": 2}
     h.mide("C-725", Fotogramas(otro, "c").huella(375) != a.huella(375),
            "y si cambia el corte, se rehace entera")
+    lz = _json.load(open("src/brand/lienzos.json", encoding="utf-8"))
+    ad = open("src/Ad.tsx", encoding="utf-8").read()
+    h.mide("C-727", (lz["horizontal"]["tablero"].get("empuje") or 0) > 0
+           and "empuje" not in lz["vertical"]["tablero"]
+           and "<EnMarcha empuje={acompanaAlPlano(cue.props) ? 0" in ad,
+           "y un tablero a pleno del horizontal va en marcha, sin congelarse")
 
 
 def _un_tropiezo_no_aparta_lo_declarado(h):

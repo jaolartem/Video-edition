@@ -8,6 +8,7 @@ import {
 } from "remotion";
 import { dibujaTablero } from "./components/Tablero";
 import { DondeEstaEl, acompanaAlPlano } from "./components/ZonaTablero";
+import { EnMarcha } from "./components/EnMarcha";
 // Sólo los tipos: **quién dibuja cada forma vive en `components/Tablero.tsx`**,
 // y aquí se declara nada más el contrato de lo que el spec puede pedir.
 import type { CausalChainProps } from "./components/CausalChain";
@@ -262,7 +263,10 @@ export const Ad: React.FC<AdProps> = ({
               entonces el tablero deja de significar nada. Quién dibuja cada
               forma lo dice `dibujaTablero`,
               en `components/Tablero.tsx`. */}
-          {dibujaTablero(cue, mode, layout)}
+          <EnMarcha empuje={acompanaAlPlano(cue.props) ? 0 : layout.tablero.empuje ?? 0}
+                    dura={cue.duration}>
+            {dibujaTablero(cue, mode, layout)}
+          </EnMarcha>
         </Sequence>
       ))}
       </DondeEstaEl.Provider>
