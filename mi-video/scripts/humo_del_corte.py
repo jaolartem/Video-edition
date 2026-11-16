@@ -157,8 +157,35 @@ def _un_tablero_sin_encargo_caduca(h):
            "el tablero que entra por consulta lo escribe guardar_tablero, con huella")
 
 
+def _el_horizontal_compone_su_tablero(h):
+    """El cuadro horizontal centra, escala y pone su suelo; el vertical, igual. C-716.
+
+    reel-23, 16-11-2026. Jaime: *«solo están utilizando un lado como si fuera
+    vertical»*. Las formas estaban maquetadas a 1080 de ancho y alineadas a la
+    izquierda, sobre una placa vertical recortada a su franja central.
+    """
+    import json as _json
+    import subprocess
+
+    from dominio.lienzo import LIENZOS
+
+    todos = _json.load(open(LIENZOS, encoding="utf-8"))
+    hz, vt = todos["horizontal"]["tablero"], todos["vertical"]["tablero"]
+    h.mide("C-716", hz["alinea"] == "center" and hz["suelo"] == "cuadricula"
+           and not hz["serie"], "el horizontal centra, pone la retícula y no lleva la serie")
+    h.mide("C-716", vt == {"alinea": "flex-start", "cuerpo": 1, "suelo": "placa",
+                           "serie": "El código del empresario"},
+           "y el vertical se compone como siempre")
+    pide = lambda f: _json.loads(subprocess.run(  # noqa: E731
+        ["node", "scripts/dibujable.mjs"], capture_output=True, text=True, encoding="utf-8",
+        input=_json.dumps({"formato": f, "tableros": [{"etapa_orden": 1, "kind": "causal",
+                           "props": {"nodes": [{"stage": "1", "text": "A"}]}}]})).stdout or "{}")
+    h.mide("C-716", bool(pide("horizontal")) and not pide("vertical"),
+           "la puerta del diseño no deja en horizontal una forma no compuesta para él")
+
+
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba
 #: `humo.py` con cada prueba de aquí, que es la razón por la que se partió.
 PRUEBAS = (_lo_publicado_queda_escrito, _lo_firmado_se_puede_volver_a_poner,
            _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido,
-           _un_tablero_sin_encargo_caduca)
+           _un_tablero_sin_encargo_caduca, _el_horizontal_compone_su_tablero)

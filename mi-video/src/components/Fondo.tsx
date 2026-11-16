@@ -8,6 +8,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { color } from "../brand/tokens";
+import { useLienzo } from "../brand/LienzoContexto";
 
 /**
  * El fotomontaje de fondo: una **placa** de `public/fondos/`.
@@ -143,6 +144,7 @@ export const Fondo: React.FC<FondoProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  const lienzo = useLienzo();
   // **La deriva dura toda la lámina** (C-701). Cada forma pasaba la suya
   // —`t + 90`, `duracion + 60`— y donde acababa, el plano se clavaba: emisión
   // midió 2 congelados al final de reel-23 e5 con la placa puesta. La medida
@@ -154,7 +156,25 @@ export const Fondo: React.FC<FondoProps> = ({
         extrapolateRight: "clamp",
       })
     : 1;
-  const lamina = (
+  // **Y en el horizontal, la retícula y no la placa** (C-716): las placas son
+  // 1080x1920 y en 16:9 sólo enseñan su franja central —el escritorio
+  // recortado, el papel rasgado—, que no es sobrio. La retícula es la del útil,
+  // doce columnas, y deriva para que nada quede quieto bajo la lámina.
+  const paso = lienzo.util / 12;
+  const va = (frame * 0.4) % paso;
+  const lamina = lienzo.tablero.suelo === "cuadricula" ? (
+    <AbsoluteFill
+      style={{
+        backgroundColor: color.navy,
+        opacity: fuerza,
+        backgroundImage:
+          `linear-gradient(to right, ${color.navyHi} 2px, transparent 2px),` +
+          ` linear-gradient(to bottom, ${color.navyHi} 2px, transparent 2px)`,
+        backgroundSize: `${paso}px ${paso}px`,
+        backgroundPosition: `${lienzo.safe.left + va}px ${lienzo.safe.top + va / 2}px`,
+      }}
+    />
+  ) : (
     <Img
       src={staticFile(`fondos/${placa}.png`)}
       style={{

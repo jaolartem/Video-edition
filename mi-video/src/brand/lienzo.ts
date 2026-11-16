@@ -40,6 +40,28 @@ type Datos = {
   safeBottomExtremo: number;
   interfaz: number;
   columna: { x: number; ancho: number };
+  tablero: {
+    alinea: string;
+    cuerpo: number;
+    suelo: string;
+    serie: string | null;
+    formas?: string[];
+  };
+};
+
+/**
+ * **Cómo se compone un tablero en este cuadro** (C-716). Los tableros se
+ * maquetaron para 1080 de ancho, alineados a la izquierda y sobre una placa
+ * vertical; en el horizontal eso dejaba media pantalla vacía. Lo declara el
+ * lienzo y lo leen las formas: en vertical son los valores de siempre.
+ */
+export type Composicion = {
+  readonly alinea: "flex-start" | "center";
+  readonly cuerpo: number;
+  readonly suelo: "placa" | "cuadricula";
+  readonly serie: string | null;
+  /** Las formas comprobadas en este cuadro; sin lista, todas. La pide `dibujable.mjs`. */
+  readonly formas?: readonly string[];
 };
 
 export class Lienzo {
@@ -105,6 +127,7 @@ export class Lienzo {
   readonly columna: { readonly x: number; readonly ancho: number };
   /** La franja del subtítulo de este lienzo, derivada de él: ver `franja.ts`. */
   readonly franja: Franja;
+  readonly tablero: Composicion;
 
   constructor(
     readonly formato: Formato,
@@ -128,6 +151,11 @@ export class Lienzo {
     this.interfaz = d.interfaz;
     this.columna = d.columna;
     this.franja = franjaDe(this);
+    const t = d.tablero;
+    if (!["flex-start", "center"].includes(t.alinea) || !(t.cuerpo > 0)
+        || !["placa", "cuadricula"].includes(t.suelo))
+      throw new Error(`lienzo ${formato}: el tablero no se sabe componer así`);
+    this.tablero = t as Composicion;
   }
 
   /** El ancho entre los dos márgenes laterales. */

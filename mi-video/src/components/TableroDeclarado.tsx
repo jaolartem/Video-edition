@@ -165,7 +165,7 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
                    */
                   padding: "6px 16px",
                   background: l.oro ? color.gold : color.richBlack,
-                  alignSelf: "flex-start",
+                  alignSelf: layout.tablero.alinea,
                   maxWidth: "100%",
                 }}
               >
@@ -173,7 +173,8 @@ export const TableroDeclarado: React.FC<TableroDeclaradoProps> = ({
                   style={{
                     fontFamily: l.grande ? fontFamily.bloque : fontFamily.video,
                     fontWeight: l.grande ? 400 : 800,
-                    fontSize: l.grande ? videoText.title : videoText.caption,
+                    fontSize: (l.grande ? videoText.title : videoText.caption) *
+                      layout.tablero.cuerpo,
                     letterSpacing: l.grande ? tracking.display : 0,
                     textTransform: l.grande ? "uppercase" : "none",
                     color: l.oro ? color.richBlack : color.lightNeutral,

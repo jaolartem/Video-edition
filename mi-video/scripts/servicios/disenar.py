@@ -40,7 +40,7 @@ import basedatos
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dominio import dibujable as _dib  # noqa: E402  C-562
+from dominio import dibujable as _dib, lienzo as _lienzo  # noqa: E402  C-562, C-716
 
 from contrato.marca import ENTRADA_GANCHO, ESTILO, PRIORIDAD  # noqa: E402,F401
 
@@ -321,7 +321,7 @@ class ServicioDisenar(Servicio):
             # composicion viven ahi y no viajaban.
             "canon_escrito": _canon_escrito(),
             "laminas": _laminas(),
-            "placas": placas_que_existen(pieza.slug),
+            "placas": placas_que_existen(pieza.slug), "cuadro": _lienzo.Lienzo.composicion(pieza.slug),
             "estilo": ESTILO,
             "antes_de_dibujar": ANTES_DE_DIBUJAR,
             "sonidos": _sonidos(),

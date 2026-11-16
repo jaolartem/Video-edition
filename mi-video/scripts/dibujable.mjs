@@ -14,6 +14,7 @@
 import fs from "fs";
 import { DEJAN_SITIO, canonico, revisarTablero, sinSujeto } from "./formas.mjs";
 import { panelLargo, pieLargo } from "./reels/tableros.mjs";
+import { lienzoDe } from "./lienzo.mjs";
 
 // `--con-su-cara`: las formas que dibujan a pleno dejandole la columna. Va en
 // el pedido para que el diseñador no elija una que el montaje va a rechazar.
@@ -21,13 +22,19 @@ if (process.argv.includes("--con-su-cara")) {
   console.log(JSON.stringify([...DEJAN_SITIO].sort()));
   process.exit(0);
 }
-const { cara, tableros } = JSON.parse(fs.readFileSync(0, "utf8") || "{}");
+const { cara, tableros, formato } = JSON.parse(fs.readFileSync(0, "utf8") || "{}");
+// **Y sólo las formas compuestas para su cuadro** (C-716): en el horizontal,
+// `causal` y `fusion` salían en negro y pegadas a la izquierda.
+const formas = lienzoDe(formato ?? undefined).tablero?.formas;
+const enSuCuadro = (kind) => !formas || formas.includes(kind) ? [] :
+  [`«${kind}» no está compuesta para el cuadro ${formato}: aquí se dibujan ${formas.join(", ")}`];
 const faltas = {};
 for (const t of tableros || []) {
   if (!t || t.retirar || !t.kind) continue;
   const kind = canonico(t.kind);
   const props = t.props || {};
-  const suyas = [...revisarTablero(kind, props), ...(cara ? sinSujeto(kind, props) : []),
+  const suyas = [...enSuCuadro(kind),
+                 ...revisarTablero(kind, props), ...(cara ? sinSujeto(kind, props) : []),
                  ...panelLargo(props), ...pieLargo(t)];
   if (suyas.length) faltas[t.etapa_orden ?? t.etapa ?? t.beat] = suyas;
 }

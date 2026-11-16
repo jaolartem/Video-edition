@@ -130,6 +130,7 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
             flexDirection: "column",
             justifyContent: "center",
             padding: `0 ${layout.safe.left}px`,
+            textAlign: layout.tablero.alinea === "center" ? "center" : undefined,
           }}
         >
           <div style={{ position: "relative", marginBottom: 26 }}>
@@ -139,7 +140,7 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
                 transform: `translateY(${((1 - pCreencia) * 22).toFixed(1)}px)`,
               }}
             >
-              <Cinta tinte={color.lightNeutral} giro={-2.4} cuerpo={62}>
+              <Cinta tinte={color.lightNeutral} giro={-2.4} cuerpo={62 * layout.tablero.cuerpo}>
                 <span style={{ fontFamily: fontFamily.bloque }}>{creencia}</span>
               </Cinta>
             </div>
@@ -171,7 +172,7 @@ export const BeliefSwap: React.FC<BeliefSwapProps> = ({
             {/* **`acento` porque aquí no hay otro oro.** Dos bloques planos y la
                 conclusión: si ésta va en claro, el tablero se queda sin sitio por
                 donde entrar. La regla es un acento, no ninguno. Ver `Remate.tsx`. */}
-            <Remate acento giro={1.9} cuerpo={68}>
+            <Remate acento giro={1.9} cuerpo={68 * layout.tablero.cuerpo}>
               <span style={{ fontFamily: fontFamily.bloque }}>{verdad}</span>
             </Remate>
           </div>

@@ -106,7 +106,9 @@ def faltas(pieza, tableros) -> dict:
     for t in tableros or []:
         if isinstance(t, dict) and t.get("cubre") and "cubre" not in (t.get("props") or {}):
             t["props"] = {**(t.get("props") or {}), "cubre": t.pop("cubre")}
-    return consulta([], {"cara": cara(pieza), "tableros": tableros}) or {}
+    from dominio.lienzo import Lienzo
+    return consulta([], {"cara": cara(pieza), "tableros": tableros,
+                         "formato": Lienzo.de_pieza(pieza.slug).formato}) or {}
 
 
 #: Lo que en el pedido del disenador es igual para todas las piezas (C-564).

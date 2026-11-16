@@ -73,6 +73,18 @@ class Lienzo:
         return cls.de(pedido or POR_DEFECTO)
 
     @classmethod
+    def composicion(cls, slug: str) -> dict | None:
+        """Cómo se compone un tablero en el cuadro de la pieza, si no es el de
+        siempre: su nota y las formas comprobadas en él. Va en el pedido del
+        diseño, para que elija entre las que sirven (C-716)."""
+        formato = cls.de_pieza(slug).formato
+        with open(LIENZOS, encoding="utf-8") as f:
+            d = json.load(f)[formato]
+        if not (d.get("tablero") or {}).get("formas"):
+            return None
+        return {"formato": formato, "por_que": d.get("_tablero"), **d["tablero"]}
+
+    @classmethod
     def de_ruta(cls, ruta: str) -> "Lienzo":
         """El de la pieza que nombra una ruta; sin pieza, vertical."""
         m = _PIEZA.search(str(ruta).replace("\\", "/"))

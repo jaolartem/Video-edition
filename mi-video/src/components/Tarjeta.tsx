@@ -108,6 +108,20 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
     });
 
   const util = layout.width - layout.safe.left * 2;
+  const { alinea, cuerpo: escala, serie } = layout.tablero;
+  const centra = alinea === "center";
+  /**
+   * **Y lo que entra, cabe** (C-716). Centrado y a cuerpo de horizontal, cuatro
+   * bloques y el remate pasaban del alto útil y el primero salía por arriba
+   * (reel-23 e14). Se estima el alto a cuerpo 1 y se encoge lo justo.
+   */
+  const alto = layout.height - layout.safe.top - layout.franja.reserva;
+  const masLarga = Math.max(...remate.map((l) => l.length), 1);
+  const altoA1 =
+    bloques.length * (58 * 1.4 + 26) +
+    (remate.length ? 40 + remate.length * Math.min(150, util / (masLarga * 0.47)) * 0.94 : 0) +
+    (pie ? 70 : 0);
+  const cuerpo = centra ? Math.min(escala, alto / Math.max(1, altoA1)) : escala;
   /**
    * Cuerpo del remate ajustado a la línea más larga.
    *
@@ -116,12 +130,36 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
    * de un texto sin medirlo tiene un error irreducible, y el margen se paga en
    * cuerpo, que es barato, no en texto cortado.
    */
-  const masLarga = Math.max(...remate.map((l) => l.length), 1);
-  const cuerpoRemate = Math.min(150, util / (masLarga * 0.47));
+  const cuerpoRemate = Math.min(150 * cuerpo, util / (masLarga * 0.47));
 
   const finBloques = bloques.length * escalon;
   /** Nivel bajo a propósito: la voz de Jaime es el audio principal. */
   const NIVEL = 0.5;
+
+  /**
+   * **Y centrado, el grupo visible es el que se centra** (C-716). El remate
+   * entra al final —en reel-23 e14 al 85% de la lámina— y ocupaba su sitio
+   * desde el principio: los bloques se quedaban arriba casi toda la lámina.
+   * Empiezan en el centro y suben lo que el remate necesita cuando entra.
+   */
+  const pRemate = entra(finBloques + 6, 14);
+  const altoRemate = remate.length
+    ? 40 * cuerpo + remate.length * cuerpoRemate * 0.94
+    : 0;
+  const envuelve = (hijos: React.ReactNode) =>
+    centra ? (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          transform: `translateY(${(((1 - pRemate) * altoRemate) / 2).toFixed(1)}px)`,
+        }}
+      >
+        {hijos}
+      </div>
+    ) : (
+      hijos
+    );
 
   return (
     <AbsoluteFill style={{ backgroundColor: color.richBlack }}>
@@ -140,7 +178,8 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
           </Sequence>
         </>
       ) : null}
-      {/* Cabecera: el frame, siempre presente. */}
+      {/* Cabecera: el frame de la serie. Sin serie, no hay cabecera (C-716). */}
+      {serie ? (
       <div
         style={{
           position: "absolute",
@@ -168,26 +207,29 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
         }}
       >
         <span>
-          El código del empresario{" "}
+          {serie}{" "}
           <span style={{ color: color.secondaryBlue }}>/ {framework}</span>
         </span>
         <span>
           {dos(beat[0])}—{dos(beat[1])}
         </span>
       </div>
+      ) : null}
 
       <div
         style={{
           position: "absolute",
-          top: 190,
+          top: centra ? layout.safe.top : 190,
           left: layout.safe.left,
           right: layout.safe.right,
-          bottom: 300,
+          bottom: centra ? layout.franja.reserva : 300,
           display: "flex",
           flexDirection: "column",
+          justifyContent: centra ? "center" : undefined,
+          textAlign: centra ? "center" : undefined,
         }}
       >
-        {bloques.map((b, i) => {
+        {envuelve(bloques.map((b, i) => {
           const p = entra(i * escalon);
           if (p <= 0) return null;
           const t = TONO[b.tono ?? (["claro", "azul", "oro"] as const)[i % 3]];
@@ -195,14 +237,14 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
             <div
               key={b.texto}
               style={{
-                alignSelf: "flex-start",
-                marginLeft: `${(SANGRIA[i % SANGRIA.length] ?? 0) * 100}%`,
-                marginBottom: 26,
+                alignSelf: alinea,
+                marginLeft: centra ? 0 : `${(SANGRIA[i % SANGRIA.length] ?? 0) * 100}%`,
+                marginBottom: 26 * cuerpo,
                 padding: "0.16em 0.5em",
                 backgroundColor: t.fondo,
                 color: t.texto,
                 fontFamily: fontFamily.bloque,
-                fontSize: 58,
+                fontSize: 58 * cuerpo,
                 letterSpacing: "0.02em",
                 lineHeight: 1.08,
                 textTransform: "uppercase",
@@ -216,9 +258,9 @@ export const Tarjeta: React.FC<TarjetaProps> = ({
               {b.texto}
             </div>
           );
-        })}
+        }))}
 
-        <div style={{ flex: 1 }} />
+        <div style={centra ? { height: 40 * cuerpo } : { flex: 1 }} />
 
         {remate.map((l, i) => {
           const p = entra(finBloques + 6 + i * 4);
