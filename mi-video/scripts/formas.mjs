@@ -47,6 +47,7 @@ import fs from "node:fs";
 import { cerrada } from "./biblioteca.mjs";
 import { camposDe, piezas } from "./catalogo.mjs";
 import { CLIPS, faltasDeApoyo } from "./reels/apoyo.mjs";
+import { faltasDePalote } from "./reels/palote.mjs";
 import { faltasDeTarjeta } from "./reels/tarjeta.mjs";
 
 const DIR_C = "src/components";
@@ -150,27 +151,18 @@ export const canonico = (k) => {
   return [...CONSTRUIDAS].find((d) => d.toLowerCase() === s.toLowerCase()) ?? s;
 };
 
-/** Las acciones que `Palote.tsx` sabe actuar (su `ACCIONES`); lo mide el humo (C-724). */
-const ACCIONES_PALOTE = ["millonario", "musculo", "mecanico", "investigar", "curriculum",
-  "guion", "aplicacion", "senalar", "pensar", "aprobar", "celebrar", "encoger", "saludar",
-  "caminar"];
-
 export class Forma {
   /**
    * @param {string} nombre        el `kind` que se guarda en `escena_desc.tablero`
    * @param {string} hace          qué dibuja, en una línea
    * @param {object} propios       sus props, `{nombre: rolDeCopy|descripcion}`
    * @param {string[]} exige       props sin los cuales no se puede dibujar
-   * @param {object} valores       `{prop: [validos]}`: lo que el componente
-   *   conoce y fuera de lo cual tira el render. `"lista[].campo"` mira el campo
-   *   de cada elemento de una lista (C-724)
    */
-  constructor(nombre, hace, propios, exige = [], valores = {}) {
+  constructor(nombre, hace, propios, exige = []) {
     this.nombre = nombre;
     this.hace = hace;
     this.propios = propios;
     this.exige = exige;
-    this.valores = valores;
   }
 
   get construida() {
@@ -236,21 +228,6 @@ export class Forma {
             `«${this.nombre}».\`${k}\` es ${rol} (tope ${TOPE[rol]}) y trae` +
               ` ${t.length}: «${t.slice(0, 40)}…». Esto NO avisa, falla el render`,
           );
-      }
-    }
-    // **Y un valor que el componente no conoce, tampoco** (C-724). reel-23,
-    // 16-11: el diseñador escribió `accion: "celebra"` y `lado: "der"`, esto
-    // pasó, y `Palote` tiró el render en los fotogramas 10 a 14 de la hoja
-    // guía; la guía no salía y la línea repetía el paso entero.
-    for (const [clave, validos] of Object.entries(this.valores)) {
-      const [lista, campo] = clave.split("[].");
-      const vistos = campo
-        ? (Array.isArray(p[lista]) ? p[lista] : []).map((e) => e?.[campo])
-        : [p[clave]];
-      for (const v of vistos) {
-        if (v !== undefined && v !== null && !validos.includes(v))
-          mal.push(`«${this.nombre}».\`${clave}\` = «${v}» no existe; hay: ` +
-            `${validos.join(", ")}. Esto NO avisa, falla el render`);
       }
     }
     return mal;
@@ -391,9 +368,7 @@ export const FORMAS = [
   // `Palote.tsx`, que es lo que lee el catálogo. `texto` y `tablas` tienen su
   // tope en el componente (`assertShort`).
   new Forma("Palote", "segundo al mando: un personaje de palotes actúa la idea, a pleno o acompañándolo a él (`cubre: panel`), alivio cómico y recurso recurrente",
-            { accion: "ideas: millonario | musculo | mecanico · proceso: investigar | curriculum | guion | aplicacion · gestos: senalar | pensar | aprobar | celebrar | encoger | saludar | caminar", acciones: "[{accion, en}]: lo que hace después en la etapa, `en` en segundos desde que empieza", lado: "con `cubre: panel`: arriba | abajo | izquierda | derecha (por defecto)", texto: "statement", tablas: "label" }, ["accion"],
-            { accion: ACCIONES_PALOTE, "acciones[].accion": ACCIONES_PALOTE,
-              lado: ["arriba", "abajo", "izquierda", "derecha"] }),
+            { accion: "ideas: millonario | musculo | mecanico · proceso: investigar | curriculum | guion | aplicacion · gestos: senalar | pensar | aprobar | celebrar | encoger | saludar | caminar", acciones: "[{accion, en}]: lo que hace después en la etapa, `en` en segundos desde que empieza", lado: "con `cubre: panel`: arriba | abajo | izquierda | derecha (por defecto)", texto: "statement", tablas: "label" }, ["accion"]),
 ];
 
 
@@ -508,7 +483,8 @@ export const revisarTablero = (kind, props) => {
   const f = forma(kind);
   // Un clip que no está en la biblioteca, cuyo fichero falta o con una forma
   // que no existe tumba el render a mitad: se dice aquí, que es antes (C-673).
-  if (kind === "Apoyo" && faltasDeApoyo(props).length) return faltasDeApoyo(props);
+  // Las formas con regla propia, cada una en su fichero (Palote: C-724).
+  for (const f of [{ Apoyo: faltasDeApoyo, Palote: faltasDePalote }[kind]].filter(Boolean)) if (f(props).length) return f(props);
   if (kind === "Tarjeta" && faltasDeTarjeta(props).length) return faltasDeTarjeta(props);
   return [...cerradas, ...(f ? f.revisar(props) : []), ...sinSusCampos(kind, props),
           ...pilaQueDesborda(props), ...oroSinLinea(kind, props)];
@@ -523,8 +499,7 @@ export const revisarTablero = (kind, props) => {
  * superconjunto de las líneas que el componente saca—, así que nunca rechaza
  * un oro que el componente aceptaría.
  */
-const DECLARADOS = new Set(["fichas", "evidencecard", "bandafecha", "listanumerada",
-                            "tablerodeclarado"]);
+const DECLARADOS = new Set(["fichas", "evidencecard", "bandafecha", "listanumerada", "tablerodeclarado"]);
 const limpio = (s) => String(s).toLowerCase().normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
 const textos = (v) => typeof v === "string" ? [v]

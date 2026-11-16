@@ -236,7 +236,7 @@ def _el_palote_es_recurso(h):
     import re as _re
     tsx = open("src/components/Palote.tsx", encoding="utf-8").read()
     suyas = _re.search(r"const ACCIONES[^{]*\{([^}]*)\}", tsx).group(1)
-    fm = open("scripts/formas.mjs", encoding="utf-8").read()
+    fm = open("scripts/reels/palote.mjs", encoding="utf-8").read()
     lista = _re.search(r"const ACCIONES_PALOTE = \[([^\]]*)\]", fm).group(1)
     h.mide("C-724", sorted(_re.findall(r"\w+", suyas)) == sorted(_re.findall(r'"(\w+)"', lista)),
            "y la puerta conoce las mismas acciones que el componente")
