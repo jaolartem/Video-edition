@@ -273,6 +273,15 @@ class Segmento:
         return f"{self.slug} e{self.n} ({self.dura}s, «{donde}»)"
 
 
+def decididas(slug) -> int:
+    """Cuántas escenas de la pieza tienen algo decidido en `escena_desc` (C-714)."""
+    cx = _con()
+    n = cx.execute("select count(*) from escena_desc where video_slug = ?",
+                   (slug,)).fetchone()[0]
+    cx.close()
+    return n
+
+
 def es_suya(quien) -> bool:
     """Si quien puso esa etiqueta **tenia derecho a aprobar**.
 

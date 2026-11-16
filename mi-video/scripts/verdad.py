@@ -130,7 +130,10 @@ VERDADES = (
         decision="El contenido de un tablero",
         vive_en="`escena_desc.tablero`, escrito por quien compone",
         lee=(Aguja("scripts/reels/base.mjs", "export function tablerosDe(slug) {"),
-             Aguja("scripts/dominio/escena.py", "NO_SE_BORRAN"),),
+             Aguja("scripts/dominio/escena.py", "NO_SE_BORRAN"),
+             # Y el marcador que lleva cada pedido, de la misma fuente (C-714).
+             Aguja("scripts/dominio/segmento.py",
+                   " corrige_es from escena_desc where video_slug = ? and etapa_orden = ?"),),
         prohibido=(Aguja("scripts/reels-spec.mjs",
                          "const tableros = (TABLEROS[slug] ?? [])\n"),),
         copia="`TABLEROS[slug]` queda SOLO como respaldo para una pieza sin"

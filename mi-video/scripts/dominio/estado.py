@@ -88,6 +88,11 @@ def escribe(slug):
     from . import ticket as _t
 
     d = lee(slug)
+    # **Lo que no se pudo publicar se dice, todo** (C-714). Tres `except: pass`
+    # dejaban el JSON con cara de entero: el pedido salía y el oficio trabajaba
+    # sobre un documento hueco sin saberlo. Si esto no queda vacío, el pedido
+    # no sale (`exige_entero`).
+    faltas = []
     try:
         con = _f._con()
         r = con.execute(
@@ -101,15 +106,15 @@ def escribe(slug):
                 d.setdefault("log", []).append(
                     {"cuando": r["entro"], "etapa": r["nombre"], "que": "entra"})
             d["etapa"], d["desde"] = r["nombre"], r["entro"]
-    except Exception:                              # noqa: BLE001
-        pass
+    except Exception as e:                         # noqa: BLE001
+        faltas.append(f"la fase: {e}")
     try:
         d["abiertos"] = [
             {"id": t["id"], "va_a": t.get("vuelve_a") or "", "beat": t.get("beat"),
              "dice": " ".join((t.get("dijo") or "").split())[:200]}
             for t in _t.abiertos(slug)]
-    except Exception:                              # noqa: BLE001
-        pass
+    except Exception as e:                         # noqa: BLE001
+        faltas.append(f"los tiquets abiertos: {e}")
     # **Y si llego al final, se cierra en vez de guardarse.** Ver `cierra`.
     try:
         from .fase import CICLO
@@ -126,14 +131,36 @@ def escribe(slug):
     try:
         from . import segmento as _sg
 
-        d["segmentos"] = [x.como_json() for x in _sg.Segmento.de(slug)]
+        # **Y lo que un oficio propuso y aún no entró, se queda** (C-714): esto
+        # corre ahora en cada pedido, y publicar no puede pisar una propuesta.
+        # Contra el mismo corte; si el corte cambió, la propuesta era de otro.
+        antes = {(x.get("etapa"), x.get("huella")): x for x in d.get("segmentos") or []
+                 if isinstance(x, dict) and x.get("propone")}
+        d["segmentos"] = []
+        for x in _sg.Segmento.de(slug):
+            j = x.como_json()
+            p = antes.get((j["etapa"], j["huella"]))
+            if p and p["propone"] != j["etiqueta"]:
+                j.update(propone=p["propone"], por=p.get("por") or j["por"])
+            if j.get("falta"):
+                faltas.append(f"e{j['etapa']}: {j['falta']}")
+            d["segmentos"].append(j)
+        # **Y si la base decidió escenas y el JSON no publica ninguna, está
+        # hueco** aunque nada haya fallado: es lo que pasó con reel-23 hasta
+        # C-713, 18 cortes sin un elemento decidido y ningún error.
+        n = _sg.decididas(slug)
+        if n and d["segmentos"] and not any(k in j for j in d["segmentos"]
+                         for k in ("trato", "plano", "tablero", "camara", "voz")):
+            faltas.append(f"la base tiene {n} escenas decididas y el JSON no"
+                          " publica ninguna")
         d["aprobada"] = _sg.aprobada(slug)
         # **Y las etapas del guion que no tienen toma, dichas** (C-713). Un
         # segmento que no está en el EDL desaparecía del JSON sin rastro:
         # reel-23 e17, «Starting with tax season», se quedó en `sin_toma` por
         # lectura plana y nadie que abriera el marcador podía saber que faltaba.
-        edl = json.load(open(os.path.join(RAIZ, "ads", slug, "edl-sell.json"),
-                             encoding="utf-8"))
+        # Sin EDL todavía no hay cortes ni etapas sin toma: no es un hueco.
+        r = os.path.join(RAIZ, "ads", slug, "edl-sell.json")
+        edl = json.load(open(r, encoding="utf-8")) if os.path.exists(r) else {}
         d["sin_toma"] = [{"etapa": h.get("beat"), "motivo": h.get("motivo"),
                           "libreto": h.get("libreto"),
                           "obligatorio": h.get("obligatorio")}
@@ -141,9 +168,54 @@ def escribe(slug):
     except Exception as e:                         # noqa: BLE001
         # Y lo que no se pudo publicar se dice: un JSON sin segmentos que no
         # avisa es igual que uno vacío, y lo trata igual quien lo lee.
-        d["falta"] = f"no se pudo publicar segmentos: {e}"[:200]
+        faltas.append(f"los segmentos: {e}")
+    # Se pone y se quita en cada vuelta: un `falta` que se queda de una vuelta
+    # vieja pararía la pieza por algo que ya no pasa.
+    d.pop("falta", None)
+    if faltas:
+        d["falta"] = "; ".join(faltas)[:400]
     d["visto_por_ultima_vez"] = _ahora()
     return _guarda(slug, d)
+
+
+def para_pedido(slug):
+    """**El marcador como viaja en un pedido: publicado ahora y entero** (C-714).
+
+    Jaime, 15-11-2026: *«el json tiene toda la información de cada corte y de
+    cada elemento sobre el que se ha decidido»*, y *«¿por qué no se usó?»*. Se
+    publicaba sólo cuando la pieza cambiaba de fase (`fase.py`), así que con
+    reel-23 nueve vueltas en `repasado` el pedido de las 23:32 llevó el JSON de
+    las 20:36: dieciocho cortes sin un solo elemento decidido. Ahora cada pedido
+    lo publica antes de llevárselo, y lleva también lo que antes se quedaba en
+    el fichero: `sin_toma`, `aprobada` y `falta`.
+    """
+    # Un pedido con sufijo o de prueba no es una pieza del ciclo: se lee, como
+    # siempre, sin publicar una carpeta nueva al lado de las piezas.
+    import re
+    d = escribe(slug) if re.fullmatch(r"reel-\d+", slug or "") else lee(slug)
+    m = {"fichero": os.path.relpath(ruta(slug), RAIZ).replace("\\", "/"),
+         "publicado": d.get("visto_por_ultima_vez"), "etapa": d.get("etapa"),
+         "abiertos": d.get("abiertos") or [], "segmentos": d.get("segmentos") or [],
+         "sin_toma": d.get("sin_toma") or [], "aprobada": d.get("aprobada")}
+    return {**m, **({"falta": d["falta"]} if d.get("falta") else {})}
+
+
+def exige_entero(marcador, slug):
+    """**Sin el JSON entero, el pedido no sale** (C-714).
+
+    Jaime: *«que me digas que un JSON está vacío es porque no se ha seguido el
+    protocolo»*. Un pedido con el marcador hueco no es un pedido incompleto: es
+    una pregunta distinta, y el oficio la contesta a ciegas —el diseñador de
+    reel-23 escribió «las props completas a ciegas» y redactó una fuente—. El
+    paso se para aquí con el motivo, y se reintenta en la vuelta siguiente.
+
+    La regla de qué cuenta como hueco vive en `escribe`; esto y
+    `servicio.mjs :: dejaPedido` sólo la obedecen.
+    """
+    falta = (marcador or {}).get("falta") if marcador else "no se pudo publicar"
+    if falta:
+        raise RuntimeError(f"el JSON de {slug} no está entero y el pedido no"
+                           f" sale: {falta}"[:400])
 
 
 #: Que permiso hace falta para poner cada etiqueta. Lo que no esta aqui pide

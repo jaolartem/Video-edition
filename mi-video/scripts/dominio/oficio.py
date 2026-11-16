@@ -111,6 +111,13 @@ def vigente(buzon, slug) -> bool:
     if m.group(2) or buzon not in LA_FASE:
         return True
     suya = next((f for f in camino() if f["nombre"] == LA_FASE[buzon]), None)
+    # **Y un visto sólo mira un render que sigue en pie** (C-714). Con la pieza
+    # de vuelta antes de `montado` el render se va a rehacer: reel-23 tuvo un
+    # visto de las 19:17 en pie tres renders, un agente lo contestó sobre
+    # fotogramas viejos y devolvió etapas ya buenas (#1170).
+    if buzon == "visto" and ahora and ahora["orden"] < next(
+            f["orden"] for f in camino() if f["nombre"] == "montado"):
+        return False
     return not (ahora and suya) or ahora["orden"] < suya["orden"]
 
 #: Si la línea lanza el CLI por bash para contestar. **Encendido desde el

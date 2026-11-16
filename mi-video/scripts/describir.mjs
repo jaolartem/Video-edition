@@ -303,6 +303,8 @@ const esperan = [];
 //: espera y tampoco es un exito**: hay una respuesta escrita que no se puede
 //: aplicar, y hasta que se rehaga la pieza no ha pasado este paso.
 const rechazadas = [];
+//: Las que no tienen el JSON entero: su pedido no sale (C-714).
+const paradas = [];
 /** Donde queda el porqué del último rechazo de una pieza, hasta que una respuesta entra (C-707). */
 const RECHAZO = (slug) => `work/servicio/${PASO}/${slug}.rechazo.txt`;
 /**
@@ -407,6 +409,13 @@ for (const [slug, suyas] of porPiezas(filas)) {
     archivaUsado(PASO, slug);
     if (fs.existsSync(RECHAZO(slug))) fs.rmSync(RECHAZO(slug));
   } catch (e) {
+    // **Sin el JSON entero no hay pedido, y no es una espera** (C-714): no hay
+    // a quién esperar. Para la pieza con el motivo, sin llamar a ningún oficio.
+    if (e.noSale) {
+      console.error(`  ${slug}: ${String(e.message).slice(0, 300)}`);
+      paradas.push(`${slug}: ${String(e.message).slice(0, 200)}`);
+      continue;
+    }
     if (e.volverA) {
       console.error(`  ${slug}: ${String(e.message).slice(0, 200)}`);
       vuelven.push({ slug, fase: e.volverA, por: String(e.message).slice(0, 120) });
@@ -438,6 +447,10 @@ console.log(`${ok}/${filas.length} descritas y guardadas`);
 if (vuelven.length) {
   console.log(`volver_a: ${vuelven[0].fase} — ${
     vuelven.map((v) => `${v.slug}: ${v.por}`).join(" | ")}`);
+  process.exit(1);
+}
+if (paradas.length) {
+  console.log(`no sale el pedido: ${paradas.join(" | ")}`);
   process.exit(1);
 }
 if (esperan.length) {

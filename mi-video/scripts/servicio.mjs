@@ -42,6 +42,22 @@ export const rutaRespuesta = (paso, slug) =>
  * reconstruir nada.
  */
 export function dejaPedido(paso, slug, prompt, datos) {
+  // **Sin el JSON entero no sale el pedido** (C-714). La regla de qué cuenta
+  // como hueco vive en `dominio/estado.py :: escribe`; aquí se obedece, igual
+  // que en `servicio.py :: pedir`. El compositor de reel-23 recibió a las 23:32
+  // el JSON de las 20:36, dieciocho cortes sin un elemento decidido.
+  const ctx = contexto(paso, slug);
+  const falta = ctx.marcador ? ctx.marcador.falta : "no se pudo publicar";
+  if (falta) {
+    // Y el pedido viejo, si nadie lo contestó, se retira: es el hueco, y en pie
+    // un agente lo contestaría igual.
+    if (fs.existsSync(rutaPedido(paso, slug)) && !fs.existsSync(rutaRespuesta(paso, slug))) {
+      archivaUsado(paso, slug);
+    }
+    throw Object.assign(
+      new Error(`el JSON de ${slug} no está entero y el pedido no sale: ${falta}`),
+      { noSale: true });
+  }
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
   // El prompt también en su fichero, por renglones: en el JSON es una línea
   // de 46.000 caracteres y se leía cortado (C-445).
@@ -51,7 +67,7 @@ export function dejaPedido(paso, slug, prompt, datos) {
     // El contrato va por referencia, como en `servicio.py` (C-550, C-563):
     // dentro del JSON se leia dos veces.
     JSON.stringify({ paso, slug, prompt: `en ${slug}.prompt.md, junto a este pedido`,
-                     ...contexto(paso, slug), datos }, null, 1),
+                     ...ctx, datos }, null, 1),
   );
 }
 
@@ -73,8 +89,11 @@ function contexto(paso, slug) {
       + "print(json.dumps(servicio.contexto(sys.argv[1],sys.argv[2]),ensure_ascii=False))",
       paso, slug], { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" },
       maxBuffer: 64 * 1024 * 1024 }).trim().split("\n").pop());
-  } catch {
-    return { marcador: marcador(slug) };
+  } catch (e) {
+    // **Y si no se pudo armar, no se rellena con el fichero tal cual** (C-714):
+    // ese fichero es el de la última vez que la pieza cambió de fase, y un
+    // pedido con él sale con cara de entero. Se dice, y `dejaPedido` para.
+    return { marcador: { falta: `no se pudo armar el contexto: ${String(e.message).slice(0, 160)}` } };
   }
 }
 

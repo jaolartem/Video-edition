@@ -114,15 +114,13 @@ def _marcador(slug):
     `marcador.segmentos`: el oficio anotaba `hecho` a mano —con horas
     inventadas— creyendo cerrar su turno, y el turno lo cierra la respuesta.
     Medido el 10-9-2026 en reel-01, 03, 04 y 05.
+
+    **Y se publica aquí, no sólo se lee** (C-714): leía el fichero tal como lo
+    dejó el último cambio de fase, y reel-23 llevó a su pedido de las 23:32 el
+    JSON de las 20:36, hueco. Lo arma `estado.para_pedido`.
     """
     try:
-        from dominio import estado
-
-        d = estado.lee(slug)
-        return {"fichero": os.path.relpath(estado.ruta(slug),
-                                           estado.RAIZ).replace("\\", "/"),
-                "etapa": d.get("etapa"), "abiertos": d.get("abiertos") or [],
-                "segmentos": d.get("segmentos") or []}
+        return _estado.para_pedido(slug)
     except Exception as e:                        # noqa: BLE001
         return _falta("marcador", e, None)
 
@@ -326,7 +324,7 @@ def contexto(paso, slug):
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 
-from dominio import instruccion as _instruccion, pieza as _pieza, pliego as _pliego  # noqa: E402  C-564, C-671
+from dominio import estado as _estado, instruccion as _instruccion, pieza as _pieza, pliego as _pliego  # noqa: E402  C-564, C-671, C-714
 from dominio.volcado import _lo_dicho, _referencia, _sin_repetir, _volcar  # noqa: E402
 
 
@@ -384,6 +382,14 @@ def pedir(paso, slug, prompt, payload, cli=True):
     # es una lista en unos pasos y un diccionario en otros, y lo que vale para
     # todos no puede depender de esa forma.
     comun = contexto(paso, slug)
+    # **Y sin el JSON entero no sale** (C-714): para el paso con su motivo, y
+    # el pedido viejo sin contestar se retira, que es el hueco.
+    try:
+        _estado.exige_entero(comun.get("marcador"), slug)
+    except RuntimeError:
+        if os.path.exists(p) and not os.path.exists(ruta_respuesta(paso, slug)):
+            _archivar(paso, slug, "sin_json")
+        raise
     # **Y el prompt, además, en su propio fichero con sus renglones.** Dentro
     # del JSON es una sola línea de 46.000 caracteres y quien contesta la leía
     # cortada a mitad del formato de respuesta (reel-08, reel-17, 12-9, C-445).
@@ -673,7 +679,6 @@ def pedir(paso, slug, prompt, payload, cli=True):
         # Sin disparar: esto corre DENTRO de un paso de `avanzar`, que sigue
         # recorriendo la pieza al volver; encender otro salto seria reentrar.
         try:
-            from dominio import estado as _estado
             _estado.marca(slug, paso, "hecho",
                           quien=_OFICIOS.get(paso, "servicio"), dispara=False)
         except Exception:                          # noqa: BLE001

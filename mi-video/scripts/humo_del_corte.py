@@ -59,7 +59,6 @@ def _el_corte_nace_derivado(h):
     C-507.
     """
     import inspect
-    import json as _json
     import shutil
 
     import modelo
@@ -93,6 +92,27 @@ def _el_corte_nace_derivado(h):
         shutil.move(copia, ruta)
 
 
+def _cada_corte_lleva_lo_decidido(h):
+    """El JSON del pedido va publicado ahora y con lo decidido de cada corte. C-714.
+
+    reel-23, 15-11-2026: el pedido de `describir` de las 23:32 llevó el JSON de
+    las 20:36 —sólo se publicaba al cambiar de fase— y sus 18 cortes sin un
+    solo elemento decidido. Jaime: *«¿y por qué no se usó?»*.
+    """
+    import time
+
+    import servicio
+    from dominio import segmento as sg
+
+    hace = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() - 60))
+    m = servicio._marcador(PIEZA)
+    con = [s["etapa"] for s in m["segmentos"] if {"trato", "plano", "tablero"} & set(s)]
+    h.mide("C-714", (m.get("publicado") or "") >= hace,
+           f"el pedido lleva el JSON publicado ahora ({m.get('publicado')})")
+    h.mide("C-714", bool(con) or not sg.decididas(PIEZA),
+           f"y lo decidido de {len(con)} de {len(m['segmentos'])} cortes")
+
+
 def _lo_publicado_queda_escrito(h):
     """La tabla `publicacion` se llena cuando algo sale. C-511.
 
@@ -111,3 +131,9 @@ def _lo_publicado_queda_escrito(h):
     h.mide("C-511", n > 0, f"{n} publicacion(es) escritas en la base")
     h.mide("C-511", "anotar(" in inspect.getsource(publicar.main),
            "y publicar la anota, no solo copia el fichero")
+
+
+#: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba
+#: `humo.py` con cada prueba de aquí, que es la razón por la que se partió.
+PRUEBAS = (_lo_publicado_queda_escrito, _lo_firmado_se_puede_volver_a_poner,
+           _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido)

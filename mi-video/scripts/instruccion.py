@@ -228,6 +228,30 @@ INSTRUCCIONES = (
             Aguja("scripts/servicios/verificar.py", "_devuelve_la_mirada("),
         ),
     ),
+    Instruccion(
+        codigo="T-08",
+        paso="todos",
+        clase="montaje",
+        enunciado=(
+            "El JSON de la pieza es la fuente de lo decidido, corte a corte, y"
+            " viaja entero en cada pedido. Cada segmento lleva sus tramos y lo"
+            " decidido sobre el —trato, plano, tablero, camara, voz, subtitulo,"
+            " correccion y paneles—, y las etapas sin toma van dichas. Se publica"
+            " al escribir cada pedido; si no esta entero, el pedido no sale y el"
+            " paso para con el motivo. Lo que no esta en el JSON no esta decidido:"
+            " no se deduce ni se redacta. Jaime, 15-11-2026: «el json tiene toda"
+            " la informacion de cada corte y de cada elemento sobre el que se ha"
+            " decidido», «de nada me sirve tener el json y tener las indicaciones"
+            " si no se respeta el proceso»."
+        ),
+        agujas=(
+            Aguja("scripts/dominio/estado.py", "def para_pedido(slug):"),
+            Aguja("scripts/servicio.py",
+                  '_estado.exige_entero(comun.get("marcador"), slug)'),
+            Aguja("scripts/servicio.mjs", "{ noSale: true });"),
+            Aguja("../docs/piso.md", "**Y es la fuente de lo decidido, corte a corte.**"),
+        ),
+    ),
 )
 
 

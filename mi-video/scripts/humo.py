@@ -126,7 +126,6 @@ def _el_marcador_propone_y_no_firma(h):
     comprobaba al escribir y se regalaba al leer—, y la puerta rechaza que un
     oficio firme por una persona. C-369.
     """
-    import json
 
     from dominio import estado, segmento as sg
 
@@ -222,7 +221,6 @@ def _lo_que_no_se_dibuja_no_se_renderiza(h):
     fichero— y se compara el `rompe` del spec con lo que dice la fuente de esas
     faltas. C-372.
     """
-    import json
     import re
     import subprocess
 
@@ -361,6 +359,18 @@ def _marcador_viaja(h):
     servicio._piso_cache = None
     h.mide("C-347", "El marcador: el JSON que viaja" in servicio._piso(),
            "y el piso le dice al oficio que lo lea y lo escriba")
+    # **Y sin el JSON entero el pedido no sale** (C-714): se rompe a propósito.
+    e, dijo = servicio._estado, ""
+    viejo, e.para_pedido = e.para_pedido, lambda s: {"falta": "rota a proposito"}
+    try:
+        servicio.pedir("humo", PIEZA, "", {})
+    except RuntimeError as x:
+        dijo = str(x)
+    finally:
+        e.para_pedido, sale = viejo, os.listdir(servicio._dir("humo"))
+        os.rmdir(servicio._dir("humo"))
+    h.mide("C-714", "no está entero" in dijo and not sale,
+           f"con el JSON roto el pedido no sale y el paso dice por que: {dijo[:60]}")
 
 
 def _interprete_resuelto(h):
@@ -512,23 +522,15 @@ def main():
 
     h = Humo()
     for f in (_perdida_no_se_calla, _las_dos_puertas_leen_igual,
-              _la_maquina_no_se_aprueba_sola,
-              _el_marcador_propone_y_no_firma,
-              _una_atascada_no_para_la_tanda,
-              _un_paso_que_falla_deja_su_diagnostico,
-              _lo_que_no_se_dibuja_no_se_renderiza,
-              _documentar_no_engorda_el_fichero,
-              _prueba_movida_va_al_compositor,
-              _declarado_no_se_quita, _tiquet_sellado, _vuelve_al_punto,
-              _pregunta_quemada, _marcador_viaja, _interprete_resuelto,
-              _camino_lleva_el_adelanto,
-              _ilegible_vuelve_a_la_cola,
-              _un_buzon_sin_oficio_no_existe,
+              _la_maquina_no_se_aprueba_sola, _el_marcador_propone_y_no_firma,
+              _una_atascada_no_para_la_tanda, _un_paso_que_falla_deja_su_diagnostico,
+              _lo_que_no_se_dibuja_no_se_renderiza, _documentar_no_engorda_el_fichero,
+              _prueba_movida_va_al_compositor, _declarado_no_se_quita, _tiquet_sellado,
+              _vuelve_al_punto, _pregunta_quemada, _marcador_viaja,
+              _interprete_resuelto, _camino_lleva_el_adelanto,
+              _ilegible_vuelve_a_la_cola, _un_buzon_sin_oficio_no_existe,
               _un_seguro_que_no_puede_fallar_no_es_un_seguro,
-              _el_segundo_dice_de_que_video_es,
-              _del_corte._lo_publicado_queda_escrito,
-              _del_corte._lo_firmado_se_puede_volver_a_poner,
-              _del_corte._el_corte_nace_derivado):
+              _el_segundo_dice_de_que_video_es, *_del_corte.PRUEBAS):
         try:
             f(h)
         except Exception as e:                     # noqa: BLE001
