@@ -230,6 +230,19 @@ def _el_palote_es_recurso(h):
            "y acompaña a cámara, a un lado y encadenando acciones")
     m = open("scripts/mirar.mjs", encoding="utf-8").read()
     h.mide("C-720", "!antes.has(d)" in m, "mirar.mjs borra lo que deja en el temporal")
+    h.mide("C-724", bool(pide("horizontal", {"accion": "celebra", "cubre": "panel",
+                                             "lado": "der"})),
+           "y una acción o un lado que no existen no pasan la puerta")
+    import re as _re
+    tsx = open("src/components/Palote.tsx", encoding="utf-8").read()
+    suyas = _re.search(r"const ACCIONES[^{]*\{([^}]*)\}", tsx).group(1)
+    fm = open("scripts/formas.mjs", encoding="utf-8").read()
+    lista = _re.search(r"const ACCIONES_PALOTE = \[([^\]]*)\]", fm).group(1)
+    h.mide("C-724", sorted(_re.findall(r"\w+", suyas)) == sorted(_re.findall(r'"(\w+)"', lista)),
+           "y la puerta conoce las mismas acciones que el componente")
+    sh = open("scripts/mirar.sh", encoding="utf-8").read()
+    h.mide("C-724", "os.path.getsize(hecho) > 0" in sh,
+           "y la guía no vuelve a sacar los fotogramas que ya tiene")
 
 
 def _un_tropiezo_no_aparta_lo_declarado(h):

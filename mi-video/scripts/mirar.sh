@@ -92,13 +92,18 @@ if [ "${1:-}" = "--segundos" ]; then
   N="${2:?pieza}"; SALIDA="${3:?carpeta}"
   bundle
   mkdir -p "$SALIDA"
-  PYTHONIOENCODING=utf-8 python - "$N" <<'PY' | node scripts/mirar.mjs "$SALIDA" "$BUNDLE"
-import json, sys
-n = int(sys.argv[1])
+  # La carpeta es de un spec (su huella): un fotograma que ya está es de este
+  # spec y no se vuelve a sacar (C-724). reel-23, 16-11: la primera corrida
+  # murió en el 112 de 117 y la segunda empezó otra vez por el cero.
+  PYTHONIOENCODING=utf-8 python - "$N" "$SALIDA" <<'PY' | node scripts/mirar.mjs "$SALIDA" "$BUNDLE"
+import json, os, sys
+n, salida = int(sys.argv[1]), sys.argv[2]
 r = next(p for p in json.load(open("src/reels.json", encoding="utf-8")) if p["id"] == f"Reel-R{n}")
 ultimo = int(float(r["duracion"]) * 30) - 1
 for s in range(int(float(r["duracion"])) + 1):
-    print(f"Reel-R{n} s{s:03d} {min(s * 30 + 15, ultimo)}")
+    hecho = os.path.join(salida, f"s{s:03d}.png")
+    if not (os.path.isfile(hecho) and os.path.getsize(hecho) > 0):
+        print(f"Reel-R{n} s{s:03d} {min(s * 30 + 15, ultimo)}")
 PY
   exit 0
 fi
