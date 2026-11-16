@@ -39,11 +39,14 @@ const NO_ES_TEXTO = new Set<string>(CIFRAS.no_es_texto);
 /**
  * **Y lo de motor no se aplana, venga como venga.** Un objeto bajo una clave de
  * motor —`ventana: {entra_con, desde…}`, `sonidos: {…}`, `anclas: {…}`— es
- * datos, no copy. **Y una lista también** (C-706): `beat: [6, 19]` se colaba
- * por la excepción de las listas y salía como «6» y «19» en pantalla. Las
- * listas que SÍ son texto —`lineas`, `palabras`— no están en `no_es_texto`.
+ * datos, no copy. **Una lista de textos sí se lee** —`lineas`, `palabras`,
+ * `renglones` están en `no_es_texto` para que el nombre de la clave no salga
+ * como rótulo, no sus textos—; **una lista de números es motor** (C-706):
+ * `beat: [6, 19]` salía como «6» y «19». Quitar la excepción entera (15-11,
+ * una hora) dejó las listas de reel-23 e5 y e16 vacías y a Jaime de espaldas.
  */
-export const esMotor = (k: string, v: unknown) => NO_ES_TEXTO.has(k) && v !== undefined;
+export const esMotor = (k: string, v: unknown) =>
+  NO_ES_TEXTO.has(k) && !(Array.isArray(v) && v.some((x) => typeof x === "string"));
 
 /**
  * **Lo que se dice al pie, y que este tablero ya no dibuja.**
