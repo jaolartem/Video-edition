@@ -24,6 +24,7 @@ import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import { bruto } from "./rutas.mjs";
 import { camaraDe, encuadres, movimientoDe } from "./camara.mjs";
+import { encuadreAprobado } from "./reels/aprobado.mjs";
 import { sql } from "./consulta.mjs";
 import { conPausa, esDeclarado, fijosDe,
          pausasDe } from "./reels/declarado.mjs";
@@ -194,6 +195,7 @@ const CAMARA = camaraPorBeat();
 
 const escenas = [];
 const PAUSAS = pausasDe(slug);
+const APROBADO = encuadreAprobado(slug);
 const declarado = esDeclarado(fijosDe(slug));
 let montado = 0;
 let aireQuitado = 0;
@@ -369,7 +371,7 @@ for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
        * `punch-ins.py` puede abrirlo si el sujeto no cabe. Ahí manda él: antes
        * un plano más abierto que una cara que se sale.
        */
-      encuadre: cam.encuadre,
+      encuadre: cam.encuadre ?? APROBADO(montado, fin - ini),
       // Sólo si lo pide: un plan sin ángulos queda igual que ayer (C-672).
       ...(cam.angulo ? { angulo: cam.angulo } : {}),
       /** La costura de ENTRADA del beat. Sólo la primera escena la tiene. */
