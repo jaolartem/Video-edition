@@ -43,10 +43,14 @@ def _angulo(cinta, nombre):
     raise SystemExit(f"la grabación {cinta} no tiene el ángulo «{nombre}»")
 
 
-def cortar(origen, desde, hasta, salida):
+def cortar(origen, desde, hasta, salida, con_sonido=False):
+    """Mudo por defecto: la voz es la del corte. Con `con_sonido`, el clip trae el
+    suyo —una pantalla con su vídeo andando— y `Apoyo` lo pone bajo la voz al
+    nivel que declare `apoyo.json` (C-705)."""
     os.makedirs(os.path.dirname(salida), exist_ok=True)
+    sonido = ["-c:a", "aac", "-b:a", "160k", "-ac", "2"] if con_sonido else ["-an"]
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                    "-ss", f"{desde:.3f}", "-to", f"{hasta:.3f}", "-i", origen, "-an",
+                    "-ss", f"{desde:.3f}", "-to", f"{hasta:.3f}", "-i", origen, *sonido,
                     "-vf", "scale=1920:1080:flags=lanczos", "-c:v", "libx264", "-crf", "18",
                     "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                     salida], check=True)
@@ -78,6 +82,8 @@ def main():
     ap.add_argument("--monitor", help="x,y,w,h del monitor, fracciones del clip")
     ap.add_argument("--insignia", default=None)
     ap.add_argument("--delante", action="store_true", help="saca su silueta con alfa")
+    ap.add_argument("--con-sonido", type=float, metavar="NIVEL", default=None,
+                    help="conserva su audio y lo declara a ese nivel bajo la voz (0–1)")
     ap.add_argument("--solo-ficheros", action="store_true", help="no toca apoyo.json")
     a = ap.parse_args()
     if a.hasta <= a.desde:
@@ -87,7 +93,10 @@ def main():
 
     origen = _angulo(a.cinta, a.angulo)
     fichero = f"apoyo/{a.id}.mp4"
-    cortar(origen, a.desde, a.hasta, os.path.join(rutas.PUBLICO, fichero))
+    if a.con_sonido is not None and not 0 < a.con_sonido <= 1:
+        raise SystemExit("--con-sonido es un nivel entre 0 y 1")
+    cortar(origen, a.desde, a.hasta, os.path.join(rutas.PUBLICO, fichero),
+           con_sonido=a.con_sonido is not None)
     print(f"  {fichero}: {a.hasta - a.desde:.1f} s de {a.cinta}/{a.angulo}")
     recorte = None
     if a.delante:
@@ -108,6 +117,8 @@ def main():
         entrada["monitor"] = {"x": x, "y": y, "w": w, "h": h}
     if recorte:
         entrada["recorte"] = recorte
+    if a.con_sonido is not None:
+        entrada["sonido"] = a.con_sonido
     declarar(a.id, entrada)
     print(f"  apoyo.json: «{a.id}» declarado")
 

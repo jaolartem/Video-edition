@@ -46,6 +46,13 @@ type Clip = {
   /** Dónde está el monitor dentro del clip (fracciones) y su silueta con alfa (C-704). */
   monitor?: Monitor;
   recorte?: string;
+  /**
+   * **Su sonido, bajo la voz** (C-705): 0–1, declarado por la ingesta. Jaime,
+   * 15-11-2026: *«ese sonido tiene que tender a minimizarse… tiene que sonar
+   * pasito, y lo que tiene que sonar duro es mi voz»*. Sin declarar, el clip va
+   * mudo: la voz es la del corte.
+   */
+  sonido?: number;
 };
 
 const CLIPS = (biblioteca as { clips: Record<string, Clip> }).clips;
@@ -131,7 +138,8 @@ export const Apoyo: React.FC<ApoyoProps> = ({
     <OffthreadVideo
       src={staticFile(c.fichero)}
       startFrom={desde}
-      muted
+      muted={!c.sonido}
+      volume={c.sonido ?? 0}
       style={{ width: "100%", height: "100%", objectFit: "cover" }}
     />
   );
