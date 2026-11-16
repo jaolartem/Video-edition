@@ -92,19 +92,32 @@ if [ "${1:-}" = "--segundos" ]; then
   N="${2:?pieza}"; SALIDA="${3:?carpeta}"
   bundle
   mkdir -p "$SALIDA"
-  # La carpeta es de un spec (su huella): un fotograma que ya está es de este
-  # spec y no se vuelve a sacar (C-724). reel-23, 16-11: la primera corrida
-  # murió en el 112 de 117 y la segunda empezó otra vez por el cero.
-  PYTHONIOENCODING=utf-8 python - "$N" "$SALIDA" <<'PY' | node scripts/mirar.mjs "$SALIDA" "$BUNDLE"
+  # Un fotograma que ya está no se vuelve a sacar (C-724), y uno que se ve
+  # igual que otro ya sacado se copia del almacén (C-725): sólo se renderizan
+  # los segundos que cambiaron. Jaime: «lo que está bien no se toca».
+  segundos() {
+    PYTHONIOENCODING=utf-8 python - "$N" "$SALIDA" "$1" <<'PY'
 import json, os, sys
-n, salida = int(sys.argv[1]), sys.argv[2]
+sys.path.insert(0, "scripts")
+from dominio.fotograma import Fotogramas, guarda, reutiliza
+n, salida, que = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 r = next(p for p in json.load(open("src/reels.json", encoding="utf-8")) if p["id"] == f"Reel-R{n}")
 ultimo = int(float(r["duracion"]) * 30) - 1
-for s in range(int(float(r["duracion"])) + 1):
-    hecho = os.path.join(salida, f"s{s:03d}.png")
+frames = {f"s{s:03d}": min(s * 30 + 15, ultimo) for s in range(int(float(r["duracion"])) + 1)}
+fotos, almacen = Fotogramas(r), os.path.join(os.path.dirname(salida.rstrip("/\\")), "segundos")
+if que == "guarda":
+    guarda(fotos, frames, salida, almacen)
+    sys.exit(0)
+print(f"guia: {reutiliza(fotos, frames, salida, almacen)} fotograma(s) iguales, del almacen",
+      file=sys.stderr)
+for nombre, frame in frames.items():
+    hecho = os.path.join(salida, f"{nombre}.png")
     if not (os.path.isfile(hecho) and os.path.getsize(hecho) > 0):
-        print(f"Reel-R{n} s{s:03d} {min(s * 30 + 15, ultimo)}")
+        print(f"Reel-R{n} {nombre} {frame}")
 PY
+  }
+  segundos pide | node scripts/mirar.mjs "$SALIDA" "$BUNDLE"
+  segundos guarda
   exit 0
 fi
 N="${1:?pieza}"; POR_ESCENA="${2:-3}"; DESDE="${3:-}"; HASTA="${4:-}"

@@ -243,6 +243,18 @@ def _el_palote_es_recurso(h):
     sh = open("scripts/mirar.sh", encoding="utf-8").read()
     h.mide("C-724", "os.path.getsize(hecho) > 0" in sh,
            "y la guía no vuelve a sacar los fotogramas que ya tiene")
+    from dominio.fotograma import Fotogramas
+    base = {"duracion": 20, "edl": {"x": 1},
+            "boards": [{"at": 0, "duration": 150, "props": {"accion": "celebra"}},
+                       {"at": 300, "duration": 150, "props": {"accion": "guion"}}]}
+    otro = _json.loads(_json.dumps(base))
+    otro["boards"][0]["props"]["accion"] = "celebrar"
+    a, b = Fotogramas(base, "c"), Fotogramas(otro, "c")
+    h.mide("C-725", a.huella(75) != b.huella(75) and a.huella(375) == b.huella(375),
+           "y la guía sólo vuelve a sacar los segundos que cambiaron")
+    otro["edl"] = {"x": 2}
+    h.mide("C-725", Fotogramas(otro, "c").huella(375) != a.huella(375),
+           "y si cambia el corte, se rehace entera")
 
 
 def _un_tropiezo_no_aparta_lo_declarado(h):
