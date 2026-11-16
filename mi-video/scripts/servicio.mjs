@@ -46,7 +46,7 @@ export function dejaPedido(paso, slug, prompt, datos) {
   // como hueco vive en `dominio/estado.py :: escribe`; aquí se obedece, igual
   // que en `servicio.py :: pedir`. El compositor de reel-23 recibió a las 23:32
   // el JSON de las 20:36, dieciocho cortes sin un elemento decidido.
-  const ctx = contexto(paso, slug);
+  const { _piso: piso = "", ...ctx } = contexto(paso, slug);
   const falta = ctx.marcador ? ctx.marcador.falta : "no se pudo publicar";
   if (falta) {
     // Y el pedido viejo, si nadie lo contestó, se retira: es el hueco, y en pie
@@ -61,7 +61,10 @@ export function dejaPedido(paso, slug, prompt, datos) {
   fs.mkdirSync(`${RAIZ}/${paso}`, { recursive: true });
   // El prompt también en su fichero, por renglones: en el JSON es una línea
   // de 46.000 caracteres y se leía cortado (C-445).
-  fs.writeFileSync(`${RAIZ}/${paso}/${slug}.prompt.md`, String(prompt ?? ""));
+  // **Y el piso delante, como en `servicio.py :: pedir`** (C-714). «Se incluye
+  // entero en todos los contratos de IA», y el de `describir` no lo llevaba: el
+  // compositor nunca leyó que el marcador es la fuente de lo decidido.
+  fs.writeFileSync(`${RAIZ}/${paso}/${slug}.prompt.md`, piso + String(prompt ?? ""));
   fs.writeFileSync(
     rutaPedido(paso, slug),
     // El contrato va por referencia, como en `servicio.py` (C-550, C-563):
@@ -86,7 +89,8 @@ function contexto(paso, slug) {
     // de describir sin instrucciones, tiquets ni precio desde el 16-10.
     return JSON.parse(execFileSync("python", ["-c",
       "import sys,json;sys.path.insert(0,'scripts');import servicio;"
-      + "print(json.dumps(servicio.contexto(sys.argv[1],sys.argv[2]),ensure_ascii=False))",
+      + "print(json.dumps({**servicio.contexto(sys.argv[1],sys.argv[2]),"
+      + "'_piso':servicio._piso()+servicio.SEPARA if servicio._piso() else ''},ensure_ascii=False))",
       paso, slug], { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" },
       maxBuffer: 64 * 1024 * 1024 }).trim().split("\n").pop());
   } catch (e) {
