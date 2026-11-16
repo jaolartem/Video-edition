@@ -156,7 +156,20 @@ class Guia:
                 d = json.load(f).get("datos") or {}
         except FileNotFoundError:
             return True
-        return d.get("huella") == self.huella and d.get("por_aprobar") == self.faltan()
+        return (d.get("huella") == self.huella and d.get("por_aprobar") == self.faltan()
+                and not self._antes_caduca())
+
+    def _antes_caduca(self) -> bool:
+        """Si la cadena caduca antes del render: la guía de hoy sale de un plan viejo (C-731).
+
+        reel-23, 16-11: C-730 cambió `plan-reel.mjs`, la cadena decía «plan
+        caducado», y la línea seguía esperando a Jaime sobre la guía de antes:
+        sin montar no se rehacía el plan, y sin plan nuevo no salía la guía.
+        """
+        import cadena
+        d = cadena.desde(self.n)
+        orden = [e[0] for e in cadena.ESLABONES]
+        return bool(d) and d[0] < orden.index("render")
 
     def aprobada(self, r) -> bool:
         return bool(r and r.get("aprobada") and r.get("huella") == self.huella)
