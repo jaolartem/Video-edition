@@ -183,6 +183,11 @@ class Guia:
             visto.setdefault(fotos.contenido(f), quien)
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(visto, f, ensure_ascii=False)
+        # Y el spec que vio, para que el plan conserve sus encuadres (C-730).
+        copia = os.path.join(os.path.dirname(ruta), "aprobados", f"{spec.get('huella')}.json")
+        os.makedirs(os.path.dirname(copia), exist_ok=True)
+        with open(copia, "w", encoding="utf-8") as f:
+            json.dump(spec, f, ensure_ascii=False)
         return len(visto) - antes
 
     def trae(self, ruta: str) -> int:
