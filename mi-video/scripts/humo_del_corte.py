@@ -229,9 +229,29 @@ def _el_palote_es_recurso(h):
     h.mide("C-720", "!antes.has(d)" in m, "mirar.mjs borra lo que deja en el temporal")
 
 
+def _un_tropiezo_no_aparta_lo_declarado(h):
+    """Una palabra oída dos veces seguidas no caduca la prueba. C-721.
+
+    reel-23, 16-11-2026: el afinado de e1 oyó «you only only ask AI» y la
+    declaración se apartó; la pieza se quedó parada en `cosido` (#1215).
+    """
+    from dominio.prueba import contiene
+    from dominio.texto import casa_la_huella, huella_de_texto
+
+    viejo = "And this is what you get when you only ask AI for doing your job."
+    nuevo = "And this is what you get when you only only ask AI for doing your job."
+    h.mide("C-721", casa_la_huella(nuevo, huella_de_texto(viejo))
+           and contiene(nuevo, viejo),
+           "un tropiezo de la voz no aparta lo que Jaime declaró")
+    h.mide("C-721", not casa_la_huella("when you ask AI for your job",
+                                       huella_de_texto(viejo)),
+           "y una palabra que se va, sí")
+
+
 #: Las que corre `humo.main()`, en su orden. La lista vivía allí y engordaba
 #: `humo.py` con cada prueba de aquí, que es la razón por la que se partió.
 PRUEBAS = (_lo_publicado_queda_escrito, _lo_firmado_se_puede_volver_a_poner,
            _el_corte_nace_derivado, _cada_corte_lleva_lo_decidido,
            _un_tablero_sin_encargo_caduca, _el_horizontal_compone_su_tablero,
-           _la_guia_va_antes_del_render, _el_palote_es_recurso)
+           _la_guia_va_antes_del_render, _el_palote_es_recurso,
+           _un_tropiezo_no_aparta_lo_declarado)

@@ -64,6 +64,20 @@ def _vid(con, slug):
 
 
 def huella(toma, a, b):
+    """La prueba de un tramo: su texto de hoy en doce caracteres (`_texto`)."""
+    from dominio.texto import huella_de_texto
+
+    return huella_de_texto(_texto(toma, a, b))
+
+
+def casa(f):
+    """Si la prueba sellada de la fila `f` casa con el texto de hoy (C-721)."""
+    from dominio.texto import casa_la_huella
+
+    return casa_la_huella(_texto(f["toma"], f["desde"], f["hasta"]), f["huella"])
+
+
+def _texto(toma, a, b):
     """Que se oye dentro de ese tramo, reducido a doce caracteres.
 
     Es la prueba contra la que se declaro. Se lee por `exigir()` —la puerta—,
@@ -79,14 +93,12 @@ def huella(toma, a, b):
     dos copias de una regla no son copias mucho tiempo.
     """
     import transcribir as _tr
-    from dominio.texto import huella_de_texto
 
     try:
         pal = _tr.exigir(toma)["segmentos"]
     except (SystemExit, Exception):                # noqa: BLE001
-        return None
-    return huella_de_texto(" ".join(w["text"] for w in pal
-                                    if _tr.suena(w, a, b)))
+        return ""
+    return " ".join(w["text"] for w in pal if _tr.suena(w, a, b))
 
 
 def fijados(slug):
@@ -402,7 +414,7 @@ def _con_prueba_viva(slug, fjs):
             vivas.append(f)
             continue
         h = huella(f["toma"], f["desde"], f["hasta"])
-        if f.get("huella") and h and h != f["huella"]:
+        if f.get("huella") and h and not casa(f):
             movidas.setdefault(f["beat"], 0)
             movidas[f["beat"]] += 1
             continue
@@ -431,7 +443,7 @@ def casan(slug, beat) -> bool:
     """
     suyas = [f for f in fijados(slug) if f["beat"] == int(beat) and f.get("toma")]
     return bool(suyas) and all(
-        not f.get("huella") or huella(f["toma"], f["desde"], f["hasta"]) == f["huella"]
+        not f.get("huella") or casa(f)
         for f in suyas)
 
 

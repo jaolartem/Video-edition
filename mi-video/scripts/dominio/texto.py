@@ -159,3 +159,29 @@ def huella_de_texto(t: str) -> str | None:
     if not plano:
         return None
     return hashlib.sha1(plano.encode("utf-8")).hexdigest()[:12]
+
+
+def sin_tropiezos(t: str) -> str:
+    """El texto con cada palabra repetida seguida dicha una vez.
+
+    «you only only ask AI» y «you only ask AI» dicen lo mismo: es un tropiezo
+    de la voz, y el transcript lo oye o no según cuántas pasadas lleve. reel-23,
+    16-11 (C-721): el afinado de e1 sacó el «only» doble y la declaración de
+    Jaime se apartó por una palabra que ya estaba.
+    """
+    out = []
+    for w in (t or "").split():
+        if not out or comparable(w).lower() != comparable(out[-1]).lower():
+            out.append(w)
+    return " ".join(out)
+
+
+def casa_la_huella(t: str, huella: str | None) -> bool:
+    """¿La prueba sellada sigue diciendo lo que se oye hoy en `t`?
+
+    Casa con el texto tal cual o sin tropiezos (`sin_tropiezos`): una palabra
+    que se oye dos veces seguidas no cambia lo que se declaró. Una que se va,
+    o una frase que es otra, sí — y eso lo decide el compositor.
+    """
+    return bool(huella) and huella in (huella_de_texto(t),
+                                       huella_de_texto(sin_tropiezos(t)))

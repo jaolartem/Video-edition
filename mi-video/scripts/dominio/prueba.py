@@ -20,12 +20,17 @@ from __future__ import annotations
 
 from .texto import huella_de_texto
 from .texto import palabras as _palabras
+from .texto import sin_tropiezos
 from .tramo import Tramo
 
 
 def contiene(nuevo: str, viejo: str) -> bool:
-    """¿Están las palabras del viejo, seguidas y en orden, dentro del nuevo?"""
-    v, n = _palabras(viejo), _palabras(nuevo)
+    """¿Están las palabras del viejo, seguidas y en orden, dentro del nuevo?
+
+    Sin tropiezos en los dos lados (C-721): una palabra que el afinado oye dos
+    veces seguidas no es una palabra que se va.
+    """
+    v, n = _palabras(sin_tropiezos(viejo)), _palabras(sin_tropiezos(nuevo))
     return bool(v) and any(n[i:i + len(v)] == v
                            for i in range(len(n) - len(v) + 1))
 
