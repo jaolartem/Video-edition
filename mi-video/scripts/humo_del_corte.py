@@ -255,6 +255,9 @@ def _el_palote_es_recurso(h):
     otro["edl"] = {"x": 2}
     h.mide("C-725", Fotogramas(otro, "c").huella(375) != a.huella(375),
            "y si cambia el corte, se rehace entera")
+    h.mide("C-728", Fotogramas(base, "c").contenido(375) == Fotogramas(base, "otro").contenido(375)
+           and a.contenido(75) != b.contenido(75),
+           "y lo que Jaime aprobó sigue aprobado: sólo vuelve lo que cambió")
     lz = _json.load(open("src/brand/lienzos.json", encoding="utf-8"))
     ad = open("src/Ad.tsx", encoding="utf-8").read()
     h.mide("C-727", (lz["horizontal"]["tablero"].get("empuje") or 0) > 0

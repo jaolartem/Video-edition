@@ -82,13 +82,24 @@ class Fotogramas:
                 self.temporales[k] = v
             else:
                 fijo[k] = v
-        self.fijo = _h([self.codigo, fijo])
+        self.del_spec = _h(fijo)
+        self.fijo = _h([self.codigo, self.del_spec])
+
+    def _ahi(self, frame: int) -> dict:
+        return {k: [e for e in v if _cuando(e)[0] - MARGEN <= frame < _cuando(e)[1] + MARGEN]
+                for k, v in self.temporales.items()}
 
     def huella(self, frame: int) -> str:
         """Lo que se ve en ese fotograma: lo fijo y lo que está en pantalla."""
-        ahi = {k: [e for e in v if _cuando(e)[0] - MARGEN <= frame < _cuando(e)[1] + MARGEN]
-               for k, v in self.temporales.items()}
-        return _h([self.fijo, frame, ahi])
+        return _h([self.fijo, frame, self._ahi(frame)])
+
+    def contenido(self, frame: int) -> str:
+        """Lo que ese segundo dice y enseña, sin el código que lo dibuja (C-728).
+
+        Es lo que Jaime aprueba. Un arreglo de la máquina —el empuje de C-727—
+        cambia cómo se dibuja, no qué hay, y no le quita la aprobación.
+        """
+        return _h([self.del_spec, frame, self._ahi(frame)])
 
 
 def reutiliza(fotos: Fotogramas, frames: dict, salida: str, almacen: str) -> int:

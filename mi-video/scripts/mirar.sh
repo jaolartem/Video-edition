@@ -110,9 +110,11 @@ if que == "guarda":
     sys.exit(0)
 print(f"guia: {reutiliza(fotos, frames, salida, almacen)} fotograma(s) iguales, del almacen",
       file=sys.stderr)
+# Sólo los segundos por aprobar, cuando `guia.py` los dice (C-728).
+solo = set(filter(None, os.environ.get("GUIA_SOLO", "").split(",")))
 for nombre, frame in frames.items():
     hecho = os.path.join(salida, f"{nombre}.png")
-    if not (os.path.isfile(hecho) and os.path.getsize(hecho) > 0):
+    if (not solo or nombre in solo) and not (os.path.isfile(hecho) and os.path.getsize(hecho) > 0):
         print(f"Reel-R{n} {nombre} {frame}")
 PY
   }
