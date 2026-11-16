@@ -90,9 +90,15 @@ class Guia:
         return [n for n, f in self.segundos().items() if fotos.contenido(f) not in visto]
 
     def hojas(self, solo: list[str]) -> list[str]:
-        """Las hojas de este spec, sólo con los segundos por aprobar; una vez por huella."""
+        """Las hojas de este spec, sólo con los segundos por aprobar; una vez por tanda.
+
+        El nombre lleva la tanda: unas hojas del mismo spec con otros segundos
+        —las de antes de traer una aprobación— no son éstas.
+        """
+        import hashlib
+        self.tanda = f"{self.huella}-{hashlib.sha1(','.join(solo).encode()).hexdigest()[:6]}"
         hechas = sorted(os.path.join(self.salida, f) for f in os.listdir(self.salida)
-                        if f.startswith(self.huella)) if os.path.isdir(self.salida) else []
+                        if f.startswith(self.tanda)) if os.path.isdir(self.salida) else []
         if hechas:
             return hechas
         subprocess.run(["bash", "scripts/mirar.sh", "--segundos", str(self.n), self.fotos],
@@ -123,7 +129,7 @@ class Guia:
                 hoja.paste(im.resize((ancho, alto)), (x, y + rotulo))
                 s = int(f[1:4])
                 pinta.text((x + 8, y + 4), f"{s // 60}:{s % 60:02d}", fill="#fad02c", font=letra)
-            ruta = os.path.join(self.salida, f"{self.huella}-{k // por_hoja + 1:02d}.jpg")
+            ruta = os.path.join(self.salida, f"{self.tanda}-{k // por_hoja + 1:02d}.jpg")
             hoja.save(ruta, quality=88)
             out.append(ruta)
         return out
