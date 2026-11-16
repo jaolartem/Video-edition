@@ -266,7 +266,7 @@ def _el_palote_es_recurso(h):
                                              "lado": "derecha", "textoAl": "al-lado"})),
            "y un `textoAl` que no existe no pasa la puerta")
     pr = open("scripts/plan-reel.mjs", encoding="utf-8").read()
-    h.mide("C-730", "encuadre: cam.encuadre ?? APROBADO(montado, fin - ini)," in pr,
+    h.mide("C-730", "{ encuadre: APROBADO(montado, fin - ini) }" in pr,
            "y una escena aprobada que no cambia conserva su encuadre")
     lz = _json.load(open("src/brand/lienzos.json", encoding="utf-8"))
     ad = open("src/Ad.tsx", encoding="utf-8").read()

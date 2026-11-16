@@ -371,7 +371,9 @@ for (const [a, b, beat, etapa, dicho, toma, hereda] of conVoz) {
        * `punch-ins.py` puede abrirlo si el sujeto no cabe. Ahí manda él: antes
        * un plano más abierto que una cara que se sale.
        */
-      encuadre: cam.encuadre ?? APROBADO(montado, fin - ini),
+      encuadre: cam.encuadre,
+      // Sin declarar, el que Jaime aprobó si la escena no ha cambiado (C-730).
+      ...(cam.encuadre ? {} : { encuadre: APROBADO(montado, fin - ini) }),
       // Sólo si lo pide: un plan sin ángulos queda igual que ayer (C-672).
       ...(cam.angulo ? { angulo: cam.angulo } : {}),
       /** La costura de ENTRADA del beat. Sólo la primera escena la tiene. */
