@@ -33,6 +33,8 @@ export type Composicion = {
   escena: Caja;
   /** Píxeles por unidad del personaje. */
   k: number;
+  /** Las líneas que se pintan, si no son las de `texto`, con la línea de la que salen. */
+  lineas?: { t: string; de: number }[];
 };
 
 /** Anton en versales gasta ~0,47 em por carácter: medido en `Tarjeta`. */
@@ -88,6 +90,8 @@ export type Sitio = "arriba" | "abajo" | "izquierda" | "derecha";
 export type TextoAl = "frente" | "encima";
 /** Lo que mide a su lado: lo segundo del cuadro después de Jaime. */
 const A_SU_LADO = 0.56;
+/** Lo menos que mide a su lado: por debajo deja de competir con su cara (C-729). */
+const MINIMO = 0.45;
 /** La columna que ocupa cada uno, en fracción del ancho útil. */
 const COLUMNA = 0.3;
 
@@ -117,21 +121,35 @@ const aSuLado = (
   const col = util * COLUMNA;
   const izq = (s: Sitio) => (s === "izquierda" ? layout.safe.left : layout.width - layout.safe.right - col);
   const otro: Sitio = sitio === "izquierda" ? "derecha" : "izquierda";
-  const base = 64 * layout.tablero.cuerpo;
+  // El texto es el otro peso del cuadro: grande, hasta un noveno del alto.
+  const base = layout.height * 0.11;
   const medir = (lineas: string[], ancho: number) =>
     Math.min(base, ancho / (Math.max(1, ...lineas.map((l) => l.length)) * AVANCE));
-  const partir = (ancho: number) =>
-    medir(texto, ancho) >= base * 0.75 ? texto : texto.flatMap((l) => l.split(/\s+/));
+  // Apilado por palabras si así sale más grande: «MUSCLE / MEMORY» es un
+  // bloque que se lee de un golpe; en una línea era una tira fina.
+  const partir = (ancho: number) => {
+    const palabras = texto.flatMap((l) => l.split(/\s+/));
+    return medir(palabras, ancho) > medir(texto, ancho) * 1.2 ? palabras : texto;
+  };
+  const deCual = (lineas: string[]) => lineas === texto ? texto.map((t, de) => ({ t, de }))
+    : texto.flatMap((l, de) => l.split(/\s+/).map((t) => ({ t, de })));
   const cara = (plano.coronilla ?? CORONILLA) * layout.height;
-  if (textoAl === "frente") {
+  // `encima` sólo si con el texto arriba el muñeco sigue siendo lo segundo
+  // del cuadro (`MINIMO` del alto); si no, el texto se va enfrente.
+  const lineasEncima = partir(col);
+  const altoEncima = suelo - (Math.max(layout.safe.top, cara)
+    + lineasEncima.length * medir(lineasEncima, col) * 0.96 + HUECO / 2);
+  if (textoAl === "frente" || altoEncima < layout.height * MINIMO) {
     const lineas = partir(col);
     const cuerpoTexto = medir(lineas, col);
     const h = lineas.length * cuerpoTexto * 0.96;
-    const caja = { x: izq(otro), y: cara + layout.height * 0.12 - h / 2, w: col, h };
     const k = Math.min((layout.height * A_SU_LADO) / papel.alto, col / papel.ancho);
     const w = papel.ancho * k;
     const escena = { x: izq(sitio) + (col - w) / 2, y: suelo - papel.alto * k, w, h: papel.alto * k };
-    return { caja, centra: true, enMedio: true, cuerpoTexto, escena, k };
+    // **Una línea que cruza el cuadro por encima de él**: el texto arranca a
+    // la altura de la cabeza del muñeco, sin subir de su coronilla.
+    const caja = { x: izq(otro), y: Math.max(cara, escena.y), w: col, h };
+    return { caja, centra: true, enMedio: false, cuerpoTexto, escena, k, lineas: deCual(lineas) };
   }
   const lineas = partir(col);
   const cuerpoTexto = medir(lineas, col);
@@ -141,7 +159,7 @@ const aSuLado = (
   const k = Math.min(alto / papel.alto, col / papel.ancho);
   const w = papel.ancho * k;
   const escena = { x: izq(sitio) + (col - w) / 2, y: suelo - papel.alto * k, w, h: papel.alto * k };
-  return { caja, centra: true, enMedio: false, cuerpoTexto, escena, k };
+  return { caja, centra: true, enMedio: false, cuerpoTexto, escena, k, lineas: deCual(lineas) };
 };
 
 /** Lo que mide acompañando: un quinto del lado corto del cuadro, con lo que lleve. */

@@ -259,7 +259,8 @@ def _el_palote_es_recurso(h):
            and a.contenido(75) != b.contenido(75),
            "y lo que Jaime aprobó sigue aprobado: sólo vuelve lo que cambió")
     comp = open("src/components/palote/composicion.ts", encoding="utf-8").read()
-    h.mide("C-729", "const A_SU_LADO = 0.56;" in comp and 'textoAl ?? "frente"' in comp,
+    h.mide("C-729", "const A_SU_LADO = 0.56;" in comp and 'textoAl ?? "frente"' in comp
+           and "altoEncima < layout.height * MINIMO" in comp,
            "y a su lado el muñeco es lo segundo del cuadro, con el texto enfrente")
     h.mide("C-729", bool(pide("horizontal", {"accion": "musculo", "cubre": "panel",
                                              "lado": "derecha", "textoAl": "al-lado"})),

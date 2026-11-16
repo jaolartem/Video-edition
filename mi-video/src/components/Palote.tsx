@@ -189,7 +189,7 @@ export const Palote: React.FC<PaloteProps> = ({
       ` uno de ${SITIOS.join(", ")}`);
   const sitio = lado ?? "derecha";
   const zona = layout.height - layout.franja.reserva;
-  const { caja, escena, k, centra, enMedio, cuerpoTexto } = conEl
+  const { caja, escena, k, centra, enMedio, cuerpoTexto, lineas } = conEl
     ? acompana(layout, papel, texto, sitio, plano, AIRE, textoAl)
     : compone(layout, papel, texto, AIRE);
   const suelo = escena.y + escena.h;
@@ -275,15 +275,15 @@ export const Palote: React.FC<PaloteProps> = ({
             textAlign: centra ? "center" : "left",
           }}
         >
-          {texto.map((l, i) => {
-            const p = interpolate(frame, [entra(i), entra(i) + 10], [0, 1], {
+          {(lineas ?? texto.map((t, de) => ({ t, de }))).map(({ t: l, de: i }, n) => {
+            const p = interpolate(frame, [entra(i) + n * 2, entra(i) + n * 2 + 10], [0, 1], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
               easing: ease.out,
             });
             return (
               <div
-                key={`${i}${l}`}
+                key={`${n}${l}`}
                 style={{
                   ...(conEl ? pintaDelCc("limpio") : {}),
                   fontFamily: fontFamily.bloque,
@@ -292,7 +292,7 @@ export const Palote: React.FC<PaloteProps> = ({
                   letterSpacing: "0.005em",
                   textTransform: "uppercase",
                   whiteSpace: "nowrap",
-                  color: enOro(l) ? color.gold : color.lightNeutral,
+                  color: enOro(texto[i]) ? color.gold : color.lightNeutral,
                   opacity: p,
                   transform: `translateY(${((1 - p) * 26).toFixed(1)}px)`,
                 }}
