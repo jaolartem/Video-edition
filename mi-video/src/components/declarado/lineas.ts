@@ -39,10 +39,11 @@ const NO_ES_TEXTO = new Set<string>(CIFRAS.no_es_texto);
 /**
  * **Y lo de motor no se aplana, venga como venga.** Un objeto bajo una clave de
  * motor —`ventana: {entra_con, desde…}`, `sonidos: {…}`, `anclas: {…}`— es
- * datos, no copy. Las listas sí se leen: `lineas` y `palabras` son texto.
+ * datos, no copy. **Y una lista también** (C-706): `beat: [6, 19]` se colaba
+ * por la excepción de las listas y salía como «6» y «19» en pantalla. Las
+ * listas que SÍ son texto —`lineas`, `palabras`— no están en `no_es_texto`.
  */
-export const esMotor = (k: string, v: unknown) =>
-  NO_ES_TEXTO.has(k) && !Array.isArray(v);
+export const esMotor = (k: string, v: unknown) => NO_ES_TEXTO.has(k) && v !== undefined;
 
 /**
  * **Lo que se dice al pie, y que este tablero ya no dibuja.**

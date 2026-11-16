@@ -193,8 +193,14 @@ function describePieza(slug, filas) {
   //
   // `null` = la pieza entera es editable, que es el modo normal, el de componer
   // de cero. Una lista = sólo ésas; las demás van de contexto.
+  // **Y el porqué del último rechazo viaja en el pedido siguiente** (C-707). El
+  // esquema tumbó dos veces la misma respuesta de reel-23 —quitaba `beat` de una
+  // Tarjeta— y el motivo sólo salía por la consola: quien volvía a contestar no
+  // lo veía y repetía el mismo fallo, 80.000 tokens por vuelta.
+  const rechazo = fs.existsSync(RECHAZO(slug)) ? fs.readFileSync(RECHAZO(slug), "utf8") : null;
   const entrada = { pedido: pedidoDe(slug, conFotos), franja: criterioDeFranja(),
                     revisa_oyendo: escucha, tiquets, editables,
+                    ...(rechazo ? { ultimo_rechazo: rechazo } : {}),
                     // **Lo que la linea ya midio, delante de quien decide.**
                     // Jaime, 10-9-2026: «nada de lo que sucede de 1 a 6 llega
                     // como decision; el compositor ve todos estos datos y puede
@@ -297,6 +303,8 @@ const esperan = [];
 //: espera y tampoco es un exito**: hay una respuesta escrita que no se puede
 //: aplicar, y hasta que se rehaga la pieza no ha pasado este paso.
 const rechazadas = [];
+/** Donde queda el porqué del último rechazo de una pieza, hasta que una respuesta entra (C-707). */
+const RECHAZO = (slug) => `work/servicio/${PASO}/${slug}.rechazo.txt`;
 //: Las que no pueden componerse todavia y saben desde donde se arregla. **Ni
 //: espera ni rechazo**: no hay pedido escrito, asi que no hay a quien esperar.
 const vuelven = [];
@@ -382,6 +390,7 @@ for (const [slug, suyas] of porPiezas(filas)) {
     // que una excepcion a mitad de aplicar se llevaba el pedido Y la respuesta
     // a `usadas/`: el error se veia una vez y la prueba desaparecia.
     archivaUsado(PASO, slug);
+    if (fs.existsSync(RECHAZO(slug))) fs.rmSync(RECHAZO(slug));
   } catch (e) {
     if (e.volverA) {
       console.error(`  ${slug}: ${String(e.message).slice(0, 200)}`);
@@ -392,6 +401,9 @@ for (const [slug, suyas] of porPiezas(filas)) {
     // espera. Lo que llegue es un fallo de verdad —esquema, JSON roto— y ese
     // se dice por pieza sin parar el lote.
     console.error(`  ${slug}: ${String(e.message).slice(0, 160)}`);
+    // El motivo, donde el pedido siguiente lo lee (C-707).
+    fs.writeFileSync(RECHAZO(slug),
+      `La respuesta anterior se rechazó por esto y se vuelve a pedir: ${String(e.message).slice(0, 400)}`);
     // **Y la respuesta que no vale se aparta, para que se pueda volver a
     // preguntar.** Dejandola en su sitio el pedido deja de contar como abierto:
     // nadie espera a nadie, el disparador no llama y el paso rechaza el mismo

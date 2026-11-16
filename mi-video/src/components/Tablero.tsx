@@ -13,6 +13,7 @@ import { LaminaCasillas } from "./LaminaCasillas";
 import { Techo, type TechoProps } from "./Techo";
 import { PanelDentro, type PanelDentroProps } from "./PanelDentro";
 import { Apoyo, type ApoyoProps } from "./Apoyo";
+import { Tarjeta, type TarjetaProps } from "./Tarjeta";
 import { PieTablero } from "./PieTablero";
 import { TableroDeclarado } from "./TableroDeclarado";
 import { Recorte, type Forma, type Lado } from "./Recorte";
@@ -233,6 +234,15 @@ const laForma = (cue: CueDeTablero, mode: Mode) => {
    * forma que el diseño **elige** cuando no quiere ninguna otra, y sin la rama
    * explícita el informe la contaba como forma sin despachar.
    */
+  /**
+   * **La tarjeta neo-constructivista, por su nombre** (C-706). El catálogo la
+   * ofrece y el esquema la exige con `framework`, `beat`, `bloques` y `remate`,
+   * pero aquí no tenía rama: caía en `TableroDeclarado`, que pintaba el `beat`
+   * `[6, 19]` como dos líneas sueltas —los «6» y «19» cruzándole la cara en
+   * reel-23 e6, e7 y e14— y nunca la cabecera ni los bloques inclinados.
+   */
+  if (cue.kind === "Tarjeta")
+    return <Tarjeta {...(props as unknown as TarjetaProps)} />;
   if (cue.kind === "TableroDeclarado")
     return <TableroDeclarado kind={cue.kind} props={props} />;
   return <TableroDeclarado kind={cue.kind} props={props} />;
