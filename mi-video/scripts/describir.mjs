@@ -305,6 +305,20 @@ const esperan = [];
 const rechazadas = [];
 /** Donde queda el porqué del último rechazo de una pieza, hasta que una respuesta entra (C-707). */
 const RECHAZO = (slug) => `work/servicio/${PASO}/${slug}.rechazo.txt`;
+/**
+ * Y el pedido que ya está en pie lo lleva también: `dejaPedido` sólo corre al
+ * abrirlo, así que sin esto el motivo esperaba a un pedido nuevo que no llegaba.
+ */
+const anotaRechazo = (slug) => {
+  const rp = rutaPedido(PASO, slug);
+  if (!fs.existsSync(RECHAZO(slug)) || !fs.existsSync(rp)) return;
+  const motivo = fs.readFileSync(RECHAZO(slug), "utf8");
+  const p = JSON.parse(fs.readFileSync(rp, "utf8"));
+  if (p?.datos && p.datos.ultimo_rechazo !== motivo) {
+    p.datos = { ...p.datos, ultimo_rechazo: motivo };
+    fs.writeFileSync(rp, JSON.stringify(p, null, 1));
+  }
+};
 //: Las que no pueden componerse todavia y saben desde donde se arregla. **Ni
 //: espera ni rechazo**: no hay pedido escrito, asi que no hay a quien esperar.
 const vuelven = [];
@@ -313,6 +327,7 @@ for (const [slug, suyas] of porPiezas(filas)) {
   try {
     const ds = describePieza(slug, suyas);
     if (!ds) {
+      anotaRechazo(slug); // el pedido en pie lleva el porqué del último rechazo (C-707)
       esperan.push(slug);
       continue;
     }
@@ -404,6 +419,7 @@ for (const [slug, suyas] of porPiezas(filas)) {
     // El motivo, donde el pedido siguiente lo lee (C-707).
     fs.writeFileSync(RECHAZO(slug),
       `La respuesta anterior se rechazó por esto y se vuelve a pedir: ${String(e.message).slice(0, 400)}`);
+    anotaRechazo(slug);
     // **Y la respuesta que no vale se aparta, para que se pueda volver a
     // preguntar.** Dejandola en su sitio el pedido deja de contar como abierto:
     // nadie espera a nadie, el disparador no llama y el paso rechaza el mismo
