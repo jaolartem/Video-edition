@@ -19,6 +19,12 @@ Ahora la línea vive en `<raiz>` (`rutas.json` → `linea.raiz`, `F:/linea`):
 Dentro de `codigo/mi-video/` los datos entran por enlaces de directorio, así que
 ningún script cambia de ruta: `ads/decisiones.db` sigue siendo `ads/decisiones.db`.
 
+**Y la línea es la máquina más su configuración** (C-733). El árbol que se copia
+junta dos commits: el de la máquina y el de su configuración (estilo, contratos,
+instrucciones, rutas), que vive en su propia carpeta con su propio git
+(`separacion.json`). Si los dos traen la misma ruta, no se despliega: una ruta
+tiene un solo dueño.
+
 **Sólo se copia lo que cambió**, y con la hora de ahora. `cadena._codigo` caduca un
 eslabón cuando su productor es más nuevo que el artefacto: copiar el árbol entero
 le pondría a todo la misma hora y la línea rehízo todas las piezas. Así sólo
@@ -41,6 +47,9 @@ CFG = json.load(open(os.path.join(AQUI, "rutas.json"), encoding="utf-8"))
 DATOS = ("ads", "work", "out", "public")
 #: El spec es un fichero que Remotion importa desde `src/`: va por enlace duro.
 SPEC = os.path.join("src", "reels.json")
+#: Lo mismo para los ganchos, que `ganchos-spec.mjs` genera y Remotion importa:
+#: es producto, no máquina (C-733), así que tampoco viaja en el commit.
+GANCHOS = os.path.join("src", "ganchos.json")
 
 #: Lo que mira el CÓDIGO. Es lo que `montar.sh` corría en producción antes de
 #: cada lote y ahora salta con `ya_desplegado`: se paga una vez, aquí.
@@ -50,6 +59,7 @@ COMPROBACIONES = [
     ("contratos", [sys.executable, "scripts/contratos.py"]),
     ("comprobado", [sys.executable, "scripts/comprobado.py", "--solo-huecos"]),
     ("tamano", [sys.executable, "scripts/tamano.py"]),
+    ("separacion", [sys.executable, "scripts/separacion.py", "--comprobar"]),
     ("lint", ["npm", "run", "lint"]),
 ]
 
@@ -78,6 +88,20 @@ def comprobar():
         print("\n".join(malos))
         return "nombres"
     return None
+
+
+def compuesto(sha) -> tuple[dict, str]:
+    """El árbol de la línea: la máquina del commit más su configuración (C-733)."""
+    sys.path.insert(0, os.path.join(AQUI, "scripts"))
+    from separacion import Separacion
+
+    maquina = arbol(sha)
+    conf_sha, conf = Separacion().arbol_configuracion()
+    choque = sorted(set(maquina) & set(conf))
+    if choque:
+        raise SystemExit("desplegar: la máquina y la configuración traen las mismas rutas;"
+                         " cada una tiene un solo dueño:\n    " + "\n    ".join(choque[:20]))
+    return {**maquina, **conf}, conf_sha
 
 
 def arbol(sha) -> dict:
@@ -115,12 +139,24 @@ def enlazar(raiz):
     for nombre, ruta in (CFG.get("linea", {}).get("compartido") or {}).items():
         if not nombre.startswith("_"):
             _enlace(os.path.join(mv, nombre), ruta)
-    spec, dato = os.path.join(mv, SPEC), os.path.join(raiz, "datos", "reels.json")
-    if not os.path.exists(dato):
-        open(dato, "w", encoding="utf-8").write("[]\n")
-    if not os.path.exists(spec):
-        os.makedirs(os.path.dirname(spec), exist_ok=True)
-        os.link(dato, spec)
+    for de, nombre in ((SPEC, "reels.json"), (GANCHOS, "ganchos.json")):
+        spec, dato = os.path.join(mv, de), os.path.join(raiz, "datos", nombre)
+        if not os.path.exists(dato):
+            # El primer despliegue sin el fichero en git conserva el que había.
+            if os.path.exists(spec):
+                shutil.copy2(spec, dato)
+                os.remove(spec)
+            else:
+                open(dato, "w", encoding="utf-8").write("[]\n")
+        if not os.path.exists(spec):
+            os.makedirs(os.path.dirname(spec), exist_ok=True)
+            os.link(dato, spec)
+
+
+#: Lo que `sincronizar` no borra aunque haya salido del árbol: los datos entran
+#: por enlace, y borrar en `codigo/mi-video/public/` es borrar en los datos.
+NO_SE_BORRA = tuple(f"mi-video/{d}/" for d in DATOS) + (
+    "mi-video/" + SPEC.replace("\\", "/"), "mi-video/" + GANCHOS.replace("\\", "/"))
 
 
 def _ajusta(nuevo, raiz):
@@ -152,7 +188,7 @@ def sincronizar(nuevo, raiz, ver=False):
             os.makedirs(os.path.dirname(destino), exist_ok=True)
             open(destino, "wb").write(contenido)
             os.utime(destino, (ahora, ahora))
-    borrados = sorted(antes - set(nuevo))
+    borrados = sorted(r for r in antes - set(nuevo) if not r.startswith(NO_SE_BORRA))
     if not ver:
         for ruta in borrados:
             try:
@@ -190,12 +226,13 @@ def en_vuelo(raiz):
     return [x for x in r.stdout.splitlines() if x.strip()]
 
 
-def anotar(raiz, sha, rama, comprobado):
+def anotar(raiz, sha, rama, comprobado, configuracion=None):
     """`DESPLIEGUE` al lado de `rutas.json`, y una fila en la base de la línea."""
     import sqlite3
 
     fecha = time.strftime("%Y-%m-%dT%H:%M:%S")
-    d = {"sha": sha, "rama": rama, "fecha": fecha, "comprobado": comprobado}
+    d = {"sha": sha, "rama": rama, "fecha": fecha, "comprobado": comprobado,
+         "configuracion": configuracion}
     json.dump(d, open(os.path.join(raiz, "codigo", "mi-video", "DESPLIEGUE"), "w",
                       encoding="utf-8"), ensure_ascii=False)
     base = os.path.join(raiz, "datos", "ads", "decisiones.db")
@@ -236,12 +273,13 @@ def main():
                          " su contrato se archivan como desfasados:\n    "
                          + "\n    ".join(vuelo) + "\nContéstalos o pasa --aunque-haya-pedidos.")
 
-    nuevo = arbol(sha)
+    nuevo, conf_sha = compuesto(sha)
     _ajusta(nuevo, raiz)
     if not a.ver:
         enlazar(raiz)
     escritos, borrados = sincronizar(nuevo, raiz, ver=a.ver)
-    print(f"desplegar {sha[:7]} -> {raiz}/codigo: {len(escritos)} ficheros cambian,"
+    print(f"desplegar {sha[:7]} + configuración {conf_sha[:7]} -> {raiz}/codigo:"
+          f" {len(escritos)} ficheros cambian,"
           f" {len(borrados)} salen")
     for r in (escritos[:20] if a.ver else []):
         print(f"    + {r}")
@@ -249,7 +287,7 @@ def main():
         return
     if nodo(raiz):
         print("  node_modules reinstalado: cambió el package-lock")
-    anotar(raiz, sha, rama, not a.sin_comprobar)
+    anotar(raiz, sha, rama, not a.sin_comprobar, conf_sha)
     print(f"desplegado. La línea corre {sha[:7]}; el disparador rearranca solo si"
           " estaba puesto.")
 

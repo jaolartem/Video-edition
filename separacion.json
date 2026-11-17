@@ -1,0 +1,68 @@
+{
+ "_": "Qué es la máquina, qué es su configuración y qué es su producto. Lo que no está en `configuracion` ni en `producto` es máquina y va a git. Lo demás vive fuera del git de la máquina: la configuración en su propia carpeta y con su propio git (`raiz_configuracion`), el producto en la línea (`F:/linea/datos`). Jaime, 16-11-2026: «a git solo va el esqueleto… esa separación tiene que ser explícita; eso permite que se confunda la estructura con el producto». Lo comprueba `scripts/separacion.py --comprobar`, que corre en cada despliegue.",
+ "raiz_configuracion": "configuracion",
+ "_raiz_configuracion": "Relativa a la copia principal del repo (la que tiene el `.git`), no al worktree: todos los worktrees leen la misma configuración. `VIDEO_CONFIG` la cambia sin tocar este fichero.",
+ "configuracion": {
+  "estilo": [
+   "mi-video/src/brand/*.json",
+   "mi-video/src/brand/paleta.ts",
+   "mi-video/src/brand/tipografia.ts",
+   "mi-video/src/brand/medida.ts",
+   "mi-video/src/brand/copy.ts",
+   "mi-video/src/brand/fonts.ts",
+   "mi-video/public/fondos/**",
+   "mi-video/public/canto-*.png",
+   "docs/canon.md",
+   "docs/ejemplos/**",
+   "skills/tableros-jaime/**"
+  ],
+  "contratos": [
+   "mi-video/scripts/*.prompt.md",
+   ".claude/agents/**",
+   "docs/piso.md",
+   "docs/playbook.md",
+   "docs/copy.md",
+   "docs/montaje.md",
+   "docs/composicion.md",
+   "docs/caminos.md",
+   "docs/libretos.md",
+   "docs/libretos-reconstruido.md",
+   "docs/tomas.md",
+   "docs/encargo-biblioteca.md",
+   "docs/prompts-fondos.md",
+   "skills/editar-video/**"
+  ],
+  "instrucciones": [
+   "CLAUDE.md",
+   "docs/estado.md",
+   "docs/proceso.md",
+   "docs/entorno.md",
+   "docs/rendimiento.md",
+   "docs/aprendizajes.md",
+   "docs/correcciones.md",
+   "docs/redundancia.md",
+   "docs/revision.md",
+   "docs/bitacora.md",
+   "docs/duplicados.txt",
+   "docs/plan-cv-horizontal.md",
+   "docs/propuestas/**",
+   "mi-video/docs/propuestas/**",
+   "mi-video/src/muestras.ts"
+  ],
+  "rutas": [
+   "mi-video/rutas.json"
+  ]
+ },
+ "producto": [
+  "revision-13-9/**",
+  "revision-reel-23.md",
+  "mi-video/docs/referencia/**",
+  "mi-video/src/ganchos.json",
+  "mi-video/public/hook-plano.jpg",
+  "mi-video/public/hook-recorte.png",
+  "mi-video/public/prueba-plano.jpg",
+  "mi-video/public/prueba-plano2.jpg",
+  "mi-video/public/recorte-plano.png",
+  "mi-video/public/apoyo/**"
+ ]
+}

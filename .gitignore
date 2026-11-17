@@ -38,3 +38,62 @@ mi-video/DESPLIEGUE
 *.db-journal
 *.db-wal
 *.db-shm
+
+# >>> separacion.json
+# Generado por scripts/separacion.py --gitignore: no se edita a mano.
+# la carpeta de la configuración, con su propio git
+/configuracion/
+# configuracion
+/mi-video/src/brand/*.json
+/mi-video/src/brand/paleta.ts
+/mi-video/src/brand/tipografia.ts
+/mi-video/src/brand/medida.ts
+/mi-video/src/brand/copy.ts
+/mi-video/src/brand/fonts.ts
+/mi-video/public/fondos/**
+/mi-video/public/canto-*.png
+/docs/canon.md
+/docs/ejemplos/**
+/skills/tableros-jaime/**
+/mi-video/scripts/*.prompt.md
+/.claude/agents/**
+/docs/piso.md
+/docs/playbook.md
+/docs/copy.md
+/docs/montaje.md
+/docs/composicion.md
+/docs/caminos.md
+/docs/libretos.md
+/docs/libretos-reconstruido.md
+/docs/tomas.md
+/docs/encargo-biblioteca.md
+/docs/prompts-fondos.md
+/skills/editar-video/**
+/CLAUDE.md
+/docs/estado.md
+/docs/proceso.md
+/docs/entorno.md
+/docs/rendimiento.md
+/docs/aprendizajes.md
+/docs/correcciones.md
+/docs/redundancia.md
+/docs/revision.md
+/docs/bitacora.md
+/docs/duplicados.txt
+/docs/plan-cv-horizontal.md
+/docs/propuestas/**
+/mi-video/docs/propuestas/**
+/mi-video/src/muestras.ts
+/mi-video/rutas.json
+# producto
+/revision-13-9/**
+/revision-reel-23.md
+/mi-video/docs/referencia/**
+/mi-video/src/ganchos.json
+/mi-video/public/hook-plano.jpg
+/mi-video/public/hook-recorte.png
+/mi-video/public/prueba-plano.jpg
+/mi-video/public/prueba-plano2.jpg
+/mi-video/public/recorte-plano.png
+/mi-video/public/apoyo/**
+# <<< separacion.json
