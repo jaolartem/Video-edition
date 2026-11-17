@@ -26,6 +26,7 @@ import argparse
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -68,14 +69,19 @@ def fuera(rutas) -> list[str]:
     s = Separacion()
     rutas = sorted(rutas)
     ign = _ignorado(rutas)
+    # De `docs/` sólo sale la documentación pública de hoy: lo de antes eran
+    # instrucciones y bitácoras, que son configuración aunque ya no estén.
+    hoy = set(_git(REPO, "ls-files", "docs").split())
     return [r for r in rutas
-            if s.clase(r) != "maquina" or r in ign or NO_SALE.search(r)]
+            if s.clase(r) != "maquina" or r in ign or NO_SALE.search(r)
+            or (r.startswith("docs/") and r not in hoy)]
 
 
 def filtrar() -> str:
     """Una copia espejo, filtrada. Devuelve su ruta."""
     if os.path.exists(COPIA):
-        shutil.rmtree(COPIA)
+        # git deja sus objetos de sólo lectura: en Windows hay que soltarlos.
+        shutil.rmtree(COPIA, onerror=lambda f, r, _: (os.chmod(r, stat.S_IWRITE), f(r)))
     comun = os.path.abspath(os.path.join(REPO, _git(REPO, "rev-parse", "--git-common-dir").strip()))
     subprocess.run(["git", "clone", "--mirror", "--no-local", comun, COPIA], check=True,
                    capture_output=True)

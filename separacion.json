@@ -64,6 +64,9 @@
   "mi-video/public/prueba-plano.jpg",
   "mi-video/public/prueba-plano2.jpg",
   "mi-video/public/recorte-plano.png",
-  "mi-video/public/apoyo/**"
+  "mi-video/public/apoyo/**",
+  "mi-video/src/cv/**",
+  "mi-video/scripts/cv/**",
+  "mi-video/public/cv/**"
  ]
 }

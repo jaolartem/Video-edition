@@ -123,14 +123,17 @@ class Separacion:
     def _documentada(self) -> list[str]:
         """La documentación pública no se queda atrás (C-736): cada fase y cada
         grupo de configuración está nombrado en ella."""
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from dominio import fase
+        # Las fases se leen del texto de `fase.py`: importar `dominio` exige estar
+        # en `mi-video/`, y esta comprobación corre desde cualquier sitio.
+        texto = open(os.path.join(REPO, "mi-video", "scripts", "dominio", "fase.py"),
+                     encoding="utf-8").read()
+        fases = re.findall(r'^\s*\(\d+(?:\.\d+)?, "(\w+)"', texto, re.M)
 
         def lee(n):
             return open(os.path.join(REPO, "docs", n), encoding="utf-8").read()
         arq, conf = lee("architecture.md"), lee("configuration.md")
-        return ([f"docs/architecture.md no nombra la fase «{f[1]}»"
-                 for f in fase.CICLO if f[1] not in arq]
+        return ([f"docs/architecture.md no nombra la fase «{f}»" for f in fases if f not in arq]
+                + (["no se leen las fases de fase.py"] if len(fases) < 10 else [])
                 + [f"docs/configuration.md no nombra el grupo «{g}»"
                    for g in self.d["configuracion"] if not g.startswith("_") and g not in conf])
 
