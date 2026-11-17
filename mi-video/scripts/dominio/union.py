@@ -108,7 +108,7 @@ class Union:
             pinta = ImageDraw.Draw(hoja)
             for i, c in enumerate(tanda_cs):
                 y = i * (alto + rot + pie)
-                pinta.text((8, y + 4), f"e{c.a['etapa']} → e{c.b['etapa']}", fill="#fad02c", font=letra)
+                pinta.text((8, y + 4), f"e{c.a['etapa']} | e{c.b['etapa']}", fill="#fad02c", font=letra)
                 for j, n in enumerate(c.nombres):
                     p = os.path.join(carpeta, f"{n}.png")
                     if os.path.isfile(p):
@@ -116,6 +116,9 @@ class Union:
                     s = int(rejilla.get(n, 0) / 30)
                     pinta.text((j * ancho + 8, y + rot + 4), f"{s // 60}:{s % 60:02d}",
                                fill="#fad02c", font=letra)
+                # El corte, donde cae: entre el último de una y el primero de la otra.
+                x = sum(1 for n in c.nombres if n.startswith(f"e{c.a['etapa']:02d}-")) * ancho
+                pinta.line([(x, y + rot), (x, y + rot + alto)], fill="#fad02c", width=4)
                 texto = "; ".join(m["detalle"] for m in c.marcas) or "sin marcas"
                 pinta.text((8, y + rot + alto + 12), texto[:120], fill="#fad02c" if c.marcas
                            else "#8a8a8a", font=letra)
