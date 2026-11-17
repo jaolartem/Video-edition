@@ -82,6 +82,17 @@ DE = {b: quien for b, (quien, _f) in BUZONES.items()}
 LA_FASE = {b: fase for b, (_q, fase) in BUZONES.items()}
 
 
+def _de_la_guia(slug) -> bool:
+    """Si el pedido de visto en pie es el de la guía (`modo: guia`), no el del render."""
+    import json
+    import servicio
+    try:
+        with open(servicio.ruta_pedido("visto", slug), encoding="utf-8") as f:
+            return (json.load(f).get("datos") or {}).get("modo") == "guia"
+    except (OSError, ValueError):
+        return False
+
+
 def vigente(buzon, slug) -> bool:
     """**Un pedido espera mientras su pieza no haya pasado su fase** (C-606).
 
@@ -123,6 +134,12 @@ def vigente(buzon, slug) -> bool:
                 and Guia(int(m.group(1))).al_dia())
     if m.group(2) or buzon not in LA_FASE:
         return True
+    # **Y el visto de la guía espera con la guía** (C-746): se pide desde
+    # `verificado`, antes del render, mientras la guía de hoy siga en pie.
+    if buzon == "visto" and _de_la_guia(slug):
+        from guia import Guia
+        return (bool(ahora) and ahora.get("nombre") == "verificado"
+                and Guia(int(m.group(1))).al_dia())
     suya = next((f for f in camino() if f["nombre"] == LA_FASE[buzon]), None)
     # **Y un visto sólo mira un render que sigue en pie** (C-714). Con la pieza
     # de vuelta antes de `montado` el render se va a rehacer: reel-23 tuvo un

@@ -148,6 +148,8 @@ class Guia:
         mide marcado (salto de encuadre, palabra repetida a través del corte) y
         la intención de cada lado escrita, para juzgar la continuidad.
         """
+        if getattr(self, "_costuras", None):
+            return self._costuras
         from dominio.union import Union
         u = Union(self.slug, self.spec)
         falta = [n for n in u.nombres() if not os.path.isfile(os.path.join(self.fotos, f"{n}.png"))]
@@ -155,9 +157,11 @@ class Guia:
             subprocess.run(["bash", "scripts/mirar.sh", "--segundos", str(self.n), self.fotos],
                            check=True, env={**os.environ, "GUIA_SOLO": ",".join(falta)})
         cs = u.costuras()
-        return {"hojas": u.hoja(self.fotos, self.salida, getattr(self, "tanda", self.huella)),
-                "marcadas": [c.como_json() for c in cs if c.marcas],
-                "cortes": len(cs)}
+        self._costuras = {"hojas": u.hoja(self.fotos, self.salida,
+                                          getattr(self, "tanda", self.huella)),
+                          "marcadas": [c.como_json() for c in cs if c.marcas],
+                          "cortes": len(cs)}
+        return self._costuras
 
     def pide(self, hojas: list[str], faltan: list[str]) -> dict | None:
         """Deja el pedido abierto para Jaime y devuelve su respuesta si ya está."""
@@ -302,6 +306,17 @@ def main() -> int:
         print(f"guia: {g.slug}: Jaime ya aprobó lo que se ve en cada segundo; se renderiza")
         return 0
     hojas = g.hojas(faltan)
+    # **Antes que Jaime, el visto, sobre la guía** (C-746): si las costuras
+    # marcan algo, lo mira el diseñador; si devuelve escenas, vuelven por sus
+    # tiquets y Jaime no ve una guía que ya se sabe mala.
+    from dominio.union import visto
+    v = visto(g, hojas)
+    if v is None:
+        print(f"espera al diseñador: visto de la guía de {g.slug}, antes de Jaime")
+        return 1
+    if v is False:
+        print(f"guia: el visto devolvió escenas de {g.slug}; vuelven por sus tiquets")
+        return 1
     r = g.pide(hojas, faltan)
     if g.aprobada(r):
         print(f"guia: {g.slug} aprobada por Jaime; se renderiza")

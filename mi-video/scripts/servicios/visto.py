@@ -223,7 +223,11 @@ class ServicioVisto(Servicio):
 
 
 def por_que_mirar(d: dict) -> list:
-    """Lo que las medidas del render tienen que enseñar al diseñador (C-663). Vacío es limpio."""
+    """Lo que las medidas del render tienen que enseñar al diseñador (C-663). Vacío es limpio.
+
+    **Sólo lo que la imagen no ve** (C-746): un silencio, una costura que se
+    oye. Lo dicho dos veces ya lo miró en la guía, antes del render.
+    """
     import suena
 
     fuera = []
@@ -231,8 +235,6 @@ def por_que_mirar(d: dict) -> list:
         fuera.append(f"un silencio de {d['aire_max']} s (máximo {suena.AIRE_MAX})")
     if d.get("costuras"):
         fuera.append(f"{len(d['costuras'])} costura(s) que se oyen")
-    if d.get("repetido"):
-        fuera.append(f"{len(d['repetido'])} cosa(s) dichas dos veces")
     if d.get("motivos_abiertos"):
         fuera.append(f"{len(d['motivos_abiertos'])} motivo(s) que la puerta dejó abiertos")
     if any("error" in x for x in d.get("se_ve") or [] if isinstance(x, dict)):

@@ -126,3 +126,36 @@ class Union:
             hoja.save(ruta, quality=88)
             out.append(ruta)
         return out
+
+
+def visto(guia, hojas: list) -> bool | None:
+    """**El visto, sobre la guía y antes del render** (C-746).
+
+    Jaime: *«sacamos esta guía y ya tú la lees»*. Si una costura sale marcada
+    —una palabra repetida a través del corte, un salto de encuadre—, el
+    diseñador mira las hojas de la guía y la de costuras antes que Jaime, y
+    aprueba o devuelve escenas como en el visto de siempre
+    (`servicios.visto.aplicar`). Sin marcas no se le llama: pasa a Jaime.
+    `None` es que espera su respuesta; `False`, que devolvió escenas.
+    """
+    import servicio as contrato
+    from servicios.base import Pieza
+    from servicios.visto import PROMPT, aplicar
+
+    costuras = guia.costuras()
+    marcadas = costuras.get("marcadas") or []
+    if not marcadas:
+        return True
+    prompt = ((open(PROMPT, encoding="utf-8").read() if os.path.exists(PROMPT) else "")
+              + "\n\nHOY MIRAS LA HOJA GUÍA, NO UN RENDER: un fotograma por segundo de cada"
+                " escena (`hojas`) y la hoja de costuras (`costuras.hojas`), con los cortes"
+                " marcados en `costuras.marcadas`. Juzgas la continuidad de plano y de"
+                " intención en cada corte marcado. Contestas como en el visto:"
+                " `se_ensena`, `por_que`, `aprueba`, `devuelve` y `mirado`.")
+    r = contrato.pedir("visto", f"reel-{guia.n:02d}", prompt, {
+        "modo": "guia", "huella": guia.huella, "hojas": hojas, "costuras": costuras,
+        "por_que_se_mira": [f"e{c['de']['etapa']}|e{c['a']['etapa']}: "
+                            + "; ".join(m["detalle"] for m in c["marcas"]) for c in marcadas]})
+    if r is None:
+        return None
+    return bool(aplicar(Pieza(guia.n), r).ok)
