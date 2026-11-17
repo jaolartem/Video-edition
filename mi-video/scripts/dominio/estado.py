@@ -277,6 +277,21 @@ def escribe(slug):
                          for k in ("trato", "plano", "tablero", "camara", "voz")):
             faltas.append(f"la base tiene {n} escenas decididas y el JSON no"
                           " publica ninguna")
+        # **Y por qué camino se monta cada escena** (C-740): el `trato` del EDL
+        # es el camino de render (portada, tablero, diapositiva…), no el trato
+        # del compositor que guarda `escena_desc`. Llevan el mismo nombre y son
+        # dos cosas; el documento las separa para que nadie las lea como copias.
+        r = os.path.join(RAIZ, "ads", slug, "edl-sell.json")
+        edl = json.load(open(r, encoding="utf-8")) if os.path.exists(r) else {}
+        caminos = {}
+        for x in edl.get("detalle") or []:
+            if x.get("beat") is not None and x.get("trato"):
+                caminos.setdefault(x["beat"], [])
+                if x["trato"] not in caminos[x["beat"]]:
+                    caminos[x["beat"]].append(x["trato"])
+        for j in d["segmentos"]:
+            if j["etapa"] in caminos:
+                j["camino"] = caminos[j["etapa"]]
         # **Y cada escena, su documento** (C-738), con su continuidad y sus
         # tiquets; la pieza los compila.
         _continuidad(d["segmentos"])
@@ -292,8 +307,6 @@ def escribe(slug):
         # reel-23 e17, «Starting with tax season», se quedó en `sin_toma` por
         # lectura plana y nadie que abriera el marcador podía saber que faltaba.
         # Sin EDL todavía no hay cortes ni etapas sin toma: no es un hueco.
-        r = os.path.join(RAIZ, "ads", slug, "edl-sell.json")
-        edl = json.load(open(r, encoding="utf-8")) if os.path.exists(r) else {}
         d["sin_toma"] = [{"etapa": h.get("beat"), "motivo": h.get("motivo"),
                           "libreto": h.get("libreto"),
                           "obligatorio": h.get("obligatorio")}
