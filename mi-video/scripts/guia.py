@@ -70,10 +70,10 @@ class Guia:
     # que necesitan cambio»*. La aprobación iba por la huella del spec entero, y
     # un cambio en e14 le volvía a pedir los 117 segundos. Ahora se guarda lo que
     # vio cada segundo (`Fotogramas.contenido`) y sólo se le enseña lo que no vio.
-    def segundos(self, dura: float | None = None) -> dict:
-        dura = self.dura if dura is None else float(dura)
-        ultimo = int(dura * 30) - 1
-        return {f"s{s:03d}": min(s * 30 + 15, ultimo) for s in range(int(dura) + 1)}
+    def segundos(self, spec: dict | None = None) -> dict:
+        """Los segundos de la guía, **por escena** (C-742): los dice `Fotogramas.rejilla`."""
+        from dominio.fotograma import Fotogramas
+        return Fotogramas(spec or self.spec).rejilla()
 
     def _aprobado(self) -> tuple[str, dict]:
         ruta = os.path.join("work", "still", "guia", self.slug, "aprobado.json")
@@ -108,7 +108,8 @@ class Guia:
     def _compone(self, solo: set) -> list[str]:
         from PIL import Image, ImageDraw, ImageFont
 
-        fotos = sorted(f for f in os.listdir(self.fotos) if f.endswith(".png") and f[:4] in solo)
+        rejilla = self.segundos()
+        fotos = sorted(f for f in os.listdir(self.fotos) if f.endswith(".png") and f[:-4] in solo)
         if not fotos:
             raise SystemExit(f"guia: {self.slug} no dio fotogramas en {self.fotos}")
         w, h = Image.open(os.path.join(self.fotos, fotos[0])).size
@@ -119,17 +120,23 @@ class Guia:
         os.makedirs(self.salida, exist_ok=True)
         por_hoja = cols * filas
         out = []
-        for k in range(0, len(fotos), por_hoja):
-            tanda = fotos[k:k + por_hoja]
+        # **Una hoja por escena** (C-742): la escena es la unidad que se mira.
+        grupos = {}
+        for f in fotos:
+            grupos.setdefault(f[:3] if f[0] == "e" else "", []).append(f)
+        paginas = [(g, fs[k:k + por_hoja]) for g, fs in grupos.items()
+                   for k in range(0, len(fs), por_hoja)]
+        for k, (grupo, tanda) in enumerate(paginas):
             hoja = Image.new("RGB", (cols * ancho, filas * (alto + rotulo)), "#0B0B0F")
             pinta = ImageDraw.Draw(hoja)
             for i, f in enumerate(tanda):
                 x, y = (i % cols) * ancho, (i // cols) * (alto + rotulo)
                 im = Image.open(os.path.join(self.fotos, f)).convert("RGB")
                 hoja.paste(im.resize((ancho, alto)), (x, y + rotulo))
-                s = int(f[1:4])
-                pinta.text((x + 8, y + 4), f"{s // 60}:{s % 60:02d}", fill="#fad02c", font=letra)
-            ruta = os.path.join(self.salida, f"{self.tanda}-{k // por_hoja + 1:02d}.jpg")
+                s = int(rejilla.get(f[:-4], 0) / 30)
+                rot = f"{s // 60}:{s % 60:02d}" + (f" · {grupo}" if grupo else "")
+                pinta.text((x + 8, y + 4), rot, fill="#fad02c", font=letra)
+            ruta = os.path.join(self.salida, f"{self.tanda}-{grupo + '-' if grupo else ''}{k + 1:02d}.jpg")
             hoja.save(ruta, quality=88)
             out.append(ruta)
         return out
@@ -204,8 +211,9 @@ class Guia:
         from dominio.segmento import APROBADO, Segmento
         fotos, (_, visto) = Fotogramas(spec), self._aprobado()
         por = {}
-        for nombre, f in self.segundos(spec["duracion"]).items():
-            b = beat_en(self.slug, int(nombre[1:]) + 0.5)
+        for nombre, f in self.segundos(spec).items():
+            # El nombre dice la escena (C-742); sin escenas, el reloj del plan.
+            b = int(nombre[1:3]) if nombre[0] == "e" else beat_en(self.slug, f / 30)
             if isinstance(b, int):  # ni sin plan ni sin EDL (`reloj.SIN_EDL`)
                 por.setdefault(b, []).append(fotos.contenido(f) in visto)
         hechas = []
@@ -220,7 +228,7 @@ class Guia:
         from dominio.fotograma import Fotogramas
         fotos, (ruta, visto) = Fotogramas(spec), self._aprobado()
         antes = len(visto)
-        for f in self.segundos(spec["duracion"]).values():
+        for f in self.segundos(spec).values():
             visto.setdefault(fotos.contenido(f), quien)
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(visto, f, ensure_ascii=False)

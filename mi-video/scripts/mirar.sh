@@ -102,9 +102,9 @@ sys.path.insert(0, "scripts")
 from dominio.fotograma import Fotogramas, guarda, reutiliza
 n, salida, que = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 r = next(p for p in json.load(open("src/reels.json", encoding="utf-8")) if p["id"] == f"Reel-R{n}")
-ultimo = int(float(r["duracion"]) * 30) - 1
-frames = {f"s{s:03d}": min(s * 30 + 15, ultimo) for s in range(int(float(r["duracion"])) + 1)}
+# La rejilla es una sola, la de `Fotogramas` (C-742): por escena si el spec las dice.
 fotos, almacen = Fotogramas(r), os.path.join(os.path.dirname(salida.rstrip("/\\")), "segundos")
+frames = fotos.rejilla()
 if que == "guarda":
     guarda(fotos, frames, salida, almacen)
     sys.exit(0)
