@@ -298,6 +298,10 @@ def escribe(slug):
         _registra_cortes(slug, d["segmentos"], d.get("etapa"))
         for j in d["segmentos"]:
             j["tiquets"] = [a for a in d.get("abiertos") or [] if a.get("beat") == j["etapa"]]
+            # **Y en qué paso está la escena, no sólo la pieza** (C-744): la
+            # que tiene un tiquet, en el paso al que vuelve; la aprobada, cerrada.
+            j["fase"] = (j["tiquets"][0].get("va_a") if j["tiquets"]
+                         else "aprobada" if j.get("aprobado") else d.get("etapa"))
         _escenas(slug, d["segmentos"])
         from .pieza import Pieza
         d.update(Pieza._vision(slug))
@@ -344,6 +348,30 @@ def para_pedido(slug):
          "abiertos": d.get("abiertos") or [], "segmentos": d.get("segmentos") or [],
          "sin_toma": d.get("sin_toma") or [], "aprobada": d.get("aprobada")}
     return {**m, **({"falta": d["falta"]} if d.get("falta") else {})}
+
+
+def por_escena(marcador: dict) -> dict:
+    """El marcador de un pedido que trabaja escena a escena (C-744).
+
+    Lleva **entero** el documento de cada escena en juego —las abiertas y las
+    que tienen un tiquet—, cada uno con su continuidad, que dice cómo acaban y
+    empiezan sus vecinas. Las demás van en un índice (`otras_escenas`): están
+    aprobadas y no se tocan. Si no hay nada aprobado, la pieza se compone
+    entera y va todo, como antes.
+    """
+    if not isinstance(marcador, dict) or not marcador.get("segmentos"):
+        return marcador
+    segs = marcador["segmentos"]
+    en_juego = [j for j in segs if not j.get("aprobado") or j.get("tiquets")]
+    if len(en_juego) == len(segs):
+        return marcador
+    return {**marcador, "segmentos": en_juego,
+            "otras_escenas": [{k: j.get(k) for k in ("etapa", "etiqueta", "huella", "dura",
+                                                       "documento")}
+                              for j in segs if j not in en_juego],
+            "por_escena": "Trabajas sólo las escenas de `segmentos`. Las de"
+                          " `otras_escenas` están aprobadas: no se tocan; su"
+                          " documento entero está en su `documento` si hace falta."}
 
 
 def exige_entero(marcador, slug):
