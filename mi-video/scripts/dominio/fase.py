@@ -267,7 +267,19 @@ def anotar(video_id, fase_id, por_que=None):
                     timespec="seconds"), por_que))
     con.commit()
     r = con.execute("select slug from video where id = ?", (video_id,)).fetchone()
+    nueva = con.execute("select nombre, orden from fase where id = ?", (fase_id,)).fetchone()
+    vieja = con.execute("select orden from fase where id = ?",
+                        (ult["fase_id"],)).fetchone() if ult else None
     con.close()
+    # **Y sus escenas suben con ella, si avanza** (C-752). Si vuelve, la baja
+    # el tiquet en su escena (`puertas.del_tiquet`), no aquí en todas.
+    try:
+        if r and nueva and (vieja is None or nueva["orden"] > vieja["orden"]):
+            from . import escena_fase, segmento
+            escena_fase.avanza(r["slug"], [s.n for s in segmento.Segmento.de(r["slug"])],
+                               nueva["nombre"], nueva["orden"])
+    except Exception:                              # noqa: BLE001
+        pass
     # **Y se publica.** Mover la pieza y decirlo son lo mismo: un estado que solo
     # vive en la base no lo puede leer quien tiene `Read` y `Write` y nada mas,
     # que son los dos oficios de la linea. Ver `dominio/estado.py`.

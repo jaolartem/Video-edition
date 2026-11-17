@@ -296,12 +296,14 @@ def escribe(slug):
         # tiquets; la pieza los compila.
         _continuidad(d["segmentos"])
         _registra_cortes(slug, d["segmentos"], d.get("etapa"))
+        from . import escena_fase
+        pasos = escena_fase.de(slug)  # el paso de cada escena (C-752)
         for j in d["segmentos"]:
             j["tiquets"] = [a for a in d.get("abiertos") or [] if a.get("beat") == j["etapa"]]
             # **Y en qué paso está la escena, no sólo la pieza** (C-744): la
             # que tiene un tiquet, en el paso al que vuelve; la aprobada, cerrada.
-            j["fase"] = (j["tiquets"][0].get("va_a") if j["tiquets"]
-                         else "aprobada" if j.get("aprobado") else d.get("etapa"))
+            j["fase"] = ("aprobada" if j.get("aprobado") and not j["tiquets"]
+                         else pasos.get(j["etapa"], (d.get("etapa"),))[0])
         _escenas(slug, d["segmentos"])
         from .pieza import Pieza
         d.update(Pieza._vision(slug))

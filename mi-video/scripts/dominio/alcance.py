@@ -104,8 +104,13 @@ class Alcance:
         try:
             from . import segmento as _sg
 
+            from . import escena_fase
             segs = _sg.Segmento.de(self.slug)
-            abiertos = [x.n for x in segs if not x.aprobado]
+            # **Y que todavía no hayan pasado por este paso** (C-752): una
+            # escena sin aprobar que ya va por delante no se vuelve a trabajar
+            # porque un tiquet devolvió otra.
+            pasadas = escena_fase.ya_paso(self.slug, self.fase)
+            abiertos = [x.n for x in segs if not x.aprobado and x.n not in pasadas]
             # Nada aprobado todavia: es refactor de verdad, la pieza entera.
             if segs and len(abiertos) < len(segs):
                 # Un tiquet no abre lo aprobado por su cuenta: acota DENTRO de

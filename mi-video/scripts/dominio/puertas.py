@@ -177,11 +177,25 @@ def del_tiquet(piezas):
             continue
         anotar(vid, destino,
                f"puerta del tiquet: {', '.join('#' + str(i) for i in ids)}")
+        _baja_sus_escenas(slug, ids, vuelve)
         ticket.devolver(ids)
         dicho.append(f"  puerta del tiquet -> {slug} vuelve a «{vuelve}» para"
                      f" que corra «{fase}», por"
                      f" {', '.join('#' + str(i) for i in ids)}")
     return dicho
+
+
+def _baja_sus_escenas(slug, ids, vuelve):
+    """**El tiquet devuelve su escena, no la pieza** (C-752): baja al paso desde
+    el que corre lo que la atiende; las demás se quedan en el suyo."""
+    from . import escena_fase
+    from .fase import camino
+    orden = next((f["orden"] for f in camino() if f["nombre"] == vuelve), None)
+    if orden is None:
+        return
+    for t in ticket.historia(slug):
+        if t.get("id") in ids and str(t.get("beat") or "").isdigit():
+            escena_fase.vuelve(slug, int(t["beat"]), vuelve, orden)
 
 
 def _catalogadas():
