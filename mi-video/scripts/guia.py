@@ -186,6 +186,34 @@ class Guia:
             json.dump({"aprobada": True, "huella": self.huella, "de": dijo, "cuando": cuando},
                       f, ensure_ascii=False, indent=1)
         self._anota(self.spec, {"de": dijo, "huella": self.huella, "cuando": cuando})
+        hechas = self._escenas_aprobadas(self.spec)
+        if hechas:
+            print(f"guia: {self.slug} e{', e'.join(map(str, hechas))} aprobadas por Jaime")
+
+    def _escenas_aprobadas(self, spec: dict) -> list:
+        """**Lo que Jaime aprueba en la guía queda aprobado en su escena** (C-741).
+
+        Las aprobaciones iban por segundo y no llegaban a las escenas: en reel-23
+        las 18 figuraban abiertas hasta que aprobó la pieza entera, y el
+        diseñador, la memoria y el visto trataron como abiertas escenas ya
+        aprobadas. Una escena con **todos** sus segundos aprobados se aprueba con
+        su firma; un tiquet suyo la reabre (`segmento.reabre`). Nunca desaprueba.
+        """
+        from dominio.fotograma import Fotogramas
+        from dominio.reloj import beat_en
+        from dominio.segmento import APROBADO, Segmento
+        fotos, (_, visto) = Fotogramas(spec), self._aprobado()
+        por = {}
+        for nombre, f in self.segundos(spec["duracion"]).items():
+            b = beat_en(self.slug, int(nombre[1:]) + 0.5)
+            if isinstance(b, int):  # ni sin plan ni sin EDL (`reloj.SIN_EDL`)
+                por.setdefault(b, []).append(fotos.contenido(f) in visto)
+        hechas = []
+        for s in Segmento.de(self.slug):
+            if por.get(s.n) and all(por[s.n]) and s.etiqueta != APROBADO:
+                s.aprueba("jaime")
+                hechas.append(s.n)
+        return hechas
 
     def _anota(self, spec: dict, quien: dict) -> int:
         """Deja aprobado, segundo a segundo, lo que se ve en `spec`."""
