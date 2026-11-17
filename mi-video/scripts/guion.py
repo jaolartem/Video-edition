@@ -37,6 +37,31 @@ _BLOQUE = re.compile(r"^###\s+\d+\s*[·.\-]\s*(.+?)\s*$")
 _LIMPIA = re.compile(r"\*\*|(?<!\*)\*(?!\*)")
 
 
+_VISION = re.compile(r"^\*\*VISI[OÓ]N:\*\*\s*(.*)$", re.I)
+
+
+def vision(texto: str) -> str | None:
+    """La visión del director: el párrafo de `**VISIÓN:**`, antes del primer bloque.
+
+    Jaime, 16-11-2026: *«si hablamos de un video, de una idea general, eso va
+    sobre todo a los compositores; es una visión del director… una mirada general
+    que tiene que ir para casi todas»* (C-737). Se transcribe, no se redacta.
+    """
+    lineas, dentro = [], False
+    for linea in texto.splitlines():
+        if _BLOQUE.match(linea):
+            break
+        m = _VISION.match(linea.strip())
+        if m:
+            dentro, lineas = True, [m.group(1)]
+        elif dentro and linea.strip() and not linea.startswith(("#", "**")):
+            lineas.append(linea.strip())
+        elif dentro:
+            break
+    t = _LIMPIA.sub("", " ".join(x for x in lineas if x)).strip()
+    return t or None
+
+
 def bloques(texto: str) -> list[dict]:
     """`[{titulo, video, audio}]` en el orden del guion. Hasta la primera `## `."""
     out, actual, modo = [], None, None
@@ -75,12 +100,23 @@ def beats(bls: list[dict]) -> list[dict]:
     return out
 
 
-def declarar(ruta_guion, slug, aprobado, estructura=None, extra=None):
-    """Escribe la pieza `slug` en `frames.json`. Devuelve cuántos beats."""
+def declarar(ruta_guion, slug, aprobado, estructura=None, extra=None, de_jaime=None):
+    """Escribe la pieza `slug` en `frames.json`. Devuelve cuántos beats.
+
+    **Sin visión no entra** (C-737), igual que sin guion aprobado: la escribe
+    Jaime en el guion (`**VISIÓN:**`) o se pasa con sus palabras (`--vision`).
+    """
     with open(ruta_guion, encoding="utf-8") as f:
-        bs = beats(bloques(f.read()))
+        crudo = f.read()
+    bs = beats(bloques(crudo))
     if not bs:
         raise SystemExit(f"{ruta_guion}: no hay bloques `### N · Título` con AUDIO")
+    vis = vision(crudo) or de_jaime
+    if not vis:
+        raise SystemExit(f"{ruta_guion}: falta la visión del director. Va en el guion,"
+                         " en un párrafo `**VISIÓN:**` antes del primer bloque, o con"
+                         " `--vision \"<sus palabras>\"`. Si no existe, se construye como"
+                         " propuesta y Jaime la aprueba antes de declarar.")
     texto = open(FRAMES, encoding="utf-8").read()
     d = json.loads(texto)
     pieza = d["reels"].get(slug) or {}
@@ -92,6 +128,7 @@ def declarar(ruta_guion, slug, aprobado, estructura=None, extra=None):
     pieza.update({
         "estructura": est,
         "guion": {"fichero": os.path.basename(ruta_guion), "aprobado": aprobado},
+        "vision": {"texto": vis, "aprobado": aprobado},
         "beats": [{"etapa": b["etapa"], "video": b["video"]} for b in bs],
         "libreto": [b["texto"] for b in bs],
     })
@@ -139,6 +176,8 @@ def main():
     ap.add_argument("--estructura")
     ap.add_argument("--formato")
     ap.add_argument("--pilar")
+    ap.add_argument("--vision", help="la visión del director con las palabras de Jaime,"
+                    " si el guion no la trae")
     a = ap.parse_args()
     if a.ver:
         with open(a.guion, encoding="utf-8") as f:
@@ -146,7 +185,7 @@ def main():
                 print(f"{i:2d} {b['etapa']:24} {b['texto'][:70]}")
         return
     n = declarar(a.guion, a.slug, a.aprobado, a.estructura,
-                 {"formato": a.formato, "pilar": a.pilar})
+                 {"formato": a.formato, "pilar": a.pilar}, a.vision)
     print(f"{a.slug}: {n} beats desde {a.guion}, aprobado por {a.aprobado}")
 
 

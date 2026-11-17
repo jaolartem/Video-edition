@@ -102,6 +102,10 @@ def migrar():
             "porque=excluded.porque",
             (slug, est, toma, m1, m2, porque))
         vid = cx.execute("SELECT id FROM video WHERE slug = ?", (slug,)).fetchone()["id"]
+        # La visión del director, de la declaración a la base (C-737).
+        if "vision" in {r[1] for r in cx.execute("pragma table_info(video)")}:
+            cx.execute("UPDATE video SET vision = ? WHERE id = ?",
+                       ((f.get("vision") or {}).get("texto"), vid))
 
         # Las etapas de la pieza, con su mensaje esperado sacado del libreto.
         sys.path.insert(0, os.path.dirname(__file__))

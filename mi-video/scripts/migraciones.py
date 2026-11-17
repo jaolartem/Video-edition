@@ -476,6 +476,15 @@ def _escena_corrige_marca(con):
     return bool(nuevas)
 
 
+def _video_vision(con):
+    """`video` gana `vision`, la visión del director de la pieza (C-737)."""
+    cols = {r[1] for r in con.execute("pragma table_info(video)")}
+    if not cols or "vision" in cols:
+        return False
+    con.execute("ALTER TABLE video ADD COLUMN vision TEXT")
+    return True
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -484,6 +493,7 @@ def migrar():
     _revision_estructurada(con)
     _escena_voz(con)
     _escena_corrige_marca(con)
+    _video_vision(con)
     _corte_fijo_etapa(con)
     _corte_fijo_huella(con)
     _escalera(con)

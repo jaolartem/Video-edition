@@ -51,7 +51,30 @@ class Pieza:
         from .idioma import Idioma
         from .lienzo import Lienzo
 
-        return {**Idioma.en_pedido(slug), **Lienzo.en_pedido(slug)}
+        return {**Pieza._vision(slug), **Idioma.en_pedido(slug), **Lienzo.en_pedido(slug)}
+
+    @staticmethod
+    def _vision(slug: str) -> dict:
+        """La visión del director, de la base (C-737). Nada si no se declaró.
+
+        Va delante y dice cómo se usa: es la mirada general de la pieza, que
+        vale para casi todas las etapas; cada etapa cumple lo suyo y además la
+        lleva. Así no hace falta tocar ningún contrato para que llegue.
+        """
+        try:
+            con = basedatos.abrir(BASE)
+            r = con.execute("select vision from video where slug = ?", (slug,)).fetchone()
+            con.close()
+        except sqlite3.Error:
+            return {}
+        if not r or not r[0]:
+            return {}
+        return {"vision_del_director": {
+            "dice": r[0],
+            "como_se_usa": "Es la mirada general de la pieza, aprobada con el guion. Vale"
+                           " para casi todas las etapas: cada etapa cumple lo que el guion"
+                           " le pide y además lleva esta intención, con continuidad de"
+                           " plano y de intención con la anterior y la siguiente."}}
 
     # ── lo que la pieza es ────────────────────────────────────────────────
     @property
