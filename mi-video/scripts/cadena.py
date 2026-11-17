@@ -198,8 +198,15 @@ def desde(n):
             return (i, nombre, quien, f"no existe {ruta}")
         # Un eslabón puede comer de varios: el spec come del hueco y del
         # trasfondo, y comparar sólo con uno deja al otro sin caducar.
+        # **El corte que se comprobó sin cambios está al día** (C-748): sus
+        # trozos son los mismos y `render-hook` no lo reescribe, así que su
+        # fecha sigue siendo la de su contenido —lo que leen los de abajo— y la
+        # de la comprobación dice que se miró después del plan.
+        visto = _cuando(f"work/seg-{s}/lista.comprobada") if nombre == "corte" else None
         for come in (come_de,) if isinstance(come_de, str) else (come_de or ()):
             padre = cuando.get(come)
+            if visto and padre is not None and visto >= padre:
+                continue
             # `encuadres` comparte fichero con `plan`: no se compara consigo mismo.
             if padre is not None and ruta != donde[come] and t < padre                     and not (nombre == "render" and _misma_huella(s, n)):
                 return (i, nombre, quien,
@@ -209,7 +216,7 @@ def desde(n):
         if nombre == "plan" and not _ritmo_al_dia(s):
             return (i, nombre, quien, "el ritmo declarado cambio y el plan no lo tiene")
         cod = _codigo(quien)
-        if cod and t < cod[0]:
+        if cod and t < cod[0] and not (visto and visto >= cod[0]):
             return (i, nombre, quien, f"{ruta} se hizo con el {cod[1]} de antes")
         cuando[nombre], donde[nombre] = t, ruta
     return None

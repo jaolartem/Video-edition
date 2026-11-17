@@ -357,6 +357,8 @@ if __name__ == "__main__":
     # que la proteccion de «el sujeto no puede salirse» sigue en pie —con un
     # margen mas conservador, no menos.
     ap.add_argument("--ancla-global", action="store_true")
+    ap.add_argument("--recalcular", action="store_true",
+                    help="vuelve a encuadrar también las escenas que no cambiaron")
     args = ap.parse_args()
 
     plan = json.load(open(args.plan, encoding="utf-8"))
@@ -487,9 +489,35 @@ if __name__ == "__main__":
         propia = anclas.get(args.source) or anclas[list(anclas)[0]]
         global_ancla, dxg, dyg = propia
 
+    # **Una escena que no cambió conserva su encuadre** (C-747). Jaime: *«la
+    # pieza es la unión de los segmentos»*. El ancla es la mediana de todas las
+    # escenas de la cinta y el plano sin declarar sale de una rueda: cambiar una
+    # escena movía el ancla y la rueda, y con ellas el recorte de TODAS — y el
+    # corte, que se guarda por escena, se rehacía entero. Lo encuadrado se
+    # guarda por escena (su cinta, sus bordes, su etapa, lo pedido) y se
+    # reutiliza mientras eso no cambie.
+    congelados_ruta = os.path.join(os.path.dirname(os.path.abspath(args.plan)), "encuadres.json")
+    try:
+        congelados = {} if args.recalcular else json.load(open(congelados_ruta, encoding="utf-8"))
+    except (OSError, ValueError):
+        congelados = {}
+    FIJA = ("encuadre", "crop", "filtro", "reescalado", "recorrido", "cara", "zoom")
+
+    def clave(e):
+        return json.dumps([os.path.basename(fuente_de(e)), round(e["origen_desde"], 3),
+                           round(e["origen_hasta"], 3), e.get("beat"), e.get("encuadre"),
+                           e.get("zoom")], ensure_ascii=False)
+
+    nuevos = {}
     idx = 0
     blandos = []
     for i, e in enumerate(escenas):
+        k = clave(e) if not (e.get("angulo") or (e.get("hereda_encuadre") and i > 0)) else None
+        if k and k in congelados:
+            e.update(congelados[k])
+            nuevos[k] = congelados[k]
+            print(f"  {i} {e.get('encuadre', ''):12} (el de antes: la escena no cambió)")
+            continue
         # **Otro ángulo entra entero** (C-672): no es un encuadre del mismo 4K
         # sino otra cámara —la pantalla, en el CV—, así que ni ancla ni serie:
         # el cuadro completo con la proporción del lienzo, centrado.
@@ -695,6 +723,8 @@ if __name__ == "__main__":
             nota += "  <-- se estira"
         print(f"  {i} {nombre:12} {cw}x{ch} en ({x},{y}) · esc {escala:.2f}x"
               f" · mov {dx*sw:.0f}x{dy*sh:.0f}px{nota}")
+        if k:
+            nuevos[k] = {c: e[c] for c in FIJA if c in e}
 
     # **La nitidez se cuenta, no se supone.**
     #
@@ -715,6 +745,7 @@ if __name__ == "__main__":
         plan["fuente"] = {"ancho": sw, "alto": sh}
     json.dump(plan, open(args.plan, "w", encoding="utf-8"),
               indent=2, ensure_ascii=False)
+    json.dump(nuevos, open(congelados_ruta, "w", encoding="utf-8"), ensure_ascii=False)
     print(f"\nplan actualizado → {args.plan}")
     if peor > TOLERANCIA + 0.001:
         # **Y para.** La vara la puso Jaime: *«si hay un plano que pierde

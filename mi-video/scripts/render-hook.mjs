@@ -322,12 +322,23 @@ for (const viejo of fs.readdirSync(tmp)) {
 }
 if (reutilizados) console.error(`  ${reutilizados} escena(s) sin cambios: se reutilizan`);
 const lista = path.join(tmp, "lista.txt");
-fs.writeFileSync(
-  lista,
-  trozos
-    .map((f) => "file '" + f.split(path.sep).join("/") + "'")
-    .join("\n") + "\n",
-);
+const texto = trozos
+  .map((f) => "file '" + f.split(path.sep).join("/") + "'")
+  .join("\n") + "\n";
+// **Si ninguna escena cambió, el corte no se reescribe** (C-748). Cada trozo
+// ya se guarda por su huella (C-567), pero se volvía a unir siempre: el mp4
+// nuevo caducaba por fecha la cara, los huecos, el trasfondo y los subtítulos
+// de la pieza entera aunque fueran los mismos trozos en el mismo orden.
+const firmada = path.join(tmp, "lista.unida.txt");
+const firma = texto + `velocidad ${VELOCIDAD}\n`;
+if (fs.existsSync(out) && fs.existsSync(firmada)
+    && fs.readFileSync(firmada, "utf8") === firma) {
+  console.error("\nsin cambios: los mismos trozos en el mismo orden → " + out);
+  // Comprobado, no rehecho: `cadena.py` lo lee para no darlo por caducado.
+  fs.writeFileSync(path.join(tmp, "lista.comprobada"), new Date().toISOString());
+  process.exit(0);
+}
+fs.writeFileSync(lista, texto);
 if (VELOCIDAD === 1) {
   // Sin cambio de velocidad se unen sin recodificar.
   execFileSync("ffmpeg", [
@@ -361,6 +372,9 @@ if (VELOCIDAD === 1) {
     "-movflags", "+faststart", out,
   ], { stdio: ["ignore", "inherit", "inherit"] });
 }
+// Y se firma lo que se unió: es lo que dice que `out` sale de estos trozos.
+fs.writeFileSync(firmada, firma);
+fs.writeFileSync(path.join(tmp, "lista.comprobada"), new Date().toISOString());
 // **Y la carpeta se queda** (C-594): este borrado final deshacia C-567 y cada
 // montaje volvia a cortar todas las escenas. Los trozos que ya no salen se
 // quitan arriba, antes de unir.
