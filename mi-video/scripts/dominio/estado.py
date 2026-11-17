@@ -518,3 +518,40 @@ def marca(slug, paso, resultado, quien="la linea", nota="", dispara=True):
 def todas(piezas):
     """El estado de varias piezas, para mirarlas de una vez."""
     return {s: lee(s) for s in piezas}
+
+
+def resella(slug, de) -> list:
+    """Vuelve a publicar desde SQL lo que se tocó por fuera. Lo corre Jaime (C-738).
+
+    El fichero no es la fuente: SQL lo es. Reescribirlo lo deja como dice la
+    base, y queda apuntado quién lo pidió y qué estaba tocado.
+    """
+    if not (de or "").strip():
+        raise SystemExit("resellar pide --de: quién lo manda y con qué palabras")
+    fuera = tocados(slug)
+    from . import fase as _f
+
+    con = _f._con()
+    con.execute("delete from documento where slug = ?", (slug,))
+    con.commit()
+    con.close()
+    d = lee(slug)
+    d.setdefault("log", []).append({"cuando": _ahora(), "que": "resellado",
+                                    "de": de, "tocado": fuera})
+    _guarda(slug, d)
+    escribe(slug)
+    return fuera
+
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(description="El documento de la pieza y sus escenas.")
+    ap.add_argument("slug")
+    ap.add_argument("--resellar", action="store_true")
+    ap.add_argument("--de")
+    a = ap.parse_args()
+    if a.resellar:
+        print(f"{a.slug}: resellado; estaba tocado: {resella(a.slug, a.de) or 'nada'}")
+    else:
+        print("\n".join(tocados(a.slug)) or f"{a.slug}: sus documentos casan con su sello")

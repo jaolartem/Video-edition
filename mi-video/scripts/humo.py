@@ -354,7 +354,7 @@ def _marcador_viaja(h):
     import servicio
 
     m = servicio._marcador(PIEZA)
-    h.mide("C-347", bool(m) and m["fichero"] == f"ads/{PIEZA}/estado.json",
+    h.mide("C-347", bool(m) and m["fichero"] == f"ads/{PIEZA}/pieza.json",
            "el pedido lleva la ruta del marcador y su etiqueta")
     servicio._piso_cache = None
     h.mide("C-347", "El marcador: el JSON que viaja" in servicio._piso(),

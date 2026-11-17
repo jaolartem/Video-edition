@@ -84,6 +84,15 @@ def _recorrer(n, ver=False, tope=None, permiso=None, planta=True):
     pieza = Pieza(n)
     if pieza.video_id is None:
         return None
+    # **Lo tocado por fuera para la pieza** (C-738): un documento de escena o de
+    # pieza que no casa con su sello. No se arregla solo: lo resella Jaime.
+    from dominio import estado as _estado
+    fuera = _estado.tocados(pieza.slug)
+    if fuera:
+        print(f"  {pieza.slug}: se para, tocado por fuera: {'; '.join(fuera)}."
+              f" Lo resella Jaime: python scripts/dominio/estado.py {pieza.slug}"
+              " --resellar --de \"<sus palabras>\"")
+        return None
     ruta = camino()
     actual = fase_de(pieza)
     if actual is None:
