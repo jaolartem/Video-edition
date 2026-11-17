@@ -118,7 +118,21 @@ class Separacion:
                 out.append(f"{f} difiere de la configuración: se edita en {self.raiz}")
         if self._bloque() not in open(os.path.join(REPO, ".gitignore"), encoding="utf-8").read():
             out.append(".gitignore no lleva el bloque de separacion.json: --gitignore")
-        return out
+        return out + self._documentada()
+
+    def _documentada(self) -> list[str]:
+        """La documentación pública no se queda atrás (C-736): cada fase y cada
+        grupo de configuración está nombrado en ella."""
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from dominio import fase
+
+        def lee(n):
+            return open(os.path.join(REPO, "docs", n), encoding="utf-8").read()
+        arq, conf = lee("architecture.md"), lee("configuration.md")
+        return ([f"docs/architecture.md no nombra la fase «{f[1]}»"
+                 for f in fase.CICLO if f[1] not in arq]
+                + [f"docs/configuration.md no nombra el grupo «{g}»"
+                   for g in self.d["configuracion"] if not g.startswith("_") and g not in conf])
 
     # -- lo que se hace -----------------------------------------------------
     def configurar(self) -> tuple[int, list[str]]:
