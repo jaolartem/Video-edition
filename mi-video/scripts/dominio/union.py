@@ -147,13 +147,17 @@ def visto(guia, hojas: list) -> bool | None:
     if not marcadas:
         return True
     prompt = ((open(PROMPT, encoding="utf-8").read() if os.path.exists(PROMPT) else "")
-              + "\n\nHOY MIRAS LA HOJA GUÍA, NO UN RENDER: un fotograma por segundo de cada"
-                " escena (`hojas`) y la hoja de costuras (`costuras.hojas`), con los cortes"
-                " marcados en `costuras.marcadas`. Juzgas la continuidad de plano y de"
-                " intención en cada corte marcado. Contestas como en el visto:"
-                " `se_ensena`, `por_que`, `aprueba`, `devuelve` y `mirado`.")
+              )
+    # La instrucción va en los datos: del prompt, el pliego sólo deja pasar los
+    # apartados del contrato (`dominio/pliego.py`).
     r = contrato.pedir("visto", f"reel-{guia.n:02d}", prompt, {
-        "modo": "guia", "huella": guia.huella, "hojas": hojas, "costuras": costuras,
+        "modo": "guia", "como_se_mira": (
+            "HOY MIRAS LA HOJA GUÍA, NO UN RENDER: un fotograma por segundo de cada"
+            " escena (`hojas`) y la hoja de costuras (`costuras.hojas`), con los cortes"
+            " marcados en `costuras.marcadas`. Juzgas la continuidad de plano y de"
+            " intención en cada corte marcado. Contestas como en el visto: `se_ensena`,"
+            " `por_que`, `aprueba`, `devuelve` y `mirado`."),
+        "huella": guia.huella, "hojas": hojas, "costuras": costuras,
         "por_que_se_mira": [f"e{c['de']['etapa']}|e{c['a']['etapa']}: "
                             + "; ".join(m["detalle"] for m in c["marcas"]) for c in marcadas]})
     if r is None:
