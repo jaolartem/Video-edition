@@ -177,6 +177,32 @@ mailbox, which has no trade: a human answers it.
   approved seconds stay approved.
 - A piece already signed off does not ask for a guide sheet again.
 
+## Everything per scene
+
+The scene (one stage of the approved script) is the unit. Every artifact that
+is expensive to produce is cached per scene, keyed by a fingerprint of what the
+scene shows and sounds, counted from the scene's own start, so a change in one
+scene only redoes that scene:
+
+| What | Cache | Key |
+|---|---|---|
+| Scene document | `ads/<piece>/escenas/eNN.json` (from SQL), compiled into `pieza.json` | written on every change, sealed |
+| Phase | table `escena_fase` | a ticket moves back only its scene |
+| Framing | `work/scenes/<piece>/encuadres.json` | tape, edges, stage, requested shot |
+| Cut clips | `work/seg-<piece>/<hash>.mp4` | source, range, crop filter |
+| Face, gaps, background | `work/scenes/<piece>/<name>.porescena.json` | what the scene shows |
+| Subject cut-outs | `public/recorte/<piece>-eN.huella` | what its window shows |
+| Subtitles | `work/subs/trozos/<piece>/<hash>.json` | audio of each silence-split chunk |
+| Guide frames | `work/still/guia/<piece>/segundos/<hash>.png` | content of that second, scene-relative |
+| Render | `work/render/<piece>/<hash>.mp4` | everything visible or audible in the scene's range |
+| Sound effects | `work/efectos/<piece>/<hash>.wav` | same as the render |
+
+Video chunks are joined without re-encoding; audio is joined as PCM trimmed to
+the sample and encoded once. What is by definition about the whole piece stays
+whole: loudness normalisation, the music bed, the clean-voice export and the
+cross-scene redundancy review. The union of scenes is checked on a seams sheet
+before the render (`dominio/union.py`).
+
 ## Deployment
 
 Development happens in a git checkout; production runs from a deployed copy.
