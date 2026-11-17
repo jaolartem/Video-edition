@@ -497,25 +497,15 @@ if __name__ == "__main__":
     # guarda por escena (su cinta, sus bordes, su etapa, lo pedido) y se
     # reutiliza mientras eso no cambie.
     congelados_ruta = os.path.join(os.path.dirname(os.path.abspath(args.plan)), "encuadres.json")
-    try:
-        congelados = {} if args.recalcular else json.load(open(congelados_ruta, encoding="utf-8"))
-    except (OSError, ValueError):
-        congelados = {}
+    congelados = {} if args.recalcular or not os.path.exists(congelados_ruta) else         json.load(open(congelados_ruta, encoding="utf-8"))
     FIJA = ("encuadre", "crop", "filtro", "reescalado", "recorrido", "cara", "zoom")
-
-    def clave(e):
-        return json.dumps([os.path.basename(fuente_de(e)), round(e["origen_desde"], 3),
-                           round(e["origen_hasta"], 3), e.get("beat"), e.get("encuadre"),
-                           e.get("zoom")], ensure_ascii=False)
-
-    nuevos = {}
-    idx = 0
-    blandos = []
+    nuevos, idx, blandos = {}, 0, []
     for i, e in enumerate(escenas):
-        k = clave(e) if not (e.get("angulo") or (e.get("hereda_encuadre") and i > 0)) else None
-        if k and k in congelados:
-            e.update(congelados[k])
-            nuevos[k] = congelados[k]
+        k = None if e.get("angulo") or (e.get("hereda_encuadre") and i > 0) else json.dumps(
+            [os.path.basename(fuente_de(e)), round(e["origen_desde"], 3),
+             round(e["origen_hasta"], 3), e.get("beat"), e.get("encuadre"), e.get("zoom")])
+        if k in congelados:
+            e.update(congelados[k]); nuevos[k] = congelados[k]  # noqa: E702
             print(f"  {i} {e.get('encuadre', ''):12} (el de antes: la escena no cambió)")
             continue
         # **Otro ángulo entra entero** (C-672): no es un encuadre del mismo 4K
