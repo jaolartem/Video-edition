@@ -141,6 +141,24 @@ class Guia:
             out.append(ruta)
         return out
 
+    def costuras(self) -> dict:
+        """**La unión, mirada antes del render** (C-745): la hoja de costuras.
+
+        Los dos segundos a cada lado de cada corte entre escenas, con lo que se
+        mide marcado (salto de encuadre, palabra repetida a través del corte) y
+        la intención de cada lado escrita, para juzgar la continuidad.
+        """
+        from dominio.union import Union
+        u = Union(self.slug, self.spec)
+        falta = [n for n in u.nombres() if not os.path.isfile(os.path.join(self.fotos, f"{n}.png"))]
+        if falta:
+            subprocess.run(["bash", "scripts/mirar.sh", "--segundos", str(self.n), self.fotos],
+                           check=True, env={**os.environ, "GUIA_SOLO": ",".join(falta)})
+        cs = u.costuras()
+        return {"hojas": u.hoja(self.fotos, self.salida, getattr(self, "tanda", self.huella)),
+                "marcadas": [c.como_json() for c in cs if c.marcas],
+                "cortes": len(cs)}
+
     def pide(self, hojas: list[str], faltan: list[str]) -> dict | None:
         """Deja el pedido abierto para Jaime y devuelve su respuesta si ya está."""
         prompt = (f"Hoja guía de {self.slug}: un fotograma por segundo del spec"
@@ -148,7 +166,7 @@ class Guia:
                   " diga de un segundo es un tiquet con `--de montaje`.")
         return servicio.pedir(PASO, self.slug, prompt, {
             "huella": self.huella, "hojas": hojas, "segundos": round(self.dura, 1),
-            "por_aprobar": faltan,
+            "por_aprobar": faltan, "costuras": self.costuras(),
             "se_aprueba_con": f"python scripts/guia.py {self.n} --aprobar --de \"…\"",
         }, cli=False)
 
