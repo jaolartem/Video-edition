@@ -98,12 +98,6 @@ def _falta(nombre, e, vacio):
     return vacio
 
 
-#: Los buzones que trabajan escena a escena (C-744). Jaime: *«cada escena es su
-#: propia unidad»*. El repaso, la redundancia y las fuentes miran la pieza
-#: entera a propósito: lo que buscan cruza escenas.
-POR_ESCENA = ("describir", "disenar", "revalidar")
-
-
 def _marcador(slug):
     """Donde esta la pieza y en que fichero lo escribe quien la mueve.
 
@@ -328,8 +322,7 @@ def contexto(paso, slug):
              # Y su lengua y su cuadro si no son los de siempre (C-665, C-671).
              **_pieza.Pieza.en_pedido(slug), "marcador": _marcador(slug)}
     # **Y el que compone o diseña recibe sus escenas, no la pieza** (C-744).
-    if paso in POR_ESCENA:
-        d["marcador"] = _estado.por_escena(d["marcador"])
+    d["marcador"] = _estado.por_escena(d["marcador"], paso)
     return {**d, **({"huecos": dict(_HUECOS)} if _HUECOS else {})}
 
 

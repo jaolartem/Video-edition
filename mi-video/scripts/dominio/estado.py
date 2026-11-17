@@ -350,7 +350,13 @@ def para_pedido(slug):
     return {**m, **({"falta": d["falta"]} if d.get("falta") else {})}
 
 
-def por_escena(marcador: dict) -> dict:
+#: Los buzones que trabajan escena a escena (C-744). Jaime: *«cada escena es su
+#: propia unidad»*. El repaso, la redundancia y las fuentes miran la pieza
+#: entera a propósito: lo que buscan cruza escenas.
+POR_ESCENA = ("describir", "disenar", "revalidar")
+
+
+def por_escena(marcador: dict, paso: str | None = None) -> dict:
     """El marcador de un pedido que trabaja escena a escena (C-744).
 
     Lleva **entero** el documento de cada escena en juego —las abiertas y las
@@ -359,7 +365,7 @@ def por_escena(marcador: dict) -> dict:
     aprobadas y no se tocan. Si no hay nada aprobado, la pieza se compone
     entera y va todo, como antes.
     """
-    if not isinstance(marcador, dict) or not marcador.get("segmentos"):
+    if paso not in POR_ESCENA or not isinstance(marcador, dict) or not marcador.get("segmentos"):
         return marcador
     segs = marcador["segmentos"]
     en_juego = [j for j in segs if not j.get("aprobado") or j.get("tiquets")]
