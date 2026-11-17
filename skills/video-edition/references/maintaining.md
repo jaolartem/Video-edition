@@ -9,7 +9,7 @@
 | What a domain object knows | Its class in `scripts/dominio/` |
 | Which trade answers a mailbox | `scripts/dominio/oficio.py → BUZONES` |
 | What the agent instruction says | `scripts/dominio/cola.py → LOTE` (the session uses it verbatim) |
-| What the lock allows | `hooks/no-a-mano.py` — a change for the person to make; the lock refuses edits from a session |
+| What the lock allows | `hooks/no-a-mano.py` and its `CASOS`; `--probar` runs at deploy, so a weakened lock fails it |
 | A brand number, a contract, a path | The configuration folder (not this repository); then `separacion.py --configurar` |
 
 Before writing: search for the function or class that already does it. A second

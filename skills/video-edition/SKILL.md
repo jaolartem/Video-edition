@@ -15,7 +15,7 @@ You have exactly two roles. There is no third.
 
 | Role | What you do | What you never do |
 |---|---|---|
-| **Maintain the machine** | Fix what breaks in the code of the repository, close gaps where a decision gets lost, put into code what only lived in someone's head; then check and deploy | Patch the running line, the database or a piece's files to get past an error |
+| **Maintain the machine** | Fix what breaks in the code or configuration, close gaps where a decision gets lost, put into code what only lived in someone's head, keep the documentation current; then check and deploy | Patch the running line, the database or a piece's files to get past an error |
 | **Act as a cog** | When a step asks (a `.pedido.json`), answer it as the service would: write the `.respuesta.json` that step reads, with the batch instruction `cola.py` prints, verbatim | Decide outside the line, compose your own instruction, or answer a question nobody asked |
 
 Doing the machine's work by hand (reading a dossier and editing the database,
@@ -164,21 +164,27 @@ Details: [references/maintaining.md](references/maintaining.md).
 ## The lock
 
 `hooks/no-a-mano.py` runs before every `Write`, `Edit`, `Bash`, `PowerShell` or
-terminal call. Inside the line, the database, piece/scene/script documents, the
-configuration folder or the lock itself, only this passes:
+terminal call. It protects **production, not tools**. Inside the line
+(`<root>`), the database or piece/scene/script documents, only this passes:
 
 - reading (SQLite only with `?mode=ro`);
 - the line's own commands: `donde.py`, `monitor.py`, `verdad.py`, `cola.py`,
   `desplegar.py`, `arrancar.sh`, `consulta.py`, `tablero.py`, `ticket.py` (with
   `--de` or `--ver`), `guia.py` (`--aprobar` only with `--de`), `separacion.py`,
   `tamano.py`, `alcance.py`, `guardas.mjs`;
-- writing a `work/servicio/<mailbox>/<slug>.respuesta.json`;
-- writing the configuration's `docs/correcciones.md`.
+- writing a `work/servicio/<mailbox>/<slug>.respuesta.json`.
 
-Everything else is denied with exit code 2 and the reason. A denial is the
-answer, not an obstacle: do not look for another way to do the same thing. In
-particular you never move a piece back a phase, write to the database or
-`<root>`, close or reroute tickets, approve a version, or edit the lock.
+Everything else there is denied with exit code 2 and the reason, writing `git`
+commands included. A denial is the answer, not an obstacle: do not look for
+another way to do the same thing. In particular you never move a piece back a
+phase, write to the database or `<root>`, close or reroute tickets, or approve
+a version.
+
+Code, configuration, instructions, documentation and the lock itself are tools:
+you edit them in the repository or the configuration folder, and keeping the
+documentation current is part of your job. They reach the line only through
+`desplegar.py`, which runs `hooks/no-a-mano.py --probar`, so a weakened lock
+fails the deploy.
 
 Command reference: [references/commands.md](references/commands.md).
 

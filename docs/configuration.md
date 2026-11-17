@@ -136,7 +136,7 @@ What the operator agent is told, and the project's memory of its mistakes.
 | `docs/estado.md` | Current state of work: what is open and how it is split |
 | `docs/proceso.md`, `docs/entorno.md`, `docs/rendimiento.md` | Process, environment gotchas, performance measurements |
 | `docs/aprendizajes.md` | Numbered lessons learned |
-| `docs/correcciones.md` | **The corrections log.** Every entry declares its guard; `guardas.mjs` fails the deploy if a guard is missing or broken (see [development.md](development.md)). This is the one configuration file an agent may write. |
+| `docs/correcciones.md` | **The corrections log.** Every entry declares its guard; `guardas.mjs` fails the deploy if a guard is missing or broken (see [development.md](development.md)). |
 | `docs/redundancia.md`, `docs/revision.md`, `docs/bitacora.md`, `docs/duplicados.txt` | Audits, review notes, logbook |
 | `docs/propuestas/**`, `mi-video/docs/propuestas/**` | Proposals |
 | `mi-video/src/muestras.ts` | Sample props for Remotion Studio previews |
@@ -164,5 +164,5 @@ The only place a path is written. Read by `scripts/rutas.py` and
 | `_*`, `herramientas` | — | Notes for humans; not read by code |
 
 The lock (`hooks/no-a-mano.py`) reads `linea.raiz` to know which root to
-protect, and `separacion.json → raiz_configuracion` to protect the
-configuration folder.
+protect. The configuration folder is not protected: it is a tool an agent may
+edit, and it reaches the line only through `desplegar.py`.

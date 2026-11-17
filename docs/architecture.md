@@ -240,14 +240,20 @@ If the trigger is running when code changes, it exits with code 75 and
 
 ## The lock
 
-`hooks/no-a-mano.py` is a `PreToolUse` hook. It works by **zones** and an allow
-list: inside a zone, only what is declared passes.
+`hooks/no-a-mano.py` is a `PreToolUse` hook. It protects **production, not
+tools**: an agent never touches a video, the line, its database or a piece's
+documents by hand, but it maintains the machine. It works by **zones** and an
+allow list: inside a zone, only what is declared passes.
 
-Zones: the line root, the configuration folder, any `.db`, scene documents
-(`/escenas/e…`), `pieza.json`, `guion.json`, `estado.json`, `frames.json`,
-`glosario.json`, `decisiones.db`, `apoyo.json`, and the lock itself
-(`hooks/no-a-mano.py`, `hooks/hooks.json`, `.claude/settings*.json`,
-`.claude/hooks/`).
+Zones: the line root (`rutas.json → linea.raiz`) and, inside the machine
+project or the line, any `*.db`, scene documents (`escenas/e*`), `pieza.json`,
+`guion.json`, `estado.json`, `frames.json`, `glosario.json` and `apoyo.json`.
+
+Not zones: code, configuration, instructions, documentation and the lock
+itself. They are tools, edited in the repository or the configuration folder,
+and keeping the documentation current is part of the job. They reach the line
+only through `desplegar.py`, which runs `hooks/no-a-mano.py --probar` among its
+checks, so a weakened lock fails the deploy.
 
 Allowed inside a zone:
 
@@ -256,14 +262,15 @@ Allowed inside a zone:
 | Read | Any command without write signals; SQLite only with `mode=ro` |
 | Line commands | Scripts in `PERMITIDOS`: `donde.py`, `monitor.py`, `verdad.py`, `cola.py`, `desplegar.py`, `arrancar.sh`, `consulta.py`, `tablero.py`, `ticket.py`, `guia.py`, `separacion.py`, `tamano.py`, `alcance.py`, `guardas.mjs` |
 | Act as a cog | Write `work/servicio/<mailbox>/<slug>.respuesta.json` |
-| Log a correction | Write `<config>/docs/correcciones.md` |
 
 Explicitly denied even with an allowed script: `--volver` (moving a piece back),
 `ticket.py --cerrar/--ruta/--estado` (closing or rerouting tickets), `ticket.py`
-without `--de` or `--ver`, `guia.py --aprobar` without `--de`, SQL writes, and
-importing `servicios` by hand. Exit code 2 with the reason on stderr means
-denied. `python hooks/no-a-mano.py --probar` runs its test cases (`CASOS`), and
-the deploy runs them too.
+without `--de` or `--ver`, `guia.py --aprobar` without `--de`, SQL writes,
+importing `servicios` by hand, and any `git` command that writes (`apply`,
+`checkout`, `restore`, `reset`, `rm`, `mv`, `clean`, `stash`, `am`,
+`cherry-pick`, `merge`, `pull`, `commit`, `switch`, `rebase`). Exit code 2 with
+the reason on stderr means denied. `python hooks/no-a-mano.py --probar` runs its
+test cases (`CASOS`), and the deploy runs them too.
 
 ## Formats and languages
 

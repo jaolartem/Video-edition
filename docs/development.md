@@ -94,7 +94,10 @@ in a document, not even as an example). It also fails on Python files that
 define the same name twice and on bouncy easing in components. If a guard breaks because code was renamed, update the guard;
 if it broke because the mechanism was lost, restore the mechanism.
 
-The lock allows an agent to write this one file in the configuration folder.
+Code, configuration (this log included), documentation and the lock itself are
+tools an agent edits in the repository or the configuration folder; the lock
+only protects production (see [architecture.md](architecture.md#the-lock)).
+Keeping the documentation current is part of every change.
 
 ## From change to production
 

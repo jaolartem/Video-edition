@@ -9,17 +9,23 @@ la máquina publicada como habilidad: *«también tiene que ser radical la
 imposibilidad de que tú lo toques o lo modifiques a mano»*.
 
 **Era una lista de lo prohibido, y lo que no estaba en la lista pasaba** (C-734).
-Ahora es al revés. Hay **zonas**: la línea en marcha, la base, los documentos de
-escena, de pieza y de guion, las declaraciones, la carpeta de configuración y
-este mismo cerrojo. Dentro de una zona sólo pasa lo declarado aquí:
+Ahora es al revés. Hay **zonas**, y son **la producción**: la línea en marcha,
+la base, los documentos de escena, de pieza y de guion, y las declaraciones.
+Dentro de una zona sólo pasa lo declarado aquí:
 - **leer**: un comando sin señales de escritura, y la base sólo con `mode=ro`;
 - **las órdenes de la línea**, por su script (`PERMITIDOS`);
-- **hacer de piñón**: escribir la respuesta de un pedido (`*.respuesta.json`);
-- **apuntar una corrección** en el log de la configuración.
+- **hacer de piñón**: escribir la respuesta de un pedido (`*.respuesta.json`).
 
-Cualquier otro intérprete, redirección, copia o consulta que escriba dentro de
-una zona se deniega. El cerrojo se protege a sí mismo: no se edita desde una
-sesión, ni el fichero ni los `settings` que lo enchufan.
+Cualquier otro intérprete, redirección, copia, consulta o `git` que escriba
+dentro de una zona se deniega.
+
+**Lo que se protege es la producción, no las herramientas** (C-754). Jaime,
+17-11-2026: *«lo que debe estar cuidado y protegido no es el código, es la línea
+de producción… tú no puedes tocar un video a mano, pero sí puedes editar y
+manejar las herramientas que tocan los videos; y además actualizar la
+documentación es parte de tu trabajo»*. El código, la configuración, las
+instrucciones y este cerrojo se cambian en el repo y llegan a la línea por
+`desplegar.py`, que corre `--probar`: así se cuida que nadie lo afloje.
 
 Sale con 2 —y el motivo por stderr— si deniega; con 0 si deja pasar.
 """
@@ -57,21 +63,15 @@ def _de_json(ruta, *claves, defecto=None):
 
 #: La línea en marcha, la que declara la configuración (`rutas.json`).
 LINEA = _norm(_de_json("mi-video/rutas.json", "linea", "raiz", defecto="")).rstrip("/")
-CONFIG = "/" + _norm(_de_json("separacion.json", "raiz_configuracion",
-                              defecto="configuracion")).strip("/") + "/"
-#: Zonas por sitio: la línea entera y la carpeta de la configuración.
+#: Zonas por sitio: la línea entera. La configuración es herramienta (C-754).
 SITIOS = tuple(z for z in (LINEA + "/" if LINEA else "", "/" + LINEA.replace(":", "", 1) + "/"
-                           if LINEA else "", CONFIG) if z)
+                           if LINEA else "") if z)
 #: Zonas por nombre: sólo dentro de la máquina o de la línea, no en otro proyecto.
 NOMBRES = (".db", "/escenas/e", "pieza.json", "guion.json", "estado.json", "frames.json",
            "glosario.json", "apoyo.json")
-#: El cerrojo mismo y lo que lo enchufa.
-PROPIO = ("hooks/no-a-mano.py", "hooks/hooks.json", ".claude/settings.json",
-          ".claude/settings.local.json", ".claude/hooks/")
 
 #: Escritura permitida dentro de una zona, por la herramienta de ficheros.
-ESCRIBE_SI = (re.compile(r"/work/servicio/[^/]+/[^/]+\.respuesta\.json\Z"),
-              re.compile(re.escape(CONFIG) + r"docs/correcciones\.md\Z"))
+ESCRIBE_SI = (re.compile(r"/work/servicio/[^/]+/[^/]+\.respuesta\.json\Z"),)
 #: Las órdenes de la línea que puede dar un agente, por el nombre del script.
 PERMITIDOS = {"donde.py", "monitor.py", "verdad.py", "cola.py", "desplegar.py",
               "arrancar.sh", "consulta.py", "tablero.py", "ticket.py", "guia.py",
@@ -105,8 +105,6 @@ def _en_zona(r):
 
 def fichero(ruta):
     r = _norm(ruta)
-    if any(p in r for p in PROPIO):
-        _niega(f"editar {ruta}: el cerrojo no se toca desde una sesión")
     if _en_zona(r) and not any(p.search(r) for p in ESCRIBE_SI):
         _niega(f"escribir en {ruta}, que es la línea, la base, un documento de la "
                "pieza o la configuración")
@@ -151,6 +149,9 @@ def _orden(s):
         _niega("tocar la base: sólo se lee, y con mode=ro")
     if "import servicios" in s or "from servicios" in s:
         _niega("llamar a un paso de la línea a mano")
+    if re.search(r"\bgit\b.*\b(apply|checkout|restore|reset|rm|mv|clean|stash|am|"
+                 r"cherry-pick|merge|pull|commit|switch|rebase)\b", s):
+        _niega("escribir en la producción con git")
     if INTERPRETE.search(s):
         guion = _script(s)
         if guion in PERMITIDOS:
@@ -165,9 +166,6 @@ def _orden(s):
 
 def comando(cmd):
     c = re.sub(r"\d?>\s*(/dev/null|&\d|\$null|nul)\b", " ", _norm(cmd))
-    if any(p in c for p in PROPIO) and (ESCRIBE.search(c) or "git rm" in c
-                                        or "git checkout" in c or "git restore" in c):
-        _niega("tocar el cerrojo desde un comando")
     if not _en_zona(c):
         return
     for s in _segmentos(c):
@@ -185,12 +183,14 @@ def decide(d):
 CASOS = [
     ("Write", {"file_path": "F:/linea/datos/ads/reel-23/x.json"}, False),
     ("Write", {"file_path": "F:/linea/codigo/mi-video/work/servicio/disenar/reel-23.respuesta.json"}, True),
-    ("Edit", {"file_path": "F:/Edicion de video/configuracion/docs/canon.md"}, False),
-    ("Edit", {"file_path": "F:/Edicion de video/configuracion/docs/correcciones.md"}, True),
+    ("Edit", {"file_path": "F:/Edicion de video/configuracion/docs/canon.md"}, True),
+    ("Edit", {"file_path": "F:/Edicion de video/configuracion/CLAUDE.md"}, True),
     ("Write", {"file_path": "mi-video/ads/reel-23/escenas/e02.json"}, False),
     ("Write", {"file_path": "D:/otro-proyecto/datos.db"}, True),
-    ("Edit", {"file_path": "F:/x/hooks/no-a-mano.py"}, False),
-    ("Edit", {"file_path": "F:/x/.claude/settings.json"}, False),
+    ("Edit", {"file_path": "F:/x/hooks/no-a-mano.py"}, True),
+    ("Edit", {"file_path": "F:/x/.claude/settings.json"}, True),
+    ("Bash", {"command": "cd F:/linea/codigo/mi-video && git apply cambio.patch"}, False),
+    ("Bash", {"command": "git -C F:/linea/datos checkout -- ads/frames.json"}, False),
     ("Write", {"file_path": "F:/x/mi-video/scripts/guia.py"}, True),
     ("Bash", {"command": "sqlite3 F:/linea/datos/ads/decisiones.db \"update video set x=1\""}, False),
     ("Bash", {"command": "cd F:/linea/codigo/mi-video && python scripts/donde.py"}, True),
@@ -202,7 +202,7 @@ CASOS = [
     ("Bash", {"command": "cd F:/linea/codigo/mi-video && python scripts/dominio/ticket.py reel-03 30 \"x\" --de entrega"}, True),
     ("Bash", {"command": "cd F:/linea/codigo/mi-video && python scripts/dominio/ticket.py --cerrar 4 x"}, False),
     ("PowerShell", {"command": "Set-Content F:\\linea\\datos\\x.txt 1"}, False),
-    ("Bash", {"command": "git rm hooks/no-a-mano.py"}, False),
+    ("Bash", {"command": "git commit -am 'cerrojo'"}, True),
     ("Bash", {"command": "python scripts/desplegar.py --aunque-haya-pedidos"}, True),
 ]
 

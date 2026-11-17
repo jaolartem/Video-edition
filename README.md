@@ -35,8 +35,9 @@ already approved is verified, never re-discussed.
   contact sheet is drawn from the Remotion bundle and approved by a human.
 - **Production never runs from git.** `desplegar.py` copies a checked commit into
   `<root>/codigo`; data lives in `<root>/datos`. A lock hook prevents agents
-  from editing the running line, its database, its documents or the
-  configuration by hand.
+  from touching production by hand (the running line, its database, its piece
+  documents); code, configuration and documentation stay editable and reach the
+  line only through a checked deploy.
 
 See [docs/architecture.md](docs/architecture.md) for the full picture.
 
@@ -103,12 +104,14 @@ The plugin root is the repository root, so Claude Code discovers:
 
 **The hook only acts inside a machine project** — a project whose root has
 `separacion.json`. Anywhere else it lets everything through. Inside one, it
-denies writes to the line root declared in `rutas.json`, the configuration
-folder, and — within the project or the line — any `*.db`, `pieza.json`,
-`guion.json`, `estado.json`, `frames.json`, `glosario.json`, `apoyo.json` or
-`escenas/e*` file. It also refuses edits to itself and to the settings that wire
-it. Inside this repository, `.claude/settings.json` wires the same hook through
-`$CLAUDE_PROJECT_DIR`.
+denies writes (including writing `git` commands) to the line root declared in
+`rutas.json` and — within the project or the line — to any `*.db`,
+`pieza.json`, `guion.json`, `estado.json`, `frames.json`, `glosario.json`,
+`apoyo.json` or `escenas/e*` file. It protects production, not tools: code,
+configuration, documentation and the hook itself are editable, and
+`desplegar.py` runs `hooks/no-a-mano.py --probar`, so a weakened lock fails the
+deploy. Inside this repository, `.claude/settings.json` wires the same hook
+through `$CLAUDE_PROJECT_DIR`.
 
 ## Using it with other agents
 

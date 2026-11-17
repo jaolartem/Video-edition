@@ -34,11 +34,12 @@ run the close.
 
 ## What the lock allows inside a zone
 
-Zones: the line root (`rutas.json → linea.raiz`), the configuration folder,
-any `.db`, `/escenas/e…`, `pieza.json`, `guion.json`, `estado.json`,
-`frames.json`, `glosario.json`, `apoyo.json`, and the lock's own files
-(`hooks/no-a-mano.py`, `hooks/hooks.json`, `.claude/settings*.json`,
-`.claude/hooks/`).
+Zones are production only: the line root (`rutas.json → linea.raiz`) and,
+inside the machine project or the line, any `*.db`, `escenas/e*`, `pieza.json`,
+`guion.json`, `estado.json`, `frames.json`, `glosario.json`, `apoyo.json`.
+Code, configuration, documentation and the lock itself are not zones: edit them
+in the repository or the configuration folder; they reach the line through
+`desplegar.py`, which fails if `--probar` does.
 
 | Passes | Denied |
 |---|---|
@@ -48,7 +49,7 @@ any `.db`, `/escenas/e…`, `pieza.json`, `guion.json`, `estado.json`,
 | `ticket.py --de …`, `ticket.py --ver` | `ticket.py --cerrar/--ruta/--estado`, `ticket.py` without `--de` |
 | `guia.py --aprobar --de …` | `guia.py --aprobar` without `--de` |
 | Writing `work/servicio/<mailbox>/<slug>.respuesta.json` | Writing any other file in a zone |
-| Writing `<config>/docs/correcciones.md` | Editing any other configuration file, or the lock |
+| Reading git (`status`, `log`, `diff`, …) | Writing git (`apply`, `checkout`, `restore`, `reset`, `rm`, `mv`, `clean`, `stash`, `am`, `cherry-pick`, `merge`, `pull`, `commit`, `switch`, `rebase`) |
 | | `--volver` anywhere (moving a piece back a phase) |
 
 Inline code with `python -c` / `node -e` passes only if it shows no write
