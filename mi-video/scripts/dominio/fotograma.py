@@ -202,3 +202,54 @@ def guarda(fotos: Fotogramas, frames: dict, salida: str, almacen: str) -> None:
         guardado = os.path.join(almacen, f"{fotos.huella(frame)}.png")
         if os.path.isfile(hecho) and os.path.getsize(hecho) > 0 and not os.path.isfile(guardado):
             shutil.copyfile(hecho, guardado)
+
+
+def tramos_de_render(spec: dict, plan_escenas: list) -> list[dict]:
+    """**Los tramos del render, uno por escena, con su huella** (C-749).
+
+    Jaime: *«haz la cadena por escena también»*. Un tramo es de su escena hasta
+    la siguiente; su huella es lo que se ve y se oye en él, **contado desde su
+    inicio**: lo fijo del spec y el código, lo que toca su ventana (también lo
+    que cruza el borde), sus cortes, su EDL y las escenas del plan que caen en
+    él —qué cinta, qué recorte, qué tramo—. Si e2 cambia, los demás tramos
+    conservan su huella y su render no se repite.
+    """
+    f = Fotogramas(spec)
+    if len(f.tramos) < 2:
+        return []
+    total = int(round(f.dura * FPS))
+    inicios = sorted(a for a, _ in f.tramos.values())
+    inicios[0] = 0
+    out = []
+    for i, a in enumerate(inicios):
+        b = inicios[i + 1] if i + 1 < len(inicios) else total
+        if b <= a:
+            continue
+        ahi = {k: [_corre(e, a) for e in v
+                   if _cuando(e)[0] < b + MARGEN and _cuando(e)[1] > a - MARGEN]
+               for k, v in f.temporales.items()}
+        cortes = [c - a for c in f.cortes if a - MARGEN <= c < b + MARGEN]
+        beats = {x for x, (p, q) in f.tramos.items() if p < b and q > a}
+        plan = [{**p, "montado_desde": round(p["montado_desde"] - a / FPS, 3)}
+                for p in plan_escenas
+                if isinstance(p.get("montado_desde"), (int, float))
+                and p["montado_desde"] * FPS < b
+                and (p["montado_desde"] + (p.get("duracion") or 0)) * FPS > a]
+        out.append({"a": a, "b": b, "huella": _h([f.fijo, b - a, ahi, cortes,
+                                                   [d for d in f.edl if d.get("beat") in beats],
+                                                   plan])})
+    return out
+
+
+if __name__ == "__main__":
+    import sys
+
+    n = int(sys.argv[sys.argv.index("--render") + 1])
+    spec = next(p for p in json.load(open("src/reels.json", encoding="utf-8"))
+                if p.get("id") == f"Reel-R{n}")
+    try:
+        plan = json.load(open(f"work/scenes/reel-{n:02d}/plan-full.json",
+                              encoding="utf-8")).get("escenas") or []
+    except (OSError, ValueError):
+        plan = []
+    print(json.dumps(tramos_de_render(spec, plan)))

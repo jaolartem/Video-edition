@@ -24,7 +24,7 @@
 import fs from 'fs';
 import {execFileSync} from 'node:child_process';
 import {bundle} from '@remotion/bundler';
-import {renderMedia, selectComposition} from '@remotion/renderer';
+import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
 import path from 'node:path';
 import {rutas} from './rutas.mjs';
 import {aplicar} from './temporal.mjs';
@@ -118,6 +118,66 @@ const CONCURRENCIA = Math.min(
   Math.max(1, Number(process.env.RENDER_CONCURRENCIA) || 8),
 );
 
+/**
+ * **El render, escena a escena** (C-749). Jaime: *«haz la cadena por escena
+ * también»*. Cada tramo —de una escena a la siguiente— se guarda en
+ * `work/render/<pieza>/<huella>.mp4`, y su huella (`dominio/fotograma.py ::
+ * tramos_de_render`) cambia sólo si cambia lo que se ve o se oye en él. Se
+ * renderizan los que faltan, el vídeo se une sin recodificar y el audio se une
+ * en PCM, cortado a la muestra, y se codifica una vez: así no se arrastra el
+ * relleno del AAC de cada tramo en cada costura. Si algo falla, `false`: el
+ * render entero de siempre.
+ */
+async function porEscena(n, composition, comun, salida) {
+  let tramos;
+  try {
+    tramos = JSON.parse(execFileSync('python', ['scripts/dominio/fotograma.py',
+      '--render', String(n)], {encoding: 'utf8', env: {...process.env, PYTHONIOENCODING: 'utf-8'}}));
+  } catch (e) {
+    console.log(`  (por escena no: ${e.message.split('\n')[0]})`);
+    return false;
+  }
+  if (!tramos || tramos.length < 2) return false;
+  const total = composition.durationInFrames;
+  const dir = path.join('work', 'render', `reel-${String(n).padStart(2, '0')}`);
+  fs.mkdirSync(dir, {recursive: true});
+  const hechos = [];
+  let nuevos = 0;
+  // Un navegador para todos los tramos: abrir uno por tramo son segundos cada vez.
+  let navegador = null;
+  for (const tr of tramos) {
+    const b = Math.min(tr.b, total);
+    if (b <= tr.a) continue;
+    const f = path.join(dir, `${tr.huella}.mp4`);
+    if (!fs.existsSync(f)) {
+      navegador ??= await openBrowser('chrome', {chromiumOptions: {gl: 'angle'}});
+      await renderMedia({...comun, frameRange: [tr.a, b - 1], enforceAudioTrack: true,
+        puppeteerInstance: navegador, outputLocation: f + '.tmp.mp4'});
+      fs.renameSync(f + '.tmp.mp4', f);
+      nuevos += 1;
+    }
+    hechos.push({f, dura: (b - tr.a) / composition.fps});
+  }
+  if (navegador) await navegador.close({silent: true});
+  for (const viejo of fs.readdirSync(dir)) {
+    if (!hechos.some((h) => path.basename(h.f) === viejo)) fs.rmSync(path.join(dir, viejo), {force: true});
+  }
+  console.log(`  por escena: ${nuevos} tramo(s) renderizados, ${hechos.length - nuevos} sin cambios`);
+  const tmp = path.join(TMP, `r${n}`);
+  fs.mkdirSync(tmp, {recursive: true});
+  const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], {stdio: ['ignore', 'inherit', 'inherit']});
+  const barra = (x) => path.resolve(x).split(path.sep).join('/');
+  fs.writeFileSync(path.join(tmp, 'v.txt'), hechos.map((h) => `file '${barra(h.f)}'`).join('\n') + '\n');
+  ff(['-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'v.txt'), '-map', '0:v', '-c', 'copy', path.join(tmp, 'v.mp4')]);
+  hechos.forEach((h, i) => ff(['-i', h.f, '-vn', '-af', `apad,atrim=0:${h.dura.toFixed(6)}`,
+    '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', path.join(tmp, `a${i}.wav`)]));
+  fs.writeFileSync(path.join(tmp, 'a.txt'), hechos.map((_, i) => `file '${barra(path.join(tmp, `a${i}.wav`))}'`).join('\n') + '\n');
+  ff(['-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'a.txt'), '-c', 'copy', path.join(tmp, 'a.wav')]);
+  ff(['-i', path.join(tmp, 'v.mp4'), '-i', path.join(tmp, 'a.wav'), '-map', '0:v', '-map', '1:a',
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', salida]);
+  return true;
+}
+
 const t0 = Date.now();
 // **En `--solo-bundle`, por la salida estandar va la ruta y NADA mas.**
 //
@@ -188,11 +248,10 @@ for (const n of piezas) {
   const salida = path.join(rutas.destino, 'reels', `reel-R${n}.mp4`);
   const t = Date.now();
   const composition = await selectComposition({serveUrl: servedUrl, id});
-  await renderMedia({
+  const comun = {
     composition,
     serveUrl: servedUrl,
     codec: 'h264',
-    outputLocation: salida,
     // La composición ya iba por GPU con `--gl=angle`: Chrome dibuja por D3D11 y
     // no por software. Se conserva tal cual.
     chromiumOptions: {gl: 'angle'},
@@ -222,7 +281,10 @@ for (const n of piezas) {
     // que tardo el doble.
     timeoutInMilliseconds: 120000,
     logLevel: 'error',
-  });
+  };
+  if (!(await porEscena(n, composition, comun, salida))) {
+    await renderMedia({...comun, outputLocation: salida});
+  }
   // **Y el fichero queda estampado con lo que dibujo.**
   //
   // Jaime: *«con una que no cuadre es suficiente para saber que eso no es lo que
