@@ -60,6 +60,7 @@ COMPROBACIONES = [
     ("comprobado", [sys.executable, "scripts/comprobado.py", "--solo-huecos"]),
     ("tamano", [sys.executable, "scripts/tamano.py"]),
     ("separacion", [sys.executable, "scripts/separacion.py", "--comprobar"]),
+    ("cerrojo", [sys.executable, "../hooks/no-a-mano.py", "--probar"]),
     ("lint", ["npm", "run", "lint"]),
 ]
 

@@ -1,0 +1,17 @@
+{
+  "description": "El cerrojo de la máquina: ningún agente toca la línea a mano.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__terminal__run_in_terminal",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/no-a-mano.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

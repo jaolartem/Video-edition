@@ -2,11 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|NotebookEdit|Bash|PowerShell|mcp__terminal__run_in_terminal",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__terminal__run_in_terminal",
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-a-mano.py\"",
+            "command": "python \"$CLAUDE_PROJECT_DIR/hooks/no-a-mano.py\"",
             "timeout": 10,
             "statusMessage": "Cerrojo: ¿toca la línea a mano?"
           }
