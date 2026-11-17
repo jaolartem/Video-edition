@@ -161,6 +161,10 @@ def migrar():
                 "obligatorio=excluded.obligatorio",
                 (vid, i, est, orden_can, libreto[i - 1] if i <= len(libreto) else "",
                  1 if b.get("obligatorio") else 0))
+            # Y lo que se ve, la columna VIDEO del guion (C-738).
+            if "video" in {r[1] for r in cx.execute("pragma table_info(etapa)")}:
+                cx.execute("UPDATE etapa SET video = ? WHERE video_id = ? AND orden = ?",
+                           (b.get("video"), vid, i))
 
         # Apertura y cierre: decisiones de oído sobre la pieza entera.
         #

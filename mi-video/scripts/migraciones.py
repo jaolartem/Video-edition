@@ -485,6 +485,25 @@ def _video_vision(con):
     return True
 
 
+def _etapa_video(con):
+    """`etapa` gana `video`, la columna VIDEO del guion (C-738): la intención de
+    lo que se ve, en SQL y no sólo en `frames.json`."""
+    cols = {r[1] for r in con.execute("pragma table_info(etapa)")}
+    if not cols or "video" in cols:
+        return False
+    con.execute("ALTER TABLE etapa ADD COLUMN video TEXT")
+    return True
+
+
+def _documento(con):
+    """El sello de lo que publica la línea (C-738): cada documento de escena y de
+    pieza, con la huella de lo que se escribió. Si el fichero ya no casa, alguien
+    lo tocó por fuera y la pieza se para."""
+    con.execute("CREATE TABLE IF NOT EXISTS documento (ruta TEXT PRIMARY KEY,"
+                " slug TEXT NOT NULL, huella TEXT NOT NULL, escrito TEXT NOT NULL)")
+    return False
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -494,6 +513,8 @@ def migrar():
     _escena_voz(con)
     _escena_corrige_marca(con)
     _video_vision(con)
+    _etapa_video(con)
+    _documento(con)
     _corte_fijo_etapa(con)
     _corte_fijo_huella(con)
     _escalera(con)

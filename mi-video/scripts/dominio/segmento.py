@@ -260,17 +260,51 @@ class Segmento:
             fuera["paneles"] = ps
         return fuera
 
+    @property
+    def intencion(self) -> dict:
+        """Lo que la escena tiene que lograr, del guion aprobado, leído de SQL (C-738).
+
+        Jaime, 16-11-2026: *«cada escena tiene una intención particular que se
+        manifiesta tanto en lo que se escribe como en lo que se dice como en lo
+        que se ve»*.
+        """
+        try:
+            cx = _con()
+            r = cx.execute(
+                "select ec.nombre, e.mensaje_esperado, e.video, l.texto from etapa e"
+                " join video v on v.id = e.video_id"
+                " left join etapa_canonica ec on ec.estructura_id = e.estructura_id"
+                "   and ec.orden = e.etapa_orden"
+                " left join libreto l on l.video_id = v.id and l.orden = e.orden"
+                " where v.slug = ? and e.orden = ?", (self.slug, self.n)).fetchone()
+            cx.close()
+        except Exception as e:                     # noqa: BLE001
+            return {"falta": f"no se pudo leer la intención: {e}"[:160]}
+        if not r:
+            return {}
+        return {k: v for k, v in (("etapa", r[0]), ("debe_decir", r[1]),
+                                  ("se_ve", r[2]), ("libreto", r[3])) if v}
+
     def como_json(self):
-        """Lo que de el se publica en el marcador."""
+        """El documento de la escena: lo que de ella dice SQL, en un fichero (C-738)."""
         return {"etapa": self.n, "etiqueta": self.etiqueta,
                 "tramos": [list(t) for t in self.tramos], "dura": self.dura,
                 "dice": self.dice, "huella": self.huella,
                 "aprobado": self.aprobado, "por": self.por_quien,
+                "intencion": self.intencion, "capas": CAPAS,
                 **self.tiene}
 
     def __str__(self):
         donde = self.etiqueta or "abierto"
         return f"{self.slug} e{self.n} ({self.dura}s, «{donde}»)"
+
+
+#: Qué clave del documento es de qué capa de la intención (C-738): lo que se
+#: dice, lo que se ve y lo que se escribe. Las claves no se mueven de sitio
+#: —los contratos las leen así—; esto dice a qué capa pertenece cada una.
+CAPAS = {"se_dice": ["tramos", "dice", "dura", "voz"],
+         "se_ve": ["trato", "plano", "camara", "paneles"],
+         "se_escribe": ["tablero", "cc_lado", "corrige_dice", "corrige_es"]}
 
 
 def decididas(slug) -> int:

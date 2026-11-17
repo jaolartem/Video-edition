@@ -45,6 +45,16 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 #: Dónde vive el estado de cada pieza. Junto a su EDL, que es el otro artefacto
 #: que la describe: quien mira la carpeta de una pieza ve las dos cosas.
 def ruta(slug):
+    """El documento de la pieza: compila los de sus escenas (C-738)."""
+    return os.path.join(RAIZ, "ads", slug, "pieza.json")
+
+
+def ruta_escena(slug, n):
+    return os.path.join(RAIZ, "ads", slug, "escenas", f"e{int(n):02d}.json")
+
+
+def _vieja(slug):
+    """Donde vivía antes de C-738: se lee una vez y se deja de escribir."""
     return os.path.join(RAIZ, "ads", slug, "estado.json")
 
 
@@ -54,14 +64,93 @@ def _ahora():
 
 def lee(slug):
     """Lo que hay escrito, o el esqueleto si todavía no hay nada."""
-    r = ruta(slug)
-    if os.path.exists(r):
-        try:
-            return json.load(open(r, encoding="utf-8"))
-        except (OSError, ValueError):
-            pass
+    for r in (ruta(slug), _vieja(slug)):
+        if os.path.exists(r):
+            try:
+                return json.load(open(r, encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
     return {"pieza": slug, "etapa": None, "desde": None, "espera": None,
             "abiertos": [], "hecho": [], "log": []}
+
+
+def _huella(contenido: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha1(contenido).hexdigest()[:16]
+
+
+def _sella(slug, r, contenido: bytes):
+    """Escribe un documento y apunta su huella en la base (C-738)."""
+    os.makedirs(os.path.dirname(r), exist_ok=True)
+    with open(r, "wb") as h:
+        h.write(contenido)
+    try:
+        from . import fase as _f
+
+        con = _f._con()
+        con.execute("insert or replace into documento (ruta, slug, huella, escrito)"
+                    " values (?,?,?,?)", (os.path.relpath(r, RAIZ).replace("\\", "/"),
+                                          slug, _huella(contenido), _ahora()))
+        con.commit()
+        con.close()
+    except Exception:                              # noqa: BLE001
+        pass  # sin la tabla (una base vieja) no hay sello: lo dirá `tocados`
+
+
+def tocados(slug) -> list:
+    """Los documentos de la pieza que no casan con su sello: tocados por fuera.
+
+    Jaime, 16-11-2026: *«tiene que ser radical la imposibilidad de que tú lo
+    toques o lo modifiques a mano»*. El cerrojo impide escribirlos; esto
+    detecta lo que se colara por otro camino, y la pieza no avanza.
+    """
+    try:
+        from . import fase as _f
+
+        con = _f._con()
+        filas = con.execute("select ruta, huella from documento where slug = ?",
+                            (slug,)).fetchall()
+        con.close()
+    except Exception:                              # noqa: BLE001
+        return []
+    out = []
+    for r, h in filas:
+        p = os.path.join(RAIZ, r)
+        if not os.path.exists(p):
+            out.append(f"{r} desapareció")
+        elif _huella(open(p, "rb").read()) != h:
+            out.append(f"{r} no casa con lo que escribió la línea")
+    return out
+
+
+def _continuidad(docs: list) -> None:
+    """Cada escena sabe cómo acaba la anterior y cómo empieza la siguiente (C-738).
+
+    Jaime: *«cada escena tiene que ir pensando en la que venía antes y en la que
+    viene después… continuidad tanto de plano como de intención»*.
+    """
+    def lado(j, palabras):
+        cam = j.get("camara") if isinstance(j.get("camara"), dict) else {}
+        return {k: v for k, v in (
+            ("etapa", j["etapa"]), ("trato", j.get("trato")), ("plano", j.get("plano")),
+            ("encuadre", cam.get("encuadre")),
+            ("intencion", (j.get("intencion") or {}).get("debe_decir")),
+            ("dice", palabras)) if v}
+    for i, j in enumerate(docs):
+        ant = docs[i - 1] if i else None
+        sig = docs[i + 1] if i + 1 < len(docs) else None
+        j["continuidad"] = {
+            "viene_de": lado(ant, " ".join(ant["dice"].split()[-8:])) if ant else None,
+            "va_a": lado(sig, " ".join(sig["dice"].split()[:8])) if sig else None}
+
+
+def _escenas(slug, docs: list) -> None:
+    """Un documento por escena, de SQL a su fichero, sellado (C-738)."""
+    for j in docs:
+        r = ruta_escena(slug, j["etapa"])
+        j["documento"] = os.path.relpath(r, RAIZ).replace("\\", "/")
+        _sella(slug, r, (json.dumps(j, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
 
 
 def _guarda(slug, d):
@@ -72,8 +161,9 @@ def _guarda(slug, d):
     # justo el principio, que es donde empieza la explicación.
     log = d.get("log", [])
     d["log"] = log[:1] + log[-59:] if len(log) > 60 else log
-    with open(r, "w", encoding="utf-8", newline="\n") as h:
-        json.dump(d, h, ensure_ascii=False, indent=1)
+    _sella(slug, r, (json.dumps(d, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
+    if os.path.exists(_vieja(slug)):
+        os.remove(_vieja(slug))
     return d
 
 
@@ -88,6 +178,12 @@ def escribe(slug):
     from . import ticket as _t
 
     d = lee(slug)
+    # **Lo tocado por fuera no se pisa: se dice** (C-738). Reescribirlo borraría
+    # la prueba; con `falta` el pedido no sale y la pieza no avanza.
+    fuera = tocados(slug)
+    if fuera:
+        d["falta"] = ("tocado por fuera, la pieza se para: " + "; ".join(fuera))[:400]
+        return d
     # **Lo que no se pudo publicar se dice, todo** (C-714). Tres `except: pass`
     # dejaban el JSON con cara de entero: el pedido salía y el oficio trabajaba
     # sobre un documento hueco sin saberlo. Si esto no queda vacío, el pedido
@@ -153,6 +249,14 @@ def escribe(slug):
                          for k in ("trato", "plano", "tablero", "camara", "voz")):
             faltas.append(f"la base tiene {n} escenas decididas y el JSON no"
                           " publica ninguna")
+        # **Y cada escena, su documento** (C-738), con su continuidad y sus
+        # tiquets; la pieza los compila.
+        _continuidad(d["segmentos"])
+        for j in d["segmentos"]:
+            j["tiquets"] = [a for a in d.get("abiertos") or [] if a.get("beat") == j["etapa"]]
+        _escenas(slug, d["segmentos"])
+        from .pieza import Pieza
+        d.update(Pieza._vision(slug))
         d["aprobada"] = _sg.aprobada(slug)
         # **Y las etapas del guion que no tienen toma, dichas** (C-713). Un
         # segmento que no está en el EDL desaparecía del JSON sin rastro:
