@@ -240,18 +240,44 @@ def recortes_de_la_pieza(n):
         # pasada de canto `limpio` la escribe, asi que solo esa la exige — con
         # la condicion a secas, el recorte del panel se rehacia SIEMPRE.
         hechos_al_dia = [dest] + ([ficha] if canto == "limpio" else [])
-        if (all(os.path.exists(f) for f in hechos_al_dia)
-                and min(os.path.getmtime(f) for f in hechos_al_dia)
-                >= os.path.getmtime(video)):
+        # **Al día por lo que hay en su ventana, no por la fecha del corte**
+        # (C-750): cambiar otra escena reescribe el mp4 entero y caducaba los
+        # recortes de todas, a ~6 s de CPU por segundo de etapa. Su huella es lo
+        # que el corte enseña en su ventana —qué cinta, qué tramo, qué recorte—
+        # contado desde su inicio, y su canto.
+        huella = _huella_ventana(n, a, b, canto)
+        sello = os.path.splitext(dest)[0] + ".huella"
+        if (all(os.path.exists(f) for f in hechos_al_dia) and os.path.exists(sello)
+                and open(sello, encoding="utf-8").read().strip() == huella):
             hechos.append(f"e{beat} al dia")
             continue
         r = subprocess.run(
             [sys.executable, os.path.join("scripts", "text-behind.py"),
              "--video", video, "--desde", f"{a:.3f}", "--hasta", f"{b:.3f}",
              "--canto", canto, "--out", dest])
+        if r.returncode == 0:
+            open(sello, "w", encoding="utf-8").write(huella)
         hechos.append(f"e{beat} {a:.1f}-{b:.1f}s"
                       + ("" if r.returncode == 0 else " FALLO"))
     return hechos
+
+
+def _huella_ventana(n, a, b, canto) -> str:
+    """Lo que el corte enseña entre `a` y `b` segundos, contado desde `a` (C-750)."""
+    import hashlib
+    import json
+
+    plan = os.path.join("work", "scenes", f"reel-{n:02d}", "plan-full.json")
+    escenas = json.load(open(plan, encoding="utf-8"))["escenas"]
+    t, ahi = 0.0, []
+    for e in escenas:
+        dura = float(e.get("duracion") or 0)
+        if t < b and t + dura > a:
+            ahi.append([e.get("fuente"), e.get("origen_desde"), e.get("origen_hasta"),
+                        e.get("filtro"), round(t - a, 3), round(dura, 3)])
+        t += dura
+    crudo = json.dumps([round(b - a, 3), canto, ahi], ensure_ascii=False)
+    return hashlib.sha1(crudo.encode("utf-8")).hexdigest()[:16]
 
 
 def main():
