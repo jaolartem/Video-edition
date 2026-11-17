@@ -456,9 +456,16 @@ if __name__ == "__main__":
         # Una grabacion en carpeta no tiene `<toma>.mp4` al lado (C-672).
         return plano if os.path.exists(plano) else rutas.cinta(f)
 
+    congelados_ruta = os.path.join(os.path.dirname(os.path.abspath(args.plan)), "encuadres.json")
+    congelados = {} if args.recalcular or not os.path.exists(congelados_ruta) else         json.load(open(congelados_ruta, encoding="utf-8"))
+    FIJA = ("encuadre", "crop", "filtro", "reescalado", "recorrido", "cara", "zoom")
+    nuevos, idx, blandos = {}, 0, []
+    clave = lambda i, e: None if e.get("angulo") or (e.get("hereda_encuadre") and i > 0)         else json.dumps([os.path.basename(fuente_de(e)), round(e["origen_desde"], 3),  # noqa: E731
+                         round(e["origen_hasta"], 3), e.get("beat"), e.get("encuadre"), e.get("zoom")])
     anclas = {}
     global_ancla = None
-    if args.ancla_global:
+    # Si todas las escenas conservan su encuadre, no hay ancla que medir (C-747).
+    if args.ancla_global and any(clave(i, e) not in congelados for i, e in enumerate(escenas)):
         for fuente in sorted({fuente_de(e) for e in escenas}):
             suyas = [e for e in escenas if fuente_de(e) == fuente]
             ts, xs, ys = [], [], []
@@ -496,14 +503,8 @@ if __name__ == "__main__":
     # corte, que se guarda por escena, se rehacía entero. Lo encuadrado se
     # guarda por escena (su cinta, sus bordes, su etapa, lo pedido) y se
     # reutiliza mientras eso no cambie.
-    congelados_ruta = os.path.join(os.path.dirname(os.path.abspath(args.plan)), "encuadres.json")
-    congelados = {} if args.recalcular or not os.path.exists(congelados_ruta) else         json.load(open(congelados_ruta, encoding="utf-8"))
-    FIJA = ("encuadre", "crop", "filtro", "reescalado", "recorrido", "cara", "zoom")
-    nuevos, idx, blandos = {}, 0, []
     for i, e in enumerate(escenas):
-        k = None if e.get("angulo") or (e.get("hereda_encuadre") and i > 0) else json.dumps(
-            [os.path.basename(fuente_de(e)), round(e["origen_desde"], 3),
-             round(e["origen_hasta"], 3), e.get("beat"), e.get("encuadre"), e.get("zoom")])
+        k = clave(i, e)
         if k in congelados:
             e.update(congelados[k]); nuevos[k] = congelados[k]  # noqa: E702
             print(f"  {i} {e.get('encuadre', ''):12} (el de antes: la escena no cambió)")
