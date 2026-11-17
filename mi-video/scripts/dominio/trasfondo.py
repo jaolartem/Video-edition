@@ -196,7 +196,7 @@ def de_la_pieza(n):
         suelos = {**suelos, "cabeza": coronilla - cabeza["margen"] / float(cuadro.alto)}
     # **Escena a escena** (C-753): sólo se decodifica el tramo de las escenas
     # que cambiaron; lo de las demás sale del almacén.
-    from .almacen_escena import Almacen, clave
+    from dominio.almacen_escena import Almacen, clave
     alm, salida = Almacen(f"reel-{n:02d}", "trasfondo"), []
     propias = _coronillas(n)
     base = dict(suelos)

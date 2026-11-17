@@ -133,7 +133,7 @@ def de_la_pieza(n):
         base_options=mp_python.BaseOptions(model_asset_path=MODELO),
         running_mode=vision.RunningMode.IMAGE,
         output_confidence_masks=True)
-    from .almacen_escena import Almacen, clave
+    from dominio.almacen_escena import Almacen, clave
 
     # **Escena a escena** (C-753): sólo se segmenta la escena que cambió.
     alm, salida, seg = Almacen(f"reel-{n:02d}", "huecos"), [], None
