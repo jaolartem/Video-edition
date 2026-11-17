@@ -31,9 +31,14 @@ import sys
 MOTIVO = ("Cerrojo: {que}. La línea no se toca a mano: si se para, se queda parada "
           "y se informa con el motivo. Lo que sí: arreglar el código en el repo y "
           "desplegar, contestar pedidos (*.respuesta.json) y anotar lo que dice "
-          "Jaime con ticket.py --de.")
+          "el usuario con ticket.py --de.")
 
 AQUI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+#: El proyecto de la máquina: el abierto si es una máquina (tiene
+#: `separacion.json`), si no el del propio cerrojo. Instalado como plugin en un
+#: proyecto que no es la máquina, el cerrojo no hace nada.
+BASE = next((d for d in (os.environ.get("CLAUDE_PROJECT_DIR"), AQUI)
+             if d and os.path.isfile(os.path.join(d, "separacion.json"))), None)
 
 
 def _norm(s):
@@ -42,7 +47,7 @@ def _norm(s):
 
 def _de_json(ruta, *claves, defecto=None):
     try:
-        d = json.load(open(os.path.join(AQUI, ruta), encoding="utf-8"))
+        d = json.load(open(os.path.join(BASE, ruta), encoding="utf-8"))
         for k in claves:
             d = d[k]
         return d
@@ -50,13 +55,16 @@ def _de_json(ruta, *claves, defecto=None):
         return defecto
 
 
-#: La línea en marcha: la de `rutas.json` y, si no hay, la de siempre.
-LINEA = _norm(_de_json("mi-video/rutas.json", "linea", "raiz", defecto="F:/linea")).rstrip("/")
+#: La línea en marcha, la que declara la configuración (`rutas.json`).
+LINEA = _norm(_de_json("mi-video/rutas.json", "linea", "raiz", defecto="")).rstrip("/")
 CONFIG = "/" + _norm(_de_json("separacion.json", "raiz_configuracion",
                               defecto="configuracion")).strip("/") + "/"
-ZONAS = (LINEA + "/", "/" + LINEA.replace(":", "", 1) + "/", CONFIG, ".db",
-         "/escenas/e", "pieza.json", "guion.json", "estado.json", "frames.json",
-         "glosario.json", "decisiones.db", "apoyo.json")
+#: Zonas por sitio: la línea entera y la carpeta de la configuración.
+SITIOS = tuple(z for z in (LINEA + "/" if LINEA else "", "/" + LINEA.replace(":", "", 1) + "/"
+                           if LINEA else "", CONFIG) if z)
+#: Zonas por nombre: sólo dentro de la máquina o de la línea, no en otro proyecto.
+NOMBRES = (".db", "/escenas/e", "pieza.json", "guion.json", "estado.json", "frames.json",
+           "glosario.json", "apoyo.json")
 #: El cerrojo mismo y lo que lo enchufa.
 PROPIO = ("hooks/no-a-mano.py", "hooks/hooks.json", ".claude/settings.json",
           ".claude/settings.local.json", ".claude/hooks/")
@@ -88,7 +96,11 @@ def _niega(que):
 
 
 def _en_zona(r):
-    return any(z in r for z in ZONAS)
+    if any(z in r for z in SITIOS):
+        return True
+    absoluta = re.match(r"^([a-z]:/|/)", r)
+    dentro = not absoluta or r.startswith(_norm(BASE).rstrip("/") + "/")
+    return dentro and any(n in r for n in NOMBRES)
 
 
 def fichero(ruta):
@@ -130,11 +142,11 @@ def _orden(s):
     if "--volver" in s:
         _niega("devolver una pieza de fase con --volver")
     if "ticket.py" in s and re.search(r"--(cerrar|ruta|estado)\b", s):
-        _niega("cerrar o reencaminar tiquets: los cierra Jaime")
+        _niega("cerrar o reencaminar tiquets: los cierra el usuario")
     if "ticket.py" in s and "--ver" not in s and "--de" not in s:
-        _niega("abrir un tiquet sin `--de`: sólo se anota lo que dice Jaime")
+        _niega("abrir un tiquet sin `--de`: sólo se anota lo que dice el usuario")
     if "guia.py" in s and "--aprobar" in s and "--de" not in s:
-        _niega("aprobar la guía sin `--de`: la aprobación es de Jaime, con sus palabras")
+        _niega("aprobar la guía sin `--de`: la aprobación es del usuario, con sus palabras")
     if SQL.search(s) or ("sqlite" in s and "mode=ro" not in s) or "basedatos.abrir" in s:
         _niega("tocar la base: sólo se lee, y con mode=ro")
     if "import servicios" in s or "from servicios" in s:
@@ -175,7 +187,8 @@ CASOS = [
     ("Write", {"file_path": "F:/linea/codigo/mi-video/work/servicio/disenar/reel-23.respuesta.json"}, True),
     ("Edit", {"file_path": "F:/Edicion de video/configuracion/docs/canon.md"}, False),
     ("Edit", {"file_path": "F:/Edicion de video/configuracion/docs/correcciones.md"}, True),
-    ("Write", {"file_path": "F:/x/mi-video/ads/reel-23/escenas/e02.json"}, False),
+    ("Write", {"file_path": "mi-video/ads/reel-23/escenas/e02.json"}, False),
+    ("Write", {"file_path": "D:/otro-proyecto/datos.db"}, True),
     ("Edit", {"file_path": "F:/x/hooks/no-a-mano.py"}, False),
     ("Edit", {"file_path": "F:/x/.claude/settings.json"}, False),
     ("Write", {"file_path": "F:/x/mi-video/scripts/guia.py"}, True),
@@ -210,6 +223,8 @@ def probar():
 
 
 def main():
+    if BASE is None:
+        return
     sys.stderr.reconfigure(encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
     if "--probar" in sys.argv:

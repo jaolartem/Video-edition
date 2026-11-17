@@ -1,0 +1,20 @@
+{
+  "name": "video-edition",
+  "version": "0.1.0",
+  "description": "Operate a Remotion + Python batch pipeline that edits short talking-head ads from long recordings, scene by scene: a skill that teaches the agent to maintain the machine and answer its step requests, and a lock hook that prevents editing the running line by hand.",
+  "author": {
+    "name": "jaolartem",
+    "url": "https://github.com/jaolartem"
+  },
+  "homepage": "https://github.com/jaolartem/Video-edition",
+  "repository": "https://github.com/jaolartem/Video-edition",
+  "license": "GPL-3.0",
+  "keywords": [
+    "video",
+    "remotion",
+    "pipeline",
+    "editing",
+    "ads",
+    "batch"
+  ]
+}

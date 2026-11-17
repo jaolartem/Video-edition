@@ -47,7 +47,8 @@
    "docs/plan-cv-horizontal.md",
    "docs/propuestas/**",
    "mi-video/docs/propuestas/**",
-   "mi-video/src/muestras.ts"
+   "mi-video/src/muestras.ts",
+   "skills/pipeline-repetible/**"
   ],
   "rutas": [
    "mi-video/rutas.json"

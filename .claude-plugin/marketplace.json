@@ -1,0 +1,24 @@
+{
+  "name": "video-edition",
+  "owner": {
+    "name": "jaolartem",
+    "url": "https://github.com/jaolartem"
+  },
+  "metadata": {
+    "description": "Marketplace for the video-edition plugin."
+  },
+  "plugins": [
+    {
+      "name": "video-edition",
+      "source": "./",
+      "description": "Operate a Remotion + Python batch pipeline that edits short talking-head ads scene by scene, with a lock hook against hand edits of the running line.",
+      "author": {
+        "name": "jaolartem"
+      },
+      "homepage": "https://github.com/jaolartem/Video-edition",
+      "repository": "https://github.com/jaolartem/Video-edition",
+      "license": "GPL-3.0",
+      "category": "video"
+    }
+  ]
+}
