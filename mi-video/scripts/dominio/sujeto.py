@@ -152,7 +152,9 @@ def de_la_pieza(n, muestras=4):
     from dominio.rostro import por_escena
     import statistics
 
-    escenas = por_escena(n, video)
+    m = {}
+    m["escenas"] = por_escena(n, video)
+    escenas = m["escenas"]
     # **La de la pieza sale de sus escenas** (C-753): la mediana de lo medido
     # en cada una. Muestrear la pieza entera aparte la volvía a mirar toda cada
     # vez que cambiaba una escena.
@@ -163,8 +165,7 @@ def de_la_pieza(n, muestras=4):
     if not co:
         return None
     m = {"coronilla": round(statistics.median(co), 3),
-         "pies": round(statistics.median(pi), 3) if pi else None, "visto": len(co)}
-    m["escenas"] = escenas
+         "pies": round(statistics.median(pi), 3) if pi else None, "visto": len(co), **m}
     d = os.path.join("work", "scenes", f"reel-{n:02d}")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "cara.json"), "w", encoding="utf-8") as f:
