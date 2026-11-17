@@ -86,10 +86,8 @@ def trozos(wav):
     return list(zip(entradas, salidas))
 
 
-def transcribir(mp4, wav, base, idioma):
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", mp4,
-                    "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav],
-                   check=True)
+def _whisper(wav, base, idioma):
+    """Los segmentos de whisper de un wav, partido en sus silencios (C-472, C-486)."""
     todas = []
     for k, (a, b) in enumerate(trozos(wav)):
         pieza = f"{base}.t{k}"
@@ -108,6 +106,47 @@ def transcribir(mp4, wav, base, idioma):
                                                "to": off["to"] + a * 1000}})
         for ext in (".wav", ".json"):
             os.remove(pieza + ext)
+    return todas
+
+
+def transcribir(mp4, wav, base, idioma, slug=None):
+    """**Escena a escena** (C-751). Jaime: *«todo por escena»*. Cada etapa del
+    montaje se transcribe sola y se guarda por la huella de lo que suena en
+    ella (`work/subs/escenas/<pieza>/`); una escena que no cambió no vuelve a
+    pasar por whisper. Sus tiempos se suman a donde empieza la etapa. Una
+    palabra nunca cruza de una etapa a otra: el corte las separa (C-578)."""
+    import hashlib
+
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", mp4,
+                    "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav],
+                   check=True)
+    from dominio.reloj import etapas
+    tramos = etapas(slug) if slug else []
+    if not tramos:
+        todas = _whisper(wav, base, idioma)
+    else:
+        guarda = os.path.join("work", "subs", "escenas", slug)
+        os.makedirs(guarda, exist_ok=True)
+        todas, usadas = [], set()
+        for beat, a, b, partes in tramos:
+            h = hashlib.sha1(json.dumps([idioma.modelo, idioma.banderas, round(b - a, 3),
+                                         partes], ensure_ascii=False).encode()).hexdigest()[:16]
+            f = os.path.join(guarda, f"{h}.json")
+            usadas.add(f"{h}.json")
+            if not os.path.exists(f):
+                ew = f"{base}.e{beat}.wav"
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t",
+                                f"{b - a:.3f}", "-i", wav, "-c:a", "pcm_s16le", ew], check=True)
+                json.dump(_whisper(ew, f"{base}.e{beat}", idioma), open(f, "w", encoding="utf-8"),
+                          ensure_ascii=False)
+                os.remove(ew)
+            for s in json.load(open(f, encoding="utf-8")):
+                off = s["offsets"]
+                todas.append({**s, "offsets": {"from": off["from"] + a * 1000,
+                                               "to": off["to"] + a * 1000}})
+        for viejo in os.listdir(guarda):
+            if viejo not in usadas:
+                os.remove(os.path.join(guarda, viejo))
     d = {"transcription": todas}
     with open(base + ".json", "w", encoding="utf-8") as fh:
         json.dump(d, fh, ensure_ascii=False)
@@ -553,7 +592,7 @@ if __name__ == "__main__":
             continue
         base = f"work/subs/reel-{r}"
         caps = agrupar(transcribir(mp4, base + ".wav", base,
-                                   Idioma.de_pieza(f"reel-{r}")),
+                                   Idioma.de_pieza(f"reel-{r}"), f"reel-{r}"),
                        costuras(f"reel-{r}"),
                        tope_de(Lienzo.de_pieza(f"reel-{r}")))
         caps, n = reconciliar(caps, esperadas(f"reel-{r}"))

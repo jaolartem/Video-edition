@@ -126,3 +126,24 @@ def a_montaje(segundo, de="entrega", pieza=None):
         factor = beats.velocidad(pieza)
     return round(float(segundo) * factor, 3), round(
         float(segundo) * (factor - 1.0), 3)
+
+
+def etapas(slug):
+    """`[(beat, desde, hasta, partes)]` del montaje, en segundos, del plan (C-751).
+
+    `partes` es lo que suena en la etapa —qué cinta, qué tramo, dónde cae—
+    contado desde su inicio: es su huella.
+    """
+    try:
+        esc = json.load(open(os.path.join(RAIZ, "work", "scenes", slug, "plan-full.json"), encoding="utf-8"))["escenas"]
+    except (OSError, ValueError, KeyError):
+        return []
+    out = []
+    for e in esc:
+        a, d = float(e["montado_desde"]), float(e.get("duracion") or 0)
+        if not out or out[-1][0] != e.get("beat"):
+            out.append([e.get("beat"), a, a + d, []])
+        out[-1][2] = a + d
+        out[-1][3].append([e.get("fuente"), e.get("origen_desde"), e.get("origen_hasta"),
+                           e.get("pausa"), round(a - out[-1][1], 3), round(d, 3)])
+    return out
