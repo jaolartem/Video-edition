@@ -140,7 +140,11 @@ def main():
     orden = ["git", "push", REMOTO, "refs/heads/*:refs/heads/*"]
     if a.primera:
         orden.insert(2, "--force")
-    subprocess.run(orden, cwd=copia, check=True)
+    # La llave de GitHub la tiene el ssh de Windows, no el que trae Git Bash.
+    ssh = "C:/Windows/System32/OpenSSH/ssh.exe"
+    env = dict(os.environ, **({"GIT_SSH_COMMAND": ssh} if os.path.exists(ssh)
+                              and "GIT_SSH_COMMAND" not in os.environ else {}))
+    subprocess.run(orden, cwd=copia, check=True, env=env)
     print(f"publicado en {REMOTO}")
 
 
