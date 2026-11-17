@@ -212,9 +212,50 @@ def _del_still(slug):
     return fuera
 
 
+def _de_la_guia(n, slug):
+    """Los fotogramas de la hoja guía del spec de hoy, si están todos (C-743).
+
+    Jaime: *«esto es lo que tienen que ver los compositores, esto es lo que
+    tienen que ver los seguros… sacamos esta guía y ya tú la lees»*. La guía es
+    del spec y del código de hoy, por escena; el render puede ser de otro corte
+    —en reel-23 era el vertical—. Si la guía no está entera, `None`.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from dominio.fotograma import Fotogramas
+    try:
+        spec = next((p for p in json.load(open("src/reels.json", encoding="utf-8"))
+                     if p.get("id") == f"Reel-R{n}"), None)
+    except (OSError, ValueError):
+        return None
+    if not spec:
+        return None
+    fotos = Fotogramas(spec)
+    almacen = os.path.join("work", "still", "guia", slug, "segundos")
+    tiros = [(f, os.path.join(almacen, f"{fotos.huella(f)}.png").replace("\\", "/"))
+             for f in fotos.rejilla().values()]
+    if not tiros or not all(os.path.isfile(p) for _, p in tiros):
+        return None
+    fuera = []
+    for e in escenas(slug):
+        mira = [{"en": round(f / 30, 2), "fichero": p} for f, p in tiros
+                if e["desde"] <= f / 30 < e["hasta"]]
+        if mira:
+            fuera.append({"escena": e["n"], "etapa": e["etapa"], "desde": round(e["desde"], 2),
+                          "hasta": round(e["hasta"], 2), "mira": mira,
+                          "de": "la hoja guía del spec de hoy, un fotograma por segundo"})
+    return fuera or None
+
+
 def sacar(n, cuantos=CUANTOS):
-    """Deja los fotogramas en disco y devuelve qué sacó, escena por escena."""
+    """Deja los fotogramas en disco y devuelve qué sacó, escena por escena.
+
+    **Primero la guía** (C-743): es la imagen del corte y el código de hoy. El
+    render y los stills sueltos quedan para cuando la guía no está entera.
+    """
     slug = f"reel-{n:02d}"
+    guia = _de_la_guia(n, slug)
+    if guia:
+        return guia, None
     mp4 = RENDER.format(n=n)
     # **Si no hay video, se renderizan los CINCO FOTOGRAMAS, no el video.**
     #
