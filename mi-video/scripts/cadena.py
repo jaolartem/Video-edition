@@ -216,8 +216,9 @@ def desde(n):
         if nombre == "plan" and not _ritmo_al_dia(s):
             return (i, nombre, quien, "el ritmo declarado cambio y el plan no lo tiene")
         cod = _codigo(quien)
-        if cod and t < cod[0] and not (visto and visto >= cod[0]):
-            return (i, nombre, quien, f"{ruta} se hizo con el {cod[1]} de antes")
+        if cod and t < cod[0]:
+            if not (visto and visto >= cod[0]):  # comprobado después (C-748)
+                return (i, nombre, quien, f"{ruta} se hizo con el {cod[1]} de antes")
         cuando[nombre], donde[nombre] = t, ruta
     return None
 
