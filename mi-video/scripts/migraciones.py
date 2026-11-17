@@ -504,6 +504,17 @@ def _documento(con):
     return False
 
 
+def _escena_corte(con):
+    """El registro del corte de cada escena (C-739): una fila cada vez que su
+    corte cambia, con su huella, lo que dice y en qué fase estaba la pieza."""
+    con.execute("CREATE TABLE IF NOT EXISTS escena_corte (id INTEGER PRIMARY KEY,"
+                " video_slug TEXT NOT NULL, etapa INTEGER NOT NULL, huella TEXT NOT NULL,"
+                " tramos TEXT NOT NULL, dice TEXT, fase TEXT, cuando TEXT NOT NULL)")
+    con.execute("CREATE INDEX IF NOT EXISTS escena_corte_de ON escena_corte"
+                " (video_slug, etapa, id)")
+    return False
+
+
 def migrar():
     """Aplica todo lo que falte, en orden. Devuelve lo que de verdad cambio."""
     con = _con()
@@ -515,6 +526,7 @@ def migrar():
     _video_vision(con)
     _etapa_video(con)
     _documento(con)
+    _escena_corte(con)
     _corte_fijo_etapa(con)
     _corte_fijo_huella(con)
     _escalera(con)

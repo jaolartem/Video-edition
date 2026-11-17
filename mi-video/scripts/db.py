@@ -69,8 +69,8 @@ def migrar():
     # **Y lo que C-737 y C-738 añadieron a la base entra solo**, en cada vuelta:
     # idempotente, y sin ello la visión, el VIDEO de cada etapa y el sello de
     # los documentos se quedarían esperando a que alguien migrara a mano.
-    from migraciones import _documento, _etapa_video, _video_vision
-    for paso in (_video_vision, _etapa_video, _documento):
+    from migraciones import _documento, _escena_corte, _etapa_video, _video_vision
+    for paso in (_video_vision, _etapa_video, _documento, _escena_corte):
         paso(cx)
     cx.commit()
     # **Las piezas que derivan de otra se expanden antes de leer nada** (C-388):

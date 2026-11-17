@@ -145,6 +145,34 @@ def _continuidad(docs: list) -> None:
             "va_a": lado(sig, " ".join(sig["dice"].split()[:8])) if sig else None}
 
 
+def _registra_cortes(slug, docs: list, fase) -> None:
+    """Lo que se dice, en el registro SQL de cada escena (C-739).
+
+    Jaime: *«cada escena guarda su registro en sql»*. Cada vez que el corte de
+    una escena cambia —lo cambie quien lo cambie— entra una fila con su huella;
+    el documento trae de ahí desde cuándo es ese corte y cuántos tuvo antes.
+    """
+    try:
+        from . import fase as _f
+
+        con = _f._con()
+        for j in docs:
+            filas = con.execute("select huella, cuando from escena_corte where video_slug = ?"
+                                " and etapa = ? order by id", (slug, j["etapa"])).fetchall()
+            if not filas or filas[-1][0] != j["huella"]:
+                con.execute("insert into escena_corte (video_slug, etapa, huella, tramos,"
+                            " dice, fase, cuando) values (?,?,?,?,?,?,?)",
+                            (slug, j["etapa"], j["huella"], json.dumps(j["tramos"]),
+                             j["dice"], fase, _ahora()))
+                filas = list(filas) + [(j["huella"], _ahora())]
+            j["corte"] = {"desde": filas[-1][1], "cortes_anteriores": len(filas) - 1}
+        con.commit()
+        con.close()
+    except Exception as e:                         # noqa: BLE001
+        for j in docs:
+            j["corte"] = {"falta": f"no se pudo registrar el corte: {e}"[:160]}
+
+
 def _escenas(slug, docs: list) -> None:
     """Un documento por escena, de SQL a su fichero, sellado (C-738)."""
     for j in docs:
@@ -252,6 +280,7 @@ def escribe(slug):
         # **Y cada escena, su documento** (C-738), con su continuidad y sus
         # tiquets; la pieza los compila.
         _continuidad(d["segmentos"])
+        _registra_cortes(slug, d["segmentos"], d.get("etapa"))
         for j in d["segmentos"]:
             j["tiquets"] = [a for a in d.get("abiertos") or [] if a.get("beat") == j["etapa"]]
         _escenas(slug, d["segmentos"])

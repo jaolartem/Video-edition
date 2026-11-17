@@ -302,7 +302,7 @@ class Segmento:
 #: Qué clave del documento es de qué capa de la intención (C-738): lo que se
 #: dice, lo que se ve y lo que se escribe. Las claves no se mueven de sitio
 #: —los contratos las leen así—; esto dice a qué capa pertenece cada una.
-CAPAS = {"se_dice": ["tramos", "dice", "dura", "voz"],
+CAPAS = {"se_dice": ["tramos", "dice", "dura", "voz", "corte"],
          "se_ve": ["trato", "plano", "camara", "paneles"],
          "se_escribe": ["tablero", "cc_lado", "corrige_dice", "corrige_es"]}
 
