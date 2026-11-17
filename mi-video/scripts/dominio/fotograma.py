@@ -57,6 +57,9 @@ def _cuando(e) -> tuple[float, float] | None:
         return None
     if isinstance(e.get("at"), (int, float)) and isinstance(e.get("duration"), (int, float)):
         return e["at"], e["at"] + e["duration"]
+    # Un golpe (un sonido, una marca) es un instante: también tiene tiempo (C-742).
+    if isinstance(e.get("at"), (int, float)) and "duration" not in e:
+        return e["at"], e["at"] + 1
     if isinstance(e.get("a"), (int, float)) and isinstance(e.get("b"), (int, float)):
         return e["a"], e["b"]
     if isinstance(e.get("desde"), (int, float)) and isinstance(e.get("hasta"), (int, float)):
