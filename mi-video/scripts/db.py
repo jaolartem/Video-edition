@@ -66,6 +66,13 @@ def _id(cx, tabla, nombre, **extra):
 def migrar():
     """Vuelca los JSON actuales a la base. Se puede correr las veces que haga falta."""
     cx = crear()
+    # **Y lo que C-737 y C-738 añadieron a la base entra solo**, en cada vuelta:
+    # idempotente, y sin ello la visión, el VIDEO de cada etapa y el sello de
+    # los documentos se quedarían esperando a que alguien migrara a mano.
+    from migraciones import _documento, _etapa_video, _video_vision
+    for paso in (_video_vision, _etapa_video, _documento):
+        paso(cx)
+    cx.commit()
     # **Las piezas que derivan de otra se expanden antes de leer nada** (C-388):
     # su línea de `frames.json` se vuelve a generar desde su origen.
     sys.path.insert(0, os.path.dirname(__file__))
