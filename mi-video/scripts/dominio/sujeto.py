@@ -147,19 +147,24 @@ def de_la_pieza(n, muestras=4):
     video = f"public/reel-{n:02d}.mp4"
     if not os.path.exists(video):
         return None
-    dur = float(subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", video], capture_output=True, text=True).stdout.strip())
-    ts = [dur * (i + 1) / (muestras + 1) for i in range(muestras)]
-    m = donde_esta(video, ts)
-    if not m:
-        return None
-    # **Y la cara de cada escena, en el mismo fichero** (C-624): la pieza
-    # entera es una constante, y el subtítulo se coloca escena por escena.
-    # Absoluto: `montar.sh` corre este fichero como script, sin paquete.
+    # **Y la cara de cada escena, en el mismo fichero** (C-624). Absoluto:
+    # `montar.sh` corre este fichero como script, sin paquete.
     from dominio.rostro import por_escena
+    import statistics
 
-    m["escenas"] = por_escena(n, video)
+    escenas = por_escena(n, video)
+    # **La de la pieza sale de sus escenas** (C-753): la mediana de lo medido
+    # en cada una. Muestrear la pieza entera aparte la volvía a mirar toda cada
+    # vez que cambiaba una escena.
+    co = [e["coronilla"] for e in escenas if e.get("coronilla") is not None]
+    pi = [e["_pies"] for e in escenas if e.get("_pies") is not None]
+    for e in escenas:
+        e.pop("_pies", None)
+    if not co:
+        return None
+    m = {"coronilla": round(statistics.median(co), 3),
+         "pies": round(statistics.median(pi), 3) if pi else None, "visto": len(co)}
+    m["escenas"] = escenas
     d = os.path.join("work", "scenes", f"reel-{n:02d}")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "cara.json"), "w", encoding="utf-8") as f:

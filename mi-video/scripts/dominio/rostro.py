@@ -79,14 +79,24 @@ def por_escena(n, video, muestras=3) -> list:
     from .sujeto import donde_esta
     from .trasfondo import _escenas
 
-    fuera = []
+    from .almacen_escena import Almacen, clave
+
+    # **Escena a escena** (C-753): MediaPipe sólo mira las escenas que cambiaron.
+    alm, fuera = Almacen(f"reel-{n:02d}", "cara"), []
     for t in _escenas(n):
-        largo = t["hasta"] - t["desde"]
-        ts = [t["desde"] + largo * (k + 1) / (muestras + 1) for k in range(muestras)]
-        cara, cuerpo = en(video, ts), donde_esta(video, ts)
-        if cara or cuerpo:
-            fuera.append({**t, **({"coronilla": cuerpo["coronilla"]} if cuerpo else {}),
-                          **{k: v for k, v in (cara or {}).items() if k != "visto"}})
+        k = clave(t.pop("_plan"), muestras)
+        hecho = alm.toma(k)
+        if hecho is None:
+            largo = t["hasta"] - t["desde"]
+            ts = [t["desde"] + largo * (j + 1) / (muestras + 1) for j in range(muestras)]
+            cara, cuerpo = en(video, ts), donde_esta(video, ts)
+            hecho = alm.pon(k, {**({"coronilla": cuerpo["coronilla"], "pies": cuerpo["pies"]}
+                                   if cuerpo else {}),
+                                **{c: v for c, v in (cara or {}).items() if c != "visto"}})
+        if hecho:
+            fuera.append({**t, **{c: v for c, v in hecho.items() if c != "pies"}})
+            fuera[-1]["_pies"] = hecho.get("pies")
+    alm.guarda()
     return fuera
 
 

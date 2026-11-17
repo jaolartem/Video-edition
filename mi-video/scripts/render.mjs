@@ -28,6 +28,7 @@ import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
 import path from 'node:path';
 import {rutas} from './rutas.mjs';
 import {aplicar} from './temporal.mjs';
+import {ff, limpia, tramosDe, unirAudio, unirVideo} from './reels/escenas-render.mjs';
 
 const piezas = process.argv.slice(2).filter((x) => /^\d+$/.test(x));
 /**
@@ -131,10 +132,9 @@ const CONCURRENCIA = Math.min(
 async function porEscena(n, composition, comun, salida) {
   let tramos;
   try {
-    tramos = JSON.parse(execFileSync('python', ['scripts/dominio/fotograma.py',
-      '--render', String(n)], {encoding: 'utf8', env: {...process.env, PYTHONIOENCODING: 'utf-8'}}));
+    tramos = tramosDe(n);
   } catch (e) {
-    console.log(`  (por escena no: ${e.message.split('\n')[0]})`);
+    console.log(`  (por escena no: ${e.message.split(String.fromCharCode(10))[0]})`);
     return false;
   }
   if (!tramos || tramos.length < 2) return false;
@@ -159,25 +159,12 @@ async function porEscena(n, composition, comun, salida) {
     hechos.push({f, dura: (b - tr.a) / composition.fps});
   }
   if (navegador) await navegador.close({silent: true});
-  for (const viejo of fs.readdirSync(dir)) {
-    if (!hechos.some((h) => path.basename(h.f) === viejo)) fs.rmSync(path.join(dir, viejo), {force: true});
-  }
+  limpia(dir, hechos);
   console.log(`  por escena: ${nuevos} tramo(s) renderizados, ${hechos.length - nuevos} sin cambios`);
-  const tmp = path.join(TMP, `r${n}`);
-  fs.mkdirSync(tmp, {recursive: true});
-  const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], {stdio: ['ignore', 'inherit', 'inherit']});
-  const barra = (x) => path.resolve(x).split(path.sep).join('/');
   // Sólo la pista de vídeo de cada tramo: unidos con su audio, el relleno del
   // AAC alarga cada tramo y el vídeo se descuadra una fracción en cada costura.
-  hechos.forEach((h, i) => ff(['-i', h.f, '-map', '0:v', '-c', 'copy', path.join(tmp, `v${i}.mp4`)]));
-  fs.writeFileSync(path.join(tmp, 'v.txt'),
-    hechos.map((_, i) => `file '${barra(path.join(tmp, `v${i}.mp4`))}'`).join('\n') + '\n');
-  ff(['-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'v.txt'), '-map', '0:v', '-c', 'copy', path.join(tmp, 'v.mp4')]);
-  hechos.forEach((h, i) => ff(['-i', h.f, '-vn', '-af', `apad,atrim=0:${h.dura.toFixed(6)}`,
-    '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', path.join(tmp, `a${i}.wav`)]));
-  fs.writeFileSync(path.join(tmp, 'a.txt'), hechos.map((_, i) => `file '${barra(path.join(tmp, `a${i}.wav`))}'`).join('\n') + '\n');
-  ff(['-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'a.txt'), '-c', 'copy', path.join(tmp, 'a.wav')]);
-  ff(['-i', path.join(tmp, 'v.mp4'), '-i', path.join(tmp, 'a.wav'), '-map', '0:v', '-map', '1:a',
+  const tmp = path.join(TMP, `r${n}`);
+  ff(['-i', unirVideo(hechos, tmp), '-i', unirAudio(hechos, tmp), '-map', '0:v', '-map', '1:a',
     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', salida]);
   return true;
 }

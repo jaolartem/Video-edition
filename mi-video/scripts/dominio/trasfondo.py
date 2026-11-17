@@ -100,7 +100,8 @@ def _escenas(n):
         dura = float(e.get("duracion") or 0)
         if dura > 0:
             tramos.append({"escena": i, "beat": e.get("beat"),
-                           "desde": round(t, 3), "hasta": round(t + dura, 3)})
+                           "desde": round(t, 3), "hasta": round(t + dura, 3),
+                           "_plan": e})
         t += dura
     return tramos
 
@@ -114,13 +115,24 @@ def _coronilla(n):
         return json.load(g).get("coronilla")
 
 
-def _gris(video, cuadro):
-    """El video entero en gris y reducido, a `MUESTRAS` fps. `None` si falla."""
+def _coronillas(n) -> dict:
+    """`{escena: coronilla}` de lo que midió `sujeto.py`, escena a escena."""
+    f = os.path.join("work", "scenes", f"reel-{n:02d}", "cara.json")
+    try:
+        return {e["escena"]: e["coronilla"] for e in json.load(open(f, encoding="utf-8"))
+                .get("escenas") or [] if e.get("coronilla") is not None}
+    except (OSError, ValueError):
+        return {}
+
+
+def _gris(video, cuadro, desde=None, dura=None):
+    """El video —o su tramo— en gris y reducido, a `MUESTRAS` fps. `None` si falla."""
     import numpy as np
 
     ANCHO, ALTO = cuadro.ancho // REDUCE, cuadro.alto // REDUCE
+    tramo = [] if desde is None else ["-ss", f"{desde:.3f}", "-t", f"{dura:.3f}"]
     crudo = subprocess.run(
-        ["ffmpeg", "-v", "error", *gpu.decodifica(), "-i", video,
+        ["ffmpeg", "-v", "error", *gpu.decodifica(), *tramo, "-i", video,
          "-vf", f"fps={MUESTRAS},format=gray,scale={ANCHO}:{ALTO}",
          "-f", "rawvideo", "-pix_fmt", "gray", "-"],
         capture_output=True).stdout
@@ -176,26 +188,37 @@ def de_la_pieza(n):
     if not os.path.exists(video) or not tramos:
         return None
     cuadro = Lienzo.de_pieza(f"reel-{n:02d}")
-    cubo = _gris(video, cuadro)
-    if cubo is None:
-        return None
-
     alto, suelos, cabeza = _marca(cuadro)
     coronilla = _coronilla(n)
     if coronilla:
         # El cc que sube al hueco de encima de su cabeza se apoya un pelo por
         # debajo de su pelo, para no morderla. El margen lo declara `cc.json`.
         suelos = {**suelos, "cabeza": coronilla - cabeza["margen"] / float(cuadro.alto)}
-    salida = []
+    # **Escena a escena** (C-753): sólo se decodifica el tramo de las escenas
+    # que cambiaron; lo de las demás sale del almacén.
+    from .almacen_escena import Almacen, clave
+    alm, salida = Almacen(f"reel-{n:02d}", "trasfondo"), []
+    propias = _coronillas(n)
+    base = dict(suelos)
     for tr in tramos:
-        i = int(tr["desde"] * MUESTRAS)
-        j = max(i + MINIMO, int(tr["hasta"] * MUESTRAS))
-        trozo = cubo[i:j]
-        medidas = {k: _medida(trozo, max(0.0, s - alto), s)
-                   for k, s in suelos.items()}
-        medidas = {k: v for k, v in medidas.items() if v}
+        plan = tr.pop("_plan")
+        # La cabeza de ESA escena, si se midió: la de la pieza cambia en cuanto
+        # cambia cualquier escena, y con ella caducaban todas (C-753).
+        suya = propias.get(tr["escena"])
+        suelos = ({**base, "cabeza": suya - cabeza["margen"] / float(cuadro.alto)}
+                  if suya is not None and "cabeza" in base else base)
+        k = clave(plan, [suelos, alto, MUESTRAS, cuadro.ancho, cuadro.alto])
+        medidas = alm.toma(k)
+        if medidas is None:
+            trozo = _gris(video, cuadro, tr["desde"], max(tr["hasta"] - tr["desde"],
+                                                          MINIMO / MUESTRAS))
+            medidas = {} if trozo is None else {
+                s: m for s, m in ((k2, _medida(trozo, max(0.0, v - alto), v))
+                                  for k2, v in suelos.items()) if m}
+            alm.pon(k, medidas)
         if medidas:
             salida.append({**tr, "bandas": medidas})
+    alm.guarda()
     if not salida:
         return None
     d = os.path.join("work", "scenes", f"reel-{n:02d}")

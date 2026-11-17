@@ -76,7 +76,7 @@ def _escenas(n):
         dura = float(e.get("duracion") or 0)
         if dura > 0:
             tramos.append({"desde": round(t, 3), "hasta": round(t + dura, 3),
-                           "en": round(t + dura / 2, 3)})
+                           "en": round(t + dura / 2, 3), "_plan": e})
         t += dura
     return tramos
 
@@ -133,12 +133,21 @@ def de_la_pieza(n):
         base_options=mp_python.BaseOptions(model_asset_path=MODELO),
         running_mode=vision.RunningMode.IMAGE,
         output_confidence_masks=True)
-    salida = []
-    with vision.ImageSegmenter.create_from_options(opts) as seg:
-        for tr in tramos:
-            lados = _costados(seg, video, tr["en"], arriba, abajo)
-            if lados:
-                salida.append({**tr, **lados})
+    from .almacen_escena import Almacen, clave
+
+    # **Escena a escena** (C-753): sólo se segmenta la escena que cambió.
+    alm, salida, seg = Almacen(f"reel-{n:02d}", "huecos"), [], None
+    for tr in tramos:
+        k = clave(tr.pop("_plan"), [arriba, abajo])
+        lados = alm.toma(k)
+        if lados is None:
+            seg = seg or vision.ImageSegmenter.create_from_options(opts)
+            lados = alm.pon(k, _costados(seg, video, tr["en"], arriba, abajo) or {})
+        if lados:
+            salida.append({**tr, **lados})
+    if seg:
+        seg.close()
+    alm.guarda()
     if not salida:
         return None
     d = os.path.join("work", "scenes", f"reel-{n:02d}")
