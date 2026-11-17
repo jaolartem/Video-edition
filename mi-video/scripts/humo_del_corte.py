@@ -268,6 +268,9 @@ def _el_palote_es_recurso(h):
     pr = open("scripts/plan-reel.mjs", encoding="utf-8").read()
     h.mide("C-730", "{ encuadre: APROBADO(montado, fin - ini) }" in pr,
            "y una escena aprobada que no cambia conserva su encuadre")
+    dp = open("scripts/disparador.py", encoding="utf-8").read()
+    h.mide("C-732", "a.despachar = True" in dp,
+           "y el disparador no se planta en «aprobado»: aprobar es la orden de seguir")
     gu = open("scripts/guia.py", encoding="utf-8").read()
     h.mide("C-731", "and not self._antes_caduca())" in gu,
            "y la guía no espera a Jaime sobre un plan que la cadena da por caducado")

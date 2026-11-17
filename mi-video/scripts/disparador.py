@@ -49,6 +49,11 @@ def main():
     # nada a ninguna fase. `--volver` es de una corrida a mano, no de estar
     # puesto: repetirlo en cada vuelta seria devolver la pieza para siempre.
     a.ver, a.paso, a.volver, a.por_que = False, None, None, ""
+    # **Y el puesto es el despachador** (C-732). Sin la marca, con una sola
+    # pieza `avanzar` se plantaba como una corrida a mano —«de aprobado sólo la
+    # mueve Jaime»— y reel-23, aprobada el 16-11, no llegó nunca a la voz
+    # limpia: aprobar ES lo que Jaime dice para que siga (C-653).
+    a.despachar = True
     disparo.puesto(lambda: avanzar._una_vuelta(a), a.cada)
 
 
