@@ -109,6 +109,10 @@ def _whisper(wav, base, idioma):
     return todas
 
 
+#: Segundos de contexto a cada lado de una escena al transcribirla (C-751).
+MARGEN = 4.0
+
+
 def transcribir(mp4, wav, base, idioma, slug=None):
     """**Escena a escena** (C-751). Jaime: *«todo por escena»*. Cada etapa del
     montaje se transcribe sola y se guarda por la huella de lo que suena en
@@ -128,22 +132,33 @@ def transcribir(mp4, wav, base, idioma, slug=None):
         guarda = os.path.join("work", "subs", "escenas", slug)
         os.makedirs(guarda, exist_ok=True)
         todas, usadas = [], set()
-        for beat, a, b, partes in tramos:
-            h = hashlib.sha1(json.dumps([idioma.modelo, idioma.banderas, round(b - a, 3),
-                                         partes], ensure_ascii=False).encode()).hexdigest()[:16]
+        fin = tramos[-1][2]
+        for beat, a, b, _ in tramos:
+            # **Con contexto a los lados** (C-751): sola, una escena corta pierde
+            # sus primeras palabras —«mapped how advisors really work» salía
+            # «map it home»—. Se transcribe con MARGEN s a cada lado y se queda
+            # lo que EMPIEZA dentro de la escena. Su huella es lo que suena en
+            # toda esa ventana, contado desde su inicio.
+            x, y = max(0.0, a - MARGEN), min(fin, b + MARGEN)
+            suena = [[p[:4] + [round(q + p[4] - x, 3), p[5]] for p in ps]
+                     for _, q, r_, ps in tramos if q < y and r_ > x]
+            h = hashlib.sha1(json.dumps([idioma.modelo, idioma.banderas, round(y - x, 3),
+                                         round(a - x, 3), round(b - x, 3), suena],
+                                        ensure_ascii=False).encode()).hexdigest()[:16]
             f = os.path.join(guarda, f"{h}.json")
             usadas.add(f"{h}.json")
             if not os.path.exists(f):
                 ew = f"{base}.e{beat}.wav"
-                subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t",
-                                f"{b - a:.3f}", "-i", wav, "-c:a", "pcm_s16le", ew], check=True)
-                json.dump(_whisper(ew, f"{base}.e{beat}", idioma), open(f, "w", encoding="utf-8"),
-                          ensure_ascii=False)
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{x:.3f}", "-t",
+                                f"{y - x:.3f}", "-i", wav, "-c:a", "pcm_s16le", ew], check=True)
+                suyas = [s for s in _whisper(ew, f"{base}.e{beat}", idioma)
+                         if (a - x) * 1000 <= s["offsets"]["from"] < (b - x) * 1000]
+                json.dump(suyas, open(f, "w", encoding="utf-8"), ensure_ascii=False)
                 os.remove(ew)
             for s in json.load(open(f, encoding="utf-8")):
                 off = s["offsets"]
-                todas.append({**s, "offsets": {"from": off["from"] + a * 1000,
-                                               "to": off["to"] + a * 1000}})
+                todas.append({**s, "offsets": {"from": off["from"] + x * 1000,
+                                               "to": off["to"] + x * 1000}})
         for viejo in os.listdir(guarda):
             if viejo not in usadas:
                 os.remove(os.path.join(guarda, viejo))
