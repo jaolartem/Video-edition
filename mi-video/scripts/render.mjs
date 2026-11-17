@@ -167,7 +167,11 @@ async function porEscena(n, composition, comun, salida) {
   fs.mkdirSync(tmp, {recursive: true});
   const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], {stdio: ['ignore', 'inherit', 'inherit']});
   const barra = (x) => path.resolve(x).split(path.sep).join('/');
-  fs.writeFileSync(path.join(tmp, 'v.txt'), hechos.map((h) => `file '${barra(h.f)}'`).join('\n') + '\n');
+  // Sólo la pista de vídeo de cada tramo: unidos con su audio, el relleno del
+  // AAC alarga cada tramo y el vídeo se descuadra una fracción en cada costura.
+  hechos.forEach((h, i) => ff(['-i', h.f, '-map', '0:v', '-c', 'copy', path.join(tmp, `v${i}.mp4`)]));
+  fs.writeFileSync(path.join(tmp, 'v.txt'),
+    hechos.map((_, i) => `file '${barra(path.join(tmp, `v${i}.mp4`))}'`).join('\n') + '\n');
   ff(['-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'v.txt'), '-map', '0:v', '-c', 'copy', path.join(tmp, 'v.mp4')]);
   hechos.forEach((h, i) => ff(['-i', h.f, '-vn', '-af', `apad,atrim=0:${h.dura.toFixed(6)}`,
     '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', path.join(tmp, `a${i}.wav`)]));
